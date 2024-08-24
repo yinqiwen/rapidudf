@@ -43,10 +43,10 @@ absl::Status JitCompiler::CompileStatement(const ast::ReturnStatement& statement
       return val_result.status();
     }
     auto val = val_result.value();
-    auto ret_val = val->CastTo(func_desc_.return_type);
+    auto ret_val = val->CastTo(GetCompileContext().desc.return_type);
     if (!ret_val) {
-      RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
-          fmt::format("Can NOT cast to return dtype:{} from dtype:{}", func_desc_.return_type, val->GetDType())));
+      RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format(
+          "Can NOT cast to return dtype:{} from dtype:{}", GetCompileContext().desc.return_type, val->GetDType())));
     }
     GetCodeGenerator().ReturnValue(ret_val);
     GetCodeGenerator().DropTmpValue(val);

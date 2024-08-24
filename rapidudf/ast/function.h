@@ -53,7 +53,7 @@ struct Function {
   uint32_t position = 0;
   absl::Status Validate(ParseContext& ctx);
   bool CompareSignature(DType rtype, const std::vector<DType>& args_types, std::string& err);
-  FuncDesc ToFuncDesc() const;
+  FunctionDesc ToFuncDesc() const;
 };
 }  // namespace ast
 }  // namespace rapidudf

@@ -334,7 +334,7 @@ ValuePtr CodeGenerator::NewValue(DType dtype, bool temp) {
   return val;
 }
 
-ValuePtr CodeGenerator::CallFunction(const FuncDesc& desc, const std::vector<const Value*>& args) {
+ValuePtr CodeGenerator::CallFunction(const FunctionDesc& desc, const std::vector<const Value*>& args) {
   SaveInuseRegisters();
 
   if (desc.arg_types.size() != args.size()) {
@@ -396,7 +396,7 @@ ValuePtr CodeGenerator::CallFunction(const FuncDesc& desc, const std::vector<con
 }
 
 ValuePtr CodeGenerator::CallFunction(const std::string& name, const std::vector<const Value*>& args) {
-  const FuncDesc* desc = FuncFactory::GetFunc(name);
+  const FunctionDesc* desc = FunctionFactory::GetFunction(name);
   if (nullptr == desc) {
     RUDF_ERROR("No func found for {}", name);
     return {};

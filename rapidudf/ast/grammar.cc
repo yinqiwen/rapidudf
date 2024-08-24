@@ -30,10 +30,12 @@
 */
 
 #include "rapidudf/ast/grammar.h"
+#include <fmt/core.h>
 
 #include <boost/parser/parser.hpp>
 #include <iostream>
 #include <type_traits>
+#include <unordered_set>
 
 #include "rapidudf/ast/block.h"
 #include "rapidudf/ast/expression.h"
@@ -49,6 +51,28 @@ namespace ast {
 namespace bp = boost::parser;
 using namespace bp::literals;
 
+static std::unordered_set<std::string> g_keywords = {"return", "if", "elif", "else", "while"};
+
+auto identifier_func = [](auto& ctx) {
+  const std::string& id = _attr(ctx);
+  auto found = Symbols::kDtypeSymbols.find(ctx, id);
+  if (found) {
+    std::string err_msg = fmt::format("invalid identiier:{} which is reserved dtype name.", id);
+    _report_error(ctx, err_msg);
+    _pass(ctx) = false;
+    return;
+  }
+
+  if (g_keywords.count(id) == 1) {
+    std::string err_msg = fmt::format("invalid identiier:{} which is keyword", id);
+    _report_error(ctx, err_msg);
+    _pass(ctx) = false;
+    return;
+  }
+
+  _val(ctx) = _attr(ctx);
+};
+
 bp::rule<struct keyword> keyword = "keyword";
 const auto keyword_def = bp::string("return") | bp::string("var") | bp::string("if") | bp::string("elif") |
                          bp::string("else") | bp::string("int") | bp::string("void") | bp::string("float") |
@@ -61,9 +85,9 @@ bp::rule<struct identifier, std::string> identifier = "identifier";
 const auto lead_char = bp::char_('a', 'z') | bp::char_('A', 'Z') | bp::char_('_');
 const auto follow_char = bp::char_('a', 'z') | bp::char_('A', 'Z') | bp::char_('_') | bp::char_('0', '9');
 const auto cls_type_char = follow_char | bp::char_(':');
-const auto identifier_def = (lead_char > *follow_char) - keyword;
+const auto identifier_def = (lead_char > *follow_char)[identifier_func];
 
-BOOST_PARSER_DEFINE_RULES(keyword, identifier);
+BOOST_PARSER_DEFINE_RULES(identifier);
 
 bp::rule<struct operand, Operand> operand = "operand";
 bp::rule<struct assign, BinaryExprPtr> assign = "assign";

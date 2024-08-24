@@ -76,8 +76,8 @@ class CodeGenerator {
     }
     return CallFunction(name, arg_vals);
   }
-  ValuePtr CallFunction(const FuncDesc& f, const std::vector<const Value*>& args);
-  ValuePtr CallFunction(const FuncDesc& f, const std::vector<ValuePtr>& args) {
+  ValuePtr CallFunction(const FunctionDesc& f, const std::vector<const Value*>& args);
+  ValuePtr CallFunction(const FunctionDesc& f, const std::vector<ValuePtr>& args) {
     std::vector<const Value*> arg_vals;
     for (auto& p : args) {
       arg_vals.emplace_back(p.get());

@@ -77,7 +77,7 @@ bool ReflectFactory::AddStructField(DType obj_dtype, const std::string& name, DT
   }
   return success;
 }
-bool ReflectFactory::AddStructMethodAccessor(DType dtype, const std::string& name, const FuncDesc& f) {
+bool ReflectFactory::AddStructMethodAccessor(DType dtype, const std::string& name, const FunctionDesc& f) {
   auto [iter, success] = get_global_reflect_index()[dtype.Control()].emplace(name, StructMember(f));
   if (!success) {
     StructMember& entry = iter->second;

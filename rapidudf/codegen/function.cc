@@ -38,7 +38,7 @@
 #include "rapidudf/log/log.h"
 namespace rapidudf {
 using namespace Xbyak::util;
-using FuncRegMap = std::unordered_map<std::string, FuncDesc>;
+using FuncRegMap = std::unordered_map<std::string, FunctionDesc>;
 static std::unique_ptr<FuncRegMap> g_regs = nullptr;
 
 static inline uint32_t allgin_n(uint32_t x, uint32_t n) { return (x + n - 1) & ~(n - 1); }
@@ -157,7 +157,7 @@ std::vector<const Xbyak::Reg*> GetUnuseFuncArgsRegisters(const std::vector<FuncA
   return unused_regs;
 }
 
-bool FuncDesc::ValidateArgs(const std::vector<DType>& ts) const {
+bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
   if (arg_types.size() != ts.size()) {
     return false;
   }
@@ -169,24 +169,24 @@ bool FuncDesc::ValidateArgs(const std::vector<DType>& ts) const {
   return true;
 }
 
-std::vector<const Xbyak::Reg*> FuncDesc::GetReturnValueRegisters(uint32_t& total_bits) const {
+std::vector<const Xbyak::Reg*> FunctionDesc::GetReturnValueRegisters(uint32_t& total_bits) const {
   return GetFuncReturnValueRegisters(return_type, total_bits);
 }
 
-std::vector<FuncArgRegister> FuncDesc::GetArgsRegisters() const { return GetFuncArgsRegistersByDTypes(arg_types); }
+std::vector<FuncArgRegister> FunctionDesc::GetArgsRegisters() const { return GetFuncArgsRegistersByDTypes(arg_types); }
 
-void FuncFactory::Register(FuncDesc&& desc) {
+bool FunctionFactory::Register(FunctionDesc&& desc) {
   if (!g_regs) {
     g_regs = std::make_unique<FuncRegMap>();
   }
   if (g_regs->count(desc.name) > 0) {
     RUDF_CRITICAL("Duplicate func name:{}", desc.name);
-    // abort();
+    return false;
   }
   RUDF_DEBUG("Registe func name:{}", desc.name);
-  g_regs->emplace(desc.name, desc);
+  return g_regs->emplace(desc.name, desc).second;
 }
-const FuncDesc* FuncFactory::GetFunc(const std::string& name) {
+const FunctionDesc* FunctionFactory::GetFunction(const std::string& name) {
   if (!g_regs) {
     return nullptr;
   }

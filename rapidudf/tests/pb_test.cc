@@ -50,28 +50,23 @@ using TTT = void (test::Header::*)(const std::string&);
 TEST(JitCompiler, pb_access_read_int) {
   spdlog::set_level(spdlog::level::debug);
 
-  // TTT xyz = &::test::Header::set_scene;
-  // RUDF_STRUCT_SAFE_MEMBER_METHOD_BIND(::test::Header, set_scene, xyz);
-
   ::test::Header pb_header;
   pb_header.set_scene("");
   pb_header.set_id(101);
   pb_header.set_scene("hello,world");
 
   JitCompiler compiler;
-  std::string content = R"(
+  std::string source = R"(
     int test_func(test::Header x){
       return x.id();
     }
    )";
-  auto rc = compiler.CompileFunction<int, const test::Header*>(content);
+  auto rc = compiler.CompileFunction<int, const test::Header&>(source);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, const test::Header*>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(&pb_header), pb_header.id());
+  ASSERT_EQ(f(pb_header), pb_header.id());
   pb_header.set_id(2000);
-  ASSERT_EQ(f(&pb_header), pb_header.id());
+  ASSERT_EQ(f(pb_header), pb_header.id());
 }
 TEST(JitCompiler, pb_access_read_str) {
   spdlog::set_level(spdlog::level::debug);

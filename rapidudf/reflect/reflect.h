@@ -44,7 +44,7 @@
 namespace rapidudf {
 
 struct StructMember {
-  std::optional<FuncDesc> member_func;
+  std::optional<FunctionDesc> member_func;
   std::optional<DType> member_field_dtype;
   std::string field_name;
   uint32_t member_field_offset = 0;
@@ -55,7 +55,7 @@ struct StructMember {
   }
   template <typename T, typename RET, typename... Args>
   StructMember(const std::string& name, RET (T::*f)(Args...)) {
-    FuncDesc desc;
+    FunctionDesc desc;
     desc.name = name;
     desc.return_type = get_dtype<RET>();
     auto this_dtype = get_dtype<T>();
@@ -68,7 +68,7 @@ struct StructMember {
 #pragma GCC diagnostic pop
     member_func = desc;
   }
-  StructMember(const FuncDesc& f) { member_func = f; }
+  StructMember(const FunctionDesc& f) { member_func = f; }
 
   bool HasField() const { return member_field_dtype.has_value(); }
   bool HasMemberFunc() const { return member_func.has_value(); }
@@ -116,10 +116,10 @@ class ReflectFactory {
   }
 
  private:
-  static bool AddStructMethodAccessor(DType dtype, const std::string& name, const FuncDesc& f);
+  static bool AddStructMethodAccessor(DType dtype, const std::string& name, const FunctionDesc& f);
   template <typename T, typename RET, typename... Args>
   static bool AddStructMethod(const std::string& name, void* f) {
-    FuncDesc desc;
+    FunctionDesc desc;
     desc.name = name;
     desc.return_type = get_dtype<RET>();
     auto this_dtype = get_dtype<T>();

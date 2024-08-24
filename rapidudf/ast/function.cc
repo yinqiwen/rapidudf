@@ -33,8 +33,8 @@
 #include "rapidudf/log/log.h"
 namespace rapidudf {
 namespace ast {
-FuncDesc Function::ToFuncDesc() const {
-  FuncDesc desc;
+FunctionDesc Function::ToFuncDesc() const {
+  FunctionDesc desc;
   desc.name = name;
   desc.return_type = return_type;
   if (args.has_value()) {

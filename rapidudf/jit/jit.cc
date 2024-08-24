@@ -62,13 +62,13 @@ void JitCompiler::AddCompileContex(const ast::Function& func_ast) {
   compile_ctxs_.emplace_back(std::move(ctx));
 }
 
-const FuncDesc* JitCompiler::GetFunction(const std::string& name) {
+const FunctionDesc* JitCompiler::GetFunction(const std::string& name) {
   for (uint32_t i = 0; i < compile_function_idx_; i++) {
     if (compile_ctxs_[i].desc.name == name) {
       return &compile_ctxs_[i].desc;
     }
   }
-  return FuncFactory::GetFunc(name);
+  return FunctionFactory::GetFunction(name);
 }
 
 absl::StatusOr<ValuePtr> JitCompiler::GetLocalVar(const std::string& name) {
@@ -116,7 +116,7 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
 
   for (const auto& builtin_func_call : ast_ctx_.GetAllBuiltinFuncCalls(compile_function_idx_)) {
     RUDF_DEBUG("Buitin funcation call:{}", builtin_func_call);
-    auto* func_call = FuncFactory::GetFunc(builtin_func_call);
+    auto* func_call = FunctionFactory::GetFunction(builtin_func_call);
     if (nullptr == func_call) {
       RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("No buitlin func:{} found.", builtin_func_call)));
     }
@@ -127,26 +127,33 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   auto unused_registers = GetUnuseFuncArgsRegisters(all_func_arg_registers);
   GetCodeGenerator().AddFreeRegisters(unused_registers);
 
-  func_desc_.return_type = ctx.func_ast.return_type;
-  func_desc_.name = ctx.func_ast.name;
-  if (ctx.func_ast.args) {
-    for (auto& arg : *ctx.func_ast.args) {
-      func_desc_.arg_types.emplace_back(arg.dtype);
+  ctx.desc = ctx.func_ast.ToFuncDesc();
+  // FunctionDesc func_desc;
+  // func_desc.return_type = ctx.func_ast.return_type;
+  // func_desc.name = ctx.func_ast.name;
+  // if (ctx.func_ast.args) {
+  //   for (auto& arg : *ctx.func_ast.args) {
+  //     func_desc.arg_types.emplace_back(arg.dtype);
+  //   }
+  //   auto arg_registers = func_desc.GetArgsRegisters();
+  //   if (arg_registers.empty()) {
+  //     return absl::InvalidArgumentError("Can NOT use registers for all func args.");
+  //   }
+
+  // }
+  auto arg_registers = ctx.desc.GetArgsRegisters();
+  if (!ctx.desc.arg_types.empty() && arg_registers.empty()) {
+    return absl::InvalidArgumentError("Can NOT use registers for all func args.");
+  }
+  for (size_t i = 0; i < ctx.func_ast.args->size(); i++) {
+    auto var = GetCodeGenerator().NewValue(ctx.desc.arg_types[i], false);
+    auto reg_var = Value::New(&GetCodeGenerator(), ctx.desc.arg_types[i], arg_registers[i], false);
+    if (0 != var->Copy(*reg_var)) {
+      RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError(
+          fmt::format("Faield to copy arg register for arg:{}", ctx.func_ast.args->at(i).name)));
     }
-    auto arg_registers = func_desc_.GetArgsRegisters();
-    if (arg_registers.empty()) {
-      return absl::InvalidArgumentError("Can NOT use registers for all func args.");
-    }
-    for (size_t i = 0; i < ctx.func_ast.args->size(); i++) {
-      auto var = GetCodeGenerator().NewValue(func_desc_.arg_types[i], false);
-      auto reg_var = Value::New(&GetCodeGenerator(), func_desc_.arg_types[i], arg_registers[i], false);
-      if (0 != var->Copy(*reg_var)) {
-        RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError(
-            fmt::format("Faield to copy arg register for arg:{}", ctx.func_ast.args->at(i).name)));
-      }
-      var->SetVarName(ctx.func_ast.args->at(i).name);
-      ctx.local_vars.emplace(ctx.func_ast.args->at(i).name, var);
-    }
+    var->SetVarName(ctx.func_ast.args->at(i).name);
+    ctx.local_vars.emplace(ctx.func_ast.args->at(i).name, var);
   }
   RUDF_DEBUG("Func args compiled success.");
   try {
@@ -165,7 +172,6 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   GetCodeGenerator().GetCodeGen().nop();
   GetCodeGenerator().Finish();
 
-  ctx.desc = ctx.func_ast.ToFuncDesc();
   const uint8_t* code = GetCodeGenerator().GetCodeGen().getCode();
   ctx.desc.func = const_cast<void*>(reinterpret_cast<const void*>(code));
   return absl::OkStatus();

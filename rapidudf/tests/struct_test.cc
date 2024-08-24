@@ -41,53 +41,50 @@
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
-struct TestBase {
+struct TestInternal {
   int a = 0;
 };
-RUDF_STRUCT_FIELDS(TestBase, a)
-struct TestA {
+RUDF_STRUCT_FIELDS(TestInternal, a)
+struct TestStruct {
   int a = 0;
-  TestBase base;
+  TestInternal internal;
   std::vector<int> vec;
 };
 
-RUDF_STRUCT_FIELDS(TestA, base, a, vec)
+RUDF_STRUCT_FIELDS(TestStruct, internal, a, vec)
 
 TEST(JitCompiler, struct_access) {
   spdlog::set_level(spdlog::level::debug);
-  TestA t;
+  TestStruct t;
   t.a = 101;
-  t.base.a = 102;
+  t.internal.a = 102;
   JitCompiler compiler;
-  ParseContext ctx;
-  std::string content = R"(
-    int test_func(TestA x){
-      return x.base.a;
+  std::string source = R"(
+    int test_func(TestStruct x){
+      return x.internal.a;
     }
   )";
-  auto rc = compiler.CompileFunction<int, const TestA*>(content);
+  auto rc = compiler.CompileFunction<int, const TestStruct&>(source);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, const TestA*>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(&t), t.base.a);
+  ASSERT_EQ(f(t), t.internal.a);
   t.a = 1200;
-  ASSERT_EQ(f(&t), t.base.a);
+  ASSERT_EQ(f(t), t.internal.a);
 }
 
 TEST(JitCompiler, return_cast) {
   spdlog::set_level(spdlog::level::debug);
-  TestA t;
+  TestStruct t;
   t.a = 101;
-  t.base.a = 102;
+  t.internal.a = 102;
   JitCompiler compiler;
   ParseContext ctx;
   std::string content = R"(
-    i64 test_func(TestA x){
+    i64 test_func(TestStruct x){
       return x.a;
     }
   )";
-  auto rc = compiler.CompileFunction<int64_t, const TestA*>(content);
+  auto rc = compiler.CompileFunction<int64_t, const TestStruct*>(content);
   ASSERT_TRUE(rc.ok());
   // auto f = compiler.GetFunc<int64_t, const TestA*>(true);
   // ASSERT_TRUE(f != nullptr);
@@ -99,7 +96,7 @@ TEST(JitCompiler, return_cast) {
 
 struct TestB {
   int a = 0;
-  TestBase* base;
+  TestInternal* base;
 };
 
 RUDF_STRUCT_FIELDS(TestB, base, a)
@@ -107,7 +104,7 @@ TEST(JitCompiler, struct_access_ptr) {
   spdlog::set_level(spdlog::level::debug);
   TestB t;
   t.a = 101;
-  t.base = new TestBase;
+  t.base = new TestInternal;
   t.base->a = 102;
   JitCompiler compiler;
   ParseContext ctx;
@@ -126,17 +123,17 @@ TEST(JitCompiler, struct_access_ptr) {
 
 TEST(JitCompiler, struct_write) {
   spdlog::set_level(spdlog::level::debug);
-  TestA t;
+  TestStruct t;
   t.a = 101;
-  t.base.a = 102;
+  t.internal.a = 102;
   JitCompiler compiler;
   ParseContext ctx;
   std::string content = R"(
-    int test_func(TestA x){
-      x.base.a = 105;
-      return x.base.a;
+    int test_func(TestStruct x){
+      x.internal.a = 105;
+      return x.internal.a;
     }
   )";
-  auto rc = compiler.CompileFunction<int, TestA&>(content);
+  auto rc = compiler.CompileFunction<int, TestStruct&>(content);
   ASSERT_FALSE(rc.ok());
 }

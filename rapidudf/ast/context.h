@@ -128,8 +128,8 @@ class ParseContext {
     return success;
   }
 
-  absl::StatusOr<const FuncDesc*> CheckFuncExist(const std::string& name) {
-    const FuncDesc* desc = nullptr;
+  absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name) {
+    const FunctionDesc* desc = nullptr;
     for (uint32_t i = 0; i < current_function_cursor_; i++) {
       if (GetFunctionParseContext(i).desc.name == name) {
         desc = &(GetFunctionParseContext(i).desc);
@@ -137,7 +137,7 @@ class ParseContext {
       }
     }
     if (nullptr == desc) {
-      desc = FuncFactory::GetFunc(name);
+      desc = FunctionFactory::GetFunction(name);
     }
     if (desc == nullptr) {
       return absl::NotFoundError(fmt::format("func:{} not exist at {}'", name, GetErrorLine()));
@@ -154,9 +154,9 @@ class ParseContext {
   }
 
   DType GetFuncReturnDType(uint32_t idx = 0) { return GetFunctionParseContext(idx).desc.return_type; }
-  void SetFuncDesc(const FuncDesc& d, uint32_t idx = 0) { GetFunctionParseContext(idx).desc = d; }
+  void SetFuncDesc(const FunctionDesc& d, uint32_t idx = 0) { GetFunctionParseContext(idx).desc = d; }
 
-  const std::unordered_map<std::string, const FuncDesc*>& GetAllFuncCalls(uint32_t funcion_idx) const {
+  const std::unordered_map<std::string, const FunctionDesc*>& GetAllFuncCalls(uint32_t funcion_idx) const {
     return GetFunctionParseContext(funcion_idx).func_calls;
   }
 
@@ -164,14 +164,14 @@ class ParseContext {
 
  private:
   using LocalVarMap = std::unordered_map<std::string, DType>;
-  using FunctionCallMap = std::unordered_map<std::string, const FuncDesc*>;
+  using FunctionCallMap = std::unordered_map<std::string, const FunctionDesc*>;
   using BuiltinFuncationCallSet = std::unordered_set<std::string>;
 
   struct FunctionParseContext {
     LocalVarMap local_vars;
     FunctionCallMap func_calls;
     BuiltinFuncationCallSet builtin_func_calls;
-    FuncDesc desc;
+    FunctionDesc desc;
   };
   const FunctionParseContext& GetFunctionParseContext(uint32_t idx) const { return function_parse_ctxs_[idx]; }
   FunctionParseContext& GetFunctionParseContext(uint32_t idx) {

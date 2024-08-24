@@ -192,7 +192,7 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(const ast::VarAccessor& 
         arg_values.emplace_back(arg_val.value());
       }
     }
-    const FuncDesc* func_desc = GetFunction(expr.name);
+    const FunctionDesc* func_desc = GetFunction(expr.name);
     if (nullptr == func_desc) {
       RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("No func:{} found", expr.name)));
     }

@@ -30,6 +30,7 @@
 */
 #include "rapidudf/ast/symbols.h"
 #include <memory>
+#include <mutex>
 #include <string_view>
 #include <vector>
 #include "rapidudf/codegen/dtype.h"
@@ -108,6 +109,8 @@ boost::parser::symbols<OpToken> Symbols::kUnaryOpSymbols = {{"-", OP_NEGATIVE}, 
 
 // void Symbols::AddDType(const std::string& name, DType dtype) { kDtypeSymbols.insert_for_next_parse(name, dtype); }
 void Symbols::Init() {
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> guard(mutex);
   DTypeFactory::Visit([](const std::string& name, DType dtype) {
     std::unique_ptr<std::string> name_str = std::make_unique<std::string>(name);
     std::string_view name_view = *name_str;

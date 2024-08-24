@@ -72,6 +72,8 @@ class JitFunction {
   JitFunction(const JitFunction&) = delete;
   JitFunction& operator=(const JitFunction&) = delete;
 
+  const std::string& GetName() const { return name_; }
+
   void SetRethrowException(bool v = true) { rethrow_ = v; }
   void SetUnsafe(bool v = true) { unsafe_ = v; }
 
@@ -85,7 +87,7 @@ class JitFunction {
   }
 
   RET SafeCall(Args... args) {
-    auto& func_ctx = FuncFactory::GetFunctionCallContext(true);
+    auto& func_ctx = FunctionFactory::GetFunctionCallContext(true);
     if (func_ctx.invoke_frame_id == 1) {  // first
       if (setjmp(func_ctx.jmp_env) == 0) {
         if constexpr (std::is_same_v<void, RET>) {
@@ -233,9 +235,9 @@ class JitCompiler {
     std::unique_ptr<CodeGenerator> code_gen;
     std::vector<std::unique_ptr<std::string>> const_strings;
     std::unordered_map<std::string, ValuePtr> local_vars;
-    FuncDesc desc;
+    FunctionDesc desc;
   };
-  const FuncDesc* GetFunction(const std::string& name);
+  const FunctionDesc* GetFunction(const std::string& name);
   CodeGenerator& GetCodeGenerator() { return *compile_ctxs_[compile_function_idx_].code_gen; }
   CompileContext& GetCompileContext() { return compile_ctxs_[compile_function_idx_]; }
 
@@ -282,6 +284,6 @@ class JitCompiler {
 
   int label_cursor_ = 0;
 
-  FuncDesc func_desc_;
+  // FunctionDesc func_desc_;
 };
 }  // namespace rapidudf

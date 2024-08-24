@@ -81,7 +81,7 @@ TEST(Function, ret_pair) {
   RUDF_FUNC_REGISTER(test_pair3);
   RUDF_FUNC_REGISTER(test_pair4);
   RUDF_FUNC_REGISTER(test_pair5);
-  auto desc = FuncFactory::GetFunc("test_pair0");
+  auto desc = FunctionFactory::GetFunction("test_pair0");
   uint32_t total_bits = 0;
   auto regs = desc->GetReturnValueRegisters(total_bits);
   ASSERT_EQ(total_bits, 64);
@@ -89,33 +89,33 @@ TEST(Function, ret_pair) {
 
   ASSERT_TRUE(regs[0]->isXMM() && regs[0]->getIdx() == 0);
 
-  desc = FuncFactory::GetFunc("test_pair1");
+  desc = FunctionFactory::GetFunction("test_pair1");
   regs = desc->GetReturnValueRegisters(total_bits);
   ASSERT_EQ(total_bits, sizeof(std::pair<int64_t, int32_t>) * 8);
   ASSERT_EQ(regs.size(), 2);
   ASSERT_TRUE(regs[0]->isREG() && regs[0]->getIdx() == rax.getIdx());
   ASSERT_TRUE(regs[1]->isREG() && regs[1]->getIdx() == rdx.getIdx());
 
-  desc = FuncFactory::GetFunc("test_pair2");
+  desc = FunctionFactory::GetFunction("test_pair2");
   regs = desc->GetReturnValueRegisters(total_bits);
   ASSERT_EQ(total_bits, sizeof(std::pair<float, int>) * 8);
   ASSERT_EQ(regs.size(), 1);
   ASSERT_TRUE(regs[0]->isREG() && regs[0]->getIdx() == rax.getIdx());
 
-  desc = FuncFactory::GetFunc("test_pair3");
+  desc = FunctionFactory::GetFunction("test_pair3");
   regs = desc->GetReturnValueRegisters(total_bits);
   ASSERT_EQ(total_bits, sizeof(std::pair<int, float>) * 8);
   ASSERT_EQ(regs.size(), 1);
   ASSERT_TRUE(regs[0]->isREG() && regs[0]->getIdx() == rax.getIdx());
 
-  desc = FuncFactory::GetFunc("test_pair4");
+  desc = FunctionFactory::GetFunction("test_pair4");
   regs = desc->GetReturnValueRegisters(total_bits);
   ASSERT_EQ(total_bits, sizeof(std::tuple<float, float, float, int>) * 8);
   ASSERT_EQ(regs.size(), 2);
   ASSERT_TRUE(regs[0]->isXMM() && regs[0]->getIdx() == xmm0.getIdx());
   ASSERT_TRUE(regs[1]->isREG() && regs[1]->getIdx() == rax.getIdx());
 
-  desc = FuncFactory::GetFunc("test_pair5");
+  desc = FunctionFactory::GetFunction("test_pair5");
   regs = desc->GetReturnValueRegisters(total_bits);
   ASSERT_EQ(regs.size(), 0);
   ASSERT_EQ(total_bits, sizeof(std::tuple<int, std::string_view, float>) * 8);

@@ -53,7 +53,7 @@ std::vector<const Xbyak::Reg*> GetFuncReturnValueRegisters(DType dtype, uint32_t
 std::vector<FuncArgRegister> GetFuncArgsRegistersByDTypes(const std::vector<DType>& arg_types);
 std::vector<const Xbyak::Reg*> GetUnuseFuncArgsRegisters(const std::vector<FuncArgRegister>& used_regs);
 
-struct FuncDesc {
+struct FunctionDesc {
   std::string name;
   // return types
   DType return_type;
@@ -73,10 +73,20 @@ struct FunctionCallContext {
   uint32_t invoke_frame_id = 0;
 };
 
-class FuncFactory {
+class FunctionFactory {
  public:
-  static void Register(FuncDesc&& desc);
-  static const FuncDesc* GetFunc(const std::string& name);
+  template <typename RET, typename... Args>
+  bool Register(std::string_view name, RET (*f)(Args...), bool safe = true) {
+    FunctionDesc desc;
+    desc.name = std::string(name);
+    desc.func = reinterpret_cast<void*>(f);
+    desc.return_type = get_dtype<RET>();
+    (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
+    return Register(std::move(desc));
+  }
+
+  static bool Register(FunctionDesc&& desc);
+  static const FunctionDesc* GetFunction(const std::string& name);
   static FunctionCallContext& GetFunctionCallContext(bool start) {
     static thread_local FunctionCallContext ctx;
     if (start) {
@@ -160,7 +170,7 @@ struct SafeFunctionWrapper<H, N, R(Args...)> {
         return GetFunc()(args...);
       }
     } catch (...) {
-      auto& func_ctx = FuncFactory::GetFunctionCallContext(false);
+      auto& func_ctx = FunctionFactory::GetFunctionCallContext(false);
       try {
         throw;
       } catch (const std::exception& e) {
@@ -188,14 +198,14 @@ template <uint64_t hash, uint32_t line, typename R, typename... Args>
 class SafeFuncRegister<hash, line, R(Args...)> {
  public:
   SafeFuncRegister(std::string_view name, R (*f)(Args...)) {
-    FuncDesc desc;
+    FunctionDesc desc;
     desc.name = std::string(name);
     SafeFunctionWrapper<hash, line, R(Args...)>::GetFuncName() = name;
     SafeFunctionWrapper<hash, line, R(Args...)>::GetFunc() = f;
     desc.func = reinterpret_cast<void*>(&SafeFunctionWrapper<hash, line, R(Args...)>::SafeCall);
     desc.return_type = get_dtype<R>();
     (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
-    FuncFactory::Register(std::move(desc));
+    FunctionFactory::Register(std::move(desc));
   }
 };
 
@@ -203,12 +213,12 @@ class FuncRegister {
  public:
   template <typename RET, typename... Args>
   FuncRegister(std::string_view name, RET (*f)(Args...), bool safe = true) {
-    FuncDesc desc;
+    FunctionDesc desc;
     desc.name = std::string(name);
     desc.func = reinterpret_cast<void*>(f);
     desc.return_type = get_dtype<RET>();
     (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
-    FuncFactory::Register(std::move(desc));
+    FunctionFactory::Register(std::move(desc));
   }
 };
 
