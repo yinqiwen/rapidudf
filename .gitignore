@@ -1,0 +1,5 @@
+a.out
+*.o
+*.pb.cc
+*.pb.h
+bazel-*

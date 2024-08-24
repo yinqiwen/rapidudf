@@ -1,0 +1,6 @@
+namespace test_fbs;
+table Header {
+  id:uint;
+  scene:string;
+}
+root_type Header;

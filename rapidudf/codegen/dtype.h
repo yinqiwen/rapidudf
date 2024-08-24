@@ -1,0 +1,597 @@
+/*
+** BSD 3-Clause License
+**
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** All rights reserved.
+**
+** Redistribution and use in source and binary forms, with or without
+** modification, are permitted provided that the following conditions are met:
+** * Redistributions of source code must retain the above copyright notice, this
+** list of conditions and the following disclaimer.
+**
+** * Redistributions in binary form must reproduce the above copyright notice,
+** this list of conditions and the following disclaimer in the documentation
+** and/or other materials provided with the distribution.
+**
+** * Neither the name of the copyright holder nor the names of its
+** contributors may be used to endorse or promote products derived from
+** this software without specific prior written permission.
+**
+** THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+** AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+** IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+** DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+** FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+** DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+** SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+** CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+#pragma once
+
+#include <string.h>
+#include <atomic>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+#include <fmt/format.h>
+#include "absl/types/span.h"
+#include "flatbuffers/flatbuffers.h"
+
+#include "xbyak/xbyak.h"
+
+#include "rapidudf/types/json_object.h"
+
+namespace rapidudf {
+
+enum CollectionType {
+  COLLECTION_INVALID = 0,
+  COLLECTION_VECTOR,
+  COLLECTION_MAP,
+  COLLECTION_SET,
+  COLLECTION_UNORDERED_MAP,
+  COLLECTION_UNORDERED_SET,
+  COLLECTION_ABSL_SPAN,
+  COLLECTION_TUPLE,
+  COLLECTION_END = 64,
+};
+
+constexpr std::array<std::string_view, COLLECTION_TUPLE + 1> kCollectionTypeStrs = {
+    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple"};
+enum FundamentalType {
+  DATA_INVALID = 0,
+  DATA_VOID,
+  DATA_U8,
+  DATA_I8,
+  DATA_U16,
+  DATA_I16,
+  DATA_U32,
+  DATA_I32,
+  DATA_U64,
+  DATA_I64,
+  DATA_F32,
+  DATA_F64,
+  DATA_STRING_VIEW,
+  DATA_STRING,
+  DATA_FLATBUFFERS_STRING,
+  DATA_JSON,
+
+  DATA_OBJECT_BEGIN = 64,
+};
+constexpr std::array<std::string_view, DATA_JSON + 1> kFundamentalTypeStrs = {
+    "invalid", "void", "u8",  "i8",  "u16",         "i16",    "u32",        "i32",
+    "u64",     "i64",  "f32", "f64", "string_view", "string", "fbs_string", "json"};
+
+class DType {
+ public:
+  DType(uint64_t control = 0) : control_(control) {}
+  DType(FundamentalType t0, FundamentalType t1 = DATA_INVALID, FundamentalType t2 = DATA_INVALID,
+        FundamentalType t3 = DATA_INVALID)
+      : control_(0) {
+    t0_ = t0;
+    t1_ = t1;
+    t2_ = t2;
+    t3_ = t3;
+  }
+  DType(const DType& other) : control_(other.Control()) {}
+  uint64_t Control() const { return control_; }
+  void SetPtr(bool v) { ptr_bit_ = (v ? 1 : 0); }
+  void SetCollectionType(CollectionType t) { container_type_ = t; }
+  FundamentalType GetFundamentalType() const { return static_cast<FundamentalType>(t0_); }
+  bool IsVector() const { return container_type_ == COLLECTION_VECTOR; }
+  bool IsAbslSpan() const { return container_type_ == COLLECTION_ABSL_SPAN; }
+  bool IsTuple() const { return container_type_ == COLLECTION_TUPLE; }
+  bool IsMap() const { return container_type_ == COLLECTION_MAP; }
+  bool IsUnorderedMap() const { return container_type_ == COLLECTION_UNORDERED_MAP; }
+  bool IsSet() const { return container_type_ == COLLECTION_SET; }
+  bool IsCollection() const { return container_type_ != 0; }
+  bool IsPtr() const { return ptr_bit_ == 1; }
+
+  bool IsPrimitive() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_STRING_VIEW); }
+  bool IsFundamental() const { return ptr_bit_ == 0 && container_type_ == 0; }
+  bool IsNumber() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_F64); }
+  bool IsF32() const { return IsFundamental() && t0_ == DATA_F32; }
+  bool IsF64() const { return IsFundamental() && t0_ == DATA_F64; }
+  bool IsFloat() const { return IsF32() || IsF64(); }
+  bool IsInteger() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_I64); }
+  bool IsVoid() const { return t0_ == DATA_VOID; }
+  bool IsBool() const { return IsFundamental() && t0_ == DATA_U8; }
+  bool IsStringView() const { return IsFundamental() && t0_ == DATA_STRING_VIEW; }
+  bool IsString() const { return IsFundamental() && t0_ == DATA_STRING; }
+  bool IsFlatbuffersString() const { return IsFundamental() && t0_ == DATA_FLATBUFFERS_STRING; }
+  bool IsJson() const { return IsFundamental() && t0_ == DATA_JSON; }
+  bool IsJsonPtr() const { return IsPtr() && (PtrTo().IsJson()); }
+  bool IsStringPtr() const { return IsPtr() && (PtrTo().IsString()); }
+  bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
+  bool CanCastTo(DType other) const;
+
+  DType Key() const;
+  DType Elem() const;
+  DType PtrTo() const {
+    DType result;
+    result.control_ = control_;
+    result.ptr_bit_ = 0;
+    return result;
+  }
+
+  DType ToPtr() const {
+    DType ret(this->control_);
+    ret.ptr_bit_ = 1;
+    return ret;
+  }
+  DType ToVector() const {
+    DType result;
+    result.control_ = control_;
+    result.container_type_ = COLLECTION_VECTOR;
+    return result;
+  }
+  uint32_t TupleSize() const;
+  std::vector<DType> ExtractTupleDtypes() const;
+
+  bool IsSameFundamentalType(const DType& other) const { return t0_ == other.t0_; }
+  uint32_t ByteSize() const;
+  uint32_t Bits() const { return ByteSize() * 8; }
+  uint32_t QwordSize() const {
+    uint32_t n = ByteSize() / 8;
+    if (ByteSize() % 8 > 0) {
+      n++;
+    }
+    return n;
+  }
+
+  DType& operator=(const DType& other) {
+    control_ = other.Control();
+    return *this;
+  }
+  bool operator==(const DType& other) const { return control_ == other.control_; }
+  bool operator!=(const DType& other) const { return control_ != other.control_; }
+  bool operator>(const DType& other) const { return t0_ > other.t0_; }
+  bool operator>=(const DType& other) const { return t0_ >= other.t0_; }
+
+  template <typename T>
+  std::optional<T> ToPrimitiveValue(uint64_t bin);
+  template <typename T>
+  std::optional<uint64_t> FromPrimitiveValue(T v);
+
+  std::string ToString() const;
+  std::string GetTypeString() const;
+
+  static std::string Demangle(const char* name);
+
+ private:
+  static constexpr uint32_t kContainerTypeBits = 6;
+  static constexpr uint32_t kPrimitiveTypeBits = 14;
+  union {
+    struct {
+      uint64_t container_type_ : kContainerTypeBits;
+      uint64_t ptr_bit_ : 1;
+      uint64_t t0_ : kPrimitiveTypeBits;
+      uint64_t t1_ : kPrimitiveTypeBits;
+      uint64_t t2_ : kPrimitiveTypeBits;
+      uint64_t t3_ : kPrimitiveTypeBits;
+      uint64_t reserved_ : 64 - kContainerTypeBits - 4 * kPrimitiveTypeBits - 1;
+    };
+    uint64_t control_;
+  };
+};
+static_assert(sizeof(DType) == 8, "sizeof(DType) != 8");
+
+template <typename T>
+DType get_dtype();
+
+class DTypeFactory {
+ public:
+  static DType GetDTypeByName(const std::string& name);
+  static std::string_view GetNameByDType(DType dtype);
+  static void Visit(std::function<void(const std::string&, DType)>&& f);
+
+  template <typename T>
+  static bool Add(const std::string& name) {
+    DType dtype = get_dtype<T>();
+    if (dtype.IsPtr()) {
+      return false;
+    }
+    return AddNameDType(name, dtype);
+  }
+
+  template <typename T>
+  static bool Add() {
+    DType dtype = get_dtype<T>();
+    if (dtype.IsPtr()) {
+      return false;
+    }
+    std::string name;
+    if (dtype.IsCollection()) {
+      name = dtype.GetTypeString();
+    } else {
+      name = DType::Demangle(typeid(T).name());
+    }
+    return AddNameDType(name, dtype);
+  }
+
+ private:
+  static bool AddNameDType(const std::string& name, DType dtype);
+
+  template <typename T>
+  friend DType get_dtype();
+};
+
+static inline uint32_t nextTypeId() {
+  static std::atomic<uint32_t> type_id_seed = {DATA_OBJECT_BEGIN};
+  return type_id_seed.fetch_add(1);
+}
+
+template <typename Test, template <typename...> class Ref>
+struct is_specialization : std::false_type {};
+template <template <typename...> class Ref, typename... Args>
+struct is_specialization<Ref<Args...>, Ref> : std::true_type {};
+
+#define RETURN_IF_NOT_FUNDAMENTAL_TYPE(xtype)                                                                         \
+  if constexpr (std::is_pointer<xtype>::value || is_specialization<xtype, std::vector>::value ||                      \
+                is_specialization<xtype, std::set>::value || is_specialization<xtype, std::map>::value ||             \
+                is_specialization<xtype, std::unordered_map>::value ||                                                \
+                is_specialization<xtype, std::unordered_set>::value || is_specialization<xtype, absl::Span>::value || \
+                is_specialization<xtype, std::pair>::value || is_specialization<xtype, std::tuple>::value) {          \
+    static_assert(sizeof(xtype) == -1, "Can NOT get dtype for complex type");                                         \
+    return {};                                                                                                        \
+  }
+
+template <typename T>
+DType get_dtype() {
+  if constexpr (std::is_void_v<T>) {
+    return DType(DATA_VOID);
+  }
+  if constexpr (std::is_const_v<T>) {
+    using Origin = std::remove_const_t<T>;
+    return get_dtype<Origin>();
+  }
+
+  if constexpr (std::is_pointer<T>::value) {
+    using Origin = std::remove_pointer_t<T>;
+    if constexpr (std::is_pointer<Origin>::value) {
+      static_assert(sizeof(Origin) == -1, "Can NOT get dtype for ptr of ptr");
+      return {};
+    }
+    auto v = get_dtype<Origin>();
+    v.SetPtr(true);
+    return v;
+  }
+  if constexpr (std::is_reference_v<T>) {
+    using Origin = std::remove_reference_t<T>;
+    if constexpr (std::is_pointer<Origin>::value) {
+      static_assert(sizeof(Origin) == -1, "Can NOT get dtype");
+      return {};
+    }
+    auto v = get_dtype<Origin>();
+    v.SetPtr(true);
+    return v;
+  }
+  if constexpr (is_specialization<T, std::vector>::value) {
+    using val_type = typename T::value_type;
+    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
+    auto v = get_dtype<typename T::value_type>();
+    v.SetCollectionType(COLLECTION_VECTOR);
+    return v;
+  }
+  if constexpr (is_specialization<T, std::set>::value) {
+    using val_type = typename T::value_type;
+    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
+    auto v = get_dtype<typename T::value_type>();
+    v.SetCollectionType(COLLECTION_SET);
+    return v;
+  }
+  if constexpr (is_specialization<T, absl::Span>::value) {
+    using val_type = typename T::value_type;
+    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
+    auto v = get_dtype<typename T::value_type>();
+    v.SetCollectionType(COLLECTION_ABSL_SPAN);
+    return v;
+  }
+  if constexpr (is_specialization<T, std::map>::value) {
+    using key_type = typename T::key_type;
+    using val_type = typename T::mapped_type;
+    RETURN_IF_NOT_FUNDAMENTAL_TYPE(key_type)
+    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
+    auto key_v = get_dtype<key_type>();
+    auto value_v = get_dtype<val_type>();
+    DType v(key_v.GetFundamentalType(), value_v.GetFundamentalType());
+    v.SetCollectionType(COLLECTION_MAP);
+    return v;
+  }
+  if constexpr (is_specialization<T, std::pair>::value) {
+    using first_type = typename T::first_type;
+    using second_type = typename T::second_type;
+    RETURN_IF_NOT_FUNDAMENTAL_TYPE(first_type)
+    RETURN_IF_NOT_FUNDAMENTAL_TYPE(second_type)
+    auto key_v = get_dtype<first_type>();
+    auto value_v = get_dtype<second_type>();
+    DType v(key_v.GetFundamentalType(), value_v.GetFundamentalType());
+    v.SetCollectionType(COLLECTION_TUPLE);
+    return v;
+  }
+
+  if constexpr (is_specialization<T, std::tuple>::value) {
+    if constexpr (std::tuple_size_v<T> > 4) {
+      static_assert(sizeof(T) == -1, "Too many tuple args for dtype, max 4 args supported.");
+    }
+    DType d0 = get_dtype<typename std::tuple_element<0, T>::type>();
+    DType d1, d2, d3;
+    if constexpr (std::tuple_size_v<T> > 1) {
+      d1 = get_dtype<typename std::tuple_element<1, T>::type>();
+    }
+    if constexpr (std::tuple_size_v<T> > 2) {
+      d2 = get_dtype<typename std::tuple_element<2, T>::type>();
+    }
+    if constexpr (std::tuple_size_v<T> > 3) {
+      d3 = get_dtype<typename std::tuple_element<3, T>::type>();
+    }
+    DType v(d0.GetFundamentalType(), d1.GetFundamentalType(), d2.GetFundamentalType(), d3.GetFundamentalType());
+    v.SetCollectionType(COLLECTION_TUPLE);
+    return v;
+  }
+
+  if constexpr (std::is_same_v<bool, T>) {
+    return DType(DATA_U8);
+  }
+  if constexpr (std::is_same_v<char, T>) {
+    return DType(DATA_I8);
+  }
+  if constexpr (std::is_same_v<int8_t, T>) {
+    return DType(DATA_I8);
+  }
+  if constexpr (std::is_same_v<uint8_t, T>) {
+    return DType(DATA_U8);
+  }
+  if constexpr (std::is_same_v<int16_t, T>) {
+    return DType(DATA_I16);
+  }
+  if constexpr (std::is_same_v<uint16_t, T>) {
+    return DType(DATA_U16);
+  }
+  if constexpr (std::is_same_v<int32_t, T>) {
+    return DType(DATA_I32);
+  }
+  if constexpr (std::is_same_v<uint32_t, T>) {
+    return DType(DATA_U32);
+  }
+  if constexpr (std::is_same_v<int64_t, T>) {
+    return DType(DATA_I64);
+  }
+  if constexpr (std::is_same_v<uint64_t, T>) {
+    return DType(DATA_U64);
+  }
+  if constexpr (std::is_same_v<size_t, T>) {
+    return DType(DATA_U64);
+  }
+  if constexpr (std::is_same_v<float, T>) {
+    return DType(DATA_F32);
+  }
+  if constexpr (std::is_same_v<double, T>) {
+    return DType(DATA_F64);
+  }
+  if constexpr (std::is_same_v<std::string_view, T>) {
+    return DType(DATA_STRING_VIEW);
+  }
+  if constexpr (std::is_same_v<std::string, T>) {
+    return DType(DATA_STRING);
+  }
+  if constexpr (std::is_same_v<flatbuffers::String, T>) {
+    return DType(DATA_FLATBUFFERS_STRING);
+  }
+  if constexpr (std::is_same_v<JsonObject, T>) {
+    return DType(DATA_JSON);
+  }
+  static uint32_t id = nextTypeId();
+  DType dtype(static_cast<FundamentalType>(id));
+  // DTypeFactory::Add<T>(dtype);
+  return dtype;
+}
+
+template <typename T>
+struct get_dtypes_helper {
+  static std::vector<DType> get() {
+    std::vector<DType> ts{get_dtype<T>()};
+    return ts;
+  }
+};
+
+template <typename... Args>
+struct get_dtypes_helper<std::tuple<Args...>> {
+  static std::vector<DType> get() {
+    std::vector<DType> ts{get_dtype<Args>()...};
+    return ts;
+  }
+};
+template <typename L, typename R>
+struct get_dtypes_helper<std::pair<L, R>> {
+  static std::vector<DType> get() { return std::vector<DType>{get_dtype<L>(), get_dtype<R>()}; }
+};
+
+template <typename T>
+std::vector<DType> get_dtypes() {
+  return get_dtypes_helper<T>::get();
+}
+
+uint64_t convert_to(uint64_t val, DType src_dtype, DType dst_type);
+
+template <typename T>
+std::optional<T> DType::ToPrimitiveValue(uint64_t bin) {
+  if (!IsFundamental()) {
+    return {};
+  }
+  switch (GetFundamentalType()) {
+    case DATA_F32: {
+      if constexpr (std::is_same_v<float, T>) {
+        uint32_t int_val = static_cast<uint32_t>(bin);
+        float fv;
+        memcpy(&fv, &int_val, sizeof(float));
+        return fv;
+      } else {
+        return {};
+      }
+    }
+    case DATA_F64: {
+      if constexpr (std::is_same_v<double, T>) {
+        double fv;
+        memcpy(&fv, &bin, sizeof(double));
+        return fv;
+      } else {
+        return {};
+      }
+    }
+    case DATA_U64: {
+      if constexpr (std::is_same_v<uint64_t, T>) {
+        return static_cast<T>(bin);
+      } else {
+        return {};
+      }
+    }
+    case DATA_I64: {
+      if constexpr (std::is_same_v<int64_t, T>) {
+        return static_cast<T>(bin);
+      } else {
+        return {};
+      }
+    }
+    case DATA_U32: {
+      if constexpr (std::is_same_v<uint32_t, T>) {
+        return static_cast<T>(bin);
+      } else {
+        return {};
+      }
+    }
+    case DATA_I32: {
+      if constexpr (std::is_same_v<int32_t, T>) {
+        return static_cast<T>(bin);
+      } else {
+        return {};
+      }
+    }
+    case DATA_U16: {
+      if constexpr (std::is_same_v<uint16_t, T>) {
+        return static_cast<T>(bin);
+      } else {
+        return {};
+      }
+    }
+    case DATA_I16: {
+      if constexpr (std::is_same_v<int16_t, T>) {
+        return static_cast<T>(bin);
+      } else {
+        return {};
+      }
+    }
+    case DATA_U8: {
+      if constexpr (std::is_same_v<uint8_t, T>) {
+        return static_cast<T>(bin);
+      } else if constexpr (std::is_same_v<bool, T>) {
+        return bin > 0 ? true : false;
+      } else {
+        return {};
+      }
+    }
+    case DATA_I8: {
+      if constexpr (std::is_same_v<int8_t, T>) {
+        return static_cast<T>(bin);
+      } else {
+        return {};
+      }
+    }
+    default: {
+      return {};
+    }
+  }
+}
+
+template <typename T>
+std::optional<uint64_t> DType::FromPrimitiveValue(T val) {
+  if constexpr (std::is_same_v<double, T> || std::is_same_v<float, T> || std::numeric_limits<T>::is_integer) {
+    if (IsF64()) {
+      double dv = static_cast<double>(val);
+      uint64_t int_val = 0;
+      memcpy(&int_val, &dv, sizeof(double));
+      return int_val;
+    } else if (IsF32()) {
+      float fv = static_cast<float>(val);
+      uint32_t int_val = 0;
+      memcpy(&int_val, &fv, sizeof(float));
+      return int_val;
+    } else if (IsNumber()) {
+      uint64_t int_val = static_cast<uint64_t>(val);
+      return int_val;
+    } else {
+      return {};
+    }
+  } else if constexpr (std::is_pointer_v<T>) {
+    if (!IsPtr()) {
+      return {};
+    }
+    uint64_t int_val = reinterpret_cast<uint64_t>(val);
+    return int_val;
+  } else {
+    return {};
+  }
+}
+
+}  // namespace rapidudf
+
+template <>
+struct fmt::formatter<rapidudf::DType> : formatter<std::string> {
+  // parse is inherited from formatter<string_view>.
+  auto format(rapidudf::DType c, format_context& ctx) const -> format_context::iterator {
+    return formatter<std::string>::format(c.ToString(), ctx);
+  }
+};
+template <>
+struct fmt::formatter<rapidudf::FundamentalType> : formatter<std::string> {
+  // parse is inherited from formatter<string_view>.
+  auto format(rapidudf::FundamentalType c, format_context& ctx) const -> format_context::iterator {
+    std::string view = "object";
+    if (c <= rapidudf::DATA_JSON) {
+      view = std::string(rapidudf::kFundamentalTypeStrs[c]);
+    } else {
+      view = fmt::format("object/{}", static_cast<int>(c));
+    }
+    return formatter<std::string>::format(view, ctx);
+  }
+};
+
+template <>
+struct fmt::formatter<Xbyak::Reg64> : formatter<std::string> {
+  auto format(Xbyak::Reg64 c, format_context& ctx) const -> format_context::iterator {
+    std::string view = "todo";
+    return formatter<std::string>::format(view, ctx);
+  }
+};
