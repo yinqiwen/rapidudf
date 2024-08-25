@@ -184,7 +184,7 @@ struct TestMethodStruct {
   float b;
   int* p = nullptr;
   std::string_view c;
-  int get_a() {
+  int get_a() const {
     RUDF_INFO("Called get_a");
     return a;
   }

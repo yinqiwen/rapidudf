@@ -58,7 +58,7 @@ class JitFunction {
   JitFunction(const std::string& name, std::unique_ptr<CodeGenerator>&& code_gen,
               std::vector<std::unique_ptr<std::string>>&& const_vals)
       : name_(name), code_gen_(std::move(code_gen)), const_strings_(std::move(const_vals)) {
-    f_ = reinterpret_cast<RET (*)(Args...)>(code_gen_->GetCodeGen().getCode());
+    f_ = reinterpret_cast<RET (*)(Args...)>(const_cast<uint8_t*>(code_gen_->GetCodeGen().getCode()));
   }
   JitFunction(JitFunction&& other) {
     name_ = std::move(other.name_);

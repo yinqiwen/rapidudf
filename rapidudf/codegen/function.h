@@ -147,12 +147,57 @@ template <typename F>
 using first_function_argument_type_t = function_argument_type_t<F, 0>;
 
 template <uint64_t, uint32_t, typename F>
+struct MemberFunctionWrapper;
+
+template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
+struct MemberFunctionWrapper<H, N, R (T::*)(Args...)> {
+  using return_type = R;
+  using func_t = R (T::*)(Args...);
+  static std::string& GetFuncName() {
+    static std::string func_name;
+    return func_name;
+  }
+  static func_t& GetFunc() {
+    static func_t func = nullptr;
+    return func;
+  }
+  static R Call(T* p, Args... args) {
+    auto func = GetFunc();
+    if constexpr (std::is_same_v<void, R>) {
+      (p->*func)(args...);
+    } else {
+      return (p->*func)(args...);
+    }
+  }
+};
+template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
+struct MemberFunctionWrapper<H, N, R (T::*)(Args...) const> {
+  using return_type = R;
+  using func_t = R (T::*)(Args...) const;
+  static std::string& GetFuncName() {
+    static std::string func_name;
+    return func_name;
+  }
+  static func_t& GetFunc() {
+    static func_t func = nullptr;
+    return func;
+  }
+  static R Call(const T* p, Args... args) {
+    auto func = GetFunc();
+    if constexpr (std::is_same_v<void, R>) {
+      (p->*func)(args...);
+    } else {
+      return (p->*func)(args...);
+    }
+  }
+};
+
+template <uint64_t, uint32_t, typename F>
 struct SafeFunctionWrapper;
 
 template <uint64_t H, uint32_t N, typename R, typename... Args>
 struct SafeFunctionWrapper<H, N, R(Args...)> {
   using return_type = R;
-  using arguments = std::tuple<Args...>;
   using func_t = R (*)(Args...);
   static std::string& GetFuncName() {
     static std::string func_name;
@@ -163,11 +208,99 @@ struct SafeFunctionWrapper<H, N, R(Args...)> {
     return func;
   }
   static R SafeCall(Args... args) {
+    auto func = GetFunc();
     try {
       if constexpr (std::is_same_v<void, R>) {
-        GetFunc()(args...);
+        func(args...);
       } else {
-        return GetFunc()(args...);
+        return func(args...);
+      }
+    } catch (...) {
+      auto& func_ctx = FunctionFactory::GetFunctionCallContext(false);
+      try {
+        throw;
+      } catch (const std::exception& e) {
+        RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), DType::Demangle(typeid(e).name()),
+                   e.what());
+        func_ctx.run_ex = e;
+      } catch (...) {
+        RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
+      }
+      if (func_ctx.invoke_frame_id > 0) {
+        longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
+      }
+      if constexpr (std::is_same_v<void, R>) {
+        // nothing
+      } else {
+        return {};
+      }
+    }
+  }
+};
+
+template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
+struct SafeFunctionWrapper<H, N, R (T::*)(Args...)> {
+  using return_type = R;
+  using arguments = std::tuple<Args...>;
+  using func_t = R (T::*)(Args...);
+  static std::string& GetFuncName() {
+    static std::string func_name;
+    return func_name;
+  }
+  static func_t& GetFunc() {
+    static func_t func = nullptr;
+    return func;
+  }
+  static R SafeCall(T* p, Args... args) {
+    try {
+      auto func = GetFunc();
+      if constexpr (std::is_same_v<void, R>) {
+        (p->*func)(args...);
+      } else {
+        return (p->*func)(args...);
+      }
+    } catch (...) {
+      auto& func_ctx = FunctionFactory::GetFunctionCallContext(false);
+      try {
+        throw;
+      } catch (const std::exception& e) {
+        RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), DType::Demangle(typeid(e).name()),
+                   e.what());
+        func_ctx.run_ex = e;
+      } catch (...) {
+        RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
+      }
+      if (func_ctx.invoke_frame_id > 0) {
+        longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
+      }
+      if constexpr (std::is_same_v<void, R>) {
+        // nothing
+      } else {
+        return {};
+      }
+    }
+  }
+};
+
+template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
+struct SafeFunctionWrapper<H, N, R (T::*)(Args...) const> {
+  using return_type = R;
+  using func_t = R (T::*)(Args...) const;
+  static std::string& GetFuncName() {
+    static std::string func_name;
+    return func_name;
+  }
+  static func_t& GetFunc() {
+    static func_t func = nullptr;
+    return func;
+  }
+  static R SafeCall(const T* p, Args... args) {
+    try {
+      auto func = GetFunc();
+      if constexpr (std::is_same_v<void, R>) {
+        (p->*func)(args...);
+      } else {
+        return (p->*func)(args...);
       }
     } catch (...) {
       auto& func_ctx = FunctionFactory::GetFunctionCallContext(false);

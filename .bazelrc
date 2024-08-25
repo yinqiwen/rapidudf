@@ -1,8 +1,8 @@
 build --copt=-g
 build --copt=-O0
-build --copt=-std=c++17
+build --cxxopt=-std=c++17
 build --action_env=LIBRARY_PATH
 build -c dbg
-build --action_env=CC=/opt/rh/gcc-toolset-12/root/usr/bin/gcc
-build --action_env=CXX=/opt/rh/gcc-toolset-12/root/usr/bin/g++
+#build --action_env=CC=clang
+#build --action_env=CXX=clang++
 

@@ -79,8 +79,7 @@ struct StructMember {
 };
 using StructMemberMap = std::unordered_map<std::string, StructMember>;
 using GlobalStructMemberIndex = std::unordered_map<uint64_t, StructMemberMap>;
-// using StructReflectAccessJitBuilder =
-//     std::function<std::optional<StructFieldReflectJitAccessor>(const std::string& field)>;
+
 class ReflectFactory {
  public:
   static void Init();
@@ -90,28 +89,10 @@ class ReflectFactory {
 
   template <typename T, typename RET, typename... Args>
   static bool AddStructMethodAccessor(const std::string& name, RET (*f)(T*, Args...)) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpmf-conversions"
+    // #pragma GCC diagnostic push
+    // #pragma GCC diagnostic ignored "-Wpmf-conversions"
     void* ff = reinterpret_cast<void*>(f);
-#pragma GCC diagnostic pop
-    return AddStructMethod<T, RET, Args...>(name, ff);
-  }
-
-  template <typename T, typename RET, typename... Args>
-  static bool AddStructMemberMethodAccessor(const std::string& name, RET (T::*f)(Args...)) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpmf-conversions"
-    void* ff = reinterpret_cast<void*>(f);
-#pragma GCC diagnostic pop
-    return AddStructMethod<T, RET, Args...>(name, ff);
-  }
-
-  template <typename T, typename RET, typename... Args>
-  static bool AddStructMemberMethodAccessor(const std::string& name, RET (T::*f)(Args...) const) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpmf-conversions"
-    void* ff = reinterpret_cast<void*>(f);
-#pragma GCC diagnostic pop
+    // #pragma GCC diagnostic pop
     return AddStructMethod<T, RET, Args...>(name, ff);
   }
 

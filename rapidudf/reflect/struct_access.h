@@ -84,34 +84,52 @@ class StructAccessHelperRegister {
  public:
   StructAccessHelperRegister(std::function<void()>&& f) { f(); }
 };
+template <uint64_t, uint32_t, typename T, typename F>
+class MemberFuncRegister;
+template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
+class MemberFuncRegister<hash, line, T, R (T::*)(Args...)> {
+ public:
+  MemberFuncRegister(std::string_view name, R (T::*f)(Args...)) {
+    MemberFunctionWrapper<hash, line, R (T::*)(Args...)>::GetFuncName() = name;
+    MemberFunctionWrapper<hash, line, R (T::*)(Args...)>::GetFunc() = f;
+    ReflectFactory::AddStructMethodAccessor(std::string(name),
+                                            &MemberFunctionWrapper<hash, line, R (T::*)(Args...)>::Call);
+    DTypeFactory::Add<T>();
+  }
+};
+template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
+class MemberFuncRegister<hash, line, T, R (T::*)(Args...) const> {
+ public:
+  MemberFuncRegister(std::string_view name, R (T::*f)(Args...) const) {
+    MemberFunctionWrapper<hash, line, R (T::*)(Args...) const>::GetFuncName() = name;
+    MemberFunctionWrapper<hash, line, R (T::*)(Args...) const>::GetFunc() = f;
+    ReflectFactory::AddStructMethodAccessor(std::string(name),
+                                            &MemberFunctionWrapper<hash, line, R (T::*)(Args...) const>::Call);
+    DTypeFactory::Add<T>();
+  }
+};
 
 template <uint64_t, uint32_t, typename T, typename F>
 class SafeMemberFuncRegister;
 template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
 class SafeMemberFuncRegister<hash, line, T, R (T::*)(Args...)> {
  public:
-  SafeMemberFuncRegister(std::string_view name, R (T::*f)(Args...) const) {
-    SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFuncName() = name;
-    using func_t = R (*)(T*, Args...);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpmf-conversions"
-    func_t ff = reinterpret_cast<func_t>(f);
-#pragma GCC diagnostic pop
-    SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFunc() = ff;
+  SafeMemberFuncRegister(std::string_view name, R (T::*f)(Args...)) {
+    SafeFunctionWrapper<hash, line, R (T::*)(Args...)>::GetFuncName() = name;
+    SafeFunctionWrapper<hash, line, R (T::*)(Args...)>::GetFunc() = f;
     ReflectFactory::AddStructMethodAccessor(std::string(name),
-                                            &SafeFunctionWrapper<hash, line, R(T*, Args...)>::SafeCall);
+                                            &SafeFunctionWrapper<hash, line, R (T::*)(Args...)>::SafeCall);
     DTypeFactory::Add<T>();
   }
-  SafeMemberFuncRegister(std::string_view name, R (T::*f)(Args...)) {
-    SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFuncName() = name;
-    using func_t = R (*)(T*, Args...);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpmf-conversions"
-    func_t ff = reinterpret_cast<func_t>(f);
-#pragma GCC diagnostic pop
-    SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFunc() = ff;
+};
+template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
+class SafeMemberFuncRegister<hash, line, T, R (T::*)(Args...) const> {
+ public:
+  SafeMemberFuncRegister(std::string_view name, R (T::*f)(Args...) const) {
+    SafeFunctionWrapper<hash, line, R (T::*)(Args...) const>::GetFuncName() = name;
+    SafeFunctionWrapper<hash, line, R (T::*)(Args...) const>::GetFunc() = f;
     ReflectFactory::AddStructMethodAccessor(std::string(name),
-                                            &SafeFunctionWrapper<hash, line, R(T*, Args...)>::SafeCall);
+                                            &SafeFunctionWrapper<hash, line, R (T::*)(Args...) const>::SafeCall);
     DTypeFactory::Add<T>();
   }
 };
@@ -121,12 +139,7 @@ class SafeMemberFuncRegister<hash, line, T, R(T*, Args...)> {
  public:
   SafeMemberFuncRegister(std::string_view name, R (*f)(T*, Args...)) {
     SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFuncName() = name;
-    using func_t = R (*)(T*, Args...);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpmf-conversions"
-    func_t ff = reinterpret_cast<func_t>(f);
-#pragma GCC diagnostic pop
-    SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFunc() = ff;
+    SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFunc() = f;
     ReflectFactory::AddStructMethodAccessor(std::string(name),
                                             &SafeFunctionWrapper<hash, line, R(T*, Args...)>::SafeCall);
     DTypeFactory::Add<T>();
@@ -182,8 +195,12 @@ class SafeMemberFuncRegister<hash, line, T, R(T*, Args...)> {
                                                                    decltype(&TYPE::member)>                   \
       BOOST_PP_CAT(rudf_safe_member_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(member), &TYPE::member);
 
-#define RUDF_STRUCT_ADD_METHOD_ACCESS_CODE(r, TYPE, i, member) \
-  ::rapidudf::ReflectFactory::AddStructMemberMethodAccessor(BOOST_PP_STRINGIZE(member), &TYPE::member);
+#define RUDF_STRUCT_ADD_METHOD_ACCESS_CODE(r, TYPE, i, member)                                                \
+  {                                                                                                           \
+    static ::rapidudf::MemberFuncRegister<::rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(member)), __LINE__, TYPE, \
+                                                                 decltype(&TYPE::member)>                     \
+        BOOST_PP_CAT(rudf_member_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(member), &TYPE::member);             \
+  }
 
 #define RUDF_STRUCT_MEMBER_METHODS(st, ...)                                                                  \
   namespace rapidudf {                                                                                       \

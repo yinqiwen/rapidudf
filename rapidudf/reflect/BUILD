@@ -1,7 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load(
-    "//rapidudf:copts/configure_copts.bzl",
-    "NSE_DEFAULT_LINKOPTS",
+    "//rapidudf/copts:configure_copts.bzl",
+    "RUDF_DEFAULT_LINKOPTS",
 )
 
 package(
@@ -41,7 +41,7 @@ cc_test(
     name = "struct_access_test",
     size = "small",
     srcs = ["struct_access_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":reflect",

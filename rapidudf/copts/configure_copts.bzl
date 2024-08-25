@@ -1,4 +1,4 @@
-NSE_DEFAULT_COPTS = [
+RUDF_DEFAULT_COPTS = [
     "-D__STDC_FORMAT_MACROS",
     "-D__STDC_LIMIT_MACROS",
     "-D__STDC_CONSTANT_MACROS",
@@ -6,7 +6,7 @@ NSE_DEFAULT_COPTS = [
     "-Werror=return-type",
 ]
 
-NSE_DEFAULT_LINKOPTS = [
+RUDF_DEFAULT_LINKOPTS = [
     "-L/usr/local/lib",
     "-L/usr/local/lib64",
     "-lfmt",

@@ -1,7 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load(
-    "//rapidudf:copts/configure_copts.bzl",
-    "NSE_DEFAULT_LINKOPTS",
+    "//rapidudf/copts:configure_copts.bzl",
+    "RUDF_DEFAULT_LINKOPTS",
 )
 
 package(
@@ -86,7 +86,7 @@ cc_test(
     name = "cmp_test",
     size = "small",
     srcs = ["cmp_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":cmp",
@@ -99,7 +99,7 @@ cc_test(
     name = "cast_stack_test",
     size = "small",
     srcs = ["cast_stack_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":cast",
@@ -112,7 +112,7 @@ cc_test(
     name = "cast_register_test",
     size = "small",
     srcs = ["cast_register_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":cast",

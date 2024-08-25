@@ -1,7 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load(
-    "//rapidudf:copts/configure_copts.bzl",
-    "NSE_DEFAULT_LINKOPTS",
+    "//rapidudf/copts:configure_copts.bzl",
+    "RUDF_DEFAULT_LINKOPTS",
 )
 
 package(
@@ -86,7 +86,7 @@ cc_test(
     name = "register_test",
     size = "small",
     srcs = ["register_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":code_generator",
@@ -99,7 +99,7 @@ cc_test(
     name = "dtype_test",
     size = "small",
     srcs = ["dtype_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":dtype",
@@ -111,7 +111,7 @@ cc_test(
     name = "function_test",
     size = "small",
     srcs = ["function_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":function",
@@ -123,7 +123,7 @@ cc_test(
     name = "code_generator_test",
     size = "small",
     srcs = ["code_generator_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":code_generator",

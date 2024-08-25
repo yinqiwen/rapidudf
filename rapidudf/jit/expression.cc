@@ -263,7 +263,6 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::UnaryExprPtr expr) 
     GetCodeGenerator().DropTmpValue(val);
     return result;
   }
-  // todo
   return val;
 }
 }  // namespace rapidudf

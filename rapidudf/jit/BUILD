@@ -1,7 +1,8 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load(
-    "//rapidudf:copts/configure_copts.bzl",
-    "NSE_DEFAULT_LINKOPTS",
+    "//rapidudf/copts:configure_copts.bzl",
+    "RUDF_DEFAULT_COPTS",
+    "RUDF_DEFAULT_LINKOPTS",
 )
 
 package(
@@ -20,6 +21,7 @@ cc_library(
     hdrs = [
         "jit.h",
     ],
+    copts = RUDF_DEFAULT_COPTS,
     deps = [
         "//rapidudf/ast",
         "//rapidudf/codegen:code_generator",
@@ -32,7 +34,7 @@ cc_test(
     name = "jit_test",
     size = "small",
     srcs = ["jit_test.cc"],
-    linkopts = NSE_DEFAULT_LINKOPTS,
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         ":jit",

@@ -178,7 +178,6 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
 }
 
 absl::Status JitCompiler::DoCompileFunction(const std::string& source) {
-  // code_gen_ = std::make_unique<CodeGenerator>(max_code_size_, use_registers_);
   auto f = ast::parse_function_ast(ast_ctx_, source);
   if (!f.ok()) {
     RUDF_LOG_ERROR_STATUS(f.status());
