@@ -186,3 +186,26 @@ TEST(JitCompiler, pb_read_map) {
   auto f = std::move(rc.value());
   ASSERT_EQ(f(&pb_header), 101);
 }
+
+TEST(JitCompiler, pb_read_map_item) {
+  spdlog::set_level(spdlog::level::debug);
+  ::test::Header pb_header;
+  pb_header.set_scene("");
+  pb_header.set_id(101);
+  pb_header.set_scene("hello,world");
+  ::test::Item item0;
+  item0.set_id(1001);
+  pb_header.mutable_item_map()->insert({"k0", item0});
+
+  JitCompiler compiler;
+  std::string content = R"(
+    int test_func(test::Header x, string_view key){
+      return x.item_map().get(key).id();
+    }
+   )";
+  auto rc = compiler.CompileFunction<int, test::Header*, std::string_view>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(&pb_header, "k0"), 1001);
+  ASSERT_EQ(f(&pb_header, "k1"), 0);
+}

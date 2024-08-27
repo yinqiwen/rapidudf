@@ -42,11 +42,16 @@ template <typename T, typename Enable = void>
 struct PBGetterReturnType {
   using return_type = T;
   static return_type value(const T& v) { return v; }
+  static return_type default_value() { return {}; }
 };
 template <typename T>
 struct PBGetterReturnType<T, typename std::enable_if<std::is_base_of<google::protobuf::Message, T>::value>::type> {
   using return_type = const T*;
   static return_type value(const T& v) { return &v; }
+  static return_type default_value() {
+    static T empty;
+    return &empty;
+  }
 };
 template <>
 struct PBGetterReturnType<std::string> {
@@ -59,11 +64,11 @@ struct PBMapHelper {
   using return_type_t = typename PBGetterReturnType<V>::return_type;
   static return_type_t Get(const ::google::protobuf::Map<K, V>* pb_map, K k) {
     if (nullptr == pb_map) {
-      return {};
+      return PBGetterReturnType<V>::default_value();
     }
     auto found = pb_map->find(k);
     if (found == pb_map->end()) {
-      return {};
+      return PBGetterReturnType<V>::default_value();
     }
     return PBGetterReturnType<V>::value(found->second);
   }
@@ -80,11 +85,11 @@ struct PBMapHelper<std::string, V> {
   using return_type_t = typename PBGetterReturnType<V>::return_type;
   static return_type_t Get(const ::google::protobuf::Map<std::string, V>* pb_map, std::string_view k) {
     if (nullptr == pb_map) {
-      return {};
+      return PBGetterReturnType<V>::default_value();
     }
     auto found = pb_map->find(k);
     if (found == pb_map->end()) {
-      return {};
+      return PBGetterReturnType<V>::default_value();
     }
     return PBGetterReturnType<V>::value(found->second);
   }
