@@ -124,7 +124,7 @@ struct Helper {
   }
 };
 
-RUDF_STRUCT_SAFE_METHODS_BIND(Helper, test0, test1)
+RUDF_STRUCT_SAFE_HELPER_METHODS_BIND(Helper, test0, test1)
 
 TEST(JitCompiler, member_func_bind) {
   spdlog::set_level(spdlog::level::debug);

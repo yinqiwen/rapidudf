@@ -43,7 +43,8 @@
 using namespace rapidudf;
 using namespace rapidudf::ast;
 
-RUDF_STRUCT_MEMBER_METHODS(::test_fbs::Header, id, scene)
+RUDF_STRUCT_MEMBER_METHODS(::test_fbs::Item, id)
+RUDF_STRUCT_MEMBER_METHODS(::test_fbs::Header, items, id, scene, tags)
 
 TEST(JitCompiler, fbs_access_read_int) {
   spdlog::set_level(spdlog::level::debug);
@@ -55,6 +56,9 @@ TEST(JitCompiler, fbs_access_read_int) {
   fbb.Finish(test_fbs::Header::Pack(fbb, &header));
   const test_fbs::Header* fbs_ptr = test_fbs::GetHeader(fbb.GetBufferPointer());
 
+  using VEC = flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>;
+  rapidudf::try_register_fbs_vector_member_funcs<VEC>();
+
   JitCompiler compiler;
   std::string content = R"(
     int test_func(test_fbs::Header x){
@@ -63,11 +67,64 @@ TEST(JitCompiler, fbs_access_read_int) {
    )";
   auto rc = compiler.CompileFunction<int, const test_fbs::Header*>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, const test_fbs::Header*>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
   ASSERT_EQ(f(fbs_ptr), header.id);
 }
+
+TEST(JitCompiler, fbs_read_vector_string) {
+  spdlog::set_level(spdlog::level::debug);
+  test_fbs::HeaderT header;
+  header.id = 101;
+  header.scene = "hello,world";
+  header.tags.emplace_back("1111");
+
+  flatbuffers::FlatBufferBuilder fbb;
+  fbb.Finish(test_fbs::Header::Pack(fbb, &header));
+  const test_fbs::Header* fbs_ptr = test_fbs::GetHeader(fbb.GetBufferPointer());
+
+  using VEC = flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>;
+  rapidudf::try_register_fbs_vector_member_funcs<VEC>();
+
+  JitCompiler compiler;
+  std::string content = R"(
+    string_view test_func(test_fbs::Header x){
+      return x.tags().get(0);
+    }
+   )";
+  auto rc = compiler.CompileFunction<std::string_view, const test_fbs::Header*>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(fbs_ptr), "1111");
+}
+
+TEST(JitCompiler, fbs_read_vector_fbs) {
+  spdlog::set_level(spdlog::level::debug);
+  test_fbs::HeaderT header;
+  header.id = 101;
+  header.scene = "hello,world";
+  flatbuffers::unique_ptr<test_fbs::ItemT> item(new test_fbs::ItemT);
+  item->id = 1001;
+  header.items.emplace_back(std::move(item));
+
+  flatbuffers::FlatBufferBuilder fbb;
+  fbb.Finish(test_fbs::Header::Pack(fbb, &header));
+  const test_fbs::Header* fbs_ptr = test_fbs::GetHeader(fbb.GetBufferPointer());
+
+  using VEC = flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>;
+  rapidudf::try_register_fbs_vector_member_funcs<VEC>();
+
+  JitCompiler compiler;
+  std::string content = R"(
+    u32 test_func(test_fbs::Header x){
+      return x.items().get(0).id();
+    }
+   )";
+  auto rc = compiler.CompileFunction<uint32_t, const test_fbs::Header*>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(fbs_ptr), 1001);
+}
+
 TEST(JitCompiler, fbs_access_read_str) {
   spdlog::set_level(spdlog::level::debug);
 

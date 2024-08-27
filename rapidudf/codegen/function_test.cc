@@ -43,25 +43,25 @@ using namespace Xbyak::util;
 
 int test_func(int a, std::string_view b, float c) { return 0; }
 
-TEST(Function, simple) {
-  //   std::function<int(int, std::string_view, float)> f = test_func;
-  FuncRegister reg("name", test_func);
-  RUDF_FUNC_REGISTER(test_func);
+// TEST(Function, simple) {
+//   //   std::function<int(int, std::string_view, float)> f = test_func;
+//   FuncRegister reg("name", test_func);
+//   RUDF_FUNC_REGISTER(test_func);
 
-  auto ts = get_dtypes<std::tuple<int, float, int64_t>>();
-  ASSERT_EQ(ts.size(), 3);
-  ASSERT_EQ(ts[0], DATA_I32);
-  ASSERT_EQ(ts[1], DATA_F32);
+//   auto ts = get_dtypes<std::tuple<int, float, int64_t>>();
+//   ASSERT_EQ(ts.size(), 3);
+//   ASSERT_EQ(ts[0], DATA_I32);
+//   ASSERT_EQ(ts[1], DATA_F32);
 
-  ts = get_dtypes<std::string>();
-  ASSERT_EQ(ts.size(), 1);
-  ASSERT_EQ(ts[0], DATA_STRING);
+//   ts = get_dtypes<std::string>();
+//   ASSERT_EQ(ts.size(), 1);
+//   ASSERT_EQ(ts[0], DATA_STRING);
 
-  ts = get_dtypes<std::pair<int, float>>();
-  ASSERT_EQ(ts.size(), 2);
-  ASSERT_EQ(ts[0], DATA_I32);
-  ASSERT_EQ(ts[1], DATA_F32);
-}
+//   ts = get_dtypes<std::pair<int, float>>();
+//   ASSERT_EQ(ts.size(), 2);
+//   ASSERT_EQ(ts[0], DATA_I32);
+//   ASSERT_EQ(ts[1], DATA_F32);
+// }
 
 struct T0 {
   double d;

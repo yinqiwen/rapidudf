@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -29,31 +29,41 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <gtest/gtest.h>
-#include <functional>
-#include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
+#pragma once
+#include <type_traits>
+#include "flatbuffers/flatbuffers.h"
 #include "rapidudf/codegen/dtype.h"
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/struct_access.h"
+#include "rapidudf/meta/function.h"
+#include "rapidudf/meta/type_traits.h"
+#include "rapidudf/reflect/reflect.h"
+namespace rapidudf {
 
-using namespace rapidudf;
-using namespace rapidudf::ast;
-
-TEST(JitCompiler, vector_size) {
-  spdlog::set_level(spdlog::level::debug);
-  std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
-  ParseContext ctx;
-  std::string content = R"(
-    int test_func(vector<i32> x){
-      return x.size();
+template <typename T>
+struct FBSVectorHelper {
+  static typename T::value_type Get(const T* fbs_vec, uint32_t i) {
+    if (nullptr == fbs_vec) {
+      return {};
     }
-  )";
-  auto rc = compiler.CompileFunction<int, std::vector<int>&>(content);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_EQ(f(vec), vec.size());
+    if (i >= fbs_vec->size()) {
+      return nullptr;
+    }
+    return fbs_vec->Get(i);
+  }
+  static size_t Size(const T* fbs_vec) {
+    if (nullptr == fbs_vec) {
+      return 0;
+    }
+    return fbs_vec->size();
+  }
+};
+
+template <typename T>
+void try_register_fbs_vector_member_funcs() {
+  using remove_ptr_t = std::remove_pointer_t<T>;
+  using remove_cv_t = std::remove_cv_t<remove_ptr_t>;
+  if constexpr (is_specialization<remove_cv_t, flatbuffers::Vector>::value) {
+    ReflectFactory::AddStructMethodAccessor("get", &FBSVectorHelper<remove_cv_t>::Get);
+    ReflectFactory::AddStructMethodAccessor("size", &FBSVectorHelper<remove_cv_t>::Size);
+  }
 }
+}  // namespace rapidudf

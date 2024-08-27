@@ -1,8 +1,14 @@
 syntax = "proto3";
 package test;
 
+message Item{
+  int32 id = 1;
+}
 
 message Header{
   string scene = 1;
   int32 id = 2;
+  repeated Item items = 3;
+  map<string, Item> item_map = 4;
+   map<string, int32> mapping = 5;
 }

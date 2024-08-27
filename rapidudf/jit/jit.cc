@@ -145,7 +145,7 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   if (!ctx.desc.arg_types.empty() && arg_registers.empty()) {
     return absl::InvalidArgumentError("Can NOT use registers for all func args.");
   }
-  for (size_t i = 0; i < ctx.func_ast.args->size(); i++) {
+  for (size_t i = 0; i < ctx.desc.arg_types.size(); i++) {
     auto var = GetCodeGenerator().NewValue(ctx.desc.arg_types[i], false);
     auto reg_var = Value::New(&GetCodeGenerator(), ctx.desc.arg_types[i], arg_registers[i], false);
     if (0 != var->Copy(*reg_var)) {

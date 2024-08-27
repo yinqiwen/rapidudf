@@ -87,7 +87,7 @@ class JitFunction {
   }
 
   RET SafeCall(Args... args) {
-    auto& func_ctx = FunctionFactory::GetFunctionCallContext(true);
+    auto& func_ctx = FunctionCallContext::Get(true);
     if (func_ctx.invoke_frame_id == 1) {  // first
       if (setjmp(func_ctx.jmp_env) == 0) {
         if constexpr (std::is_same_v<void, RET>) {

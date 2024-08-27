@@ -1,6 +1,13 @@
 namespace test_fbs;
+
+table Item {
+  id:uint;
+}
+
 table Header {
   id:uint;
   scene:string;
+  tags:[string];
+  items:[Item];
 }
 root_type Header;

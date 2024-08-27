@@ -52,6 +52,7 @@
 
 #include "xbyak/xbyak.h"
 
+#include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/json_object.h"
 
 namespace rapidudf {
@@ -252,11 +253,6 @@ static inline uint32_t nextTypeId() {
   static std::atomic<uint32_t> type_id_seed = {DATA_OBJECT_BEGIN};
   return type_id_seed.fetch_add(1);
 }
-
-template <typename Test, template <typename...> class Ref>
-struct is_specialization : std::false_type {};
-template <template <typename...> class Ref, typename... Args>
-struct is_specialization<Ref<Args...>, Ref> : std::true_type {};
 
 #define RETURN_IF_NOT_FUNDAMENTAL_TYPE(xtype)                                                                         \
   if constexpr (std::is_pointer<xtype>::value || is_specialization<xtype, std::vector>::value ||                      \

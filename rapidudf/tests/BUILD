@@ -184,3 +184,15 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "example_test",
+    size = "small",
+    srcs = ["example_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)

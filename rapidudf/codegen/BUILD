@@ -23,6 +23,7 @@ cc_library(
     ],
     deps = [
         "//rapidudf/log",
+        "//rapidudf/meta",
         "//rapidudf/types",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_github_xbyak//:xbyak",

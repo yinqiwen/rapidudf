@@ -46,6 +46,8 @@
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/value.h"
+#include "rapidudf/reflect/flatbuffers.h"
+#include "rapidudf/reflect/protobuf.h"
 #include "rapidudf/reflect/reflect.h"
 #include "rapidudf/reflect/reflect_value.h"
 #include "xbyak/xbyak.h"
@@ -84,67 +86,6 @@ class StructAccessHelperRegister {
  public:
   StructAccessHelperRegister(std::function<void()>&& f) { f(); }
 };
-template <uint64_t, uint32_t, typename T, typename F>
-class MemberFuncRegister;
-template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
-class MemberFuncRegister<hash, line, T, R (T::*)(Args...)> {
- public:
-  MemberFuncRegister(std::string_view name, R (T::*f)(Args...)) {
-    MemberFunctionWrapper<hash, line, R (T::*)(Args...)>::GetFuncName() = name;
-    MemberFunctionWrapper<hash, line, R (T::*)(Args...)>::GetFunc() = f;
-    ReflectFactory::AddStructMethodAccessor(std::string(name),
-                                            &MemberFunctionWrapper<hash, line, R (T::*)(Args...)>::Call);
-    DTypeFactory::Add<T>();
-  }
-};
-template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
-class MemberFuncRegister<hash, line, T, R (T::*)(Args...) const> {
- public:
-  MemberFuncRegister(std::string_view name, R (T::*f)(Args...) const) {
-    MemberFunctionWrapper<hash, line, R (T::*)(Args...) const>::GetFuncName() = name;
-    MemberFunctionWrapper<hash, line, R (T::*)(Args...) const>::GetFunc() = f;
-    ReflectFactory::AddStructMethodAccessor(std::string(name),
-                                            &MemberFunctionWrapper<hash, line, R (T::*)(Args...) const>::Call);
-    DTypeFactory::Add<T>();
-  }
-};
-
-template <uint64_t, uint32_t, typename T, typename F>
-class SafeMemberFuncRegister;
-template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
-class SafeMemberFuncRegister<hash, line, T, R (T::*)(Args...)> {
- public:
-  SafeMemberFuncRegister(std::string_view name, R (T::*f)(Args...)) {
-    SafeFunctionWrapper<hash, line, R (T::*)(Args...)>::GetFuncName() = name;
-    SafeFunctionWrapper<hash, line, R (T::*)(Args...)>::GetFunc() = f;
-    ReflectFactory::AddStructMethodAccessor(std::string(name),
-                                            &SafeFunctionWrapper<hash, line, R (T::*)(Args...)>::SafeCall);
-    DTypeFactory::Add<T>();
-  }
-};
-template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
-class SafeMemberFuncRegister<hash, line, T, R (T::*)(Args...) const> {
- public:
-  SafeMemberFuncRegister(std::string_view name, R (T::*f)(Args...) const) {
-    SafeFunctionWrapper<hash, line, R (T::*)(Args...) const>::GetFuncName() = name;
-    SafeFunctionWrapper<hash, line, R (T::*)(Args...) const>::GetFunc() = f;
-    ReflectFactory::AddStructMethodAccessor(std::string(name),
-                                            &SafeFunctionWrapper<hash, line, R (T::*)(Args...) const>::SafeCall);
-    DTypeFactory::Add<T>();
-  }
-};
-
-template <uint64_t hash, uint32_t line, typename T, typename R, typename... Args>
-class SafeMemberFuncRegister<hash, line, T, R(T*, Args...)> {
- public:
-  SafeMemberFuncRegister(std::string_view name, R (*f)(T*, Args...)) {
-    SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFuncName() = name;
-    SafeFunctionWrapper<hash, line, R(T*, Args...)>::GetFunc() = f;
-    ReflectFactory::AddStructMethodAccessor(std::string(name),
-                                            &SafeFunctionWrapper<hash, line, R(T*, Args...)>::SafeCall);
-    DTypeFactory::Add<T>();
-  }
-};
 
 }  // namespace rapidudf
 
@@ -178,28 +119,21 @@ class SafeMemberFuncRegister<hash, line, T, R(T*, Args...)> {
   static ::rapidudf::StructFieldAccessRegister<st> BOOST_PP_CAT(rudf_struct_access_, __COUNTER__);          \
   }
 
-#define RUDF_STRUCT_ADD_SAFE_C_METHOD_ACCESS_CODE(r, TYPE, i, member)                                        \
-  {                                                                                                          \
-    using func_type = decltype(TYPE::member);                                                                \
-    using first_arg_type = std::remove_pointer_t<::rapidudf::first_function_argument_type_t<func_type>>;     \
-    static ::rapidudf::SafeMemberFuncRegister<::rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(member)), __LINE__,  \
-                                                                     first_arg_type, decltype(TYPE::member)> \
-        BOOST_PP_CAT(rudf_safe_member_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(member), &TYPE::member);       \
-  }
+#define RUDF_STRUCT_ADD_SAFE_C_METHOD_ACCESS_CODE(r, TYPE, i, member) \
+  SAFE_MEMBER_FUNC_WRAPPER(BOOST_PP_STRINGIZE(member), &TYPE::member);
 
 #define RUDF_STRUCT_ADD_C_METHOD_ACCESS_CODE(r, TYPE, i, member) \
   ::rapidudf::ReflectFactory::AddStructMethodAccessor(BOOST_PP_STRINGIZE(member), &TYPE::member);
 
-#define RUDF_STRUCT_ADD_SAFE_METHOD_ACCESS_CODE(r, TYPE, i, member)                                           \
-  static ::rapidudf::SafeMemberFuncRegister<::rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(NAME)), __LINE__, TYPE, \
-                                                                   decltype(&TYPE::member)>                   \
-      BOOST_PP_CAT(rudf_safe_member_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(member), &TYPE::member);
+#define RUDF_STRUCT_ADD_SAFE_METHOD_ACCESS_CODE(r, TYPE, i, member) \
+  SAFE_MEMBER_FUNC_WRAPPER(BOOST_PP_STRINGIZE(member), &TYPE::member);
 
-#define RUDF_STRUCT_ADD_METHOD_ACCESS_CODE(r, TYPE, i, member)                                                \
-  {                                                                                                           \
-    static ::rapidudf::MemberFuncRegister<::rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(member)), __LINE__, TYPE, \
-                                                                 decltype(&TYPE::member)>                     \
-        BOOST_PP_CAT(rudf_member_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(member), &TYPE::member);             \
+#define RUDF_STRUCT_ADD_METHOD_ACCESS_CODE(r, TYPE, i, member)                         \
+  {                                                                                    \
+    MEMBER_FUNC_WRAPPER(BOOST_PP_STRINGIZE(member), &TYPE::member);                    \
+    using ret_type = ::rapidudf::FunctionTraits<decltype(&TYPE::member)>::return_type; \
+    ::rapidudf::try_register_fbs_vector_member_funcs<ret_type>();                      \
+    ::rapidudf::try_register_pb_map_member_funcs<ret_type>();                          \
   }
 
 #define RUDF_STRUCT_MEMBER_METHODS(st, ...)                                                                  \
@@ -207,6 +141,7 @@ class SafeMemberFuncRegister<hash, line, T, R(T*, Args...)> {
   template <>                                                                                                \
   class StructMethodAccess<st> {                                                                             \
    public:                                                                                                   \
+    template <typename T = void>                                                                             \
     static void Init() {                                                                                     \
       static bool inited = false;                                                                            \
       if (inited) {                                                                                          \
@@ -248,27 +183,26 @@ class SafeMemberFuncRegister<hash, line, T, R(T*, Args...)> {
   static ::rapidudf::StructMethodAccessRegister<st> BOOST_PP_CAT(rudf_struct_method_access_, __COUNTER__);        \
   }
 
-#define RUDF_STRUCT_METHODS_BIND(helper, ...)                                                                        \
+#define RUDF_STRUCT_HELPER_METHODS_BIND(helper, ...)                                                                 \
   static ::rapidudf::StructAccessHelperRegister<helper> BOOST_PP_CAT(rudf_struct_access_helper_, __COUNTER__)([]() { \
     BOOST_PP_SEQ_FOR_EACH_I(RUDF_STRUCT_ADD_C_METHOD_ACCESS_CODE, helper, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))     \
   });
 
-#define RUDF_STRUCT_SAFE_METHODS_BIND(helper, ...)                                                                    \
+#define RUDF_STRUCT_SAFE_HELPER_METHODS_BIND(helper, ...)                                                             \
   static ::rapidudf::StructAccessHelperRegister<helper> BOOST_PP_CAT(rudf_struct_access_helper_, __COUNTER__)([]() {  \
     BOOST_PP_SEQ_FOR_EACH_I(RUDF_STRUCT_ADD_SAFE_C_METHOD_ACCESS_CODE, helper, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)) \
   });
 
-#define RUDF_STRUCT_SAFE_MEMBER_METHOD_BIND(st, NAME, member_method)                                                   \
-  {                                                                                                                    \
-    using func_type = decltype(member_method);                                                                         \
-    using object_type = ::rapidudf::FunctionTraits<func_type>::object_type;                                            \
-    static ::rapidudf::SafeMemberFuncRegister<::rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(NAME)), __LINE__, object_type, \
-                                                                     func_type>                                        \
-        BOOST_PP_CAT(rudf_safe_member_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(NAME), member_method);                   \
-  }
+#define RUDF_STRUCT_SAFE_MEMBER_METHOD_BIND(NAME, member_method)                                         \
+  static ::rapidudf::StructAccessHelperRegister BOOST_PP_CAT(rudf_safe_member_bind_, __COUNTER__)([]() { \
+    using obj_t = FunctionTraits<decltype(member_method)>::object_type;                                  \
+    SAFE_MEMBER_FUNC_WRAPPER(NAME, member_method);                                                       \
+    DTypeFactory::Add<obj_t>();                                                                          \
+  });
 
-#define RUDF_STRUCT_MEMBER_METHOD_BIND(st, NAME, member_method)                                                        \
-  {                                                                                                                    \
-    static ::rapidudf::StructAccessHelperRegister<st> BOOST_PP_CAT(rudf_struct_access_helper_, __COUNTER__)(           \
-        []() { ::rapidudf::ReflectFactory::AddStructMemberMethodAccessor(BOOST_PP_STRINGIZE(NAME), member_method); }); \
-  }
+#define RUDF_STRUCT_MEMBER_METHOD_BIND(NAME, member_method)                                         \
+  static ::rapidudf::StructAccessHelperRegister BOOST_PP_CAT(rudf_member_bind_, __COUNTER__)([]() { \
+    using obj_t = FunctionTraits<decltype(member_method)>::object_type;                             \
+    MEMBER_FUNC_WRAPPER(NAME, member_method);                                                       \
+    DTypeFactory::Add<obj_t>();                                                                     \
+  });

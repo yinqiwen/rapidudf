@@ -37,13 +37,17 @@
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/function.h"
+#include "rapidudf/reflect/protobuf.h"
+#include "rapidudf/reflect/reflect.h"
 #include "rapidudf/reflect/struct_access.h"
 #include "rapidudf/tests/test_pb.pb.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
 
-RUDF_STRUCT_MEMBER_METHODS(::test::Header, id, scene, set_id)
+RUDF_STRUCT_MEMBER_METHODS(::test::Item, id)
+RUDF_STRUCT_MEMBER_METHODS(::test::Header, id, scene, set_id, item_map, mapping)
 
 using TTT = void (test::Header::*)(const std::string&);
 
@@ -103,9 +107,82 @@ TEST(JitCompiler, pb_access_write_int) {
    )";
   auto rc = compiler.CompileFunction<int, test::Header*, int>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, test::Header*, int>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
   ASSERT_EQ(f(&pb_header, 1024), 1024);
   ASSERT_EQ(pb_header.id(), 1024);
+}
+
+TEST(JitCompiler, pb_read_repetead) {
+  spdlog::set_level(spdlog::level::debug);
+  ::test::Header pb_header;
+  pb_header.set_scene("");
+  pb_header.set_id(101);
+  pb_header.set_scene("hello,world");
+  pb_header.add_items()->set_id(10001);
+  // pb_header.mutable_item_map()->insert(1);
+
+  // the only way to bind overload member func
+  using GetItemsFunc = const ::test::Item& (::test::Header::*)(int) const;
+  GetItemsFunc get_func = &::test::Header::items;
+  MEMBER_FUNC_WRAPPER("items", get_func);
+
+  JitCompiler compiler;
+  std::string content = R"(
+    int test_func(test::Header x){
+      return x.items(0).id();
+    }
+   )";
+  auto rc = compiler.CompileFunction<int, test::Header*>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(&pb_header), 10001);
+}
+
+TEST(JitCompiler, pb_write_string) {
+  spdlog::set_level(spdlog::level::debug);
+  ::test::Header pb_header;
+  pb_header.set_scene("");
+  pb_header.set_id(101);
+  pb_header.set_scene("hello,world");
+  pb_header.add_items()->set_id(10001);
+  // pb_header.mutable_item_map()->insert(1);
+
+  // the only way to bind overload member func
+  using SetFunc = void (::test::Header::*)(std::string&&);
+  SetFunc set_func = &::test::Header::set_scene;
+  PB_SET_STRING_HELPER("set_scene", set_func);
+
+  JitCompiler compiler;
+  std::string content = R"(
+    string_view test_func(test::Header x){
+      x.set_scene("123456");
+      return x.scene();
+    }
+   )";
+  auto rc = compiler.CompileFunction<std::string_view, test::Header*>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(&pb_header), "123456");
+  ASSERT_EQ(pb_header.scene(), "123456");
+}
+
+TEST(JitCompiler, pb_read_map) {
+  spdlog::set_level(spdlog::level::debug);
+  ::test::Header pb_header;
+  pb_header.set_scene("");
+  pb_header.set_id(101);
+  pb_header.set_scene("hello,world");
+  pb_header.mutable_mapping()->insert({"k0", 100});
+  pb_header.mutable_mapping()->insert({"k1", 101});
+
+  JitCompiler compiler;
+  std::string content = R"(
+    int test_func(test::Header x){
+      return x.mapping().get("k1");
+    }
+   )";
+  auto rc = compiler.CompileFunction<int, test::Header*>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(&pb_header), 101);
 }

@@ -51,7 +51,7 @@ struct VectorReflectHelper {
     }
     return vec->size();
   }
-  static void Init() { RUDF_STRUCT_METHODS_BIND(VectorReflectHelper<T>, get, set, add, size) }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(VectorReflectHelper<T>, get, set, add, size) }
 };
 template <typename T>
 struct SetReflectHelper {
@@ -73,7 +73,7 @@ struct SetReflectHelper {
     }
     return vec->size();
   }
-  static void Init() { RUDF_STRUCT_METHODS_BIND(SetReflectHelper<T>, contains, insert, size) }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SetReflectHelper<T>, contains, insert, size) }
 };
 
 #define RUDF_STL_REFLECT_HELPER_INIT(r, STL_HELPER, i, TYPE) STL_HELPER<TYPE>::Init();
