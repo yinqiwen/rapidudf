@@ -59,8 +59,6 @@ using namespace Xbyak::util;
 static inline uint32_t allgin16(uint32_t x) { return (x + 15) & ~15; }
 
 CodeGenerator::CodeGenerator(size_t max_size, bool use_register) : use_register_(use_register) {
-  init_builtin();
-
   jit_ = std::make_unique<Xbyak::CodeGenerator>(max_size);
   if (use_register_) {
     InitFreeRegisters();
@@ -226,19 +224,45 @@ void CodeGenerator::RestoreCalleeSavedRegisters() {
   }
 }
 
-const Xbyak::Reg* CodeGenerator::AllocateRegister() {
+const Xbyak::Reg* CodeGenerator::AllocateRegister(const std::vector<RegisterId>& exclude_regs) {
   if (free_registers_.empty()) {
     return nullptr;
   }
-  auto op = free_registers_.front();
-  free_registers_.pop_front();
-  inuse_registers_.insert(op);
-  if (callee_saved_registers_.count(op) == 1) {
-    if (used_callee_saved_registers_.insert(op).second) {
-      SaveRegister(op);
+  std::vector<const Xbyak::Reg*> allocated_not_used;
+  const Xbyak::Reg* allocated_reg = nullptr;
+  while (!free_registers_.empty()) {
+    auto op = free_registers_.front();
+    free_registers_.pop_front();
+    if (!exclude_regs.empty()) {
+      RegisterId id(*op);
+      for (auto exclude_reg : exclude_regs) {
+        if (id == exclude_reg) {
+          allocated_not_used.emplace_back(op);
+          op = nullptr;
+          break;
+        }
+      }
+    }
+    if (nullptr != op) {
+      allocated_reg = op;
+      break;
     }
   }
-  return op;
+  for (auto reg : allocated_not_used) {
+    free_registers_.emplace_back(reg);
+  }
+
+  if (nullptr == allocated_reg) {
+    return nullptr;
+  }
+
+  inuse_registers_.insert(allocated_reg);
+  if (callee_saved_registers_.count(allocated_reg) == 1) {
+    if (used_callee_saved_registers_.insert(allocated_reg).second) {
+      SaveRegister(allocated_reg);
+    }
+  }
+  return allocated_reg;
 }
 
 void CodeGenerator::RecycleRegister(const Xbyak::Reg* reg) {
@@ -288,13 +312,14 @@ std::pair<uint32_t, uint32_t> CodeGenerator::AllocateStack(DType dtype, uint32_t
   return {stack_cursor_, stack_offset_inc};
 }
 
-ValuePtr CodeGenerator::AllocateValue(DType dtype, uint32_t len, bool with_register, bool temp) {
+ValuePtr CodeGenerator::AllocateValue(DType dtype, uint32_t len, const std::vector<RegisterId>& exlucde_regs,
+                                      bool with_register, bool temp) {
   switch (len) {
     case 8:
     case 4:
     case 2:
     case 1: {
-      const Xbyak::Reg* reg = with_register ? AllocateRegister() : nullptr;
+      const Xbyak::Reg* reg = with_register ? AllocateRegister(exlucde_regs) : nullptr;
       if (reg != nullptr) {
         auto value = Value::New(this, dtype, reg, temp);
         return value;
@@ -329,8 +354,8 @@ ValuePtr CodeGenerator::NewConstValue(DType dtype, uint64_t val) {
   return value;
 }
 
-ValuePtr CodeGenerator::NewValue(DType dtype, bool temp) {
-  auto val = AllocateValue(dtype, dtype.ByteSize(), true, temp);
+ValuePtr CodeGenerator::NewValue(DType dtype, const std::vector<RegisterId>& exlucde_regs, bool temp) {
+  auto val = AllocateValue(dtype, dtype.ByteSize(), exlucde_regs, true, temp);
   return val;
 }
 
@@ -382,7 +407,7 @@ ValuePtr CodeGenerator::CallFunction(const FunctionDesc& desc, const std::vector
     } else {
       RUDF_DEBUG("return {} with registers:{} stack_bytes:{}", desc.return_type, return_value_regs.size(), stack_bytes);
       auto register_val = Value::New(this, desc.return_type, return_value_regs, false);
-      auto return_value = AllocateValue(desc.return_type, stack_bytes, true, true);
+      auto return_value = AllocateValue(desc.return_type, stack_bytes, {}, true, true);
       RUDF_DEBUG("return_value stack:{}, reg:{}", return_value->IsStack(), return_value->IsRegister());
       int rc = return_value->Copy(*register_val);
       if (rc != 0) {

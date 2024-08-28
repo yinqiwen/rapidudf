@@ -460,7 +460,7 @@ ValuePtr Value::CastTo(DType dtype) {
     }
     return SelfPtr();
   }
-  auto tmp = c_->NewValue(dtype_, true);
+  auto tmp = c_->NewValue(dtype_, {}, true);
   int rc = tmp->Copy(*this);
   if (rc != 0) {
     return {};
@@ -529,7 +529,7 @@ int Value::CastToInplace(DType dtype) {
     uint32_t dst_len = dtype.ByteSize();
     int rc = 0;
     if (src_len != dst_len) {
-      auto tmp = c_->AllocateValue(dtype, dst_len, false, temp_);
+      auto tmp = c_->AllocateValue(dtype, dst_len, {}, false, temp_);
       rc = static_cast_value(c_->GetCodeGen(), GetStackAddress(), dtype_, tmp->GetStackAddress(), dtype);
       if (rc == 0) {
         std::swap(tmp->stack_len_, stack_len_);

@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,25 +28,21 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/codegen/builtin/builtin.h"
-#include <mutex>
-#include "flatbuffers/flatbuffers.h"
-#include "rapidudf/codegen/function.h"
+
+#pragma once
+#include "google/protobuf/arena.h"
 namespace rapidudf {
-static std::once_flag g_init_builtin_flag;
-void init_builtin() {
-  std::call_once(g_init_builtin_flag, []() {
-    init_builtin_math();
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonMemberGet, json_member_get);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonArrayGet, json_array_get);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpString, json_cmp_string);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpInt, json_cmp_int);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpFloat, json_cmp_float);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpBool, json_cmp_bool);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpJson, json_cmp_json);
-  });
-}
+class Arena {
+ public:
+  static Arena& Get() {
+    static thread_local Arena arena;
+    return arena;
+  }
+  uint8_t* Allocate(size_t n) { return google::protobuf::Arena::CreateArray<uint8_t>(&arena_, n); }
+  void Reset() { arena_.Reset(); }
+
+ private:
+  Arena();
+  google::protobuf::Arena arena_;
+};
 }  // namespace rapidudf

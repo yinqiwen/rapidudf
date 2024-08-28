@@ -36,8 +36,10 @@
 #include "rapidudf/ast/grammar.h"
 #include "rapidudf/ast/statement.h"
 #include "rapidudf/ast/symbols.h"
+#include "rapidudf/codegen/builtin/builtin.h"
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
+#include "rapidudf/codegen/register.h"
 #include "rapidudf/codegen/value.h"
 #include "rapidudf/reflect/reflect.h"
 
@@ -51,6 +53,7 @@ namespace rapidudf {
 JitCompiler::JitCompiler(size_t max_size, bool use_register) {
   max_code_size_ = max_size;
   use_registers_ = use_register;
+  init_builtin();
   ReflectFactory::Init();
   ast::Symbols::Init();
 }
@@ -128,25 +131,19 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   GetCodeGenerator().AddFreeRegisters(unused_registers);
 
   ctx.desc = ctx.func_ast.ToFuncDesc();
-  // FunctionDesc func_desc;
-  // func_desc.return_type = ctx.func_ast.return_type;
-  // func_desc.name = ctx.func_ast.name;
-  // if (ctx.func_ast.args) {
-  //   for (auto& arg : *ctx.func_ast.args) {
-  //     func_desc.arg_types.emplace_back(arg.dtype);
-  //   }
-  //   auto arg_registers = func_desc.GetArgsRegisters();
-  //   if (arg_registers.empty()) {
-  //     return absl::InvalidArgumentError("Can NOT use registers for all func args.");
-  //   }
 
-  // }
   auto arg_registers = ctx.desc.GetArgsRegisters();
   if (!ctx.desc.arg_types.empty() && arg_registers.empty()) {
     return absl::InvalidArgumentError("Can NOT use registers for all func args.");
   }
+  std::vector<RegisterId> exclude_regs;
+  for (auto& regs : arg_registers) {
+    for (auto reg : regs) {
+      exclude_regs.emplace_back(RegisterId(*reg));
+    }
+  }
   for (size_t i = 0; i < ctx.desc.arg_types.size(); i++) {
-    auto var = GetCodeGenerator().NewValue(ctx.desc.arg_types[i], false);
+    auto var = GetCodeGenerator().NewValue(ctx.desc.arg_types[i], exclude_regs, false);
     auto reg_var = Value::New(&GetCodeGenerator(), ctx.desc.arg_types[i], arg_registers[i], false);
     if (0 != var->Copy(*reg_var)) {
       RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError(

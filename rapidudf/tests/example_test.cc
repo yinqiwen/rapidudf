@@ -144,3 +144,19 @@ TEST(JitCompiler, safe_func) {
   auto f = std::move(rc.value());
   f();
 }
+
+TEST(JitCompiler, var) {
+  spdlog::set_level(spdlog::level::debug);
+  rapidudf::JitCompiler compiler;
+  std::string source = R"(
+    int test_func(int x, int y){
+      var a = x+1;
+      var b = y-1;
+      return a + b;
+    }
+  )";
+  auto result = compiler.CompileFunction<int, int, int>(source);
+  auto f = std::move(result.value());
+  int v = f(1, 1);
+  ASSERT_EQ(v, 2);
+}

@@ -140,7 +140,8 @@ auto unary_expr_func = [](auto& ctx) {
 auto binary_expr_func = [](auto& ctx) {
   auto v = std::make_shared<BinaryExpr>();
   v->left = std::get<0>(_attr(ctx));
-  v->right = std::get<1>(_attr(ctx));
+  // v->right = std::get<1>(_attr(ctx));
+  v->SetRight(std::get<1>(_attr(ctx)));
   v->position = _where(ctx).begin() - _begin(ctx);
   _val(ctx) = v;
 };
@@ -166,13 +167,13 @@ auto const operand_def =
     bp::double_ | bp::long_ | bp::bool_ | bp::quoted_string | var_declare | var_accessor | ('(' >> expression >> ')');
 auto const func_invoke_args_def = '(' > -(expression % ',') > ')';
 auto const expression_def = assign;
-auto const assign_def = (logic_expr >> -(Symbols::kAssignOpSymbols >> logic_expr))[binary_expr_func];
-auto const logic_expr_def = (cmp_expr >> -(Symbols::kLogicOpSymbols >> cmp_expr))[binary_expr_func];
-auto const cmp_expr_def = (additive_expr >> -(Symbols::kCmpOpSymbols >> additive_expr))[binary_expr_func];
+auto const assign_def = (logic_expr >> *(Symbols::kAssignOpSymbols >> logic_expr))[binary_expr_func];
+auto const logic_expr_def = (cmp_expr >> *(Symbols::kLogicOpSymbols >> cmp_expr))[binary_expr_func];
+auto const cmp_expr_def = (additive_expr >> *(Symbols::kCmpOpSymbols >> additive_expr))[binary_expr_func];
 auto const additive_expr_def =
-    (multiplicative_expr >> -(Symbols::kAdditiveOpSymbols >> multiplicative_expr))[binary_expr_func];
+    (multiplicative_expr >> *(Symbols::kAdditiveOpSymbols >> multiplicative_expr))[binary_expr_func];
 auto const multiplicative_expr_def =
-    (unary_expr >> -(Symbols::kMultiplicativeOpSymbols >> unary_expr))[binary_expr_func];
+    (unary_expr >> *(Symbols::kMultiplicativeOpSymbols >> unary_expr))[binary_expr_func];
 auto const unary_expr_def = (-Symbols::kUnaryOpSymbols >> operand)[unary_expr_func];
 
 auto const filed_access_def = ('.' > identifier > -func_invoke_args);

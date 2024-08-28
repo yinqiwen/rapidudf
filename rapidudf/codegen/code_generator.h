@@ -57,7 +57,7 @@ class CodeGenerator {
 
   void AddFreeRegisters(const std::vector<const Xbyak::Reg*>& regs, bool head = true);
 
-  ValuePtr NewValue(DType dtype, bool temp = true);
+  ValuePtr NewValue(DType dtype, const std::vector<RegisterId>& exlucde_regs = {}, bool temp = true);
   ValuePtr NewValueByRegister(DType dtype, const Xbyak::Reg& reg);
   ValuePtr NewValueByRegister(DType dtype, const std::vector<const Xbyak::Reg*>& regs);
   ValuePtr NewConstValue(DType dtype, uint64_t val = 0);
@@ -102,7 +102,8 @@ class CodeGenerator {
 
  private:
   std::pair<uint32_t, uint32_t> AllocateStack(DType dtype, uint32_t len);
-  ValuePtr AllocateValue(DType dtype, uint32_t len, bool with_register, bool temp);
+  ValuePtr AllocateValue(DType dtype, uint32_t len, const std::vector<RegisterId>& exlucde_regs, bool with_register,
+                         bool temp);
 
   void RecycleStack(uint32_t offset, uint32_t len);
 
@@ -113,7 +114,7 @@ class CodeGenerator {
   void SaveInuseRegisters();
   void RestoreInuseRegisters();
   void RestoreCalleeSavedRegisters();
-  const Xbyak::Reg* AllocateRegister();
+  const Xbyak::Reg* AllocateRegister(const std::vector<RegisterId>& exlucde_regs);
   void RecycleRegister(const Xbyak::Reg* reg);
 
   std::unique_ptr<Xbyak::CodeGenerator> jit_;

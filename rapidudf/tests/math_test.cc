@@ -28,25 +28,52 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/codegen/builtin/builtin.h"
-#include <mutex>
-#include "flatbuffers/flatbuffers.h"
-#include "rapidudf/codegen/function.h"
-namespace rapidudf {
-static std::once_flag g_init_builtin_flag;
-void init_builtin() {
-  std::call_once(g_init_builtin_flag, []() {
-    init_builtin_math();
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonMemberGet, json_member_get);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonArrayGet, json_array_get);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpString, json_cmp_string);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpInt, json_cmp_int);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpFloat, json_cmp_float);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpBool, json_cmp_bool);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpJson, json_cmp_json);
-  });
+
+#include <gtest/gtest.h>
+#include <functional>
+#include <vector>
+#include "rapidudf/ast/context.h"
+#include "rapidudf/ast/grammar.h"
+#include "rapidudf/codegen/dtype.h"
+#include "rapidudf/jit/jit.h"
+#include "rapidudf/log/log.h"
+#include "rapidudf/reflect/struct_access.h"
+
+using namespace rapidudf;
+using namespace rapidudf::ast;
+
+TEST(JitCompiler, sqrt) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  ParseContext ctx;
+  std::string content = R"(
+    float test_func(float x){
+      return sqrt(x);
+    }
+  )";
+  auto rc = compiler.CompileFunction<float, float>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  float v = 1.2;
+  ASSERT_FLOAT_EQ(f(v), sqrt(v));
 }
-}  // namespace rapidudf
+
+TEST(JitCompiler, complex_math) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  ParseContext ctx;
+  std::string content = R"(
+    double test_func(double a, double t, double c){
+      return a * exp(2.2/3.3*t) + c;
+    }
+  )";
+  auto rc = compiler.CompileFunction<double, double, double, double>(content, true);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  double a = 1.2;
+  double t = 2.1;
+  double c = 3.3;
+
+  double v = a * std::exp(2.2 / 3.3 * t) + c;
+  ASSERT_DOUBLE_EQ(f(a, t, c), v);
+}

@@ -117,7 +117,7 @@ TEST(codegen, func_call2) {
   b->Set(2.79);
   auto c = codegen.NewValue(DATA_I32);
   c->Set(202);
-  auto x = codegen.NewValue(DATA_U8, 1);
+  auto x = codegen.NewValue(DATA_U8, {}, 1);
   x->Set(0);
   args.push_back(a);
   args.push_back(b);

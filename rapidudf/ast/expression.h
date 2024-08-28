@@ -33,6 +33,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <variant>
 #include <vector>
 #include "rapidudf/ast/context.h"
@@ -87,8 +88,21 @@ struct VarAccessor {
 
 struct BinaryExpr {
   Operand left;
-  std::optional<std::tuple<OpToken, Operand>> right;
+  // std::optional<std::tuple<OpToken, Operand>> right;
+  std::vector<std::tuple<OpToken, Operand>> right;
   uint32_t position = 0;
+  void SetRight(const std::vector<std::tuple<OpToken, UnaryExprPtr>>& ops) {
+    for (const auto& [op, expr] : ops) {
+      Operand operand = expr;
+      right.emplace_back(std::make_tuple(op, operand));
+    }
+  }
+  void SetRight(const std::vector<std::tuple<OpToken, BinaryExprPtr>>& ops) {
+    for (const auto& [op, expr] : ops) {
+      Operand operand = expr;
+      right.emplace_back(std::make_tuple(op, operand));
+    }
+  }
   absl::StatusOr<VarTag> Validate(ParseContext& ctx);
 };
 struct UnaryExpr {

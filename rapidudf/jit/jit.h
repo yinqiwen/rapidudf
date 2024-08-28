@@ -151,7 +151,6 @@ class JitCompiler {
     (arg_types.emplace_back(get_dtype<Args>()), ...);
     for (auto& ctx : compile_ctxs_) {
       if (ctx.desc.name == name) {
-        RUDF_DEBUG("#{}#{}#", ctx.desc.name, name);
         if (!ctx.code_gen) {
           RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("Func:{} already loaded before.", name)));
         }
@@ -279,11 +278,6 @@ class JitCompiler {
   std::vector<CompileContext> compile_ctxs_;
 
   uint32_t compile_function_idx_ = 0;
-  // std::vector<std::unique_ptr<std::string>> const_strings_;
-  // std::unordered_map<std::string, ValuePtr> local_vars_;
-
   int label_cursor_ = 0;
-
-  // FunctionDesc func_desc_;
 };
 }  // namespace rapidudf

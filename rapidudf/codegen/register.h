@@ -32,6 +32,14 @@
 #pragma once
 #include "xbyak/xbyak.h"
 namespace rapidudf {
+
+struct RegisterId {
+  Xbyak::Operand::Kind kind;
+  uint32_t index = 0;
+  RegisterId(const Xbyak::Operand& reg) : kind(reg.getKind()), index(reg.getIdx()) {}
+  bool operator==(const RegisterId& other) const { return kind == other.kind && index == other.index; }
+};
+
 class Register {
  public:
   Register(Xbyak::CodeGenerator& code_gen, const Xbyak::Reg* reg, bool high = false);

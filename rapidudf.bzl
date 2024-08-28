@@ -40,6 +40,15 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
         url = "https://github.com/bazelbuild/rules_foreign_cc/archive/0.7.0.zip",
     )
 
+    http_archive(
+        name = "rules_license",
+        urls = [
+            "https://mirror.bazel.build/github.com/bazelbuild/rules_license/releases/download/0.0.8/rules_license-0.0.8.tar.gz",
+            "https://github.com/bazelbuild/rules_license/releases/download/0.0.8/rules_license-0.0.8.tar.gz",
+        ],
+        sha256 = "241b06f3097fd186ff468832150d6cc142247dc42a32aaefb56d0099895fd229",
+    )
+
     _SPDLOG_BUILD_FILE = """
 cc_library(
     name = "spdlog",
@@ -202,4 +211,10 @@ cc_library(
             "https://mirrors.tencent.com/github.com/abseil/abseil-cpp/archive/{ver}.tar.gz".format(ver = abseil_ver),
             "https://github.com/abseil/abseil-cpp/archive/refs/tags/{ver}.tar.gz".format(ver = abseil_ver),
         ],
+    )
+
+    git_repository(
+        name = "com_google_highway",
+        remote = "https://github.com/google/highway.git",
+        tag = "1.2.0",
     )
