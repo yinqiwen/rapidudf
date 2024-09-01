@@ -89,10 +89,12 @@ class ReflectFactory {
 
   template <typename T, typename RET, typename... Args>
   static bool AddStructMethodAccessor(const std::string& name, RET (*f)(T*, Args...)) {
-    // #pragma GCC diagnostic push
-    // #pragma GCC diagnostic ignored "-Wpmf-conversions"
     void* ff = reinterpret_cast<void*>(f);
-    // #pragma GCC diagnostic pop
+    return AddStructMethod<T, RET, Args...>(name, ff);
+  }
+  template <typename T, typename RET, typename... Args>
+  static bool AddStructMethodAccessor(const std::string& name, RET (*f)(T, Args...)) {
+    void* ff = reinterpret_cast<void*>(f);
     return AddStructMethod<T, RET, Args...>(name, ff);
   }
 

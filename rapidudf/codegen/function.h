@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "rapidudf/codegen/dtype.h"
+#include "rapidudf/codegen/optype.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/function.h"
 
@@ -68,12 +69,6 @@ struct FunctionDesc {
   // std::vector<std::variant<const Xbyak::Reg*, uint32_t>> GetArgsRegisters() const;
 };
 
-// struct FunctionCallContext {
-//   jmp_buf jmp_env;
-//   std::exception run_ex;
-//   uint32_t invoke_frame_id = 0;
-// };
-
 class FunctionFactory {
  public:
   template <typename RET, typename... Args>
@@ -88,233 +83,12 @@ class FunctionFactory {
 
   static bool Register(FunctionDesc&& desc);
   static const FunctionDesc* GetFunction(const std::string& name);
-  // static FunctionCallContext& GetFunctionCallContext(bool start) {
-  //   static thread_local FunctionCallContext ctx;
-  //   if (start) {
-  //     ctx.invoke_frame_id++;
-  //   }
-  //   return ctx;
-  // }
 };
-
-// constexpr uint64_t fnv1a_hash(const char* str) {
-//   uint64_t hash = 14695981039346656037ULL;
-//   while (*str) {
-//     hash = (hash ^ static_cast<uint64_t>(*str)) * 1099511628211ULL;
-//     ++str;
-//   }
-//   return hash;
-// }
-
-// template <uint64_t, uint32_t, typename F>
-// struct MemberFunctionWrapper;
-
-// template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
-// struct MemberFunctionWrapper<H, N, R (T::*)(Args...)> {
-//   using return_type = R;
-//   using func_t = R (T::*)(Args...);
-//   static std::string& GetFuncName() {
-//     static std::string func_name;
-//     return func_name;
-//   }
-//   static func_t& GetFunc() {
-//     static func_t func = nullptr;
-//     return func;
-//   }
-//   static R Call(T* p, Args... args) {
-//     auto func = GetFunc();
-//     if constexpr (std::is_same_v<void, R>) {
-//       (p->*func)(std::forward<Args>(args)...);
-//     } else {
-//       return (p->*func)(std::forward<Args>(args)...);
-//     }
-//   }
-// };
-// template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
-// struct MemberFunctionWrapper<H, N, R (T::*)(Args...) const> {
-//   using return_type = R;
-//   using func_t = R (T::*)(Args...) const;
-//   static std::string& GetFuncName() {
-//     static std::string func_name;
-//     return func_name;
-//   }
-//   static func_t& GetFunc() {
-//     static func_t func = nullptr;
-//     return func;
-//   }
-//   static R Call(const T* p, Args... args) {
-//     auto func = GetFunc();
-//     if constexpr (std::is_same_v<void, R>) {
-//       (p->*func)(std::forward<Args>(args)...);
-//     } else {
-//       return (p->*func)(std::forward<Args>(args)...);
-//     }
-//   }
-// };
-
-// template <uint64_t, uint32_t, typename F>
-// struct SafeFunctionWrapper;
-
-// template <uint64_t H, uint32_t N, typename R, typename... Args>
-// struct SafeFunctionWrapper<H, N, R(Args...)> {
-//   using return_type = R;
-//   using func_t = R (*)(Args...);
-//   static std::string& GetFuncName() {
-//     static std::string func_name;
-//     return func_name;
-//   }
-//   static func_t& GetFunc() {
-//     static func_t func = nullptr;
-//     return func;
-//   }
-//   static R SafeCall(Args... args) {
-//     auto func = GetFunc();
-//     try {
-//       if constexpr (std::is_same_v<void, R>) {
-//         func(std::forward<Args>(args)...);
-//       } else {
-//         return func(std::forward<Args>(args)...);
-//       }
-//     } catch (...) {
-//       auto& func_ctx = FunctionFactory::GetFunctionCallContext(false);
-//       try {
-//         throw;
-//       } catch (const std::exception& e) {
-//         RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), DType::Demangle(typeid(e).name()),
-//                    e.what());
-//         func_ctx.run_ex = e;
-//       } catch (...) {
-//         RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
-//       }
-//       if (func_ctx.invoke_frame_id > 0) {
-//         longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
-//       }
-//       if constexpr (std::is_same_v<void, R>) {
-//         // nothing
-//       } else {
-//         return {};
-//       }
-//     }
-//   }
-// };
-
-// template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
-// struct SafeFunctionWrapper<H, N, R (T::*)(Args...)> {
-//   using return_type = R;
-//   using arguments = std::tuple<Args...>;
-//   using func_t = R (T::*)(Args...);
-//   static std::string& GetFuncName() {
-//     static std::string func_name;
-//     return func_name;
-//   }
-//   static func_t& GetFunc() {
-//     static func_t func = nullptr;
-//     return func;
-//   }
-//   static R SafeCall(T* p, Args... args) {
-//     try {
-//       auto func = GetFunc();
-//       if constexpr (std::is_same_v<void, R>) {
-//         (p->*func)(std::forward<Args>(args)...);
-//       } else {
-//         return (p->*func)(std::forward<Args>(args)...);
-//       }
-//     } catch (...) {
-//       auto& func_ctx = FunctionFactory::GetFunctionCallContext(false);
-//       try {
-//         throw;
-//       } catch (const std::exception& e) {
-//         RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), DType::Demangle(typeid(e).name()),
-//                    e.what());
-//         func_ctx.run_ex = e;
-//       } catch (...) {
-//         RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
-//       }
-//       if (func_ctx.invoke_frame_id > 0) {
-//         longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
-//       }
-//       if constexpr (std::is_same_v<void, R>) {
-//         // nothing
-//       } else {
-//         return {};
-//       }
-//     }
-//   }
-// };
-
-// template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
-// struct SafeFunctionWrapper<H, N, R (T::*)(Args...) const> {
-//   using return_type = R;
-//   using func_t = R (T::*)(Args...) const;
-//   static std::string& GetFuncName() {
-//     static std::string func_name;
-//     return func_name;
-//   }
-//   static func_t& GetFunc() {
-//     static func_t func = nullptr;
-//     return func;
-//   }
-//   static R SafeCall(const T* p, Args... args) {
-//     try {
-//       auto func = GetFunc();
-//       if constexpr (std::is_same_v<void, R>) {
-//         (p->*func)(std::forward<Args>(args)...);
-//       } else {
-//         return (p->*func)(std::forward<Args>(args)...);
-//       }
-//     } catch (...) {
-//       auto& func_ctx = FunctionFactory::GetFunctionCallContext(false);
-//       try {
-//         throw;
-//       } catch (const std::exception& e) {
-//         RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), DType::Demangle(typeid(e).name()),
-//                    e.what());
-//         func_ctx.run_ex = e;
-//       } catch (...) {
-//         RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
-//       }
-//       if (func_ctx.invoke_frame_id > 0) {
-//         longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
-//       }
-//       if constexpr (std::is_same_v<void, R>) {
-//         // nothing
-//       } else {
-//         return {};
-//       }
-//     }
-//   }
-// };
-
-// template <uint64_t, uint32_t, typename F>
-// class SafeFuncRegister;
-// template <uint64_t hash, uint32_t line, typename R, typename... Args>
-// class SafeFuncRegister<hash, line, R(Args...)> {
-//  public:
-//   SafeFuncRegister(std::string_view name, R (*f)(Args...)) {
-//     FunctionDesc desc;
-//     desc.name = std::string(name);
-//     SafeFunctionWrapper<hash, line, R(Args...)>::GetFuncName() = name;
-//     SafeFunctionWrapper<hash, line, R(Args...)>::GetFunc() = f;
-//     desc.func = reinterpret_cast<void*>(&SafeFunctionWrapper<hash, line, R(Args...)>::SafeCall);
-//     desc.return_type = get_dtype<R>();
-//     (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
-//     FunctionFactory::Register(std::move(desc));
-//   }
-// };
 
 class FuncRegister {
  public:
   FuncRegister(std::function<void()>&& f) { f(); }
 
-  // template <typename RET, typename... Args>
-  // static FunctionDesc GetFunctionDesc(std::string_view name, RET (*f)(Args...)) {
-  //   FunctionDesc desc;
-  //   desc.name = std::string(name);
-  //   desc.func = reinterpret_cast<void*>(f);
-  //   desc.return_type = get_dtype<RET>();
-  //   (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
-  //   return desc;
-  // }
   template <typename RET, typename... Args>
   FuncRegister(std::string_view name, RET (*f)(Args...)) {
     FunctionDesc desc;
@@ -326,6 +100,8 @@ class FuncRegister {
     FunctionFactory::Register(std::move(desc));
   }
 };
+
+std::string GetFunctionName(std::string_view prefix, OpToken op, DType dtype);
 
 }  // namespace rapidudf
 

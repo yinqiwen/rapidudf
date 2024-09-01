@@ -10,13 +10,16 @@ package(
 
 cc_library(
     name = "context",
+    srcs = ["context.cc"],
     hdrs = [
         "context.h",
     ],
     deps = [
         "//rapidudf/codegen:dtype",
         "//rapidudf/codegen:function",
+        "//rapidudf/codegen:optype",
         "//rapidudf/log",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 

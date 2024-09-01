@@ -30,6 +30,7 @@
 */
 
 #include <gtest/gtest.h>
+#include <cmath>
 #include <functional>
 #include <vector>
 #include "rapidudf/ast/context.h"
@@ -59,4 +60,7 @@ TEST(JitCompiler, while0) {
   auto f = std::move(rc.value());
   ASSERT_EQ(f(10, 1), 101);
   ASSERT_EQ(f(100, 1), 1001);
+
+  int x = 4;
+  printf("%f\n", std::pow(x, 2));
 }

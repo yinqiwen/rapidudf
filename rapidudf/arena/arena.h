@@ -42,7 +42,7 @@ class Arena {
   void Reset() { arena_.Reset(); }
 
  private:
-  Arena();
+  Arena() {}
   google::protobuf::Arena arena_;
 };
 }  // namespace rapidudf

@@ -118,8 +118,6 @@ auto func_convert = [](auto& ctx) {
 
 auto var_declare_func = [](auto& ctx) {
   VarDefine v;
-  // v.dtype = std::get<0>(_attr(ctx));
-  // v.name = std::get<1>(_attr(ctx));
   v.name = _attr(ctx);
   v.position = _where(ctx).begin() - _begin(ctx);
   _val(ctx) = v;

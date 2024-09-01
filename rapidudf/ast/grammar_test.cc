@@ -73,7 +73,7 @@ TEST(Grammar, simple) {
 }
 
 TEST(Grammar, duplicate_var_name) {
-  spdlog::set_level(spdlog::level::debug);
+  // spdlog::set_level(spdlog::level::debug);
   ParseContext ctx;
   std::string content = R"(
     int test_func(int a, int a){  
@@ -129,6 +129,20 @@ TEST(Grammar, invalid_return) {
     RUDF_ERROR("{}", f.status().ToString());
   }
   ASSERT_FALSE(f.ok());
+}
+
+TEST(Grammar, expression) {
+  spdlog::set_level(spdlog::level::debug);
+  ParseContext ctx;
+  std::string content = R"(
+    int test_func(int a,int b, int c){
+     return a*b+c;
+    }
+  )";
+  auto f = parse_functions_ast(ctx, content);
+  if (!f.ok()) {
+    RUDF_ERROR("{}", f.status().ToString());
+  }
 }
 
 // // TEST(Grammar, obj_func_call) {

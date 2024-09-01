@@ -200,7 +200,6 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                 left_result->dtype, right_result->dtype));
         }
-        // return left_result;
         break;
       }
       case OP_ASSIGN: {
@@ -271,126 +270,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       }
     }
   }
-  // if (left_result.ok() && right.has_value()) {
-  //   auto& [op, right_operand] = *right;
-  //   auto right_result = validate_operand(ctx, right_operand);
-  //   if (!right_result.ok()) {
-  //     return right_result.status();
-  //   }
-  //   bool can_cmp = true;
-  //   do {
-  //     if (left_result->dtype == right_result->dtype) {
-  //       can_cmp = true;
-  //       break;
-  //     }
-  //     if (left_result->dtype.IsVoid() && !left_result->name.empty() && op == OP_ASSIGN) {
-  //       can_cmp = true;
-  //       break;
-  //     }
-  //     if (left_result->dtype.IsJsonPtr() && right_result->dtype.IsPrimitive()) {
-  //       can_cmp = true;
-  //       break;
-  //     }
-  //     if (right_result->dtype.IsJsonPtr() && left_result->dtype.IsPrimitive()) {
-  //       can_cmp = true;
-  //       break;
-  //     }
-  //     if (!left_result->dtype.CanCastTo(right_result->dtype) && !right_result->dtype.CanCastTo(left_result->dtype))
-  //     {
-  //       can_cmp = false;
-  //       break;
-  //     }
-  //     if (left_result->dtype.CanCastTo(right_result->dtype)) {
-  //       left_result->dtype = right_result->dtype;
-  //     } else {
-  //       right_result->dtype = left_result->dtype;
-  //     }
-  //     if (left_result->dtype.IsStringPtr() || right_result->dtype.IsStringPtr()) {
-  //       ctx.AddBuiltinFuncCall(kBuiltinCastStdStrToStringView);
-  //     } else if (left_result->dtype.IsFlatbuffersStringPtr() || right_result->dtype.IsFlatbuffersStringPtr()) {
-  //       ctx.AddBuiltinFuncCall(kBuiltinCastFbsStrToStringView);
-  //     }
-  //   } while (0);
 
-  //   if (!can_cmp) {
-  //     return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} by expression
-  //     validate",
-  //                                           op, left_result->dtype, right_result->dtype));
-  //   }
-  //   switch (op) {
-  //     case OP_PLUS:
-  //     case OP_MINUS:
-  //     case OP_MULTIPLY:
-  //     case OP_DIVIDE:
-  //     case OP_MOD: {
-  //       if (!left_result->dtype.IsNumber() || !right_result->dtype.IsNumber()) {
-  //         return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
-  //                                               left_result->dtype, right_result->dtype));
-  //       }
-  //       return left_result;
-  //     }
-  //     case OP_ASSIGN: {
-  //       if (!left_result->name.empty()) {
-  //         ctx.AddLocalVar(left_result->name, right_result->dtype);
-  //       }
-  //       return right_result;
-  //     }
-  //     case OP_EQUAL:
-  //     case OP_NOT_EQUAL:
-  //     case OP_LESS:
-  //     case OP_LESS_EQUAL:
-  //     case OP_GREATER:
-  //     case OP_GREATER_EQUAL: {
-  //       bool can_cmp = false;
-  //       if (left_result->dtype.IsNumber() && right_result->dtype.IsNumber()) {
-  //         can_cmp = true;
-  //       } else if (left_result->dtype.IsStringView() && right_result->dtype.IsStringView()) {
-  //         can_cmp = true;
-  //         ctx.AddBuiltinFuncCall(kBuiltinStringViewCmp);
-  //       } else if (left_result->dtype.IsJsonPtr() && right_result->dtype.IsPrimitive()) {
-  //         can_cmp = true;
-  //         if (right_result->dtype.IsFloat()) {
-  //           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpFloat);
-  //         } else if (right_result->dtype.IsStringView()) {
-  //           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpString);
-  //         } else {
-  //           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpInt);
-  //         }
-  //       } else if (left_result->dtype.IsPrimitive() && right_result->dtype.IsJsonPtr()) {
-  //         can_cmp = true;
-  //         if (left_result->dtype.IsFloat()) {
-  //           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpFloat);
-  //         } else if (left_result->dtype.IsStringView()) {
-  //           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpString);
-  //         } else {
-  //           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpInt);
-  //         }
-  //       } else if (left_result->dtype.IsJsonPtr() && right_result->dtype.IsJsonPtr()) {
-  //         can_cmp = true;
-  //         ctx.AddBuiltinFuncCall(kBuiltinJsonCmpJson);
-  //       }
-  //       if (!can_cmp) {
-  //         // RUDF_DEBUG("#### {}:{} {}", *left_result, left_result->dtype.IsJsonPtr(),
-  //         // right_result->dtype.IsPrimitive());
-  //         return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
-  //                                               left_result->dtype, right_result->dtype));
-  //       }
-  //       return DType(DATA_U8);
-  //     }
-  //     case OP_LOGIC_AND:
-  //     case OP_LOGIC_OR: {
-  //       if (!left_result->dtype.IsBool() || !right_result->dtype.IsBool()) {
-  //         return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
-  //                                               left_result->dtype, right_result->dtype));
-  //       }
-  //       return DType(DATA_U8);
-  //     }
-  //     default: {
-  //       return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
-  //                                             left_result->dtype, right_result->dtype));
-  //     }
-  //   }
-  // }
   return left_var;
 }
 
@@ -432,6 +312,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
   } else if (func_args.has_value()) {
     std::vector<DType> arg_dtypes;
     DType largest_dtype;
+    bool has_simd_vector = false;
     if (func_args->args.has_value()) {
       for (auto expr : *(func_args->args)) {
         auto result = expr->Validate(ctx);
@@ -442,11 +323,18 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
         if (result->dtype > largest_dtype) {
           largest_dtype = result->dtype;
         }
+        if (result->dtype.IsSimdVector()) {
+          has_simd_vector = true;
+        }
       }
     }
     RUDF_DEBUG("{} is builtin:{}", name, is_builtin_math_func(name));
     if (is_builtin_math_func(name)) {
-      name = name + "_" + largest_dtype.GetTypeString();
+      if (has_simd_vector) {
+        name = "simd_vector_" + name + "_" + largest_dtype.Elem().GetTypeString();
+      } else {
+        name = name + "_" + largest_dtype.GetTypeString();
+      }
     }
     auto result = ctx.CheckFuncExist(name);
     if (!result.ok()) {
@@ -461,5 +349,6 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     return ctx.IsVarExist(name, false);
   }
 }
+
 }  // namespace ast
 }  // namespace rapidudf

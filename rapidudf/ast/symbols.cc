@@ -118,22 +118,15 @@ void Symbols::Init() {
     if (dtype.IsPtr()) {
       kDtypeSymbols.insert_for_next_parse(name_view, dtype);
     } else if (!dtype.IsPrimitive()) {
-      RUDF_DEBUG("Add symbol {}:{}", name, dtype.ToPtr());
-      kDtypeSymbols.insert_for_next_parse(name_view, dtype.ToPtr());
+      DType reg_dtype = dtype;
+      if (!dtype.IsSimdVector()) {
+        reg_dtype = dtype.ToPtr();
+      }
+      kDtypeSymbols.insert_for_next_parse(name_view, reg_dtype);
+      RUDF_DEBUG("Add symbol {}:{}", name, reg_dtype);
     }
 
     if (dtype.IsPrimitive()) {
-      // std::string vector_type_name = fmt::format("vector<{}>", name);
-      // std::unique_ptr<std::string> vector_str = std::make_unique<std::string>(vector_type_name);
-      // std::string_view symbol_token_view = *vector_str;
-      // get_symbol_token_cache().emplace_back(std::move(vector_str));
-      // kDtypeSymbols.insert_for_next_parse(symbol_token_view, dtype.ToVector().ToPtr());
-
-      // std::string set_type_name = fmt::format("set<{}>", name);
-      // std::unique_ptr<std::string> set_str = std::make_unique<std::string>(set_type_name);
-      // symbol_token_view = *set_str;
-      // get_symbol_token_cache().emplace_back(std::move(set_str));
-      // kDtypeSymbols.insert_for_next_parse(symbol_token_view, dtype.ToVector().ToPtr());
     }
   });
   // kDtypeSymbols.insert_for_next_parse("vector<int>", DType(DATA_I32).ToVector().ToPtr());

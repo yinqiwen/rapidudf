@@ -246,6 +246,25 @@ int Value::LogicOp(OpToken op, Value& other, ValuePtr result) {
 int Value::ArithmeticOp(OpToken op, Value& other, ValuePtr result) {
   auto left = SelfPtr();
   auto right = other.SelfPtr();
+  if (left->GetDType().IsSimdVector() || right->GetDType().IsSimdVector()) {
+    // do simd binary op
+
+    if (left->GetDType().IsSimdVector() && right->GetDType().IsSimdVector()) {
+      DType left_ele_dtype = left->GetDType().Elem();
+      DType right_ele_dtype = right->GetDType().Elem();
+      if (left_ele_dtype != right_ele_dtype) {
+        RUDF_ERROR("Can NOT do op:{} with left:{}, right:{}", op, left->GetDType(), right->GetDType());
+        return -1;
+      }
+      if (left->IsConst()) {
+        left = left->CastTo(right->GetDType().Elem());
+      }
+      if (right->IsConst()) {
+        right = right->CastTo(left->GetDType().Elem());
+      }
+    }
+  }
+
   DType dst_dtype = dtype_;
   if (other.dtype_ != dtype_) {
     dst_dtype = other.dtype_ > dtype_ ? other.dtype_ : dtype_;
@@ -453,7 +472,7 @@ ValuePtr Value::CastTo(DType dtype) {
   if (dtype_ == dtype) {
     return SelfPtr();
   }
-  if (IsTemp()) {
+  if (IsTemp() || IsConst()) {
     int rc = CastToInplace(dtype);
     if (rc != 0) {
       return {};

@@ -54,6 +54,7 @@
 
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/json_object.h"
+#include "rapidudf/types/simd.h"
 
 namespace rapidudf {
 
@@ -66,14 +67,16 @@ enum CollectionType {
   COLLECTION_UNORDERED_SET,
   COLLECTION_ABSL_SPAN,
   COLLECTION_TUPLE,
+  COLLECTION_SIMD_VECTOR,
   COLLECTION_END = 64,
 };
 
-constexpr std::array<std::string_view, COLLECTION_TUPLE + 1> kCollectionTypeStrs = {
-    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple"};
+constexpr std::array<std::string_view, COLLECTION_SIMD_VECTOR + 1> kCollectionTypeStrs = {
+    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector"};
 enum FundamentalType {
   DATA_INVALID = 0,
   DATA_VOID,
+  DATA_BIT,
   DATA_U8,
   DATA_I8,
   DATA_U16,
@@ -92,7 +95,7 @@ enum FundamentalType {
   DATA_OBJECT_BEGIN = 64,
 };
 constexpr std::array<std::string_view, DATA_JSON + 1> kFundamentalTypeStrs = {
-    "invalid", "void", "u8",  "i8",  "u16",         "i16",    "u32",        "i32",
+    "invalid", "void", "bit", "u8",  "i8",          "u16",    "i16",        "u32", "i32",
     "u64",     "i64",  "f32", "f64", "string_view", "string", "fbs_string", "json"};
 
 class DType {
@@ -111,6 +114,7 @@ class DType {
   void SetPtr(bool v) { ptr_bit_ = (v ? 1 : 0); }
   void SetCollectionType(CollectionType t) { container_type_ = t; }
   FundamentalType GetFundamentalType() const { return static_cast<FundamentalType>(t0_); }
+  bool IsSimdVector() const { return container_type_ == COLLECTION_SIMD_VECTOR; }
   bool IsVector() const { return container_type_ == COLLECTION_VECTOR; }
   bool IsAbslSpan() const { return container_type_ == COLLECTION_ABSL_SPAN; }
   bool IsTuple() const { return container_type_ == COLLECTION_TUPLE; }
@@ -259,7 +263,8 @@ static inline uint32_t nextTypeId() {
                 is_specialization<xtype, std::set>::value || is_specialization<xtype, std::map>::value ||             \
                 is_specialization<xtype, std::unordered_map>::value ||                                                \
                 is_specialization<xtype, std::unordered_set>::value || is_specialization<xtype, absl::Span>::value || \
-                is_specialization<xtype, std::pair>::value || is_specialization<xtype, std::tuple>::value) {          \
+                is_specialization<xtype, std::pair>::value || is_specialization<xtype, std::tuple>::value ||          \
+                is_specialization<xtype, simd::Vector>::value) {                                                      \
     static_assert(sizeof(xtype) == -1, "Can NOT get dtype for complex type");                                         \
     return {};                                                                                                        \
   }
@@ -292,6 +297,13 @@ DType get_dtype() {
     }
     auto v = get_dtype<Origin>();
     v.SetPtr(true);
+    return v;
+  }
+  if constexpr (is_specialization<T, simd::Vector>::value) {
+    using val_type = typename T::value_type;
+    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
+    auto v = get_dtype<typename T::value_type>();
+    v.SetCollectionType(COLLECTION_SIMD_VECTOR);
     return v;
   }
   if constexpr (is_specialization<T, std::vector>::value) {
@@ -408,6 +420,9 @@ DType get_dtype() {
   }
   if constexpr (std::is_same_v<JsonObject, T>) {
     return DType(DATA_JSON);
+  }
+  if constexpr (std::is_same_v<simd::Bit, T>) {
+    return DType(DATA_BIT);
   }
   static uint32_t id = nextTypeId();
   DType dtype(static_cast<FundamentalType>(id));

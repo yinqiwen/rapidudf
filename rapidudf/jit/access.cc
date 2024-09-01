@@ -44,7 +44,7 @@
 namespace rapidudf {
 using namespace Xbyak::util;
 absl::StatusOr<ValuePtr> JitCompiler::CompileFieldAccess(ValuePtr var, const ast::FieldAccess& field) {
-  if (!var->GetDType().IsPtr()) {
+  if (!var->GetDType().IsSimdVector() && !var->GetDType().IsPtr()) {
     RUDF_LOG_ERROR_STATUS(
         ast_ctx_.GetErrorStatus(fmt::format("Can NOT access field:{} with dtype:{}", field.field, var->GetDType())));
   }

@@ -25,6 +25,7 @@ cc_library(
         "//rapidudf/log",
         "//rapidudf/meta",
         "//rapidudf/types",
+        "//rapidudf/types:simd",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_github_xbyak//:xbyak",
         "@com_google_absl//absl/types:span",
@@ -39,6 +40,7 @@ cc_library(
     ],
     deps = [
         ":dtype",
+        ":optype",
         "//rapidudf/log",
         "@com_github_xbyak//:xbyak",
     ],

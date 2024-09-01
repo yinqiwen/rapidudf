@@ -28,27 +28,24 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/codegen/builtin/builtin.h"
-#include <mutex>
-#include "flatbuffers/flatbuffers.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/simd/simd_ops.h"
+#include "rapidudf/types/simd.h"
 namespace rapidudf {
-static std::once_flag g_init_builtin_flag;
-void init_builtin() {
-  std::call_once(g_init_builtin_flag, []() {
-    init_builtin_math();
-    simd::init_builtin_simd_funcs();
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonMemberGet, json_member_get);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonArrayGet, json_array_get);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpString, json_cmp_string);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpInt, json_cmp_int);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpFloat, json_cmp_float);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpBool, json_cmp_bool);
-    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpJson, json_cmp_json);
-  });
-}
+namespace simd {
+// IntermediateData IntermediateData::New(bool mask, size_t vec_element_size, size_t vec_size, size_t
+// residue_element_size,
+//                                        size_t residue_size) {
+//   IntermediateData tmp(Private{});
+//   tmp.is_mask_ = mask;
+//   auto& arena = Arena::Get();
+//   tmp.vecs_ = arena.Allocate(vec_element_size * vec_size);
+//   tmp.residues_ = arena.Allocate(residue_element_size * residue_size);
+//   return tmp;
+// }
+// VectorData* VectorData::New(size_t size, size_t bytes) {
+//   auto& arena = Arena::Get();
+//   VectorData* tmp = reinterpret_cast<VectorData*>(arena.Allocate(sizeof(VectorData)));
+//   tmp->size_ = size;
+//   return tmp;
+// }
+}  // namespace simd
 }  // namespace rapidudf

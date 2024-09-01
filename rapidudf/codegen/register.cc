@@ -112,8 +112,6 @@ Register::Register(Xbyak::CodeGenerator& code_gen, const Xbyak::Reg* reg, bool h
   }
 }
 int Register::Mov(const Register& src, uint32_t bits) {
-  printf("###mov src xmm_h:%d, xmm_L:%d, regular:%d\n", src.IsXmmHigh(), src.IsXmmLow(), src.IsRegular());
-  printf("###mov dst xmm_h:%d, xmm_L:%d, regular:%d\n", IsXmmHigh(), IsXmmLow(), IsRegular());
   if (bits == 64) {
     if (IsRegular()) {
       if (src.IsRegular()) {
@@ -124,7 +122,6 @@ int Register::Mov(const Register& src, uint32_t bits) {
       } else if (src.IsXmmLow()) {
         mov_xmm_low_to_reg_64(&code_gen_, reg_, src.reg_);
       } else {
-        printf("####00\n");
         return -1;
       }
     } else if (IsXmmHigh()) {
@@ -135,7 +132,6 @@ int Register::Mov(const Register& src, uint32_t bits) {
       } else if (src.IsXmmLow()) {
         mov_xmm_low_to_xmm_high_64(&code_gen_, reg_, src.reg_);
       } else {
-        printf("####01\n");
         return -1;
       }
     } else if (IsXmmLow()) {
@@ -146,11 +142,9 @@ int Register::Mov(const Register& src, uint32_t bits) {
       } else if (src.IsXmmLow()) {
         mov_xmm_low_to_xmm_low_64(&code_gen_, reg_, src.reg_);
       } else {
-        printf("####02\n");
         return -1;
       }
     } else {
-      printf("####03\n");
       return -1;
     }
   } else if (bits == 32 || bits == 16 || bits == 8) {
@@ -158,12 +152,10 @@ int Register::Mov(const Register& src, uint32_t bits) {
       if (src.IsRegular()) {
         mov_reg_to_reg(&code_gen_, reg_, src.reg_);
       } else if (src.IsXmmHigh()) {
-        printf("###movmov_xmm_high_to_reg_32\n");
         mov_xmm_high_to_reg_32(&code_gen_, reg_, src.reg_);
       } else if (src.IsXmmLow()) {
         mov_xmm_low_to_reg_32(&code_gen_, reg_, src.reg_);
       } else {
-        printf("####10\n");
         return -1;
       }
     } else if (IsXmmHigh()) {
@@ -174,7 +166,6 @@ int Register::Mov(const Register& src, uint32_t bits) {
       } else if (src.IsXmmLow()) {
         mov_xmm_low_to_xmm_high_32(&code_gen_, reg_, src.reg_);
       } else {
-        printf("####11\n");
         return -1;
       }
     } else if (IsXmmLow()) {
@@ -185,11 +176,9 @@ int Register::Mov(const Register& src, uint32_t bits) {
       } else if (src.IsXmmLow()) {
         mov_xmm_low_to_xmm_low_32(&code_gen_, reg_, src.reg_);
       } else {
-        printf("####12\n");
         return -1;
       }
     } else {
-      printf("####13\n");
       return -1;
     }
   } else {

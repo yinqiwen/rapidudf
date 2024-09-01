@@ -25,6 +25,17 @@ flatbuffer_cc_library(
     srcs = ["test_fbs.fbs"],
 )
 
+cc_binary(
+    name = "expr_bench",
+    srcs = ["expr_bench.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        "//rapidudf",
+        "@com_google_benchmark//:benchmark",
+        "@exprtk",
+    ],
+)
+
 cc_test(
     name = "pb_test",
     size = "small",
@@ -201,6 +212,18 @@ cc_test(
     name = "example_test",
     size = "small",
     srcs = ["example_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "simd_vector_test",
+    size = "small",
+    srcs = ["simd_vector_test.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [

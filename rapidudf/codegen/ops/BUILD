@@ -82,22 +82,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "simd_arithmetic_ops",
-    srcs = ["simd_arithmetic_ops.cc"],
-    hdrs = [
-        "simd_arithmetic_ops.h",
-    ],
-    deps = [
-        ":copy",
-        "//rapidudf/codegen:dtype",
-        "//rapidudf/codegen:optype",
-        "//rapidudf/log",
-        "@com_github_xbyak//:xbyak",
-        "@com_google_highway//:hwy",
-    ],
-)
-
 cc_test(
     name = "cmp_test",
     size = "small",

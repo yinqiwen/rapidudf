@@ -15,6 +15,7 @@ cc_library(
         "//rapidudf/codegen:dtype",
         "//rapidudf/codegen:function",
         "//rapidudf/codegen:optype",
+        "//rapidudf/codegen/simd:simd_ops",
         "//rapidudf/log",
         "@com_github_google_flatbuffers//:runtime_cc",
     ],

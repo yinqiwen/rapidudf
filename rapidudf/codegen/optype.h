@@ -54,11 +54,37 @@ enum OpToken {
   OP_GREATER_EQUAL,
   OP_LOGIC_AND,
   OP_LOGIC_OR,
+  OP_MAX,
+  OP_MIN,
+  OP_SQRT,
+  OP_FLOOR,
+  OP_ABS,
+  OP_SIN,
+  OP_COS,
+  OP_ASIN,
+  OP_ACOS,
+  OP_ATANH,
+  OP_ATAN2,
+  OP_SINH,
+  OP_TANH,
+  OP_ASINH,
+  OP_ACOSH,
+  OP_EXP,
+  OP_EXP2,
+  OP_EXPM1,
+  OP_LOG,
+  OP_LOG2,
+  OP_LOG10,
+  OP_LOG1P,
+  OP_HYPOT,
   OP_END,
 };
 constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
     "invalid", "assign", "plus",      "minus", "multiply",   "divide",  "mod",           "positive",  "negative",
-    "not",     "equal",  "not_equal", "less",  "less_equal", "greater", "greater_equal", "logic_and", "logic_or"};
+    "not",     "equal",  "not_equal", "less",  "less_equal", "greater", "greater_equal", "logic_and", "logic_or",
+    "max",     "min",    "sqrt",      "floor", "abs",        "sin",     "cos",           "asin",      "acos",
+    "atanh",   "atan2",  "sinh",      "tanh",  "asinh",      "acosh",   "exp",           "exp2",      "expm1",
+    "log",     "log2",   "log10",     "log1p", "hypot"};
 }  // namespace rapidudf
 
 template <>

@@ -43,6 +43,13 @@ static std::unique_ptr<FuncRegMap> g_regs = nullptr;
 
 static inline uint32_t allgin_n(uint32_t x, uint32_t n) { return (x + n - 1) & ~(n - 1); }
 
+std::string GetFunctionName(std::string_view prefix, OpToken op, DType dtype) {
+  std::string fname(prefix);
+  fname.append("_").append(std::string(kOpTokenStrs[op]));
+  fname.append("_").append(dtype.GetTypeString());
+  return fname;
+}
+
 std::vector<const Xbyak::Reg*> GetFuncReturnValueRegisters(DType return_type, uint32_t& total_bits) {
   std::vector<const Xbyak::Reg*> regs;
   uint32_t bits = 0;
@@ -124,7 +131,7 @@ std::vector<FuncArgRegister> GetFuncArgsRegistersByDTypes(const std::vector<DTyp
         RUDF_ERROR("Too many func args:{}, while can NOT use registers.", arg_types.size());
         return {};
       }
-    } else if (arg_dtype.IsAbslSpan() || arg_dtype.IsStringView()) {
+    } else if (arg_dtype.IsAbslSpan() || arg_dtype.IsStringView() || arg_dtype.IsSimdVector()) {
       if (int_regs.size() >= 2) {
         auto* reg0 = int_regs.front();
         int_regs.pop_front();
@@ -183,6 +190,7 @@ bool FunctionFactory::Register(FunctionDesc&& desc) {
     RUDF_CRITICAL("Duplicate func name:{}", desc.name);
     return false;
   }
+  // printf("Registe func name:%s\n", desc.name.c_str());
   RUDF_DEBUG("Registe func name:{}", desc.name);
   return g_regs->emplace(desc.name, desc).second;
 }

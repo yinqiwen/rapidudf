@@ -14,3 +14,14 @@ cc_library(
         "@com_google_nlohmann_json//:json",
     ],
 )
+
+cc_library(
+    name = "simd",
+    srcs = ["simd.cc"],
+    hdrs = [
+        "simd.h",
+    ],
+    deps = [
+        "//rapidudf/arena",
+    ],
+)

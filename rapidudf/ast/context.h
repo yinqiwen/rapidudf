@@ -30,8 +30,7 @@
 */
 
 #pragma once
-#include <fmt/core.h>
-#include <fmt/format.h>
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -40,14 +39,12 @@
 #include <vector>
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
+#include "rapidudf/codegen/optype.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
 namespace rapidudf {
 namespace ast {
-
-enum ParseResult { kParseOK = 0, kParseFuncNotExist, kParseResultEnd };
-constexpr std::array<std::string_view, kParseResultEnd> kParseResultStrs = {"OK", "Function Not Exist"};
 
 struct VarTag {
   std::string name;
@@ -60,91 +57,24 @@ struct VarTag {
 
 class ParseContext {
  public:
-  void Clear() {
-    source_.clear();
-    source_lines_.clear();
-    function_parse_ctxs_.clear();
-    ast_err_.clear();
-    validate_posistion_ = 0;
-  }
+  void Clear();
 
   const std::string& GetAstErr() const { return ast_err_; }
   void SetAstErr(const std::string& err) { ast_err_ = err; }
   void SetPosition(uint32_t pos) { validate_posistion_ = pos; }
-  void SetSource(const std::string& src, bool clear_vars = true) {
-    source_ = src;
-    source_lines_.clear();
-    if (clear_vars) {
-      function_parse_ctxs_.clear();
-    } else {
-      for (auto& ctx : function_parse_ctxs_) {
-        ctx.builtin_func_calls.clear();
-        ctx.func_calls.clear();
-      }
-    }
-    ast_err_.clear();
-    validate_posistion_ = 0;
-    source_lines_ = absl::StrSplit(absl::string_view(source_), '\n');
-  }
+  void SetSource(const std::string& src, bool clear_vars = true);
 
   absl::Status GetErrorStatus(const std::string& err) {
     return absl::InvalidArgumentError(fmt::format("{} at {}", err, GetErrorLine()));
   }
 
-  absl::StatusOr<DType> IsVarExist(const std::string& name, bool error_on_exist) {
-    auto found = GetFunctionParseContext(current_function_cursor_).local_vars.find(name);
-    if (found != GetFunctionParseContext(current_function_cursor_).local_vars.end()) {
-      if (error_on_exist) {
-        return absl::AlreadyExistsError(fmt::format("var:{} already exist at {}", name, GetErrorLine()));
-      }
-      return found->second;
-    }
-    if (!error_on_exist) {
-      return absl::NotFoundError(fmt::format("var:{} is not exist at {}", name, GetErrorLine()));
-    }
-    return DType(DATA_VOID);
-  }
+  absl::StatusOr<DType> IsVarExist(const std::string& name, bool error_on_exist);
 
-  std::string GetErrorLine() const {
-    uint32_t cursor = 0;
-    uint32_t lineno = 1;
-    for (auto line : source_lines_) {
-      if (validate_posistion_ <= (cursor + line.size())) {
-        // return {lineno, fmt::format("{}", line)};
-        return fmt::format("line:{}, error line: {}", lineno, line);
-      }
-      cursor += line.size();
-      lineno++;
-    }
-    return fmt::format("cursor:{}, source lines:'{}'", validate_posistion_, source_lines_.size());
-  }
+  std::string GetErrorLine() const;
 
-  bool AddLocalVar(const std::string& name, DType dtype) {
-    auto [iter, success] = GetFunctionParseContext(current_function_cursor_).local_vars.emplace(name, dtype);
-    if (!success && iter->second.IsVoid()) {
-      iter->second = dtype;
-      return true;
-    }
-    return success;
-  }
+  bool AddLocalVar(const std::string& name, DType dtype);
 
-  absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name) {
-    const FunctionDesc* desc = nullptr;
-    for (uint32_t i = 0; i < current_function_cursor_; i++) {
-      if (GetFunctionParseContext(i).desc.name == name) {
-        desc = &(GetFunctionParseContext(i).desc);
-        break;
-      }
-    }
-    if (nullptr == desc) {
-      desc = FunctionFactory::GetFunction(name);
-    }
-    if (desc == nullptr) {
-      return absl::NotFoundError(fmt::format("func:{} not exist at {}'", name, GetErrorLine()));
-    }
-    GetFunctionParseContext(current_function_cursor_).func_calls.emplace(name, desc);
-    return desc;
-  }
+  absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name);
 
   void AddBuiltinFuncCall(std::string_view name) {
     GetFunctionParseContext(current_function_cursor_).builtin_func_calls.insert(std::string(name));
@@ -186,12 +116,8 @@ class ParseContext {
   std::vector<FunctionParseContext> function_parse_ctxs_;
   uint32_t current_function_cursor_ = 0;
 
-  // std::unordered_map<std::string, DType> local_vars_;
-  // std::unordered_map<std::string, const FuncDesc*> func_calls_;
-  // std::unordered_set<std::string> builtin_func_calls_;
   std::string ast_err_;
   uint32_t validate_posistion_ = 0;
-  // std::vector<DType> func_ret_dtypes_;
 };
 
 }  // namespace ast

@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -29,11 +29,25 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#pragma once
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/optype.h"
-#include "xbyak/xbyak.h"
-namespace rapidudf {
-int simd_arithmetic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, const Xbyak::Operand& left,
-                       const Xbyak::Operand& right, const Xbyak::Operand& result);
+#include <gtest/gtest.h>
+#include <functional>
+#include <vector>
+#include "rapidudf/rapidudf.h"
+
+using namespace rapidudf;
+
+TEST(JitCompiler, vector_size) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<float> vec{1, 2, 3};
+  simd::Vector<float> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<f32> test_func(simd_vector<f32> x){
+      return cos(x);
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  // ASSERT_EQ(f(simd_vec), vec.size());
 }

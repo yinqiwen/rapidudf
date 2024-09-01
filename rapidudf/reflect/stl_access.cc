@@ -54,6 +54,13 @@ struct VectorReflectHelper {
   static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(VectorReflectHelper<T>, get, set, add, size) }
 };
 template <typename T>
+struct SimdVectorReflectHelper {
+  static T get(simd::Vector<T> v, size_t i) { return v[i]; }
+  static size_t size(simd::Vector<T> v) { return v.Size(); }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorReflectHelper<T>, get, size) }
+};
+
+template <typename T>
 struct SetReflectHelper {
   static bool contains(std::set<T>* v, T val) {
     if (nullptr == v) {
@@ -85,5 +92,7 @@ void init_stl_reflect_access() {
                           float, double, std::string_view)
   RUDF_STL_REFLECT_HELPER(SetReflectHelper, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
                           float, double, std::string_view)
+  RUDF_STL_REFLECT_HELPER(SimdVectorReflectHelper, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+                          int64_t, float, double, simd::Bit)
 }
 }  // namespace rapidudf
