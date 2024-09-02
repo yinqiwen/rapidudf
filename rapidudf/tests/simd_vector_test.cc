@@ -51,3 +51,139 @@ TEST(JitCompiler, vector_size) {
   auto f = std::move(rc.value());
   // ASSERT_EQ(f(simd_vec), vec.size());
 }
+TEST(JitCompiler, vector_add) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<float> vec{1, 2, 3};
+  simd::Vector<float> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<f32> test_func(simd_vector<f32> x){
+      return x+5;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_FLOAT_EQ(result[i], vec[i] + 5);
+  }
+}
+TEST(JitCompiler, vector_sub) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<float> vec{1, 2, 3};
+  simd::Vector<float> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<f32> test_func(simd_vector<f32> x){
+      return x-5;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_FLOAT_EQ(result[i], vec[i] - 5);
+  }
+}
+TEST(JitCompiler, vector_mul) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<float> vec{1, 2, 3};
+  simd::Vector<float> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<f32> test_func(simd_vector<f32> x){
+      return 5*x;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_FLOAT_EQ(result[i], vec[i] * 5);
+  }
+}
+TEST(JitCompiler, vector_div) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<float> vec{1, 2, 3};
+  simd::Vector<float> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<f32> test_func(simd_vector<f32> x){
+      return 5/x;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_FLOAT_EQ(result[i], 5 / vec[i]);
+  }
+}
+TEST(JitCompiler, vector_mod) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  simd::Vector<int> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<i32> test_func(simd_vector<i32> x){
+      return x%5;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<int>, simd::Vector<int>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_FLOAT_EQ(result[i], vec[i] % 5);
+  }
+}
+
+TEST(JitCompiler, vector_cmp) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  simd::Vector<int> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<i32> test_func(simd_vector<i32> x){
+      x>5&&x<5;
+      return 5+x;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<int>, simd::Vector<int>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_FLOAT_EQ(result[i], vec[i] + 5);
+  }
+}
+
+TEST(JitCompiler, vector_add2) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  simd::Vector<int> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<i32> test_func(simd_vector<i32> x){
+      return x+5+10;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<int>, simd::Vector<int>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_FLOAT_EQ(result[i], vec[i] + 5 + 10);
+  }
+}

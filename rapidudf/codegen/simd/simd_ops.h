@@ -39,16 +39,16 @@ namespace simd {
 enum ReuseFlag {
   REUSE_NONE = 0,
   REUSE_LEFT = 1,
-  REUSE_Right = 2,
+  REUSE_RIGHT = 2,
 };
 using VectorDataWithDType = std::pair<VectorData, DType>;
 template <typename T, typename R, OpToken op>
-Vector<R> simd_binary_op(Vector<T> left, Vector<T> right);
+Vector<R> simd_binary_op(Vector<T> left, Vector<T> right, uint32_t reuse);
 template <typename T, typename R, OpToken op>
-Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse);
+Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse, uint32_t reuse);
 
 template <typename T, OpToken op>
-Vector<T> simd_unary_op(Vector<T> left);
+Vector<T> simd_unary_op(Vector<T> left, uint32_t reuse);
 
 void init_builtin_simd_funcs();
 

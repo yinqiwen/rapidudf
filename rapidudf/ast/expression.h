@@ -91,6 +91,12 @@ struct BinaryExpr {
   // std::optional<std::tuple<OpToken, Operand>> right;
   std::vector<std::tuple<OpToken, Operand>> right;
   uint32_t position = 0;
+  static BinaryExprPtr New(Operand operand, uint32_t pos) {
+    auto p = std::make_shared<BinaryExpr>();
+    p->left = operand;
+    p->position = pos;
+    return p;
+  }
   void SetRight(const std::vector<std::tuple<OpToken, UnaryExprPtr>>& ops) {
     for (const auto& [op, expr] : ops) {
       Operand operand = expr;

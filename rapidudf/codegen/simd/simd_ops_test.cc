@@ -88,10 +88,10 @@ TEST(SIMD, simple_op) {
   std::vector<float> a{1.1, 2.2, 3.3, 4.4, 5, 6, 7, 8, 91, 92};
   std::vector<float> b{10.1, 2.2, 3.3, 40.4, 50, 60, 70, 80, 90, 93};
   std::vector<float> c{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-  auto final0 = simd::simd_binary_op<float, simd::Bit, OP_LESS>(a, b);
+  auto final0 = simd::simd_binary_op<float, simd::Bit, OP_LESS>(a, b, simd::REUSE_NONE);
   // auto [vec0, dtype] = std::move(result0.value());
   // simd::Vector<simd::Bit> final0(vec0);
-  auto final1 = simd::simd_binary_op<float, simd::Bit, OP_GREATER>(b, c);
+  auto final1 = simd::simd_binary_op<float, simd::Bit, OP_GREATER>(b, c, simd::REUSE_NONE);
   // auto [vec1, dtype1] = std::move(result1.value());
   // simd::Vector<simd::Bit> final1(vec1);
   // RUDF_INFO("{}", dtype);
@@ -102,7 +102,7 @@ TEST(SIMD, simple_op) {
   for (size_t i = 0; i < final1.Size(); i++) {
     RUDF_INFO("final1:{}", final1[i].val);
   }
-  auto final2 = simd::simd_binary_op<simd::Bit, simd::Bit, OP_LOGIC_OR>(final0, final1);
+  auto final2 = simd::simd_binary_op<simd::Bit, simd::Bit, OP_LOGIC_OR>(final0, final1, simd::REUSE_NONE);
   // auto [vec2, dtype2] = std::move(result2.value());
   // RUDF_INFO("{}", dtype2);
   // simd::Vector<simd::Bit> final2(vec2);

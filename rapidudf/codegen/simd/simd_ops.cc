@@ -311,7 +311,7 @@ static auto get_constant(T v) {
 }
 
 template <typename T, typename R, OpToken op>
-Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse) {
+Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse, uint32_t reuse) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   using MaskType = hn::Mask<decltype(d)>;
@@ -324,7 +324,14 @@ Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse) {
     byte_size = get_bits_byte_size(left.Size());
     result_dtype = DType(DATA_BIT);
   }
-  uint8_t* arena_data = Arena::Get().Allocate(byte_size);
+  uint8_t* arena_data = nullptr;
+  RUDF_DEBUG("op:{},reuse:{},size:{}", op, reuse, left.Size());
+  if (reuse == REUSE_LEFT) {
+    arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(left.Data()));
+  } else {
+    arena_data = Arena::Get().Allocate(byte_size);
+  }
+  // uint8_t* arena_data = Arena::Get().Allocate(byte_size);
   VectorDataHelper<number_t> helper(arena_data);
   constexpr auto lanes = hn::Lanes(d);
   auto rv = hn::Set(d, get_constant(right));
@@ -343,11 +350,12 @@ Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse) {
   //   }
   // }
   VectorData result_data(arena_data, result_size);
+  RUDF_DEBUG("return size:{}", result_size);
   return Vector<R>(result_data);
 }
 
 template <typename T, typename R, OpToken op>
-Vector<R> simd_binary_op(Vector<T> left, Vector<T> right) {
+Vector<R> simd_binary_op(Vector<T> left, Vector<T> right, uint32_t reuse) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   using MaskType = hn::Mask<decltype(d)>;
@@ -360,7 +368,15 @@ Vector<R> simd_binary_op(Vector<T> left, Vector<T> right) {
     byte_size = get_bits_byte_size(left.Size());
     result_dtype = DType(DATA_BIT);
   }
-  uint8_t* arena_data = Arena::Get().Allocate(byte_size);
+  uint8_t* arena_data = nullptr;
+  if (reuse == REUSE_LEFT) {
+    arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(left.Data()));
+  } else if (reuse == REUSE_RIGHT) {
+    arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(right.Data()));
+  } else {
+    arena_data = Arena::Get().Allocate(byte_size);
+  }
+
   VectorDataHelper<number_t> helper(arena_data);
   constexpr auto lanes = hn::Lanes(d);
   for (; (i) < left.Size(); i += lanes) {
@@ -377,7 +393,7 @@ Vector<R> simd_binary_op(Vector<T> left, Vector<T> right) {
   return Vector<R>(result_data);
 }
 template <typename T, OpToken op>
-Vector<T> simd_unary_op(Vector<T> left) {
+Vector<T> simd_unary_op(Vector<T> left, uint32_t reuse) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   size_t i = 0;
@@ -389,7 +405,12 @@ Vector<T> simd_unary_op(Vector<T> left) {
     byte_size = get_bits_byte_size(left.Size());
     result_dtype = DType(DATA_BIT);
   }
-  uint8_t* arena_data = Arena::Get().Allocate(byte_size);
+  uint8_t* arena_data = nullptr;
+  if (reuse == REUSE_LEFT) {
+    arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(left.Data()));
+  } else {
+    arena_data = Arena::Get().Allocate(byte_size);
+  }
   VectorDataHelper<number_t> helper(arena_data);
   constexpr auto lanes = hn::Lanes(d);
   for (; (i) < left.Size(); i += lanes) {
@@ -401,9 +422,10 @@ Vector<T> simd_unary_op(Vector<T> left) {
   return Vector<T>(result_data);
 }
 
-#define DEFINE_SIMD_BINARY_MATH_OP_TEMPLATE(r, op, ii, TYPE)                                   \
-  template Vector<TYPE> simd_binary_op<TYPE, TYPE, op>(Vector<TYPE> left, Vector<TYPE> right); \
-  template Vector<TYPE> simd_binary_scalar_op<TYPE, TYPE, op>(Vector<TYPE> left, TYPE right, bool reverse);
+#define DEFINE_SIMD_BINARY_MATH_OP_TEMPLATE(r, op, ii, TYPE)                                                   \
+  template Vector<TYPE> simd_binary_op<TYPE, TYPE, op>(Vector<TYPE> left, Vector<TYPE> right, uint32_t reuse); \
+  template Vector<TYPE> simd_binary_scalar_op<TYPE, TYPE, op>(Vector<TYPE> left, TYPE right, bool reverse,     \
+                                                              uint32_t reuse);
 // RUDF_FUNC_REGISTER_WITH_NAME(GetFunctionName("simd_binary_op", op, get_dtype<TYPE>()),                    \
   //                              (simd_binary_op<TYPE, TYPE, op>))                                            \
   // RUDF_FUNC_REGISTER_WITH_NAME(GetFunctionName("simd_binary_scalar_op", op, get_dtype<TYPE>()),             \
@@ -428,9 +450,10 @@ DEFINE_SIMD_BINARY_MATH_OP(OP_MIN, float, double, uint64_t, int64_t, uint32_t, i
 DEFINE_SIMD_BINARY_MATH_OP(OP_HYPOT, float, double);
 DEFINE_SIMD_BINARY_MATH_OP(OP_ATAN2, float, double);
 
-#define DEFINE_SIMD_BINARY_BOOL_OP_TEMPLATE(r, op, ii, TYPE)                                 \
-  template Vector<Bit> simd_binary_op<TYPE, Bit, op>(Vector<TYPE> left, Vector<TYPE> right); \
-  template Vector<Bit> simd_binary_scalar_op<TYPE, Bit, op>(Vector<TYPE> left, TYPE right, bool reverse);
+#define DEFINE_SIMD_BINARY_BOOL_OP_TEMPLATE(r, op, ii, TYPE)                                                 \
+  template Vector<Bit> simd_binary_op<TYPE, Bit, op>(Vector<TYPE> left, Vector<TYPE> right, uint32_t reuse); \
+  template Vector<Bit> simd_binary_scalar_op<TYPE, Bit, op>(Vector<TYPE> left, TYPE right, bool reverse,     \
+                                                            uint32_t reuse);
 
 // RUDF_FUNC_REGISTER_WITH_NAME(GetFunctionName("simd_binary_op", op, get_dtype<TYPE>()),                  \
   //                              (simd_binary_op<TYPE, TYPE, op>))                                          \
@@ -453,7 +476,8 @@ DEFINE_SIMD_BINARY_BOOL_OP(OP_NOT_EQUAL, float, double, uint64_t, int64_t, uint3
 DEFINE_SIMD_BINARY_BOOL_OP(OP_LOGIC_AND, Bit);
 DEFINE_SIMD_BINARY_BOOL_OP(OP_LOGIC_OR, Bit);
 
-#define DEFINE_SIMD_UNARY_OP_TEMPLATE(r, op, ii, TYPE) template Vector<TYPE> simd_unary_op<TYPE, op>(Vector<TYPE> left);
+#define DEFINE_SIMD_UNARY_OP_TEMPLATE(r, op, ii, TYPE) \
+  template Vector<TYPE> simd_unary_op<TYPE, op>(Vector<TYPE> left, uint32_t reuse);
 // RUDF_FUNC_REGISTER_WITH_NAME(GetFunctionName("simd_unary_op", op, get_dtype<TYPE>()), (simd_unary_op<TYPE, op>))
 #define DEFINE_SIMD_UNARY_OP(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_UNARY_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))

@@ -218,3 +218,29 @@ cc_library(
         remote = "https://github.com/google/highway.git",
         tag = "1.2.0",
     )
+
+    _EXPRTK_BUILD_FILE = """
+cc_library(
+    name = "exprtk",
+    hdrs = [
+        "exprtk.hpp",
+    ],
+    visibility = ["//visibility:public"],
+)
+"""
+    new_git_repository(
+        name = "exprtk",
+        remote = "https://github.com/ArashPartow/exprtk.git",
+        branch = "master",
+        build_file_content = _EXPRTK_BUILD_FILE,
+    )
+
+    bench_ver = kwargs.get("bench_ver", "1.8.3")
+    bench_name = "benchmark-{ver}".format(ver = bench_ver)
+    http_archive(
+        name = "com_google_benchmark",
+        strip_prefix = bench_name,
+        urls = [
+            "https://github.com/google/benchmark/archive/v{ver}.tar.gz".format(ver = bench_ver),
+        ],
+    )

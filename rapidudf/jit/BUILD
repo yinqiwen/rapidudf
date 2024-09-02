@@ -25,6 +25,7 @@ cc_library(
     deps = [
         "//rapidudf/ast",
         "//rapidudf/codegen:code_generator",
+        "//rapidudf/codegen/simd:simd_ops",
         "//rapidudf/log",
         "//rapidudf/reflect",
     ],

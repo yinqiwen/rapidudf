@@ -62,6 +62,8 @@ struct FunctionDesc {
   // args types
   std::vector<DType> arg_types;
   void* func = nullptr;
+  bool is_simd_vector_func = false;
+  bool is_simd_vector_scalar_func = false;
 
   bool ValidateArgs(const std::vector<DType>& ts) const;
   std::vector<const Xbyak::Reg*> GetReturnValueRegisters(uint32_t& total_bits) const;
@@ -71,6 +73,8 @@ struct FunctionDesc {
 
 class FunctionFactory {
  public:
+  static constexpr std::string_view kSimdVectorFuncPrefix = "simd_vector";
+  static constexpr std::string_view kSimdVectorScalarFuncPrefix = "simd_vector_scalar";
   template <typename RET, typename... Args>
   bool Register(std::string_view name, RET (*f)(Args...), bool safe = true) {
     FunctionDesc desc;
@@ -101,7 +105,7 @@ class FuncRegister {
   }
 };
 
-std::string GetFunctionName(std::string_view prefix, OpToken op, DType dtype);
+std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype);
 
 }  // namespace rapidudf
 

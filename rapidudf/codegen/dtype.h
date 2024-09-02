@@ -123,7 +123,7 @@ class DType {
   bool IsSet() const { return container_type_ == COLLECTION_SET; }
   bool IsCollection() const { return container_type_ != 0; }
   bool IsPtr() const { return ptr_bit_ == 1; }
-
+  bool IsSimdVectorBit() const { return container_type_ == COLLECTION_SIMD_VECTOR && t0_ == DATA_BIT; }
   bool IsPrimitive() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_STRING_VIEW); }
   bool IsFundamental() const { return ptr_bit_ == 0 && container_type_ == 0; }
   bool IsNumber() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_F64); }
@@ -148,6 +148,12 @@ class DType {
     DType result;
     result.control_ = control_;
     result.ptr_bit_ = 0;
+    return result;
+  }
+  DType ToSimdVector() const {
+    DType result;
+    result.control_ = control_;
+    result.container_type_ = COLLECTION_SIMD_VECTOR;
     return result;
   }
 

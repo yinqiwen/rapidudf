@@ -31,7 +31,7 @@
 #include <benchmark/benchmark.h>
 #include <cmath>
 #include <vector>
-#include "exprtk.hpp"
+// #include "exprtk.hpp"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
@@ -66,35 +66,35 @@ static void BM_rapidudf_expr_func(benchmark::State& state) {
 }
 BENCHMARK(BM_rapidudf_expr_func)->Setup(DoRapidUDFExprSetup)->Teardown(DoRapidUDFExprTeardown);
 
-static exprtk::parser<double> exprtk_parser;
-static exprtk::expression<double> exprtk_expression;
-static exprtk::symbol_table<double> exprtk_symbol_table;
-static double exprtk_x = 100;
-static double exprtk_y = 102;
-static void DoExprtkExprSetup(const benchmark::State& state) {
-  exprtk_symbol_table.add_constants();
-  exprtk_symbol_table.add_variable("x", exprtk_x);
-  exprtk_symbol_table.add_variable("y", exprtk_y);
-  exprtk_expression.register_symbol_table(exprtk_symbol_table);
-  std::string expr = "x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y";
-  // std::string expr = "cos(y - sin(2 / x * pi))";
-  if (!exprtk_parser.compile(expr, exprtk_expression)) {
-    RUDF_ERROR("[load_expression] - Parser Error:{}\tExpression: {}", exprtk_parser.error().c_str(), expr);
-  }
-}
+// static exprtk::parser<double> exprtk_parser;
+// static exprtk::expression<double> exprtk_expression;
+// static exprtk::symbol_table<double> exprtk_symbol_table;
+// static double exprtk_x = 100;
+// static double exprtk_y = 102;
+// static void DoExprtkExprSetup(const benchmark::State& state) {
+//   exprtk_symbol_table.add_constants();
+//   exprtk_symbol_table.add_variable("x", exprtk_x);
+//   exprtk_symbol_table.add_variable("y", exprtk_y);
+//   exprtk_expression.register_symbol_table(exprtk_symbol_table);
+//   std::string expr = "x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y";
+//   // std::string expr = "cos(y - sin(2 / x * pi))";
+//   if (!exprtk_parser.compile(expr, exprtk_expression)) {
+//     RUDF_ERROR("[load_expression] - Parser Error:{}\tExpression: {}", exprtk_parser.error().c_str(), expr);
+//   }
+// }
 
-static void DooExprtkExprTeardown(const benchmark::State& state) {}
+// static void DooExprtkExprTeardown(const benchmark::State& state) {}
 
-static double __attribute__((noinline)) invoke_exprtk() { return exprtk_expression.value(); }
-static void BM_exprtk_expr_func(benchmark::State& state) {
-  double total = 0;
-  size_t n = 0;
-  for (auto _ : state) {
-    total += invoke_exprtk();
-    n++;
-  }
-  RUDF_INFO("Result:{} for loop:{}", total, n);
-}
-BENCHMARK(BM_exprtk_expr_func)->Setup(DoExprtkExprSetup)->Teardown(DooExprtkExprTeardown);
+// static double __attribute__((noinline)) invoke_exprtk() { return exprtk_expression.value(); }
+// static void BM_exprtk_expr_func(benchmark::State& state) {
+//   double total = 0;
+//   size_t n = 0;
+//   for (auto _ : state) {
+//     total += invoke_exprtk();
+//     n++;
+//   }
+//   RUDF_INFO("Result:{} for loop:{}", total, n);
+// }
+// BENCHMARK(BM_exprtk_expr_func)->Setup(DoExprtkExprSetup)->Teardown(DooExprtkExprTeardown);
 
 BENCHMARK_MAIN();

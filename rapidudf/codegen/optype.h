@@ -80,7 +80,7 @@ enum OpToken {
   OP_END,
 };
 constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
-    "invalid", "assign", "plus",      "minus", "multiply",   "divide",  "mod",           "positive",  "negative",
+    "invalid", "assign", "add",       "sub",   "multiply",   "divide",  "mod",           "positive",  "negative",
     "not",     "equal",  "not_equal", "less",  "less_equal", "greater", "greater_equal", "logic_and", "logic_or",
     "max",     "min",    "sqrt",      "floor", "abs",        "sin",     "cos",           "asin",      "acos",
     "atanh",   "atan2",  "sinh",      "tanh",  "asinh",      "acosh",   "exp",           "exp2",      "expm1",

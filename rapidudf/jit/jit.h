@@ -267,6 +267,8 @@ class JitCompiler {
   absl::StatusOr<ValuePtr> CompileJsonAccess(ValuePtr var, const ast::VarRef& key);
   absl::StatusOr<ValuePtr> GetLocalVar(const std::string& name);
 
+  absl::StatusOr<ValuePtr> CallFunction(const std::string& name, std::vector<ValuePtr>& args);
+
   void AddCompileContex(const ast::Function& func_ast);
 
   std::mutex jit_mutex_;

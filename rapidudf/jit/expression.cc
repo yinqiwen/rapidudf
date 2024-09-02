@@ -30,12 +30,15 @@
 */
 #include <fmt/core.h>
 #include <variant>
+#include <vector>
 #include "absl/cleanup/cleanup.h"
 #include "rapidudf/codegen/builtin/builtin.h"
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/ops/cmp.h"
 #include "rapidudf/codegen/optype.h"
+#include "rapidudf/codegen/simd/simd_ops.h"
+#include "rapidudf/codegen/value.h"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
 namespace rapidudf {
@@ -60,6 +63,50 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileOperand(const ast::Operand& expr) {
       },
       expr);
 }
+absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name, std::vector<ValuePtr>& arg_values) {
+  const FunctionDesc* func_desc = GetFunction(name);
+  if (nullptr == func_desc) {
+    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("No func:{} found", name)));
+  }
+  uint32_t simd_vector_reuse_flag = 0;
+  uint8_t simd_vector_reverse = 0;
+  if (func_desc->is_simd_vector_scalar_func) {
+    if (arg_values.size() == 2) {
+      if (arg_values[0]->GetDType().IsSimdVector()) {
+        simd_vector_reverse = 0;
+      } else {
+        simd_vector_reverse = 1;
+        std::swap(arg_values[0], arg_values[1]);
+      }
+    }
+  }
+  for (size_t i = 0; i < arg_values.size(); i++) {
+    if (arg_values[i]->GetDType() != func_desc->arg_types[i]) {
+      arg_values[i] = arg_values[i]->CastTo(func_desc->arg_types[i]);
+    }
+    if (simd_vector_reuse_flag == 0 && arg_values[i]->IsTemp()) {
+      if (i == 0) {
+        simd_vector_reuse_flag = simd::REUSE_LEFT;
+      } else {
+        simd_vector_reuse_flag = simd::REUSE_RIGHT;
+      }
+    }
+  }
+  if (func_desc->is_simd_vector_scalar_func) {
+    arg_values.emplace_back(GetCodeGenerator().NewConstValue(DATA_U8, simd_vector_reverse));
+  }
+  if (func_desc->is_simd_vector_func) {
+    arg_values.emplace_back(GetCodeGenerator().NewConstValue(DATA_U32, simd_vector_reuse_flag));
+  }
+  ValuePtr result = GetCodeGenerator().CallFunction(*func_desc, arg_values);
+  if (result) {
+    for (auto& arg : arg_values) {
+      GetCodeGenerator().DropTmpValue(arg);
+    }
+  }
+  return result;
+}
+
 absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr) {
   ast_ctx_.SetPosition(expr->position);
   auto left_result = CompileOperand(expr->left);
@@ -86,6 +133,17 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
       case OP_MULTIPLY:
       case OP_DIVIDE:
       case OP_MOD: {
+        if (left->GetDType().IsSimdVector() || right->GetDType().IsSimdVector()) {
+          auto func_name = GetFunctionName(op, left->GetDType(), right->GetDType());
+          std::vector<ValuePtr> args{left, right};
+          auto result = CallFunction(func_name, args);
+          if (!result.ok()) {
+            return result.status();
+          }
+          left = result.value();
+          break;
+        }
+
         auto result =
             GetCodeGenerator().NewValue(left->GetDType() > right->GetDType() ? left->GetDType() : right->GetDType());
         int rc = left->ArithmeticOp(op, *right, result);
@@ -130,6 +188,16 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
       case OP_LESS_EQUAL:
       case OP_GREATER:
       case OP_GREATER_EQUAL: {
+        if (left->GetDType().IsSimdVector() || right->GetDType().IsSimdVector()) {
+          auto func_name = GetFunctionName(op, left->GetDType(), right->GetDType());
+          std::vector<ValuePtr> args{left, right};
+          auto result = CallFunction(func_name, args);
+          if (!result.ok()) {
+            return result.status();
+          }
+          left = result.value();
+          break;
+        }
         auto result = GetCodeGenerator().NewValue(DATA_U8, {}, true);
         int rc = left->Cmp(op, *right, result);
         if (0 != rc) {
@@ -144,6 +212,16 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
       }
       case OP_LOGIC_AND:
       case OP_LOGIC_OR: {
+        if (left->GetDType().IsSimdVector() || right->GetDType().IsSimdVector()) {
+          auto func_name = GetFunctionName(op, left->GetDType(), right->GetDType());
+          std::vector<ValuePtr> args{left, right};
+          auto result = CallFunction(func_name, args);
+          if (!result.ok()) {
+            return result.status();
+          }
+          left = result.value();
+          break;
+        }
         uint32_t logic_label_cursor = label_cursor_++;
         std::string fast_exit_label = fmt::format("logic_fast_exit_{}", logic_label_cursor);
         std::string normal_exit_label = fmt::format("logic_normal_exit_{}", logic_label_cursor);
@@ -198,21 +276,7 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(const ast::VarAccessor& 
         arg_values.emplace_back(arg_val.value());
       }
     }
-    const FunctionDesc* func_desc = GetFunction(expr.name);
-    if (nullptr == func_desc) {
-      RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("No func:{} found", expr.name)));
-    }
-    for (size_t i = 0; i < arg_values.size(); i++) {
-      if (arg_values[i]->GetDType() != func_desc->arg_types[i]) {
-        arg_values[i] = arg_values[i]->CastTo(func_desc->arg_types[i]);
-      }
-    }
-    ValuePtr result = GetCodeGenerator().CallFunction(*func_desc, arg_values);
-    if (result) {
-      for (auto& arg : arg_values) {
-        GetCodeGenerator().DropTmpValue(arg);
-      }
-    }
+    auto result = CallFunction(expr.name, arg_values);
     return result;
   } else if (expr.access_args.has_value()) {
     // name is var name

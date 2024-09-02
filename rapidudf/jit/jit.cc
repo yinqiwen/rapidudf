@@ -112,8 +112,11 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   ctx.local_vars.clear();
   std::vector<FuncArgRegister> all_func_arg_registers;
   for (const auto& [name, func_call] : ast_ctx_.GetAllFuncCalls(compile_function_idx_)) {
-    RUDF_DEBUG("Normal funcation call:{}", name);
     auto arg_registers = func_call->GetArgsRegisters();
+    RUDF_DEBUG("Normal funcation call:{} with registers:{}", name, arg_registers.size());
+    if (arg_registers.empty()) {
+      RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("Can NOT allocate registers for func:{}.", name)));
+    }
     all_func_arg_registers.insert(all_func_arg_registers.end(), arg_registers.begin(), arg_registers.end());
   }
 
@@ -124,6 +127,10 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
       RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("No buitlin func:{} found.", builtin_func_call)));
     }
     auto arg_registers = func_call->GetArgsRegisters();
+    if (arg_registers.empty()) {
+      RUDF_LOG_ERROR_STATUS(
+          absl::NotFoundError(fmt::format("Can NOT allocate registers for func:{}.", builtin_func_call)));
+    }
     all_func_arg_registers.insert(all_func_arg_registers.end(), arg_registers.begin(), arg_registers.end());
   }
 

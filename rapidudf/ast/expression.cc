@@ -140,6 +140,19 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
   }
   return result;
 }
+static bool IsValidSimdVectorBinaryOperands(DType left, DType right) {
+  if (left.IsSimdVector() || right.IsSimdVector()) {
+    if (left.IsSimdVector() && right.IsSimdVector()) {
+      if (left != right) {
+        return false;
+      }
+
+      return true;
+    }
+    return true;
+  }
+  return false;
+}
 absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
   ctx.SetPosition(position);
   auto left_result = validate_operand(ctx, left);
@@ -152,26 +165,31 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
     if (!right_result.ok()) {
       return right_result.status();
     }
-    bool can_cmp = true;
+    bool can_binary_op = true;
     do {
       if (left_var.dtype == right_result->dtype) {
-        can_cmp = true;
+        can_binary_op = true;
         break;
       }
+      if (IsValidSimdVectorBinaryOperands(left_var.dtype, right_result->dtype)) {
+        can_binary_op = true;
+        break;
+      }
+
       if (left_var.dtype.IsVoid() && !left_var.name.empty() && op == OP_ASSIGN) {
-        can_cmp = true;
+        can_binary_op = true;
         break;
       }
       if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsPrimitive()) {
-        can_cmp = true;
+        can_binary_op = true;
         break;
       }
       if (right_result->dtype.IsJsonPtr() && left_var.dtype.IsPrimitive()) {
-        can_cmp = true;
+        can_binary_op = true;
         break;
       }
       if (!left_var.dtype.CanCastTo(right_result->dtype) && !right_result->dtype.CanCastTo(left_result->dtype)) {
-        can_cmp = false;
+        can_binary_op = false;
         break;
       }
       if (left_var.dtype.CanCastTo(right_result->dtype)) {
@@ -185,7 +203,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         ctx.AddBuiltinFuncCall(kBuiltinCastFbsStrToStringView);
       }
     } while (0);
-    if (!can_cmp) {
+    if (!can_binary_op) {
       return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} by expression validate ",
                                             op, left_var.dtype, right_result->dtype));
     }
@@ -196,6 +214,12 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       case OP_MULTIPLY:
       case OP_DIVIDE:
       case OP_MOD: {
+        if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
+          if (!left_var.dtype.IsSimdVector()) {
+            left_var.dtype = right_result->dtype;
+          }
+          break;
+        }
         if (!left_var.dtype.IsNumber() || !right_result->dtype.IsNumber()) {
           return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                 left_result->dtype, right_result->dtype));
@@ -243,6 +267,9 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         } else if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsJsonPtr()) {
           can_cmp = true;
           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpJson);
+        } else if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
+          left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+          break;
         }
         if (!can_cmp) {
           // RUDF_DEBUG("#### {}:{} {}", *left_result, left_result->dtype.IsJsonPtr(),
@@ -250,12 +277,15 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           return ctx.GetErrorStatus(
               fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op, left_var.dtype, right_result->dtype));
         }
-        // return DType(DATA_U8);
         left_var = VarTag(DType(DATA_U8));
         break;
       }
       case OP_LOGIC_AND:
       case OP_LOGIC_OR: {
+        if (left_result->dtype.IsSimdVectorBit() && right_result->dtype.IsSimdVectorBit()) {
+          left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+          break;
+        }
         if (!left_result->dtype.IsBool() || !right_result->dtype.IsBool()) {
           return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                 left_result->dtype, right_result->dtype));
@@ -342,7 +372,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     }
     auto* desc = result.value();
     if (!desc->ValidateArgs(arg_dtypes)) {
-      return ctx.GetErrorStatus(fmt::format("Invalid func call args with invalid dtypes."));
+      return ctx.GetErrorStatus(fmt::format("Invalid func call args with invalid args."));
     }
     return desc->return_type;
   } else {

@@ -225,6 +225,8 @@ uint32_t DType::ByteSize() const {
   }
   if (IsAbslSpan()) {
     return 16;
+  } else if (IsSimdVector()) {
+    return 16;
   }
   switch (t0_) {
     case DATA_U8:

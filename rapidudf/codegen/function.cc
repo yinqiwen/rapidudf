@@ -43,11 +43,26 @@ static std::unique_ptr<FuncRegMap> g_regs = nullptr;
 
 static inline uint32_t allgin_n(uint32_t x, uint32_t n) { return (x + n - 1) & ~(n - 1); }
 
-std::string GetFunctionName(std::string_view prefix, OpToken op, DType dtype) {
-  std::string fname(prefix);
-  fname.append("_").append(std::string(kOpTokenStrs[op]));
-  fname.append("_").append(dtype.GetTypeString());
-  return fname;
+std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype) {
+  std::string fname(kOpTokenStrs[op]);
+  if (left_dtype.IsSimdVector() || right_dtype.IsSimdVector()) {
+    std::string simd_prefix;
+    DType suffix_dtype;
+    if (left_dtype.IsSimdVector() && right_dtype.IsSimdVector()) {
+      simd_prefix = std::string(FunctionFactory::kSimdVectorFuncPrefix);
+      suffix_dtype = left_dtype.Elem();
+    } else {
+      simd_prefix = std::string(FunctionFactory::kSimdVectorScalarFuncPrefix);
+      if (left_dtype.IsSimdVector()) {
+        suffix_dtype = left_dtype.Elem();
+      } else {
+        suffix_dtype = right_dtype.Elem();
+      }
+    }
+    return simd_prefix + "_" + fname + "_" + suffix_dtype.GetTypeString();
+  } else {
+    return fname + "_" + left_dtype.GetTypeString();
+  }
 }
 
 std::vector<const Xbyak::Reg*> GetFuncReturnValueRegisters(DType return_type, uint32_t& total_bits) {
@@ -165,9 +180,20 @@ std::vector<const Xbyak::Reg*> GetUnuseFuncArgsRegisters(const std::vector<FuncA
 }
 
 bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
-  if (arg_types.size() != ts.size()) {
-    return false;
+  if (is_simd_vector_scalar_func) {
+    if (arg_types.size() != (ts.size() + 2)) {
+      return false;
+    }
+  } else if (is_simd_vector_func) {
+    if (arg_types.size() != (ts.size() + 1)) {
+      return false;
+    }
+  } else {
+    if (arg_types.size() != ts.size()) {
+      return false;
+    }
   }
+
   for (size_t i = 0; i < ts.size(); i++) {
     if (!ts[i].CanCastTo(arg_types[i])) {
       return false;
@@ -190,8 +216,14 @@ bool FunctionFactory::Register(FunctionDesc&& desc) {
     RUDF_CRITICAL("Duplicate func name:{}", desc.name);
     return false;
   }
+  if (desc.name.find(kSimdVectorFuncPrefix) == 0) {
+    desc.is_simd_vector_func = true;
+  }
+  if (desc.name.find(kSimdVectorScalarFuncPrefix) == 0) {
+    desc.is_simd_vector_scalar_func = true;
+  }
   // printf("Registe func name:%s\n", desc.name.c_str());
-  RUDF_DEBUG("Registe func name:{}", desc.name);
+  RUDF_DEBUG("Registe func name:{}, is_simd_vector:{}", desc.name, desc.is_simd_vector_func);
   return g_regs->emplace(desc.name, desc).second;
 }
 const FunctionDesc* FunctionFactory::GetFunction(const std::string& name) {
