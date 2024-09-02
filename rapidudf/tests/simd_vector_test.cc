@@ -32,6 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -185,5 +186,26 @@ TEST(JitCompiler, vector_add2) {
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_FLOAT_EQ(result[i], vec[i] + 5 + 10);
+  }
+}
+
+TEST(JitCompiler, vector_ternary) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3, 4, 1, 5, 6};
+  simd::Vector<int> simd_vec(vec);
+  JitCompiler compiler(4096, true);
+  std::string content = R"(
+    simd_vector<i32> test_func(simd_vector<i32> x){
+      return x>2?1:0;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<int>, simd::Vector<int>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    RUDF_DEBUG("{}", result[i]);
+    // ASSERT_FLOAT_EQ(result[i], vec[i] + 5 + 10);
   }
 }

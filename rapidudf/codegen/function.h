@@ -75,6 +75,7 @@ class FunctionFactory {
  public:
   static constexpr std::string_view kSimdVectorFuncPrefix = "simd_vector";
   static constexpr std::string_view kSimdVectorScalarFuncPrefix = "simd_vector_scalar";
+  static constexpr std::string_view kSimdVectorTernaryFuncPrefix = "simd_vector_ternary";
   template <typename RET, typename... Args>
   bool Register(std::string_view name, RET (*f)(Args...), bool safe = true) {
     FunctionDesc desc;
@@ -106,6 +107,7 @@ class FuncRegister {
 };
 
 std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype);
+std::string GetSimdVectorTernaryFunctionName(DType true_dtype, DType false_dtype);
 
 }  // namespace rapidudf
 

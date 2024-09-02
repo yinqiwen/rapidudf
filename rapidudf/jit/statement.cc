@@ -99,6 +99,7 @@ absl::Status JitCompiler::CompileStatement(const ast::IfElseStatement& statement
       return status;
     }
   }
+  GetCodeGenerator().Jump(if_final_label);
   RUDF_DEBUG("if body compiled success.");
   for (size_t i = 0; i < statement.elif_statements.size(); i++) {
     GetCodeGenerator().Label(elif_labels[i]);
@@ -130,6 +131,7 @@ absl::Status JitCompiler::CompileStatement(const ast::IfElseStatement& statement
         return status;
       }
     }
+    GetCodeGenerator().Jump(if_final_label);
   }
   if (statement.else_statements) {
     GetCodeGenerator().Label(else_label);

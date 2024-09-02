@@ -96,6 +96,7 @@ bp::rule<struct cmp_expr, BinaryExprPtr> cmp_expr = "cmp_expr";
 bp::rule<struct additive_expr, BinaryExprPtr> additive_expr = "additive_expr";
 bp::rule<struct multiplicative_expr, BinaryExprPtr> multiplicative_expr = "multiplicative_expr";
 bp::rule<struct unary_expr, UnaryExprPtr> unary_expr = "unary_expr";
+bp::rule<struct ternary_expr, TernaryExprPtr> ternary_expr = "ternary_expr";
 bp::rule<struct expression, BinaryExprPtr> expression = "expression";
 bp::rule<struct func_invoke_args, FuncInvokeArgs> func_invoke_args = "func_invoke_args";
 
@@ -143,6 +144,14 @@ auto binary_expr_func = [](auto& ctx) {
   v->position = _where(ctx).begin() - _begin(ctx);
   _val(ctx) = v;
 };
+auto ternary_expr_func = [](auto& ctx) {
+  auto v = std::make_shared<TernaryExpr>();
+  v->cond = std::get<0>(_attr(ctx));
+  // v->right = std::get<1>(_attr(ctx));
+  v->true_false_operands = std::get<1>(_attr(ctx));
+  v->position = _where(ctx).begin() - _begin(ctx);
+  _val(ctx) = v;
+};
 auto var_accessor_func = [](auto& ctx) {
   VarAccessor f;
   f.name = std::get<0>(_attr(ctx));
@@ -165,7 +174,8 @@ auto const operand_def =
     bp::double_ | bp::long_ | bp::bool_ | bp::quoted_string | var_declare | var_accessor | ('(' >> expression >> ')');
 auto const func_invoke_args_def = '(' > -(expression % ',') > ')';
 auto const expression_def = assign;
-auto const assign_def = (logic_expr >> *(Symbols::kAssignOpSymbols >> logic_expr))[binary_expr_func];
+auto const assign_def = (ternary_expr >> -(Symbols::kAssignOpSymbols >> expression))[binary_expr_func];
+auto const ternary_expr_def = (logic_expr > -('?' > expression > ':' > expression))[ternary_expr_func];
 auto const logic_expr_def = (cmp_expr >> *(Symbols::kLogicOpSymbols >> cmp_expr))[binary_expr_func];
 auto const cmp_expr_def = (additive_expr >> *(Symbols::kCmpOpSymbols >> additive_expr))[binary_expr_func];
 auto const additive_expr_def =
@@ -181,7 +191,7 @@ auto const var_accessor_def = (identifier > -(member_access | func_invoke_args))
 
 BOOST_PARSER_DEFINE_RULES(var_declare, var_ref, var_accessor, filed_access, dynamic_param_access, operand,
                           func_invoke_args, member_access, unary_expr, assign, logic_expr, cmp_expr, additive_expr,
-                          multiplicative_expr, expression);
+                          multiplicative_expr, expression, ternary_expr);
 
 bp::rule<struct statements, std::vector<Statement>> statements = "statements";
 bp::rule<struct return_statement, ReturnStatement> return_statement = "return_statement";

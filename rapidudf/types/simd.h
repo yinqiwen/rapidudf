@@ -30,9 +30,10 @@
 */
 
 #pragma once
+#include <stddef.h>
 #include <cstdint>
 #include <vector>
-#include "rapidudf/arena/arena.h"
+
 namespace rapidudf {
 namespace simd {
 

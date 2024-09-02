@@ -58,11 +58,14 @@ struct VarRef {
 
 struct BinaryExpr;
 struct UnaryExpr;
+struct TernaryExpr;
 struct FuncInvoke;
 struct VarAccessor;
 using BinaryExprPtr = std::shared_ptr<BinaryExpr>;
 using UnaryExprPtr = std::shared_ptr<UnaryExpr>;
-using Operand = std::variant<double, int64_t, bool, std::string, VarAccessor, BinaryExprPtr, UnaryExprPtr, VarDefine>;
+using TernaryExprPtr = std::shared_ptr<TernaryExpr>;
+using Operand = std::variant<double, int64_t, bool, std::string, VarAccessor, TernaryExprPtr, BinaryExprPtr,
+                             UnaryExprPtr, VarDefine>;
 using Expression = BinaryExprPtr;
 
 struct FuncInvokeArgs {
@@ -86,6 +89,14 @@ struct VarAccessor {
   absl::StatusOr<VarTag> Validate(ParseContext& ctx);
 };
 
+struct TernaryExpr {
+  Operand cond;
+  std::optional<std::tuple<Operand, Operand>> true_false_operands;
+  uint32_t position = 0;
+  DType ternary_result_dtype;
+  absl::StatusOr<VarTag> Validate(ParseContext& ctx);
+};
+
 struct BinaryExpr {
   Operand left;
   // std::optional<std::tuple<OpToken, Operand>> right;
@@ -97,6 +108,14 @@ struct BinaryExpr {
     p->position = pos;
     return p;
   }
+  void SetRight(std::optional<std::tuple<rapidudf::OpToken, BinaryExprPtr>> operand) {
+    if (operand.has_value()) {
+      auto [op, right_op] = *operand;
+      Operand operand = right_op;
+      right.emplace_back(std::make_tuple(op, operand));
+    }
+  }
+
   void SetRight(const std::vector<std::tuple<OpToken, UnaryExprPtr>>& ops) {
     for (const auto& [op, expr] : ops) {
       Operand operand = expr;

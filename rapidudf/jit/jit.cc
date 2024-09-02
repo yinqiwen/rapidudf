@@ -114,7 +114,7 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   for (const auto& [name, func_call] : ast_ctx_.GetAllFuncCalls(compile_function_idx_)) {
     auto arg_registers = func_call->GetArgsRegisters();
     RUDF_DEBUG("Normal funcation call:{} with registers:{}", name, arg_registers.size());
-    if (arg_registers.empty()) {
+    if (arg_registers.empty() && !func_call->arg_types.empty()) {
       RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("Can NOT allocate registers for func:{}.", name)));
     }
     all_func_arg_registers.insert(all_func_arg_registers.end(), arg_registers.begin(), arg_registers.end());
@@ -127,7 +127,7 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
       RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("No buitlin func:{} found.", builtin_func_call)));
     }
     auto arg_registers = func_call->GetArgsRegisters();
-    if (arg_registers.empty()) {
+    if (arg_registers.empty() && !func_call->arg_types.empty()) {
       RUDF_LOG_ERROR_STATUS(
           absl::NotFoundError(fmt::format("Can NOT allocate registers for func:{}.", builtin_func_call)));
     }
@@ -138,6 +138,7 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   GetCodeGenerator().AddFreeRegisters(unused_registers);
 
   ctx.desc = ctx.func_ast.ToFuncDesc();
+  ctx.has_simd_vector_operations = ast_ctx_.HasSimdVectorOperation(compile_function_idx_);
 
   auto arg_registers = ctx.desc.GetArgsRegisters();
   if (!ctx.desc.arg_types.empty() && arg_registers.empty()) {

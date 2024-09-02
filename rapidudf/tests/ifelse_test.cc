@@ -64,3 +64,30 @@ TEST(JitCompiler, ifelse0) {
   ASSERT_DOUBLE_EQ(f(6), 10);
   ASSERT_DOUBLE_EQ(f(4), 0);
 }
+
+TEST(JitCompiler, ifelse1) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  ParseContext ctx;
+  std::string content = R"(
+    int test_func(int x){ 
+      if(x>10){
+         x=20;
+      }elif(x > 5){
+       x= 10;
+      }else{
+        x= 0;
+      }
+      return x;
+    }
+  )";
+  auto rc = compiler.CompileFunction<int, int>(content);
+  ASSERT_TRUE(rc.ok());
+  // auto f = compiler.GetFunc<int, int>(true);
+  // ASSERT_TRUE(f != nullptr);
+  auto f = std::move(rc.value());
+  ASSERT_DOUBLE_EQ(f(11), 20);
+  ASSERT_DOUBLE_EQ(f(9), 10);
+  ASSERT_DOUBLE_EQ(f(6), 10);
+  ASSERT_DOUBLE_EQ(f(4), 0);
+}

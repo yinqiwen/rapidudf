@@ -385,6 +385,26 @@ static void register_simd_vector_cmp() {
 }
 
 template <typename T>
+static void register_simd_vector_ternary() {
+  std::string simd_vector_func_name =
+      fmt::format("simd_vector_ternary_{}_scalar_scalar", get_dtype<T>().GetTypeString());
+  simd::Vector<T> (*simd_f0)(simd::Vector<simd::Bit>, T, T, uint32_t) = simd::simd_ternary_op_scalar_scalar<T>;
+  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f0);
+  simd_vector_func_name = fmt::format("simd_vector_ternary_{}_vector_vector", get_dtype<T>().GetTypeString());
+  simd::Vector<T> (*simd_f1)(simd::Vector<simd::Bit>, simd::Vector<T>, simd::Vector<T>, uint32_t) =
+      simd::simd_ternary_op_vector_vector<T>;
+  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f1);
+  simd_vector_func_name = fmt::format("simd_vector_ternary_{}_vector_scalar", get_dtype<T>().GetTypeString());
+  simd::Vector<T> (*simd_f2)(simd::Vector<simd::Bit>, simd::Vector<T>, T, uint32_t) =
+      simd::simd_ternary_op_vector_scalar<T>;
+  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f2);
+  simd_vector_func_name = fmt::format("simd_vector_ternary_{}_scalar_vector", get_dtype<T>().GetTypeString());
+  simd::Vector<T> (*simd_f3)(simd::Vector<simd::Bit>, T, simd::Vector<T>, uint32_t) =
+      simd::simd_ternary_op_scalar_vector<T>;
+  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f3);
+}
+
+template <typename T>
 static void register_simd_vector_add() {
   register_simd_vector_arithmetic<T, OP_PLUS>();
 }
@@ -502,5 +522,7 @@ void init_builtin_math() {
                       uint16_t, uint8_t)
   REGISTER_MATH_FUNCS(register_simd_vector_and, simd::Bit)
   REGISTER_MATH_FUNCS(register_simd_vector_or, simd::Bit)
+  REGISTER_MATH_FUNCS(register_simd_vector_ternary, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                      uint32_t, uint16_t, uint8_t)
 }
 }  // namespace rapidudf

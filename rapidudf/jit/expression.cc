@@ -53,7 +53,8 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileOperand(const ast::Operand& expr) {
           return CompileConstants(arg);
         } else if constexpr (std::is_same_v<T, ast::VarAccessor> || std::is_same_v<T, ast::VarDefine>) {
           return CompileExpression(arg);
-        } else if constexpr (std::is_same_v<T, ast::BinaryExprPtr> || std::is_same_v<T, ast::UnaryExprPtr>) {
+        } else if constexpr (std::is_same_v<T, ast::BinaryExprPtr> || std::is_same_v<T, ast::UnaryExprPtr> ||
+                             std::is_same_v<T, ast::TernaryExprPtr>) {
           return CompileExpression(arg);
         } else {
           static_assert(sizeof(arg) == -1, "non-exhaustive visitor!");
@@ -339,5 +340,86 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::UnaryExprPtr expr) 
     return result;
   }
   return val;
+}
+absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::TernaryExprPtr expr) {
+  ast_ctx_.SetPosition(expr->position);
+  auto cond_result = CompileOperand(expr->cond);
+  if (expr->true_false_operands.has_value()) {
+    if (!cond_result.ok()) {
+      return cond_result.status();
+    }
+    auto cond_val = cond_result.value();
+    auto [true_expr, false_expr] = *(expr->true_false_operands);
+    if (cond_val->GetDType().IsBool()) {
+      uint32_t ternary_cursor = GetLabelCursor();
+      std::string ternary_final_label = fmt::format("ternary_final_{}", ternary_cursor);
+      std::string ternary_true_label = fmt::format("ternary_true_{}", ternary_cursor);
+      auto true_bin = Value::New(&GetCodeGenerator(), DATA_U8, static_cast<uint64_t>(1));
+      auto result_val = GetCodeGenerator().NewValue(expr->ternary_result_dtype, {}, true);
+      int rc = cond_val->Cmp(OP_EQUAL, *true_bin, nullptr);
+      if (0 != rc) {
+        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("cmp ternary failed.")));
+      }
+      GetCodeGenerator().Jump(ternary_true_label, OP_EQUAL);
+      auto false_expr_result = CompileOperand(false_expr);
+      if (!false_expr_result.ok()) {
+        return false_expr_result.status();
+      }
+      auto false_expr_val = false_expr_result.value();
+      false_expr_val = false_expr_val->CastTo(result_val->GetDType());
+      if (!false_expr_val) {
+        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+            fmt::format("ternary cast false expr value:{} to {}", false_expr_val->GetDType(), result_val->GetDType())));
+      }
+      rc = result_val->Copy(*false_expr_val);
+      if (0 != rc) {
+        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("ternary copy false expr result.")));
+      }
+      GetCodeGenerator().DropTmpValue(false_expr_val);
+      GetCodeGenerator().Jump(ternary_final_label);
+      GetCodeGenerator().Label(ternary_true_label);
+      auto true_expr_result = CompileOperand(true_expr);
+      if (!true_expr_result.ok()) {
+        return true_expr_result.status();
+      }
+      auto true_expr_val = true_expr_result.value();
+      true_expr_val = true_expr_val->CastTo(result_val->GetDType());
+      if (!true_expr_val) {
+        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+            fmt::format("ternary cast true expr value:{} to {}", true_expr_val->GetDType(), result_val->GetDType())));
+      }
+      rc = result_val->Copy(*true_expr_val);
+      if (0 != rc) {
+        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("ternary copy true expr result.")));
+      }
+      GetCodeGenerator().DropTmpValue(true_expr_val);
+      GetCodeGenerator().Label(ternary_final_label);
+      GetCodeGenerator().GetCodeGen().nop();
+      return result_val;
+    } else if (cond_val->GetDType().IsSimdVectorBit()) {
+      auto true_expr_result = CompileOperand(true_expr);
+      if (!true_expr_result.ok()) {
+        return true_expr_result.status();
+      }
+      auto true_expr_val = true_expr_result.value();
+      auto false_expr_result = CompileOperand(false_expr);
+      if (!false_expr_result.ok()) {
+        return false_expr_result.status();
+      }
+      auto false_expr_val = false_expr_result.value();
+      auto func_name = GetSimdVectorTernaryFunctionName(true_expr_val->GetDType(), false_expr_val->GetDType());
+      std::vector<ValuePtr> args{cond_val, true_expr_val, false_expr_val};
+      auto result = CallFunction(func_name, args);
+      if (!result.ok()) {
+        return result.status();
+      }
+      GetCodeGenerator().DropTmpValue(true_expr_val);
+      GetCodeGenerator().DropTmpValue(false_expr_val);
+      return result.value();
+    }
+    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("ternary op with cond:{", cond_val->GetDType())));
+  } else {
+    return cond_result;
+  }
 }
 }  // namespace rapidudf

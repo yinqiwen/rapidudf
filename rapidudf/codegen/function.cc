@@ -64,6 +64,18 @@ std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype) {
     return fname + "_" + left_dtype.GetTypeString();
   }
 }
+std::string GetSimdVectorTernaryFunctionName(DType true_dtype, DType false_dtype) {
+  std::string fname(FunctionFactory::kSimdVectorTernaryFuncPrefix);
+  if (true_dtype.IsSimdVector() && false_dtype.IsSimdVector()) {
+    return fname + "_" + true_dtype.Elem().GetTypeString() + "_vector_vector";
+  } else if (true_dtype.IsSimdVector() && !false_dtype.IsSimdVector()) {
+    return fname + "_" + true_dtype.Elem().GetTypeString() + "_vector_scalar";
+  } else if (!true_dtype.IsSimdVector() && false_dtype.IsSimdVector()) {
+    return fname + "_" + true_dtype.Elem().GetTypeString() + "_scalar_vector";
+  } else {
+    return fname + "_" + true_dtype.Elem().GetTypeString() + "_scalar_scalar";
+  }
+}
 
 std::vector<const Xbyak::Reg*> GetFuncReturnValueRegisters(DType return_type, uint32_t& total_bits) {
   std::vector<const Xbyak::Reg*> regs;

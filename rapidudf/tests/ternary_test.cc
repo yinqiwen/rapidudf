@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -29,37 +29,30 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#pragma once
-#include "absl/status/statusor.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/optype.h"
+#include <gtest/gtest.h>
+#include <functional>
+#include <vector>
+#include "rapidudf/ast/context.h"
+#include "rapidudf/ast/grammar.h"
+#include "rapidudf/jit/jit.h"
+#include "rapidudf/log/log.h"
 
-namespace rapidudf {
-namespace simd {
-enum ReuseFlag {
-  REUSE_NONE = 0,
-  REUSE_LEFT = 1,
-  REUSE_RIGHT = 2,
-};
-using VectorDataWithDType = std::pair<VectorData, DType>;
-template <typename T, typename R, OpToken op>
-Vector<R> simd_binary_op(Vector<T> left, Vector<T> right, uint32_t reuse);
-template <typename T, typename R, OpToken op>
-Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse, uint32_t reuse);
-
-template <typename T, OpToken op>
-Vector<T> simd_unary_op(Vector<T> left, uint32_t reuse);
-
-template <typename T>
-Vector<T> simd_ternary_op_scalar_scalar(Vector<Bit> cond, T true_val, T false_val, uint32_t reuse);
-template <typename T>
-Vector<T> simd_ternary_op_vector_vector(Vector<Bit> cond, Vector<T> true_val, Vector<T> false_val, uint32_t reuse);
-template <typename T>
-Vector<T> simd_ternary_op_vector_scalar(Vector<Bit> cond, Vector<T> true_val, T false_val, uint32_t reuse);
-template <typename T>
-Vector<T> simd_ternary_op_scalar_vector(Vector<Bit> cond, T true_val, Vector<T> false_val, uint32_t reuse);
-
-void init_builtin_simd_funcs();
-
-}  // namespace simd
-}  // namespace rapidudf
+using namespace rapidudf;
+using namespace rapidudf::ast;
+TEST(JitCompiler, ternary0) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  ParseContext ctx;
+  std::string content = R"(
+    int test_func(int x){ 
+      return x>3?1:0;
+    }
+  )";
+  auto rc = compiler.CompileFunction<int, int>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_DOUBLE_EQ(f(3), 0);
+  ASSERT_DOUBLE_EQ(f(4), 1);
+  ASSERT_DOUBLE_EQ(f(6), 1);
+  ASSERT_DOUBLE_EQ(f(2), 0);
+}

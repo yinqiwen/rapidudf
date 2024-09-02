@@ -39,6 +39,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+#include "rapidudf/arena/arena.h"
 #include "rapidudf/ast/block.h"
 #include "rapidudf/ast/context.h"
 #include "rapidudf/ast/expression.h"
@@ -49,6 +50,7 @@
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/value.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/function.h"
 namespace rapidudf {
 
 class JitCompiler;
@@ -56,7 +58,7 @@ template <typename RET, typename... Args>
 class JitFunction {
  public:
   JitFunction(const std::string& name, std::unique_ptr<CodeGenerator>&& code_gen,
-              std::vector<std::unique_ptr<std::string>>&& const_vals)
+              std::vector<std::unique_ptr<std::string>>&& const_vals, bool reset_arena)
       : name_(name), code_gen_(std::move(code_gen)), const_strings_(std::move(const_vals)) {
     f_ = reinterpret_cast<RET (*)(Args...)>(const_cast<uint8_t*>(code_gen_->GetCodeGen().getCode()));
   }
@@ -78,6 +80,9 @@ class JitFunction {
   void SetUnsafe(bool v = true) { unsafe_ = v; }
 
   RET UnsafeCall(Args... args) {
+    if (reset_arena_) {
+      GetArena().Reset();
+    }
     if constexpr (std::is_same_v<void, RET>) {
       f_(args...);
     } else {
@@ -88,6 +93,9 @@ class JitFunction {
 
   RET SafeCall(Args... args) {
     auto& func_ctx = FunctionCallContext::Get(true);
+    if (reset_arena_) {
+      func_ctx.arena.Reset();
+    }
     if (func_ctx.invoke_frame_id == 1) {  // first
       if (setjmp(func_ctx.jmp_env) == 0) {
         if constexpr (std::is_same_v<void, RET>) {
@@ -134,6 +142,7 @@ class JitFunction {
   RET (*f_)(Args...) = nullptr;
   bool unsafe_ = false;
   bool rethrow_ = false;
+  bool reset_arena_ = false;
   friend class JitCompiler;
 };
 
@@ -159,7 +168,9 @@ class JitCompiler {
           RUDF_ERROR("{}", err);
           return absl::InvalidArgumentError(err);
         }
-        return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings));
+
+        return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
+                                         ctx.has_simd_vector_operations);
       }
     }
     return absl::NotFoundError(fmt::format("No function:{} found in compuled functions.", name));
@@ -186,7 +197,8 @@ class JitCompiler {
       GetCodeGenerator().DumpAsm();
     }
     auto& ctx = compile_ctxs_[compile_function_idx_];
-    return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings));
+    return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
+                                     ctx.has_simd_vector_operations);
   }
 
   template <typename RET, typename... Args>
@@ -224,7 +236,8 @@ class JitCompiler {
       GetCodeGenerator().DumpAsm();
     }
     auto& ctx = compile_ctxs_[compile_function_idx_];
-    return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings));
+    return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
+                                     ctx.has_simd_vector_operations);
   }
 
  private:
@@ -235,6 +248,7 @@ class JitCompiler {
     std::vector<std::unique_ptr<std::string>> const_strings;
     std::unordered_map<std::string, ValuePtr> local_vars;
     FunctionDesc desc;
+    bool has_simd_vector_operations = false;
   };
   const FunctionDesc* GetFunction(const std::string& name);
   CodeGenerator& GetCodeGenerator() { return *compile_ctxs_[compile_function_idx_].code_gen; }
@@ -250,10 +264,12 @@ class JitCompiler {
   absl::Status CompileStatement(const ast::WhileStatement& statement);
   absl::Status CompileStatement(const ast::ExpressionStatement& statement);
 
+  absl::StatusOr<ValuePtr> CompileExpression(ast::UnaryExprPtr expr);
   absl::StatusOr<ValuePtr> CompileExpression(ast::BinaryExprPtr expr);
+  absl::StatusOr<ValuePtr> CompileExpression(ast::TernaryExprPtr expr);
   absl::StatusOr<ValuePtr> CompileExpression(const ast::VarAccessor& expr);
   absl::StatusOr<ValuePtr> CompileExpression(const ast::VarDefine& expr);
-  absl::StatusOr<ValuePtr> CompileExpression(ast::UnaryExprPtr expr);
+
   absl::StatusOr<ValuePtr> CompileOperand(const ast::Operand& expr);
 
   absl::StatusOr<ValuePtr> CompileConstants(double v);
@@ -271,6 +287,8 @@ class JitCompiler {
 
   void AddCompileContex(const ast::Function& func_ast);
 
+  uint32_t GetLabelCursor() { return label_cursor_++; }
+
   std::mutex jit_mutex_;
   // std::unique_ptr<CodeGenerator> code_gen_;
 
@@ -280,6 +298,6 @@ class JitCompiler {
   std::vector<CompileContext> compile_ctxs_;
 
   uint32_t compile_function_idx_ = 0;
-  int label_cursor_ = 0;
+  uint32_t label_cursor_ = 0;
 };
 }  // namespace rapidudf

@@ -8,4 +8,8 @@ cc_library(
         "function.h",
         "type_traits.h",
     ],
+    deps = [
+        "//rapidudf/arena",
+        "//rapidudf/log",
+    ],
 )

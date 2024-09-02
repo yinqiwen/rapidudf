@@ -34,15 +34,10 @@
 namespace rapidudf {
 class Arena {
  public:
-  static Arena& Get() {
-    static thread_local Arena arena;
-    return arena;
-  }
   uint8_t* Allocate(size_t n) { return google::protobuf::Arena::CreateArray<uint8_t>(&arena_, n); }
   void Reset() { arena_.Reset(); }
 
  private:
-  Arena() {}
   google::protobuf::Arena arena_;
 };
 }  // namespace rapidudf

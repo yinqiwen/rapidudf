@@ -92,6 +92,9 @@ class ParseContext {
 
   void SetFunctionCursor(uint32_t idx) { current_function_cursor_ = idx; }
 
+  void MarkSimdVectorOperation() { GetFunctionParseContext(current_function_cursor_).has_simd_vector_op = true; }
+  bool HasSimdVectorOperation(uint32_t idx) const { return GetFunctionParseContext(idx).has_simd_vector_op; }
+
  private:
   using LocalVarMap = std::unordered_map<std::string, DType>;
   using FunctionCallMap = std::unordered_map<std::string, const FunctionDesc*>;
@@ -102,6 +105,7 @@ class ParseContext {
     FunctionCallMap func_calls;
     BuiltinFuncationCallSet builtin_func_calls;
     FunctionDesc desc;
+    bool has_simd_vector_op = false;
   };
   const FunctionParseContext& GetFunctionParseContext(uint32_t idx) const { return function_parse_ctxs_[idx]; }
   FunctionParseContext& GetFunctionParseContext(uint32_t idx) {

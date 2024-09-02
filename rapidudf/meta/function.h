@@ -33,11 +33,13 @@
 #include <setjmp.h>
 #include <cstdint>
 #include <functional>
+#include "rapidudf/arena/arena.h"
 #include "rapidudf/log/log.h"
 
 namespace rapidudf {
 
 struct FunctionCallContext {
+  Arena arena;
   jmp_buf jmp_env;
   std::exception run_ex;
   uint32_t invoke_frame_id = 0;
@@ -49,6 +51,8 @@ struct FunctionCallContext {
     return ctx;
   }
 };
+
+inline Arena& GetArena() { return FunctionCallContext::Get(false).arena; }
 
 constexpr uint64_t fnv1a_hash(const char* str) {
   uint64_t hash = 14695981039346656037ULL;

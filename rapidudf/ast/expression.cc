@@ -30,6 +30,7 @@
 */
 #include "rapidudf/ast/expression.h"
 #include <fmt/core.h>
+#include <cstdint>
 #include <variant>
 #include <vector>
 #include "rapidudf/ast/context.h"
@@ -48,6 +49,9 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
         if constexpr (std::is_same_v<T, double>) {
           int64_t iv = static_cast<int64_t>(arg);
           if (static_cast<double>(iv) == arg) {
+            if (iv <= INT32_MAX) {
+              return absl::StatusOr<VarTag>(get_dtype<int32_t>());
+            }
             return absl::StatusOr<VarTag>(get_dtype<int64_t>());
           }
           return absl::StatusOr<VarTag>(get_dtype<T>());
@@ -57,7 +61,8 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
           return absl::StatusOr<VarTag>(DATA_STRING_VIEW);
         } else if constexpr (std::is_same_v<T, VarAccessor> || std::is_same_v<T, VarDefine>) {
           return arg.Validate(ctx);
-        } else if constexpr (std::is_same_v<T, BinaryExprPtr> || std::is_same_v<T, UnaryExprPtr>) {
+        } else if constexpr (std::is_same_v<T, BinaryExprPtr> || std::is_same_v<T, UnaryExprPtr> ||
+                             std::is_same_v<T, TernaryExprPtr>) {
           return arg->Validate(ctx);
         } else {
           static_assert(sizeof(arg) == -1, "No avaialble!");
@@ -218,6 +223,8 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           if (!left_var.dtype.IsSimdVector()) {
             left_var.dtype = right_result->dtype;
           }
+          ctx.MarkSimdVectorOperation();
+          ctx.AddBuiltinFuncCall(GetFunctionName(op, left_var.dtype, right_result->dtype));
           break;
         }
         if (!left_var.dtype.IsNumber() || !right_result->dtype.IsNumber()) {
@@ -268,6 +275,8 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           can_cmp = true;
           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpJson);
         } else if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
+          ctx.AddBuiltinFuncCall(GetFunctionName(op, left_var.dtype, right_result->dtype));
+          ctx.MarkSimdVectorOperation();
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
           break;
         }
@@ -302,6 +311,70 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
   }
 
   return left_var;
+}
+
+absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
+  ctx.SetPosition(position);
+  auto cond_result = validate_operand(ctx, cond);
+  if (true_false_operands.has_value()) {
+    if (!cond_result.ok()) {
+      return cond_result.status();
+    }
+    auto [true_expr, false_expr] = *true_false_operands;
+    auto true_expr_result = validate_operand(ctx, true_expr);
+    auto false_expr_result = validate_operand(ctx, false_expr);
+    if (!true_expr_result.ok()) {
+      return true_expr_result.status();
+    }
+    if (!false_expr_result.ok()) {
+      return false_expr_result.status();
+    }
+    if (cond_result->dtype.IsBool()) {
+      if (true_expr_result->dtype.CanCastTo(false_expr_result->dtype)) {
+        ternary_result_dtype = false_expr_result->dtype;
+        return VarTag(ternary_result_dtype);
+      } else if (false_expr_result->dtype.CanCastTo(true_expr_result->dtype)) {
+        ternary_result_dtype = true_expr_result->dtype;
+        return VarTag(ternary_result_dtype);
+      }
+    } else if (cond_result->dtype.IsSimdVectorBit()) {
+      if (true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
+        if (true_expr_result->dtype == false_expr_result->dtype) {
+          ternary_result_dtype = true_expr_result->dtype;
+          ctx.MarkSimdVectorOperation();
+          ctx.AddBuiltinFuncCall(GetSimdVectorTernaryFunctionName(true_expr_result->dtype, false_expr_result->dtype));
+          return VarTag(ternary_result_dtype);
+        }
+      } else if (true_expr_result->dtype.IsSimdVector() && !false_expr_result->dtype.IsSimdVector()) {
+        if (false_expr_result->dtype.CanCastTo(true_expr_result->dtype.Elem())) {
+          ternary_result_dtype = true_expr_result->dtype;
+          ctx.MarkSimdVectorOperation();
+          ctx.AddBuiltinFuncCall(GetSimdVectorTernaryFunctionName(true_expr_result->dtype, false_expr_result->dtype));
+          return VarTag(ternary_result_dtype);
+        }
+      } else if (!true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
+        if (true_expr_result->dtype.CanCastTo(false_expr_result->dtype.Elem())) {
+          ternary_result_dtype = false_expr_result->dtype;
+          ctx.MarkSimdVectorOperation();
+          ctx.AddBuiltinFuncCall(GetSimdVectorTernaryFunctionName(true_expr_result->dtype, false_expr_result->dtype));
+          return VarTag(ternary_result_dtype);
+        }
+      } else {
+        if (true_expr_result->dtype.IsNumber() && false_expr_result->dtype.IsNumber()) {
+          ternary_result_dtype =
+              true_expr_result->dtype >= false_expr_result->dtype ? true_expr_result->dtype : false_expr_result->dtype;
+          ctx.MarkSimdVectorOperation();
+          ctx.AddBuiltinFuncCall(GetSimdVectorTernaryFunctionName(true_expr_result->dtype, false_expr_result->dtype));
+          return VarTag(ternary_result_dtype.ToSimdVector());
+        }
+      }
+    }
+    return ctx.GetErrorStatus(
+        fmt::format("can NOT do ternary with cond dtype:{}, true_expr_dtype:{}, false_expr_dtype:{}",
+                    cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
+  } else {
+    return cond_result;
+  }
 }
 
 absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
@@ -361,6 +434,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     RUDF_DEBUG("{} is builtin:{}", name, is_builtin_math_func(name));
     if (is_builtin_math_func(name)) {
       if (has_simd_vector) {
+        ctx.MarkSimdVectorOperation();
         name = "simd_vector_" + name + "_" + largest_dtype.Elem().GetTypeString();
       } else {
         name = name + "_" + largest_dtype.GetTypeString();
