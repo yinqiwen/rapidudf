@@ -34,6 +34,7 @@
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
 using namespace Xbyak::util;
 absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(double v) {
@@ -60,7 +61,7 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(bool v) {
 }
 absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(const std::string& v) {
   std::unique_ptr<std::string> str = std::make_unique<std::string>(v);
-  std::string_view view = *str;
+  StringView view(*str);
   GetCompileContext().const_strings.emplace_back(std::move(str));
   auto val = GetCodeGenerator().NewConstValue(DType(DATA_STRING_VIEW));
   if (0 != val->Set(view)) {

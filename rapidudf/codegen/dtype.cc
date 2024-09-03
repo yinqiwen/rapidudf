@@ -248,6 +248,7 @@ uint32_t DType::ByteSize() const {
     case DATA_I64: {
       return 8;
     }
+    case DATA_STD_STRING_VIEW:
     case DATA_STRING_VIEW: {
       return 16;
     }

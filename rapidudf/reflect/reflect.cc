@@ -111,8 +111,7 @@ absl::StatusOr<ValuePtr> StructMember::BuildFieldAccess(CodeGenerator& codegen) 
     codegen.GetCodeGen().add(rcx, 8);
     codegen.GetCodeGen().mov(rdx, ptr[rcx]);
     return codegen.NewValueByRegister(val_dtype, {&rax, &rdx});
-
-  } else if (member_field_dtype->IsStringView()) {
+  } else if (member_field_dtype->IsStringView() || member_field_dtype->IsStdStringView()) {
     codegen.GetCodeGen().mov(rax, ptr[rcx]);
     codegen.GetCodeGen().add(rcx, 8);
     codegen.GetCodeGen().mov(rdx, ptr[rcx]);

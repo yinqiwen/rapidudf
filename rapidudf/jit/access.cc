@@ -41,6 +41,7 @@
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/reflect/reflect.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
 using namespace Xbyak::util;
 absl::StatusOr<ValuePtr> JitCompiler::CompileFieldAccess(ValuePtr var, const ast::FieldAccess& field) {
@@ -125,7 +126,7 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileJsonAccess(ValuePtr var, const std:
         ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
   }
   std::unique_ptr<std::string> str = std::make_unique<std::string>(key);
-  std::string_view key_view = *str;
+  StringView key_view(*str);
   GetCompileContext().const_strings.emplace_back(std::move(str));
 
   auto key_arg = GetCodeGenerator().NewConstValue(DATA_STRING_VIEW);

@@ -36,11 +36,13 @@
 #include "rapidudf/codegen/optype.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/types/json_object.h"
+#include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 static constexpr std::string_view kBuiltinStringViewCmp = "rapidudf_compare_string_view";
 static constexpr std::string_view kBuiltinCastStdStrToStringView = "rapidudf_cast_fbsstr_to_string_view";
 static constexpr std::string_view kBuiltinCastFbsStrToStringView = "rapidudf_cast_stdstr_to_string_view";
+static constexpr std::string_view kBuiltinCastStdStrViewToStringView = "rapidudf_cast_stdstrview_to_string_view";
 static constexpr std::string_view kBuiltinJsonMemberGet = "rapidudf_json_member_get";
 static constexpr std::string_view kBuiltinJsonArrayGet = "rapidudf_json_array_get";
 static constexpr std::string_view kBuiltinJsonCmpString = "rapidudf_json_cmp_string";
@@ -49,13 +51,14 @@ static constexpr std::string_view kBuiltinJsonCmpFloat = "rapidudf_json_cmp_floa
 static constexpr std::string_view kBuiltinJsonCmpBool = "rapidudf_json_cmp_bool";
 static constexpr std::string_view kBuiltinJsonCmpJson = "rapidudf_json_cmp_json";
 
-bool compare_string_view(uint32_t op, std::string_view left, std::string_view right);
-std::string_view cast_stdstr_to_string_view(const std::string& str);
-std::string_view cast_fbsstr_to_string_view(const flatbuffers::String& str);
+bool compare_string_view(uint32_t op, StringView left, StringView right);
+StringView cast_stdstr_to_string_view(const std::string& str);
+StringView cast_fbsstr_to_string_view(const flatbuffers::String& str);
+StringView cast_stdstrview_to_string_view(std::string_view str);
 
-const JsonObject& json_member_get(const JsonObject& json, std::string_view key);
+const JsonObject& json_member_get(const JsonObject& json, StringView key);
 const JsonObject& json_array_get(const JsonObject& json, size_t idx);
-bool json_cmp_string(uint32_t op, const JsonObject& json, std::string_view right, bool reverse);
+bool json_cmp_string(uint32_t op, const JsonObject& json, StringView right, bool reverse);
 bool json_cmp_int(uint32_t op, const JsonObject& json, int64_t right, bool reverse);
 bool json_cmp_bool(uint32_t op, const JsonObject& json, bool right, bool reverse);
 bool json_cmp_float(uint32_t op, const JsonObject& json, double right, bool reverse);

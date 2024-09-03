@@ -38,7 +38,12 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/contrib/math/math-inl.h"
+#include "hwy/contrib/sort/sorting_networks-inl.h"
+#include "hwy/contrib/sort/traits-inl.h"
+#include "hwy/contrib/sort/traits128-inl.h"
+#include "hwy/contrib/sort/vqsort.h"
 #include "hwy/highway.h"
 
 #include "rapidudf/codegen/dtype.h"
@@ -280,7 +285,6 @@ class VectorDataHelper {
   }
 
   void AddResidue(Bit v) {
-    RUDF_INFO("AddResidueBit:{}", v.val);
     if (v.val) {
       data_[cursor_] = bit_set(data_[cursor_], bit_cursor_);
     } else {
@@ -467,8 +471,6 @@ Vector<T> simd_ternary_op_scalar_scalar(Vector<Bit> cond, T true_val, T false_va
   uint8_t* arena_data = GetArena().Allocate(byte_size);
   size_t result_size = cond.Size();
   VectorDataHelper<number_t> helper(arena_data);
-  RUDF_DEBUG("simd_ternary_op_scalar_vector element_size:{}, size:{},byte_size:{},lanes:{}", element_size, cond.Size(),
-             byte_size, lanes);
   size_t i = 0;
   for (; i < cond.Size(); i += lanes) {
     helper.Add(select_ternary_value<T, decltype(d)>(cond, true_v, false_v, i));
@@ -536,6 +538,15 @@ Vector<T> simd_ternary_op_scalar_vector(Vector<Bit> cond, T true_val, Vector<T> 
   }
   VectorData result_data(arena_data, result_size);
   return Vector<T>(result_data);
+}
+
+template <typename T>
+T simd_vector_dot(Vector<T> left, Vector<T> right, uint32_t reuse) {
+  using D = hn::ScalableTag<T>;
+  const D d;
+  constexpr auto assumptions = hn::Dot::Assumptions::kAtLeastOneVector;
+  T val = hn::Dot::Compute<assumptions, D, T>(d, left.Data(), right.Data(), left.Size());
+  return val;
 }
 
 #define DEFINE_SIMD_BINARY_MATH_OP_TEMPLATE(r, op, ii, TYPE)                                                   \
@@ -622,6 +633,13 @@ DEFINE_SIMD_UNARY_OP(OP_ABS, float, double, int64_t, int32_t, int16_t, int8_t);
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_TERNARY_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 DEFINE_SIMD_TERNARY_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
+
+#define DEFINE_SIMD_DOT_OP_TEMPLATE(r, op, ii, TYPE) \
+  template TYPE simd_vector_dot(Vector<TYPE> left, Vector<TYPE> right, uint32_t reuse);
+#define DEFINE_SIMD_DOT_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_DOT_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_DOT_OP(float, double);
+
 void init_builtin_simd_funcs() {}
 }  // namespace simd
 }  // namespace rapidudf

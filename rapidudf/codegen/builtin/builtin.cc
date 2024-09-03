@@ -42,6 +42,7 @@ void init_builtin() {
     RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
     RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
     RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);
+    RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrViewToStringView, cast_stdstrview_to_string_view);
     RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonMemberGet, json_member_get);
     RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonArrayGet, json_array_get);
     RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpString, json_cmp_string);

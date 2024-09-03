@@ -77,6 +77,7 @@ enum OpToken {
   OP_LOG10,
   OP_LOG1P,
   OP_HYPOT,
+  OP_DOT,
   OP_END,
 };
 constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
@@ -84,7 +85,7 @@ constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
     "not",     "equal",  "not_equal", "less",  "less_equal", "greater", "greater_equal", "logic_and", "logic_or",
     "max",     "min",    "sqrt",      "floor", "abs",        "sin",     "cos",           "asin",      "acos",
     "atanh",   "atan2",  "sinh",      "tanh",  "asinh",      "acosh",   "exp",           "exp2",      "expm1",
-    "log",     "log2",   "log10",     "log1p", "hypot"};
+    "log",     "log2",   "log10",     "log1p", "hypot",      "dot"};
 }  // namespace rapidudf
 
 template <>

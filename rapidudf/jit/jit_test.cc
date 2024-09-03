@@ -70,7 +70,7 @@ TEST(JitCompiler, str) {
   )";
   // auto func = parse_function_ast(ctx, content);
   // ASSERT_TRUE(func.has_value());
-  auto rc = compiler.CompileFunction<std::string_view>(content, true);
+  auto rc = compiler.CompileFunction<StringView>(content, true);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(), "hello,world");

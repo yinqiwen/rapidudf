@@ -32,10 +32,11 @@
 #include "rapidudf/codegen/builtin/builtin.h"
 #include "rapidudf/codegen/optype.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 
-bool compare_string_view(uint32_t op, std::string_view left, std::string_view right) {
+bool compare_string_view(uint32_t op, StringView left, StringView right) {
   bool result = false;
   switch (op) {
     case OP_EQUAL: {
@@ -70,9 +71,9 @@ bool compare_string_view(uint32_t op, std::string_view left, std::string_view ri
   RUDF_DEBUG("cmp string:{} & {} with op:{} result:{}", left, right, op, result);
   return result;
 }
-std::string_view cast_stdstr_to_string_view(const std::string& str) { return str; }
-std::string_view cast_fbsstr_to_string_view(const flatbuffers::String& str) {
-  return std::string_view(str.c_str(), str.size());
-}
+
+StringView cast_stdstr_to_string_view(const std::string& str) { return StringView(str); }
+StringView cast_fbsstr_to_string_view(const flatbuffers::String& str) { return StringView(str.c_str(), str.size()); }
+StringView cast_stdstrview_to_string_view(std::string_view str) { return StringView(str); }
 
 }  // namespace rapidudf

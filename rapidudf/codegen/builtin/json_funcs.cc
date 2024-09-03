@@ -37,7 +37,7 @@
 
 namespace rapidudf {
 
-const JsonObject& json_member_get(const JsonObject& json, std::string_view key) { return json[key]; }
+const JsonObject& json_member_get(const JsonObject& json, StringView key) { return json[key]; }
 const JsonObject& json_array_get(const JsonObject& json, size_t idx) { return json[idx]; }
 
 template <typename T>
@@ -94,13 +94,13 @@ static bool json_cmp(uint32_t op, T left, T right, bool reverse) {
   return result;
 }
 
-bool json_cmp_string(uint32_t op, const JsonObject& json, std::string_view right, bool reverse) {
+bool json_cmp_string(uint32_t op, const JsonObject& json, StringView right, bool reverse) {
   RUDF_DEBUG("json_cmp_string {}", right);
   if (!json.is_string()) {
     RUDF_CRITICAL("Unsupported json_cmp_string compare op:{} with non string json object:{} ", op, json.type_name());
     return false;
   }
-  std::string_view left = json.get<std::string_view>();
+  StringView left = StringView(json.get<std::string_view>());
   return json_cmp(op, left, right, reverse);
 }
 
@@ -135,7 +135,7 @@ bool json_cmp_json(uint32_t op, const JsonObject& left, const JsonObject& right)
   if (left.is_boolean() && right.is_boolean()) {
     return json_cmp_bool(op, left, right.get<bool>(), false);
   } else if (left.is_string() && right.is_string()) {
-    return json_cmp_string(op, left, right.get<std::string_view>(), false);
+    return json_cmp_string(op, left, StringView(right.get<std::string_view>()), false);
   } else if (left.is_number_float() && right.is_number_float()) {
     return json_cmp_float(op, left, right.get<double>(), false);
   } else if (left.is_number_integer() && right.is_number_integer()) {

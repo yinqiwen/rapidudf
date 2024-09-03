@@ -149,7 +149,7 @@ class Value : public std::enable_shared_from_this<Value> {
     } else if constexpr (std::is_pointer_v<T>) {
       uint64_t int_val = reinterpret_cast<uint64_t>(val);
       return DoSetValue(int_val);
-    } else if constexpr (std::is_same_v<std::string_view, T>) {
+    } else if constexpr (std::is_same_v<StringView, T>) {
       return DoSetStringView(val);
     } else {
       uint64_t int_val = static_cast<uint64_t>(val);
@@ -172,7 +172,7 @@ class Value : public std::enable_shared_from_this<Value> {
   int CmpRegister(const Value& other);
   int CmpJson(OpToken op, Value& other, ValuePtr result, bool reverse);
 
-  int DoSetStringView(std::string_view str);
+  int DoSetStringView(StringView str);
 
   std::string var_name_;
   uint64_t uniq_id_ = 0;

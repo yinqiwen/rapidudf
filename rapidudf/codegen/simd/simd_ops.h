@@ -33,6 +33,8 @@
 #include "absl/status/statusor.h"
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/optype.h"
+#include "rapidudf/types/simd.h"
+#include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 namespace simd {
@@ -58,6 +60,14 @@ template <typename T>
 Vector<T> simd_ternary_op_vector_scalar(Vector<Bit> cond, Vector<T> true_val, T false_val, uint32_t reuse);
 template <typename T>
 Vector<T> simd_ternary_op_scalar_vector(Vector<Bit> cond, T true_val, Vector<T> false_val, uint32_t reuse);
+
+template <OpToken op>
+Vector<Bit> simd_vector_string_cmp(Vector<StringView> left, Vector<StringView> right, uint32_t reuse);
+template <OpToken op>
+Vector<Bit> simd_vector_string_cmp_scalar(Vector<StringView> left, StringView right, bool reverse, uint32_t reuse);
+
+template <typename T>
+T simd_vector_dot(Vector<T> left, Vector<T> right, uint32_t reuse);
 
 void init_builtin_simd_funcs();
 

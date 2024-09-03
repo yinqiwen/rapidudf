@@ -37,6 +37,7 @@
 #include "rapidudf/ast/grammar.h"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
@@ -166,7 +167,7 @@ TEST(JitCompiler, cmp_string) {
       return x>y;
     }
   )";
-  auto rc = compiler.CompileFunction<bool, std::string_view, std::string_view>(content);
+  auto rc = compiler.CompileFunction<bool, StringView, StringView>(content);
   ASSERT_TRUE(rc.ok());
   // auto f = compiler.GetFunc<bool, std::string_view, std::string_view>(true);
   // ASSERT_TRUE(f != nullptr);

@@ -465,6 +465,14 @@ static void register_simd_vector_or() {
   register_simd_vector_cmp<T, OP_LOGIC_OR>();
 }
 
+template <typename T>
+static void register_simd_vector_dot() {
+  std::string simd_vector_func_name = fmt::format("simd_vector_dot_{}", get_dtype<T>().GetTypeString());
+  T (*simd_f0)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_vector_dot<T>;
+  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f0);
+  get_builtin_math_funcs().insert("dot");
+}
+
 bool is_builtin_math_func(std::string_view name) { return get_builtin_math_funcs().count(name) == 1; }
 
 void init_builtin_math() {
@@ -524,5 +532,6 @@ void init_builtin_math() {
   REGISTER_MATH_FUNCS(register_simd_vector_or, simd::Bit)
   REGISTER_MATH_FUNCS(register_simd_vector_ternary, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
                       uint32_t, uint16_t, uint8_t)
+  REGISTER_MATH_FUNCS(register_simd_vector_dot, float, double)
 }
 }  // namespace rapidudf

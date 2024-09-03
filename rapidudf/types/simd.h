@@ -34,6 +34,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "rapidudf/types/string_view.h"
+
 namespace rapidudf {
 namespace simd {
 
@@ -110,6 +112,33 @@ class Vector {
       return Data()[idx];
     }
   }
+
+ private:
+  VectorData vec_data_;
+};
+
+template <>
+class Vector<StringView> {
+ public:
+  using value_type = StringView;
+  Vector() {}
+  Vector(const value_type* data, size_t size) {
+    VectorData vdata(data, size);
+    vec_data_ = vdata;
+  }
+  Vector(VectorData vdata) { vec_data_ = vdata; }
+  template <typename Str, typename ArenaAlloc>
+  Vector(const std::vector<Str>& vec, ArenaAlloc& alloc) {
+    StringView* data = reinterpret_cast<StringView*>(alloc.Allocate(sizeof(StringView) * vec.size()));
+    for (size_t i = 0; i < vec.size(); i++) {
+      data[i] = StringView(vec[i]);
+    }
+    VectorData vdata(data, vec.size());
+    vec_data_ = vdata;
+  }
+  size_t Size() const { return vec_data_.Size(); }
+  auto Data() const { return reinterpret_cast<const value_type*>(vec_data_.Data()); }
+  value_type operator[](size_t idx) const { return Data()[idx]; }
 
  private:
   VectorData vec_data_;

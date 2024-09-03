@@ -84,7 +84,7 @@ TEST(JitCompiler, pb_access_read_str) {
       return x.scene();
     }
    )";
-  auto rc = compiler.CompileFunction<std::string_view, const test::Header*>(content);
+  auto rc = compiler.CompileFunction<StringView, const test::Header*>(content);
   ASSERT_TRUE(rc.ok());
   // auto f = compiler.GetFunc<std::string_view, const test::Header*>(true);
   // ASSERT_TRUE(f != nullptr);
@@ -159,7 +159,7 @@ TEST(JitCompiler, pb_write_string) {
       return x.scene();
     }
    )";
-  auto rc = compiler.CompileFunction<std::string_view, test::Header*>(content);
+  auto rc = compiler.CompileFunction<StringView, test::Header*>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(&pb_header), "123456");
@@ -203,7 +203,7 @@ TEST(JitCompiler, pb_read_map_item) {
       return x.item_map().get(key).id();
     }
    )";
-  auto rc = compiler.CompileFunction<int, test::Header*, std::string_view>(content);
+  auto rc = compiler.CompileFunction<int, test::Header*, StringView>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(&pb_header, "k0"), 1001);

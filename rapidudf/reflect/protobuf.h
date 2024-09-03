@@ -35,6 +35,7 @@
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/reflect/reflect.h"
+#include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 
@@ -83,7 +84,7 @@ struct PBMapHelper {
 template <typename V>
 struct PBMapHelper<std::string, V> {
   using return_type_t = typename PBGetterReturnType<V>::return_type;
-  static return_type_t Get(const ::google::protobuf::Map<std::string, V>* pb_map, std::string_view k) {
+  static return_type_t Get(const ::google::protobuf::Map<std::string, V>* pb_map, StringView k) {
     if (nullptr == pb_map) {
       return PBGetterReturnType<V>::default_value();
     }
@@ -128,9 +129,9 @@ struct PBSetStringHelper<SOURCE, LINE, HASH, void (T::*)(std::string&&)> {
     static func_t func = nullptr;
     return func;
   }
-  static void Call(T* p, std::string_view str) {
+  static void Call(T* p, StringView str) {
     auto func = GetFunc();
-    (p->*func)(std::string(str));
+    (p->*func)(str.str());
   }
 };
 }  // namespace rapidudf

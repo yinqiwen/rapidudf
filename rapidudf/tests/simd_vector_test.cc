@@ -171,15 +171,15 @@ TEST(JitCompiler, vector_cmp) {
 
 TEST(JitCompiler, vector_add2) {
   spdlog::set_level(spdlog::level::debug);
-  std::vector<int> vec{1, 2, 3};
-  simd::Vector<int> simd_vec(vec);
+  std::vector<float> vec{1, 2, 3};
+  simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<i32> test_func(simd_vector<i32> x){
+    simd_vector<f32> test_func(simd_vector<f32> x){
       return x+5+10;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<int>, simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto result = f(simd_vec);
@@ -208,4 +208,26 @@ TEST(JitCompiler, vector_ternary) {
     RUDF_DEBUG("{}", result[i]);
     // ASSERT_FLOAT_EQ(result[i], vec[i] + 5 + 10);
   }
+}
+TEST(JitCompiler, vector_dot) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<float> left{1, 2, 3, 4, 1, 5, 6};
+  std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
+  simd::Vector<float> simd_left(left);
+  simd::Vector<float> simd_right(right);
+  JitCompiler compiler(4096, true);
+  std::string content = R"(
+    f32 test_func(simd_vector<f32> x,simd_vector<f32> y){
+      return dot(x,y);
+    }
+  )";
+  auto rc = compiler.CompileFunction<float, simd::Vector<float>, simd::Vector<float>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_left, simd_right);
+  float native_result = 0;
+  for (size_t i = 0; i < left.size(); i++) {
+    native_result += (left[i] * right[i]);
+  }
+  ASSERT_FLOAT_EQ(result, native_result);
 }

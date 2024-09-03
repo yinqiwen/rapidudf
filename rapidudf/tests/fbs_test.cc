@@ -91,7 +91,7 @@ TEST(JitCompiler, fbs_read_vector_string) {
       return x.tags().get(0);
     }
    )";
-  auto rc = compiler.CompileFunction<std::string_view, const test_fbs::Header*>(content);
+  auto rc = compiler.CompileFunction<StringView, const test_fbs::Header*>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(fbs_ptr), "1111");

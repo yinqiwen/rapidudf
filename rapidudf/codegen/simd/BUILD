@@ -26,8 +26,10 @@ cc_library(
         "//rapidudf/types:simd",
         "@com_github_xbyak//:xbyak",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_highway//:dot",
         "@com_google_highway//:hwy",
         "@com_google_highway//:math",
+        "@com_google_highway//hwy/contrib/sort:vqsort",
     ],
 )
 

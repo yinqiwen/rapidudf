@@ -519,6 +519,8 @@ int Value::CastToInplace(DType dtype) {
         cast_result = c_->CallFunction(std::string(kBuiltinCastStdStrToStringView), {SelfPtr()});
       } else if (dtype_.PtrTo().IsFlatbuffersString()) {
         cast_result = c_->CallFunction(std::string(kBuiltinCastFbsStrToStringView), {SelfPtr()});
+      } else if (dtype_.PtrTo().IsStdStringView()) {
+        cast_result = c_->CallFunction(std::string(kBuiltinCastStdStrViewToStringView), {SelfPtr()});
       }
       if (!cast_result) {
         RUDF_ERROR("Cast from {} to {} failed", dtype_, dtype);
@@ -756,7 +758,7 @@ int Value::DoSetValue(std::vector<uint64_t> vals, bool is_ptr) {
 
 int Value::DoSetValue(uint64_t val) { return DoSetValue(std::vector<uint64_t>{val}); }
 
-int Value::DoSetStringView(std::string_view str) {
+int Value::DoSetStringView(StringView str) {
   if (!dtype_.IsStringView()) {
     RUDF_ERROR("Invalid dtype:{} to set string_view", dtype_);
     return -1;

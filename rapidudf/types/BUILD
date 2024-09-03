@@ -8,6 +8,7 @@ cc_library(
     hdrs = [
         "json_object.h",
         "params.h",
+        "string_view.h",
     ],
     deps = [
         "@com_google_absl//absl/container:flat_hash_map",
@@ -22,6 +23,7 @@ cc_library(
         "simd.h",
     ],
     deps = [
+        ":types",
         "//rapidudf/arena",
     ],
 )
