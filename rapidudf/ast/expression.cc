@@ -46,16 +46,7 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
   return std::visit(
       [&](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, double>) {
-          int64_t iv = static_cast<int64_t>(arg);
-          if (static_cast<double>(iv) == arg) {
-            if (iv <= INT32_MAX) {
-              return absl::StatusOr<VarTag>(get_dtype<int32_t>());
-            }
-            return absl::StatusOr<VarTag>(get_dtype<int64_t>());
-          }
-          return absl::StatusOr<VarTag>(get_dtype<T>());
-        } else if constexpr (std::is_same_v<T, bool> || std::is_same_v<T, int64_t>) {
+        if constexpr (std::is_same_v<T, bool>) {
           return absl::StatusOr<VarTag>(get_dtype<T>());
         } else if constexpr (std::is_same_v<T, std::string>) {
           return absl::StatusOr<VarTag>(DATA_STRING_VIEW);
@@ -64,6 +55,18 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
         } else if constexpr (std::is_same_v<T, BinaryExprPtr> || std::is_same_v<T, UnaryExprPtr> ||
                              std::is_same_v<T, TernaryExprPtr>) {
           return arg->Validate(ctx);
+        } else if constexpr (std::is_same_v<T, ConstantNumber>) {
+          if (arg.dtype.has_value()) {
+            return absl::StatusOr<VarTag>(*arg.dtype);
+          }
+          int64_t iv = static_cast<int64_t>(arg.dv);
+          if (static_cast<double>(iv) == arg.dv) {
+            if (iv <= INT32_MAX) {
+              return absl::StatusOr<VarTag>(get_dtype<int32_t>());
+            }
+            return absl::StatusOr<VarTag>(get_dtype<int64_t>());
+          }
+          return absl::StatusOr<VarTag>(get_dtype<double>());
         } else {
           static_assert(sizeof(arg) == -1, "No avaialble!");
           return absl::InvalidArgumentError("No avaialble");
@@ -151,10 +154,18 @@ static bool IsValidSimdVectorBinaryOperands(DType left, DType right) {
       if (left != right) {
         return false;
       }
-
-      return true;
+      return false;
+    } else {
+      DType left_ele_dtype = left.Elem();
+      DType right_ele_dtype = left.Elem();
+      if (left_ele_dtype.IsNumber() && right_ele_dtype.IsNumber()) {
+        return true;
+      }
+      if (left_ele_dtype.IsStringView() && right_ele_dtype.IsStringView()) {
+        return true;
+      }
+      return false;
     }
-    return true;
   }
   return false;
 }
@@ -433,6 +444,9 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     }
     RUDF_DEBUG("{} is builtin:{}", name, is_builtin_math_func(name));
     if (is_builtin_math_func(name)) {
+      if (name == "iota") {
+        has_simd_vector = true;
+      }
       if (has_simd_vector) {
         ctx.MarkSimdVectorOperation();
         name = "simd_vector_" + name + "_" + largest_dtype.Elem().GetTypeString();

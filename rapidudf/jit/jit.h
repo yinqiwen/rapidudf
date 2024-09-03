@@ -272,8 +272,8 @@ class JitCompiler {
 
   absl::StatusOr<ValuePtr> CompileOperand(const ast::Operand& expr);
 
+  absl::StatusOr<ValuePtr> CompileConstants(double v, DType dtype);
   absl::StatusOr<ValuePtr> CompileConstants(double v);
-  absl::StatusOr<ValuePtr> CompileConstants(int64_t v);
   absl::StatusOr<ValuePtr> CompileConstants(bool v);
   absl::StatusOr<ValuePtr> CompileConstants(const std::string& v);
 

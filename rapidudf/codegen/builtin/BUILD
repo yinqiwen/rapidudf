@@ -6,9 +6,9 @@ cc_library(
     name = "builtin",
     srcs = [
         "builtin.cc",
-        "json_funcs.cc",
+        "json.cc",
         "math.cc",
-        "string_funcs.cc",
+        "string.cc",
     ],
     hdrs = ["builtin.h"],
     deps = [

@@ -48,14 +48,19 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileOperand(const ast::Operand& expr) {
   return std::visit(
       [&](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, bool> || std::is_same_v<T, int64_t> ||
-                      std::is_same_v<T, std::string>) {
+        if constexpr (std::is_same_v<T, bool> || std::is_same_v<T, std::string>) {
           return CompileConstants(arg);
         } else if constexpr (std::is_same_v<T, ast::VarAccessor> || std::is_same_v<T, ast::VarDefine>) {
           return CompileExpression(arg);
         } else if constexpr (std::is_same_v<T, ast::BinaryExprPtr> || std::is_same_v<T, ast::UnaryExprPtr> ||
                              std::is_same_v<T, ast::TernaryExprPtr>) {
           return CompileExpression(arg);
+        } else if constexpr (std::is_same_v<T, ast::ConstantNumber>) {
+          if (arg.dtype.has_value()) {
+            return CompileConstants(arg.dv, *arg.dtype);
+          } else {
+            return CompileConstants(arg.dv);
+          }
         } else {
           static_assert(sizeof(arg) == -1, "non-exhaustive visitor!");
           ValuePtr empty;

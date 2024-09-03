@@ -283,29 +283,29 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
 };
 }  // namespace rapidudf
 
-#define MEMBER_FUNC_WRAPPER(name, func)                                                            \
-  do {                                                                                             \
-    using wrapper_t = rapidudf::MemberFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__,    \
-                                                      rapidudf::fnv1a_hash(name), decltype(func)>; \
-    wrapper_t::GetFunc() = func;                                                                   \
-    wrapper_t::GetFuncName() = name;                                                               \
-    rapidudf::ReflectFactory::AddStructMethodAccessor(name, &wrapper_t::Call);                     \
+#define MEMBER_FUNC_WRAPPER(name, func)                                                                     \
+  do {                                                                                                      \
+    using wrapper_t = typename rapidudf::MemberFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__,    \
+                                                               rapidudf::fnv1a_hash(name), decltype(func)>; \
+    wrapper_t::GetFunc() = func;                                                                            \
+    wrapper_t::GetFuncName() = name;                                                                        \
+    rapidudf::ReflectFactory::AddStructMethodAccessor(name, &wrapper_t::Call);                              \
   } while (0)
 
-#define SAFE_MEMBER_FUNC_WRAPPER(name, func)                                                     \
-  do {                                                                                           \
-    using wrapper_t = rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__,    \
-                                                    rapidudf::fnv1a_hash(name), decltype(func)>; \
-    wrapper_t::GetFunc() = func;                                                                 \
-    wrapper_t::GetFuncName() = name;                                                             \
-    rapidudf::ReflectFactory::AddStructMethodAccessor(name, &wrapper_t::SafeCall);               \
+#define SAFE_MEMBER_FUNC_WRAPPER(name, func)                                                              \
+  do {                                                                                                    \
+    using wrapper_t = typename rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__,    \
+                                                             rapidudf::fnv1a_hash(name), decltype(func)>; \
+    wrapper_t::GetFunc() = func;                                                                          \
+    wrapper_t::GetFuncName() = name;                                                                      \
+    rapidudf::ReflectFactory::AddStructMethodAccessor(name, &wrapper_t::SafeCall);                        \
   } while (0)
 
-#define SAFE_FUNC_WRAPPER(name, func)                                                            \
-  do {                                                                                           \
-    using wrapper_t = rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__,    \
-                                                    rapidudf::fnv1a_hash(name), decltype(func)>; \
-    wrapper_t::GetFunc() = func;                                                                 \
-    wrapper_t::GetFuncName() = name;                                                             \
-    func = wrapper_t::SafeCall;                                                                  \
+#define SAFE_FUNC_WRAPPER(name, func)                                                                     \
+  do {                                                                                                    \
+    using wrapper_t = typename rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__,    \
+                                                             rapidudf::fnv1a_hash(name), decltype(func)>; \
+    wrapper_t::GetFunc() = func;                                                                          \
+    wrapper_t::GetFuncName() = name;                                                                      \
+    func = wrapper_t::SafeCall;                                                                           \
   } while (0)

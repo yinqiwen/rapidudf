@@ -97,10 +97,9 @@ enum FundamentalType {
   DATA_OBJECT_BEGIN = 64,
 };
 constexpr std::array<std::string_view, DATA_JSON + 1> kFundamentalTypeStrs = {
-    "invalid", "void",       "bit", "u8",          "i8",
-    "u16",     "i16",        "u32", "i32",         "u64",
-    "i64",     "f32",        "f64", "string_view", "std_string_view",
-    "string",  "fbs_string", "json"};
+    "invalid",     "void",   "bit",        "u8",  "i8",  "u16", "i16",
+    "u32",         "i32",    "u64",        "i64", "f32", "f64", "std_string_view",
+    "string_view", "string", "fbs_string", "json"};
 
 class DType {
  public:

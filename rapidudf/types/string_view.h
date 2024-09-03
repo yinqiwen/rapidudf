@@ -19,6 +19,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <fmt/format.h>
 
@@ -67,6 +68,14 @@ struct StringView {
       memcpy(prefix_, data, kPrefixSize);
       value_.data = data;
     }
+  }
+  template <typename Str>
+  static std::vector<StringView> makeVector(const std::vector<Str>& vec) {
+    std::vector<StringView> vals(vec.size());
+    for (size_t i = 0; i < vals.size(); i++) {
+      vals[i] = StringView(vec[i]);
+    }
+    return vals;
   }
 
   static StringView makeInline(std::string str) {

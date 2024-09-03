@@ -35,6 +35,7 @@
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <vector>
 #include "rapidudf/reflect/struct_access.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
 template <typename T>
 struct VectorReflectHelper {
@@ -93,6 +94,6 @@ void init_stl_reflect_access() {
   RUDF_STL_REFLECT_HELPER(SetReflectHelper, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
                           float, double, std::string_view)
   RUDF_STL_REFLECT_HELPER(SimdVectorReflectHelper, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
-                          int64_t, float, double, simd::Bit)
+                          int64_t, float, double, simd::Bit, StringView)
 }
 }  // namespace rapidudf

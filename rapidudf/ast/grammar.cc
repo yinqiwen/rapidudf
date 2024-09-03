@@ -73,20 +73,13 @@ auto identifier_func = [](auto& ctx) {
   _val(ctx) = _attr(ctx);
 };
 
-bp::rule<struct keyword> keyword = "keyword";
-const auto keyword_def = bp::string("return") | bp::string("var") | bp::string("if") | bp::string("elif") |
-                         bp::string("else") | bp::string("int") | bp::string("void") | bp::string("float") |
-                         bp::string("double") | bp::string("bool") | bp::string("string");
-
 bp::rule<struct comment> comment = "comment";
 const auto comment_def = "//" > *(bp::char_ - bp::eol) > (bp::eol);
 
 bp::rule<struct identifier, std::string> identifier = "identifier";
 const auto lead_char = bp::char_('a', 'z') | bp::char_('A', 'Z') | bp::char_('_');
 const auto follow_char = bp::char_('a', 'z') | bp::char_('A', 'Z') | bp::char_('_') | bp::char_('0', '9');
-const auto cls_type_char = follow_char | bp::char_(':');
 const auto identifier_def = (lead_char > *follow_char)[identifier_func];
-
 BOOST_PARSER_DEFINE_RULES(identifier);
 
 bp::rule<struct operand, Operand> operand = "operand";
@@ -106,6 +99,7 @@ bp::rule<struct filed_access, FieldAccess> filed_access = "filed_access";
 bp::rule<struct dynamic_param_access, DynamicParamAccess> dynamic_param_access = "dynamic_param_access";
 bp::rule<struct member_access, std::vector<MemberAccess>> member_access = "member_access";
 bp::rule<struct var_accessor, VarAccessor> var_accessor = "var_accessor";
+bp::rule<struct constant_number, ConstantNumber> constant_number = "constant_number";
 
 auto func_convert = [](auto& ctx) {
   Function f;
@@ -167,11 +161,12 @@ auto var_accessor_func = [](auto& ctx) {
   _val(ctx) = f;
 };
 
+auto const constant_number_def = bp::lexeme[bp::double_ > -('_' > Symbols::kNumberSymbols)];
 // const auto dynamic_param_access_def = identifier > *('[' > (bp::quoted_string | bp::uint_) > ']');
 auto const var_declare_def = ("var" > identifier)[var_declare_func];
 auto const var_ref_def = identifier[var_ref_func];
 auto const operand_def =
-    bp::double_ | bp::long_ | bp::bool_ | bp::quoted_string | var_declare | var_accessor | ('(' >> expression >> ')');
+    constant_number | bp::bool_ | bp::quoted_string | var_declare | var_accessor | ('(' >> expression >> ')');
 auto const func_invoke_args_def = '(' > -(expression % ',') > ')';
 auto const expression_def = assign;
 auto const assign_def = (ternary_expr >> -(Symbols::kAssignOpSymbols >> expression))[binary_expr_func];
@@ -189,9 +184,9 @@ auto const dynamic_param_access_def = ('[' > (bp::quoted_string | bp::uint_ | va
 auto const member_access_def = +(filed_access | dynamic_param_access);
 auto const var_accessor_def = (identifier > -(member_access | func_invoke_args))[var_accessor_func];
 
-BOOST_PARSER_DEFINE_RULES(var_declare, var_ref, var_accessor, filed_access, dynamic_param_access, operand,
-                          func_invoke_args, member_access, unary_expr, assign, logic_expr, cmp_expr, additive_expr,
-                          multiplicative_expr, expression, ternary_expr);
+BOOST_PARSER_DEFINE_RULES(constant_number, var_declare, var_ref, var_accessor, filed_access, dynamic_param_access,
+                          operand, func_invoke_args, member_access, unary_expr, assign, logic_expr, cmp_expr,
+                          additive_expr, multiplicative_expr, expression, ternary_expr);
 
 bp::rule<struct statements, std::vector<Statement>> statements = "statements";
 bp::rule<struct return_statement, ReturnStatement> return_statement = "return_statement";

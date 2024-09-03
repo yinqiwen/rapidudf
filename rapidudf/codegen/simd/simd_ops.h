@@ -69,6 +69,9 @@ Vector<Bit> simd_vector_string_cmp_scalar(Vector<StringView> left, StringView ri
 template <typename T>
 T simd_vector_dot(Vector<T> left, Vector<T> right, uint32_t reuse);
 
+template <typename T>
+Vector<T> simd_vector_iota(T start, uint32_t n, uint32_t reuse);
+
 void init_builtin_simd_funcs();
 
 }  // namespace simd

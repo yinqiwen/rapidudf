@@ -38,6 +38,7 @@ namespace ast {
 
 struct Symbols {
   static boost::parser::symbols<DType> kDtypeSymbols;
+  static boost::parser::symbols<DType> kNumberSymbols;
   static boost::parser::symbols<OpToken> kAssignOpSymbols;
   static boost::parser::symbols<OpToken> kLogicOpSymbols;
   static boost::parser::symbols<OpToken> kCmpOpSymbols;

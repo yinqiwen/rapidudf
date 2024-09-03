@@ -33,7 +33,10 @@
 #include <functional>
 #include <vector>
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/function.h"
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/types/simd.h"
+#include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
 
@@ -230,4 +233,48 @@ TEST(JitCompiler, vector_dot) {
     native_result += (left[i] * right[i]);
   }
   ASSERT_FLOAT_EQ(result, native_result);
+}
+
+TEST(JitCompiler, vector_iota) {
+  spdlog::set_level(spdlog::level::debug);
+
+  JitCompiler compiler(4096, true);
+  std::string content = R"(
+    simd_vector<f64> test_func(){
+      return iota(1_f64,12);
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<double>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f();
+  ASSERT_EQ(result.Size(), 12);
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_DOUBLE_EQ(result[i], i + 1);
+  }
+}
+
+TEST(JitCompiler, vector_string_cmp) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<std::string> left{"hello0", "hello1", "hello2"};
+  std::vector<std::string> right{"afasf", "rwrewe", "qw1231241"};
+  auto left_views = StringView::makeVector(left);
+  auto right_views = StringView::makeVector(right);
+  simd::Vector<StringView> simd_left(left_views);
+  simd::Vector<StringView> simd_right(right_views);
+  JitCompiler compiler(4096, true);
+  std::string content = R"(
+    simd_vector<bit> test_func(simd_vector<string_view> x,simd_vector<string_view> y){
+      return x > y;
+    }
+  )";
+  auto rc =
+      compiler.CompileFunction<simd::Vector<simd::Bit>, simd::Vector<StringView>, simd::Vector<StringView>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_left, simd_right);
+  ASSERT_EQ(result.Size(), left.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_EQ(result[i], left[i] > right[i]);
+  }
 }

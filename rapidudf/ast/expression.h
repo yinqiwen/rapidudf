@@ -55,6 +55,10 @@ struct VarRef {
   uint32_t position = 0;
   absl::StatusOr<VarTag> Validate(ParseContext& ctx);
 };
+struct ConstantNumber {
+  double dv = 0;
+  std::optional<DType> dtype;
+};
 
 struct BinaryExpr;
 struct UnaryExpr;
@@ -64,7 +68,7 @@ struct VarAccessor;
 using BinaryExprPtr = std::shared_ptr<BinaryExpr>;
 using UnaryExprPtr = std::shared_ptr<UnaryExpr>;
 using TernaryExprPtr = std::shared_ptr<TernaryExpr>;
-using Operand = std::variant<double, int64_t, bool, std::string, VarAccessor, TernaryExprPtr, BinaryExprPtr,
+using Operand = std::variant<bool, ConstantNumber, std::string, VarAccessor, TernaryExprPtr, BinaryExprPtr,
                              UnaryExprPtr, VarDefine>;
 using Expression = BinaryExprPtr;
 

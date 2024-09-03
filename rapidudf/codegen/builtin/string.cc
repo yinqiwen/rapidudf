@@ -28,13 +28,25 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include <boost/preprocessor/library.hpp>
+#include <boost/preprocessor/seq/for_each.hpp>
+#include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/variadic/to_seq.hpp>
 #include <string_view>
 #include "rapidudf/codegen/builtin/builtin.h"
+#include "rapidudf/codegen/dtype.h"
+#include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/optype.h"
+#include "rapidudf/codegen/simd/simd_ops.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/types/simd.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
+
+#define REGISTER_STRING_FUNC_WITH_TYPE(r, FUNC, i, type) FUNC<type>();
+#define REGISTER_STRING_FUNCS(func, ...) \
+  BOOST_PP_SEQ_FOR_EACH_I(REGISTER_STRING_FUNC_WITH_TYPE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 bool compare_string_view(uint32_t op, StringView left, StringView right) {
   bool result = false;
@@ -75,5 +87,28 @@ bool compare_string_view(uint32_t op, StringView left, StringView right) {
 StringView cast_stdstr_to_string_view(const std::string& str) { return StringView(str); }
 StringView cast_fbsstr_to_string_view(const flatbuffers::String& str) { return StringView(str.c_str(), str.size()); }
 StringView cast_stdstrview_to_string_view(std::string_view str) { return StringView(str); }
+
+template <OpToken op>
+static void register_simd_vector_string_cmp() {
+  simd::Vector<simd::Bit> (*simd_f0)(simd::Vector<StringView>, simd::Vector<StringView>, uint32_t) =
+      simd::simd_vector_string_cmp<op>;
+  std::string func_name =
+      GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW).ToSimdVector());
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f0);
+
+  simd::Vector<simd::Bit> (*simd_f1)(simd::Vector<StringView>, StringView, bool, uint32_t) =
+      simd::simd_vector_string_cmp_scalar<op>;
+  func_name = GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW));
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f1);
+}
+
+void init_builtin_string_funcs() {
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrViewToStringView, cast_stdstrview_to_string_view);
+  REGISTER_STRING_FUNCS(register_simd_vector_string_cmp, OP_GREATER, OP_GREATER_EQUAL, OP_LESS_EQUAL, OP_LESS, OP_EQUAL,
+                        OP_NOT_EQUAL)
+}
 
 }  // namespace rapidudf

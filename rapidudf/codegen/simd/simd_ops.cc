@@ -34,10 +34,12 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
+#include <cstring>
 #include <type_traits>
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "hwy/bit_set.h"
 #include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/contrib/math/math-inl.h"
 #include "hwy/contrib/sort/sorting_networks-inl.h"
@@ -50,6 +52,7 @@
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/optype.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/simd.h"
@@ -339,7 +342,7 @@ Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse, uint32_t 
     result_dtype = DType(DATA_BIT);
   }
   uint8_t* arena_data = nullptr;
-  RUDF_DEBUG("op:{},reuse:{},size:{}", op, reuse, left.Size());
+  RUDF_DEBUG("op:{},reuse:{},size:{}", static_cast<int>(op), reuse, left.Size());
   if (reuse == REUSE_LEFT) {
     arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(left.Data()));
   } else {
@@ -521,6 +524,9 @@ Vector<T> simd_ternary_op_vector_scalar(Vector<Bit> cond, Vector<T> true_val, T 
 
 template <typename T>
 Vector<T> simd_ternary_op_scalar_vector(Vector<Bit> cond, T true_val, Vector<T> false_val, uint32_t reuse) {
+  if (cond.Size() != false_val.Size()) {
+    THROW_LOGIC_ERR(fmt::format("vector ternary_op size mismatch {}:{}", cond.Size(), false_val.Size()));
+  }
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
@@ -540,13 +546,107 @@ Vector<T> simd_ternary_op_scalar_vector(Vector<Bit> cond, T true_val, Vector<T> 
   return Vector<T>(result_data);
 }
 
+template <OpToken op, typename T = void>
+static inline bool do_string_view_cmp(StringView lv, StringView rv) {
+  if constexpr (op == OP_GREATER) {
+    return lv > rv;
+  } else if constexpr (op == OP_GREATER_EQUAL) {
+    return lv >= rv;
+  } else if constexpr (op == OP_LESS) {
+    return lv < rv;
+  } else if constexpr (op == OP_LESS_EQUAL) {
+    return lv <= rv;
+  } else if constexpr (op == OP_EQUAL) {
+    return lv == rv;
+  } else if constexpr (op == OP_NOT_EQUAL) {
+    return lv != rv;
+  } else {
+    static_assert(sizeof(T) == -1, "unsupported cmp op");
+  }
+}
+
 template <typename T>
 T simd_vector_dot(Vector<T> left, Vector<T> right, uint32_t reuse) {
+  if (left.Size() != right.Size()) {
+    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left.Size(), right.Size()));
+  }
   using D = hn::ScalableTag<T>;
   const D d;
   constexpr auto assumptions = hn::Dot::Assumptions::kAtLeastOneVector;
   T val = hn::Dot::Compute<assumptions, D, T>(d, left.Data(), right.Data(), left.Size());
   return val;
+}
+
+template <typename T>
+Vector<T> simd_vector_iota(T start, uint32_t n, uint32_t reuse) {
+  const hn::ScalableTag<T> d;
+  constexpr auto lanes = hn::Lanes(d);
+  size_t element_size = get_arena_element_size(n, lanes);
+  uint32_t byte_size = sizeof(T) * element_size;
+  uint8_t* arena_data = GetArena().Allocate(byte_size);
+  size_t result_size = n;
+  size_t i = 0;
+  for (; i < result_size; i += lanes) {
+    auto v = hn::Iota(d, start + i);
+    hn::StoreU(v, d, reinterpret_cast<T*>(arena_data + i * sizeof(T)));
+  }
+  VectorData result_data(arena_data, result_size);
+  return Vector<T>(result_data);
+}
+
+template <OpToken op>
+Vector<Bit> simd_vector_string_cmp(Vector<StringView> left, Vector<StringView> right, uint32_t reuse) {
+  if (left.Size() != right.Size()) {
+    THROW_LOGIC_ERR(fmt::format("vector string_view size mismatch {}:{}", left.Size(), right.Size()));
+  }
+  uint8_t* arena_data = nullptr;
+  if (reuse == REUSE_LEFT) {
+    arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(left.Data()));
+  } else if (reuse == REUSE_RIGHT) {
+    arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(right.Data()));
+  } else {
+    uint32_t byte_size = get_bits_byte_size(left.Size());
+    arena_data = GetArena().Allocate(byte_size);
+  }
+  size_t bitset_n = left.Size() / 64;
+  if (left.Size() % 64 > 0) {
+    bitset_n++;
+  }
+  std::vector<hwy::BitSet64> bitsets(bitset_n);
+  for (size_t i = 0; i < left.Size(); i++) {
+    bool v = do_string_view_cmp<op>(left[i], right[i]);
+    if (v) {
+      bitsets[i / 64].Set(i % 64);
+    }
+  }
+  memcpy(arena_data, bitsets.data(), sizeof(uint64_t) * bitsets.size());
+  VectorData result_data(arena_data, left.Size());
+  return Vector<Bit>(result_data);
+}
+
+template <OpToken op>
+Vector<Bit> simd_vector_string_cmp_scalar(Vector<StringView> left, StringView right, bool reverse, uint32_t reuse) {
+  uint8_t* arena_data = nullptr;
+  if (reuse == REUSE_LEFT) {
+    arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(left.Data()));
+  } else {
+    uint32_t byte_size = get_bits_byte_size(left.Size());
+    arena_data = GetArena().Allocate(byte_size);
+  }
+  size_t bitset_n = left.Size() / 64;
+  if (left.Size() % 64 > 0) {
+    bitset_n++;
+  }
+  std::vector<hwy::BitSet64> bitsets(bitset_n);
+  for (size_t i = 0; i < left.Size(); i++) {
+    bool v = reverse ? do_string_view_cmp<op>(right, left[i]) : do_string_view_cmp<op>(left[i], right);
+    if (v) {
+      bitsets[i / 64].Set(i % 64);
+    }
+  }
+  memcpy(arena_data, bitsets.data(), sizeof(uint64_t) * bitsets.size());
+  VectorData result_data(arena_data, left.Size());
+  return Vector<Bit>(result_data);
 }
 
 #define DEFINE_SIMD_BINARY_MATH_OP_TEMPLATE(r, op, ii, TYPE)                                                   \
@@ -639,6 +739,21 @@ DEFINE_SIMD_TERNARY_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint
 #define DEFINE_SIMD_DOT_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_DOT_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_DOT_OP(float, double);
+
+#define DEFINE_SIMD_IOTA_OP_TEMPLATE(r, op, ii, TYPE) \
+  template Vector<TYPE> simd_vector_iota(TYPE start, uint32_t n, uint32_t reuse);
+#define DEFINE_SIMD_IOTA_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_IOTA_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
+
+#define DEFINE_SIMD_VECTOR_STRING_CMP_TEMPLATE(r, op, ii, TYPE)                                                     \
+  template Vector<Bit> simd_vector_string_cmp<TYPE>(Vector<StringView> left, Vector<StringView> right,              \
+                                                    uint32_t reuse);                                                \
+  template Vector<Bit> simd_vector_string_cmp_scalar<TYPE>(Vector<StringView> left, StringView right, bool reverse, \
+                                                           uint32_t reuse);
+#define DEFINE_SIMD_VECTOR_STRING_CMP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_VECTOR_STRING_CMP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_VECTOR_STRING_CMP(OP_GREATER_EQUAL, OP_GREATER, OP_LESS_EQUAL, OP_LESS, OP_EQUAL, OP_NOT_EQUAL)
 
 void init_builtin_simd_funcs() {}
 }  // namespace simd

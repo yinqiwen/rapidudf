@@ -32,13 +32,26 @@
 #include <cstdint>
 #include <memory>
 #include "rapidudf/codegen/dtype.h"
+#include "rapidudf/codegen/ops/cast.h"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
 using namespace Xbyak::util;
+
+absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(double v, DType dtype) {
+  auto val = GetCodeGenerator().NewConstValue(dtype);
+  if (dtype.IsInteger()) {
+    int64_t iv = static_cast<int64_t>(v);
+    val->Set(iv);
+  } else if (dtype.IsF32()) {
+    val->Set(static_cast<float>(v));
+  } else {
+    val->Set(v);
+  }
+  return val;
+}
 absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(double v) {
-  RUDF_DEBUG("CompileConstants:{}", v);
   int64_t iv = static_cast<int64_t>(v);
   if (static_cast<double>(iv) == v) {
     auto val = GetCodeGenerator().NewConstValue(DType(iv <= INT32_MAX ? DATA_I32 : DATA_I64));
@@ -49,11 +62,7 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(double v) {
   val->Set(v);
   return val;
 }
-absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(int64_t v) {
-  auto val = GetCodeGenerator().NewConstValue(DType(v <= INT32_MAX ? DATA_I32 : DATA_I64));
-  val->Set(v);
-  return val;
-}
+
 absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(bool v) {
   auto val = GetCodeGenerator().NewConstValue(DType(DATA_U8));
   val->Set(v ? 1 : 0);

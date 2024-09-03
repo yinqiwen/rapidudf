@@ -42,40 +42,11 @@ static std::vector<std::unique_ptr<std::string>>& get_symbol_token_cache() {
   static std::vector<std::unique_ptr<std::string>> c;
   return c;
 }
-// static boost::parser::symbols<DType> get_initial_symbols() {
-//   std::unordered_map<std::string, DType> primitive_types = {{"void", DType(DATA_VOID)},
-//                                                             {"bool", DType(DATA_U8)},
-//                                                             {"u8", DType(DATA_U8)},
-//                                                             {"i8", DType(DATA_I8)},
-//                                                             {"u16", DType(DATA_U16)},
-//                                                             {"i16", DType(DATA_I16)},
-//                                                             {"u32", DType(DATA_U32)},
-//                                                             {"i32", DType(DATA_I32)},
-//                                                             {"u64", DType(DATA_U64)},
-//                                                             {"i64", DType(DATA_I64)},
-//                                                             {"f32", DType(DATA_F32)},
-//                                                             {"f64", DType(DATA_F64)},
-//                                                             {"int", DType(DATA_I32)},
-//                                                             {"long", DType(DATA_I64)},
-//                                                             {"float", DType(DATA_F32)},
-//                                                             {"double", DType(DATA_F64)},
-//                                                             {"string", DType(DATA_STRING_VIEW)},
-//                                                             {"string_view", DType(DATA_STRING_VIEW)}};
-//   boost::parser::symbols<DType> symbols;
-//   for (auto [name, dtype] : primitive_types) {
-//     symbols.insert_for_next_parse(name, dtype);
-//   }
-//   for (auto [name, dtype] : primitive_types) {
-//     if (dtype.IsVoid() || !dtype.IsFundamental()) {
-//       continue;
-//     }
-//     if (dtype.GetFundamentalType() == DATA_I32) {
-//       std::string vector_type_name = fmt::format("vector<{}>", name);
-//       symbols.insert_for_next_parse(vector_type_name, dtype.ToVector().ToPtr());
-//     }
-//   }
-//   return symbols;
-// }
+
+boost::parser::symbols<DType> Symbols::kNumberSymbols = {
+    {"u8", DType(DATA_U8)},   {"i8", DType(DATA_I8)},   {"u16", DType(DATA_U16)}, {"i16", DType(DATA_I16)},
+    {"u32", DType(DATA_U32)}, {"i32", DType(DATA_U32)}, {"u64", DType(DATA_U64)}, {"i64", DType(DATA_I64)},
+    {"f32", DType(DATA_F32)}, {"f64", DType(DATA_F64)}};
 
 boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID)},
                                                         {"bool", DType(DATA_U8)},

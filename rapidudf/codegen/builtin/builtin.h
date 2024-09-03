@@ -64,8 +64,11 @@ bool json_cmp_bool(uint32_t op, const JsonObject& json, bool right, bool reverse
 bool json_cmp_float(uint32_t op, const JsonObject& json, double right, bool reverse);
 bool json_cmp_json(uint32_t op, const JsonObject& left, const JsonObject& right);
 
-void init_builtin_math();
 void init_builtin();
+
+void init_builtin_string_funcs();
+void init_builtin_math_funcs();
+void init_builtin_json_funcs();
 bool is_builtin_math_func(std::string_view name);
 
 }  // namespace rapidudf

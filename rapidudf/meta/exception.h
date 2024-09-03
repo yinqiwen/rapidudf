@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,18 +28,12 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/codegen/builtin/builtin.h"
-#include <mutex>
-#include "flatbuffers/flatbuffers.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/simd/simd_ops.h"
-namespace rapidudf {
-static std::once_flag g_init_builtin_flag;
-void init_builtin() {
-  std::call_once(g_init_builtin_flag, []() {
-    init_builtin_math_funcs();
-    init_builtin_string_funcs();
-    init_builtin_json_funcs();
-  });
-}
-}  // namespace rapidudf
+
+#pragma once
+#include <exception>
+#include "fmt/format.h"
+
+#define THROW_LOGIC_ERR(msg)                                                        \
+  do {                                                                              \
+    throw std::logic_error(fmt::format("{}:{} error:{}", __FILE__, __LINE__, msg)); \
+  } while (0)
