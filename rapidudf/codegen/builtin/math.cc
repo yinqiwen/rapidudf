@@ -40,249 +40,190 @@
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/optype.h"
-#include "rapidudf/codegen/simd/simd_ops.h"
-#include "rapidudf/types/simd.h"
 
 #define REGISTER_MATH_FUNC_WITH_TYPE(r, FUNC, i, type) FUNC<type>();
 
 #define REGISTER_MATH_FUNCS(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(REGISTER_MATH_FUNC_WITH_TYPE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 namespace rapidudf {
+
 static std::unordered_set<std::string_view>& get_builtin_math_funcs() {
   static std::unordered_set<std::string_view> funcs;
   return funcs;
 }
 bool register_builtin_math_func(std::string_view name) { return get_builtin_math_funcs().insert(name).second; }
+
 template <typename T>
 static void register_abs() {
   T (*abs_f)(T) = &std::abs;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "abs_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ABS, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("abs");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_ABS>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 
 template <typename T>
 static void register_pow() {
   T (*abs_f)(T, T) = &std::pow;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "pow_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_POW, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("pow");
 }
 
 template <typename T>
 static void register_ceil() {
   T (*abs_f)(T) = &std::ceil;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "ceil_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_CEIL, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("ceil");
 }
 
 template <typename T>
 static void register_erf() {
   T (*abs_f)(T) = &std::erf;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "erf_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ERF, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("erf");
 }
 
 template <typename T>
 static void register_erfc() {
   T (*abs_f)(T) = &std::erfc;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "erfc_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ERFC, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("erfc");
 }
 
 template <typename T>
 static void register_exp() {
   T (*abs_f)(T) = &std::exp;
-  std::string func_name = "exp_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_EXP, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("exp");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_EXP>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 
 template <typename T>
 static void register_expm1() {
   T (*abs_f)(T) = &std::expm1;
-  std::string func_name = "expm1_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_EXPM1, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("expm1");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_EXPM1>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 
 template <typename T>
 static void register_exp2() {
   T (*abs_f)(T) = &std::exp2;
-  std::string func_name = "exp2_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_EXP2, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("exp2");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_EXP>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 
 template <typename T>
 static void register_floor() {
   T (*abs_f)(T) = &std::expm1;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "floor_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_FLOOR, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("floor");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_FLOOR>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 
 template <typename T>
 static void register_sqrt() {
   T (*abs_f)(T) = &std::sqrt;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "sqrt_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_SQRT, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("sqrt");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_SQRT>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 
 template <typename T>
 static void register_log() {
   T (*abs_f)(T) = &std::log;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "log_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_LOG, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("log");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_LOG>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_log10() {
   T (*abs_f)(T) = &std::log10;
-  std::string name = get_dtype<T>().GetTypeString();
-  std::string func_name = "log10_" + name;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_LOG10, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("log10");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_LOG10>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_log1p() {
   T (*abs_f)(T) = &std::log1p;
-  std::string func_name = "log1p_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_LOG1P, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_math_func("log1p");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_LOG1P>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_log2() {
   T (*f)(T) = &std::log2;
-  std::string func_name = "log2_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_LOG2, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("log2");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_LOG2>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_hypot() {
   T (*f)(T, T) = &std::hypot;
-  std::string func_name = "hypot_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_HYPOT, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("hypot");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_binary_op<T, T, OP_HYPOT>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(OP_HYPOT, simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_sin() {
   T (*f)(T) = &std::sin;
-  std::string func_name = "sin_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_SIN, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("sin");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_SIN>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_cos() {
   T (*f)(T) = &std::cos;
-  std::string func_name = "cos_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_COS, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_COS>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
-  register_builtin_math_func("cos");
 }
 template <typename T>
 static void register_tan() {
   T (*f)(T) = &std::tan;
-  std::string func_name = "tan_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_TAN, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("tan");
 }
 template <typename T>
 static void register_asin() {
   T (*f)(T) = &std::asin;
-  std::string func_name = "asin_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ASIN, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("asin");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_ASIN>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_acos() {
   T (*f)(T) = &std::acos;
-  std::string func_name = "acos_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ACOS, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("acos");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_ACOS>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_atan() {
   T (*f)(T) = &std::atan;
-  std::string func_name = "atan_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ATAN, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("atan");
 }
+
 template <typename T>
 static void register_atan2() {
   T (*f)(T, T) = &std::atan2;
-  std::string func_name = "atan2_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ATAN2, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("atan2");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_binary_op<T, T, OP_ATAN2>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(OP_ATAN2, simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_sinh() {
   T (*f)(T) = &std::sinh;
-  std::string func_name = "sinh_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_SINH, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("sinh");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_SINH>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_cosh() {
@@ -294,42 +235,30 @@ static void register_cosh() {
 template <typename T>
 static void register_tanh() {
   T (*f)(T) = &std::tanh;
-  std::string func_name = "tanh_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_TANH, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("tanh");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_TANH>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_asinh() {
   T (*f)(T) = &std::asinh;
-  std::string func_name = "asinh_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ASINH, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("asinh");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_ASINH>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_acosh() {
-  T (*f)(T) = &std::cosh;
-  std::string func_name = "acosh_" + get_dtype<T>().GetTypeString();
+  T (*f)(T) = &std::acosh;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ACOSH, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("acosh");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_ACOSH>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static void register_atanh() {
-  T (*f)(T) = &std::tanh;
-  std::string func_name = "atanh_" + get_dtype<T>().GetTypeString();
+  T (*f)(T) = &std::atanh;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ATANH, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("atanh");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_unary_op<T, OP_ATANH>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static T scalar_max(T left, T right) {
@@ -338,12 +267,9 @@ static T scalar_max(T left, T right) {
 template <typename T>
 static void register_max() {
   T (*f)(T, T) = &scalar_max<T>;
-  std::string func_name = "max_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_MAX, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_math_func("max");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_binary_op<T, T, OP_MAX>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(OP_MAX, simd_vector_func_name.c_str(), simd_f);
 }
 template <typename T>
 static T scalar_min(T left, T right) {
@@ -352,17 +278,30 @@ static T scalar_min(T left, T right) {
 template <typename T>
 static void register_min() {
   T (*f)(T, T) = &scalar_min<T>;
-  std::string func_name = "min_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_MIN, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  get_builtin_math_funcs().insert("min");
-  std::string simd_vector_func_name = "simd_vector_" + func_name;
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_binary_op<T, T, OP_MIN>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(OP_MIN, simd_vector_func_name.c_str(), simd_f);
+}
+
+template <typename T>
+static T scalar_clamp(T a, T b, T c) {
+  return std::clamp(a, b, c);
+}
+
+template <typename T>
+static void register_clamp() {
+  T (*f)(T, T, T) = &scalar_clamp<T>;
+  std::string func_name = "clamp_" + get_dtype<T>().GetTypeString();
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
 }
 
 bool is_builtin_math_func(std::string_view name) { return get_builtin_math_funcs().count(name) == 1; }
 
 void init_builtin_math_funcs() {
+  for (uint32_t op = OP_CONDITIONAL; op < OP_END; op++) {
+    get_builtin_math_funcs().insert(kOpTokenStrs[op]);
+  }
+
   REGISTER_MATH_FUNCS(register_abs, float, double, int64_t, int32_t)
   REGISTER_MATH_FUNCS(register_max, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t,
                       uint8_t)
@@ -393,5 +332,7 @@ void init_builtin_math_funcs() {
   REGISTER_MATH_FUNCS(register_asinh, float, double)
   REGISTER_MATH_FUNCS(register_acosh, float, double)
   REGISTER_MATH_FUNCS(register_atanh, float, double)
+  REGISTER_MATH_FUNCS(register_clamp, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t,
+                      uint8_t)
 }
 }  // namespace rapidudf

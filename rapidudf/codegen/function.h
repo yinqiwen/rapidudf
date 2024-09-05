@@ -64,7 +64,6 @@ struct FunctionDesc {
   std::vector<DType> arg_types;
   void* func = nullptr;
   bool is_simd_vector_func = false;
-  bool is_simd_vector_scalar_func = false;
 
   bool ValidateArgs(const std::vector<DType>& ts) const;
   std::vector<const Xbyak::Reg*> GetReturnValueRegisters(uint32_t& total_bits) const;
@@ -74,9 +73,10 @@ struct FunctionDesc {
 
 class FunctionFactory {
  public:
-  static constexpr std::string_view kSimdVectorFuncPrefix = "simd_vector";
-  static constexpr std::string_view kSimdVectorScalarFuncPrefix = "simd_vector_scalar";
+  static constexpr std::string_view kSimdVectorUnaryFuncPrefix = "simd_vector_unary";
+  static constexpr std::string_view kSimdVectorBinaryFuncPrefix = "simd_vector_binary";
   static constexpr std::string_view kSimdVectorTernaryFuncPrefix = "simd_vector_ternary";
+  static constexpr std::string_view kSimdVectorFuncPrefix = "simd_vector";
   template <typename RET, typename... Args>
   bool Register(std::string_view name, RET (*f)(Args...), bool safe = true) {
     FunctionDesc desc;
@@ -110,9 +110,13 @@ class FuncRegister {
     FunctionFactory::Register(std::move(desc));
   }
 };
-
+std::string GetFunctionName(OpToken op, DType dtype);
 std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype);
-std::string GetSimdVectorTernaryFunctionName(DType true_dtype, DType false_dtype);
+std::string GetFunctionName(OpToken op, DType a, DType b, DType c);
+std::string GetFunctionName(std::string_view op, DType dtype);
+std::string GetFunctionName(std::string_view op, DType left_dtype, DType right_dtype);
+std::string GetFunctionName(std::string_view op, DType a, DType b, DType c);
+std::string GetFunctionName(std::string_view op, const std::vector<DType>& arg_dtypes);
 
 }  // namespace rapidudf
 

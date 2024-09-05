@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <vector>
 #include "rapidudf/codegen/dtype.h"
+#include "rapidudf/codegen/optype.h"
 #include "rapidudf/log/log.h"
 namespace rapidudf {
 using namespace Xbyak::util;
@@ -43,38 +44,81 @@ static std::unique_ptr<FuncRegMap> g_regs = nullptr;
 
 static inline uint32_t allgin_n(uint32_t x, uint32_t n) { return (x + n - 1) & ~(n - 1); }
 
-std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype) {
-  std::string fname(kOpTokenStrs[op]);
-  if (left_dtype.IsSimdVector() || right_dtype.IsSimdVector()) {
-    std::string simd_prefix;
-    DType suffix_dtype;
-    if (left_dtype.IsSimdVector() && right_dtype.IsSimdVector()) {
-      simd_prefix = std::string(FunctionFactory::kSimdVectorFuncPrefix);
-      suffix_dtype = left_dtype.Elem();
+static std::string get_simd_vector_func_suffix(const std::vector<DType>& dtypes) {
+  std::string suffix;
+  for (auto dtype : dtypes) {
+    if (dtype.IsSimdVector()) {
+      suffix.append("_vector");
     } else {
-      simd_prefix = std::string(FunctionFactory::kSimdVectorScalarFuncPrefix);
-      if (left_dtype.IsSimdVector()) {
-        suffix_dtype = left_dtype.Elem();
-      } else {
-        suffix_dtype = right_dtype.Elem();
-      }
+      suffix.append("_scalar");
     }
-    return simd_prefix + "_" + fname + "_" + suffix_dtype.GetTypeString();
+  }
+  return suffix;
+}
+
+std::string GetFunctionName(std::string_view op, DType dtype) {
+  std::string fname(op);
+  fname = fname + "_" + dtype.Elem().GetTypeString();
+  if (dtype.IsSimdVector()) {
+    return std::string(FunctionFactory::kSimdVectorUnaryFuncPrefix) + "_" + fname;
   } else {
-    return fname + "_" + left_dtype.GetTypeString();
+    return fname;
   }
 }
-std::string GetSimdVectorTernaryFunctionName(DType true_dtype, DType false_dtype) {
-  std::string fname(FunctionFactory::kSimdVectorTernaryFuncPrefix);
-  if (true_dtype.IsSimdVector() && false_dtype.IsSimdVector()) {
-    return fname + "_" + true_dtype.Elem().GetTypeString() + "_vector_vector";
-  } else if (true_dtype.IsSimdVector() && !false_dtype.IsSimdVector()) {
-    return fname + "_" + true_dtype.Elem().GetTypeString() + "_vector_scalar";
-  } else if (!true_dtype.IsSimdVector() && false_dtype.IsSimdVector()) {
-    return fname + "_" + true_dtype.Elem().GetTypeString() + "_scalar_vector";
+std::string GetFunctionName(std::string_view op, DType a, DType b) {
+  std::string fname(op);
+  DType ele_type;
+  if (a.IsSimdVector()) {
+    ele_type = a.Elem();
   } else {
-    return fname + "_" + true_dtype.Elem().GetTypeString() + "_scalar_scalar";
+    ele_type = b.Elem();
   }
+  fname = fname + "_" + ele_type.GetTypeString();
+  if (a.IsSimdVector() || b.IsSimdVector()) {
+    fname = std::string(FunctionFactory::kSimdVectorBinaryFuncPrefix) + "_" + fname;
+    return fname + get_simd_vector_func_suffix({a, b});
+  } else {
+    return fname;
+  }
+}
+std::string GetFunctionName(std::string_view op, DType a, DType b, DType c) {
+  std::string fname(op);
+  DType ele_type;
+  if (c.IsSimdVector()) {
+    ele_type = c.Elem();
+  } else if (b.IsSimdVector()) {
+    ele_type = b.Elem();
+  } else {
+    ele_type = a.Elem();
+    if (op == kOpTokenStrs[OP_CONDITIONAL]) {
+      ele_type = b;
+    }
+  }
+  fname = fname + "_" + ele_type.GetTypeString();
+  if (a.IsSimdVector() || b.IsSimdVector() || c.IsSimdVector()) {
+    fname = std::string(FunctionFactory::kSimdVectorTernaryFuncPrefix) + "_" + fname;
+    return fname + get_simd_vector_func_suffix({a, b, c});
+  } else {
+    return fname;
+  }
+}
+
+std::string GetFunctionName(std::string_view op, const std::vector<DType>& arg_dtypes) {
+  if (arg_dtypes.size() == 1) {
+    return GetFunctionName(op, arg_dtypes[0]);
+  } else if (arg_dtypes.size() == 2) {
+    return GetFunctionName(op, arg_dtypes[0], arg_dtypes[1]);
+  } else if (arg_dtypes.size() == 3) {
+    return GetFunctionName(op, arg_dtypes[0], arg_dtypes[1], arg_dtypes[2]);
+  } else {
+    return std::string(op);
+  }
+}
+
+std::string GetFunctionName(OpToken op, DType dtype) { return GetFunctionName(kOpTokenStrs[op], dtype); }
+std::string GetFunctionName(OpToken op, DType a, DType b) { return GetFunctionName(kOpTokenStrs[op], a, b); }
+std::string GetFunctionName(OpToken op, DType a, DType b, DType c) {
+  return GetFunctionName(kOpTokenStrs[op], a, b, c);
 }
 
 std::vector<const Xbyak::Reg*> GetFuncReturnValueRegisters(DType return_type, uint32_t& total_bits) {
@@ -192,11 +236,7 @@ std::vector<const Xbyak::Reg*> GetUnuseFuncArgsRegisters(const std::vector<FuncA
 }
 
 bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
-  if (is_simd_vector_scalar_func) {
-    if (arg_types.size() != (ts.size() + 2)) {
-      return false;
-    }
-  } else if (is_simd_vector_func) {
+  if (is_simd_vector_func) {
     if (arg_types.size() != (ts.size() + 1)) {
       return false;
     }
@@ -230,9 +270,6 @@ bool FunctionFactory::Register(FunctionDesc&& desc) {
   }
   if (desc.name.find(kSimdVectorFuncPrefix) == 0) {
     desc.is_simd_vector_func = true;
-  }
-  if (desc.name.find(kSimdVectorScalarFuncPrefix) == 0) {
-    desc.is_simd_vector_scalar_func = true;
   }
   // printf("Registe func name:%s\n", desc.name.c_str());
   RUDF_DEBUG("Registe func name:{}, is_simd_vector:{}", desc.name, desc.is_simd_vector_func);

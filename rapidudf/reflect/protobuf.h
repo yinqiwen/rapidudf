@@ -65,6 +65,15 @@ struct PBGetterReturnType<std::string> {
   static return_type value(const std::string& v) { return &v; }
 };
 
+template <typename T, typename Enable = void>
+struct PBSetterArgType {
+  using arg_type = T;
+};
+template <>
+struct PBSetterArgType<const std::string&> {
+  using arg_type = std::string&&;
+};
+
 template <typename K, typename V>
 struct PBMapHelper {
   using return_type_t = typename PBGetterReturnType<V>::return_type;
@@ -184,19 +193,15 @@ void try_register_pb_container_member_funcs(std::string_view member) {
   }
 }
 
-}  // namespace rapidudf
+template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename F>
+void register_pb_set_string_func(std::string_view name, F set_func) {
+  using wrapper_t = rapidudf::PBSetStringHelper<SOURCE, LINE, HASH, decltype(set_func)>;
+  wrapper_t::GetFunc() = set_func;
+  wrapper_t::GetFuncName() = std::string(name);
+  rapidudf::Reflect::AddStructMethodAccessor(wrapper_t::GetFuncName(), &wrapper_t::Call);
+}
 
-#define RUDF_PB_SET_STRING_HELPER(st, member)                                                                     \
-  static ::rapidudf::StructAccessHelperRegister<st> BOOST_PP_CAT(rudf_struct_method_access_, __COUNTER__)([]() {  \
-    using set_func_t = void (st::*)(std::string&&);                                                               \
-    set_func_t set_func = &st::BOOST_PP_CAT(set_, member);                                                        \
-    using wrapper_t =                                                                                             \
-        rapidudf::PBSetStringHelper<rapidudf::fnv1a_hash(__FILE__), __LINE__,                                     \
-                                    rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(member)), decltype(set_func)>;        \
-    wrapper_t::GetFunc() = set_func;                                                                              \
-    wrapper_t::GetFuncName() = BOOST_PP_STRINGIZE(BOOST_PP_CAT(set_, member));                                    \
-    rapidudf::Reflect::AddStructMethodAccessor(BOOST_PP_STRINGIZE(BOOST_PP_CAT(set_, member)), &wrapper_t::Call); \
-  });
+}  // namespace rapidudf
 
 #define RUDF_PB_ADD_FIELD_ACCESS_CODE(r, TYPE, i, member)                                          \
   {                                                                                                \
@@ -215,6 +220,35 @@ void try_register_pb_container_member_funcs(std::string_view member) {
     static void Init() {                                                                                         \
       BOOST_PP_SEQ_FOR_EACH_I(RUDF_PB_ADD_FIELD_ACCESS_CODE, st, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))          \
       ::rapidudf::DTypeFactory::Add<st>();                                                                       \
+    }                                                                                                            \
+  };                                                                                                             \
+  static ::rapidudf::StructAccessHelperRegister<st> BOOST_PP_CAT(rudf_struct_method_access_, __COUNTER__)([]() { \
+    ReflectRegisterHelper<rapidudf::fnv1a_hash(__FILE__), __LINE__, 0, st>::Init<void>();                        \
+  });                                                                                                            \
+  }
+
+#define RUDF_PB_ADD_SET_FIELD_ACCESS_CODE(r, TYPE, i, member)                                              \
+  {                                                                                                        \
+    using func_return_t = decltype(((TYPE*)1)->member());                                                  \
+    using arg_t = typename rapidudf::PBSetterArgType<func_return_t>::arg_type;                             \
+    using set_func_t = void (TYPE::*)(arg_t);                                                              \
+    set_func_t set_func = &TYPE::BOOST_PP_CAT(set_, member);                                               \
+    if constexpr (std::is_same_v<arg_t, std::string&&>) {                                                  \
+      rapidudf::register_pb_set_string_func<rapidudf::fnv1a_hash(__FILE__), __LINE__,                      \
+                                            rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(member)), set_func_t>( \
+          BOOST_PP_STRINGIZE(BOOST_PP_CAT(set_, member)), set_func);                                       \
+    } else {                                                                                               \
+      MEMBER_FUNC_WRAPPER(BOOST_PP_STRINGIZE(BOOST_PP_CAT(set_, member)), set_func);                       \
+    }                                                                                                      \
+  }
+
+#define RUDF_PB_SET_FIELDS(st, ...)                                                                              \
+  namespace rapidudf {                                                                                           \
+  template <>                                                                                                    \
+  struct ReflectRegisterHelper<rapidudf::fnv1a_hash(__FILE__), __LINE__, 0, st> {                                \
+    template <typename T = void>                                                                                 \
+    static void Init() {                                                                                         \
+      BOOST_PP_SEQ_FOR_EACH_I(RUDF_PB_ADD_SET_FIELD_ACCESS_CODE, st, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))      \
     }                                                                                                            \
   };                                                                                                             \
   static ::rapidudf::StructAccessHelperRegister<st> BOOST_PP_CAT(rudf_struct_method_access_, __COUNTER__)([]() { \

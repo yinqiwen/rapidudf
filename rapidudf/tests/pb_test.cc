@@ -42,7 +42,9 @@ using namespace rapidudf::ast;
 RUDF_PB_FIELDS(::test::Header, id, scene, items, item_map, mapping, items_size)
 RUDF_PB_FIELDS(::test::Item, id)
 
-RUDF_STRUCT_MEMBER_METHODS(::test::Header, set_id)
+RUDF_PB_SET_FIELDS(::test::Header, id, scene)
+
+// RUDF_STRUCT_MEMBER_METHODS(::test::Header, set_id)
 
 TEST(JitCompiler, pb_access_read_int) {
   spdlog::set_level(spdlog::level::debug);
@@ -152,12 +154,13 @@ TEST(JitCompiler, pb_write_string) {
   pb_header.set_id(101);
   pb_header.set_scene("hello,world");
   pb_header.add_items()->set_id(10001);
+
   // pb_header.mutable_item_map()->insert(1);
 
   // the only way to bind overload member func
   // using SetFunc = void (::test::Header::*)(std::string&&);
   // SetFunc set_func = &::test::Header::set_scene;
-  RUDF_PB_SET_STRING_HELPER(::test::Header, scene);
+  // RUDF_PB_SET_STRING_HELPER(::test::Header, scene);
 
   JitCompiler compiler;
   std::string content = R"(

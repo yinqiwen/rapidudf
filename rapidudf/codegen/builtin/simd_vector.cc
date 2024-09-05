@@ -39,157 +39,198 @@
 #include "rapidudf/codegen/optype.h"
 #include "rapidudf/codegen/simd/simd_ops.h"
 #include "rapidudf/types/simd.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
 #define REGISTER_SIMD_VECTOR_FUNC_WITH_TYPE(r, FUNC, i, type) FUNC<type>();
 #define REGISTER_SIMD_VECTOR_FUNCS(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_FUNC_WITH_TYPE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
+#define REGISTER_SIMD_VECTOR_UNARY_FUNC_WITH_TYPE(r, op, i, type) register_unary_simd_vector_op<type, op>();
+#define REGISTER_SIMD_VECTOR_UNARY_FUNCS(op, ...) \
+  BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_UNARY_FUNC_WITH_TYPE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define REGISTER_SIMD_VECTOR_BINARY_FUNC_WITH_TYPE(r, op, i, type) register_binary_simd_vector_op<type, type, op>();
+#define REGISTER_SIMD_VECTOR_BINARY_FUNCS(op, ...) \
+  BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_BINARY_FUNC_WITH_TYPE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNC_WITH_TYPE(r, op, i, type) register_binary_simd_vector_op<type, Bit, op>();
+#define REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(op, ...) \
+  BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNC_WITH_TYPE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define REGISTER_SIMD_VECTOR_TERNARY_FUNC_WITH_TYPE(r, op, i, type) register_ternary_simd_vector_op<type, op>();
+#define REGISTER_SIMD_VECTOR_TERNARY_FUNCS(op, ...) \
+  BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_TERNARY_FUNC_WITH_TYPE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
 template <typename T, OpToken op>
-static void register_simd_vector_arithmetic() {
-  std::string simd_vector_func_name =
-      fmt::format("simd_vector_{}_{}", kOpTokenStrs[op], get_dtype<T>().GetTypeString());
-  simd::Vector<T> (*simd_f)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_binary_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, simd_vector_func_name.c_str(), simd_f);
-  simd_vector_func_name = fmt::format("simd_vector_scalar_{}_{}", kOpTokenStrs[op], get_dtype<T>().GetTypeString());
-  simd::Vector<T> (*simd_ff)(simd::Vector<T>, T, bool, uint32_t) = simd::simd_binary_scalar_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, simd_vector_func_name.c_str(), simd_ff);
+static void register_unary_simd_vector_op() {
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(op, dtype.ToSimdVector());
+  simd::Vector<T> (*simd_f)(simd::Vector<T>, uint32_t) = simd::simd_vector_unary_op<T, op>;
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f);
+}
+
+template <typename T, typename R, OpToken op>
+static void register_binary_simd_vector_op() {
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype.ToSimdVector());
+  simd::Vector<R> (*simd_f)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_vector_binary_op<T, R, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f);
+  func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype);
+  simd::Vector<R> (*simd_f1)(simd::Vector<T>, T, uint32_t) = simd::simd_vector_binary_vector_scalar_op<T, R, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f1);
+  func_name = GetFunctionName(op, dtype, dtype.ToSimdVector());
+  simd::Vector<R> (*simd_f2)(T, simd::Vector<T>, uint32_t) = simd::simd_vector_binary_scalar_vector_op<T, R, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f2);
 }
 
 template <typename T, OpToken op>
-static void register_simd_vector_cmp() {
+static void register_ternary_simd_vector_op() {
+  DType dtype = get_dtype<T>();
   std::string simd_vector_func_name =
-      fmt::format("simd_vector_{}_{}", kOpTokenStrs[op], get_dtype<T>().GetTypeString());
-  simd::Vector<Bit> (*simd_f)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_binary_op<T, Bit, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, simd_vector_func_name.c_str(), simd_f);
-  simd_vector_func_name = fmt::format("simd_vector_scalar_{}_{}", kOpTokenStrs[op], get_dtype<T>().GetTypeString());
-  simd::Vector<Bit> (*simd_ff)(simd::Vector<T>, T, bool, uint32_t) = simd::simd_binary_scalar_op<T, Bit, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, simd_vector_func_name.c_str(), simd_ff);
+      GetFunctionName(op, dtype.ToSimdVector(), dtype.ToSimdVector(), dtype.ToSimdVector());
+  simd::Vector<T> (*simd_f0)(simd::Vector<T>, simd::Vector<T>, simd::Vector<T>, uint32_t) =
+      simd::simd_vector_ternary_op<T, T, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f0);
+  simd_vector_func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype.ToSimdVector(), dtype);
+  simd::Vector<T> (*simd_f1)(simd::Vector<T>, simd::Vector<T>, T, uint32_t) =
+      simd::simd_vector_ternary_vector_vector_scalar_op<T, T, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f1);
+  simd_vector_func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype, dtype.ToSimdVector());
+  simd::Vector<T> (*simd_f2)(simd::Vector<T>, T, simd::Vector<T>, uint32_t) =
+      simd::simd_vector_ternary_vector_scalar_vector_op<T, T, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f2);
+  simd_vector_func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype, dtype);
+  simd::Vector<T> (*simd_f3)(simd::Vector<T>, T, T, uint32_t) =
+      simd::simd_vector_ternary_vector_scalar_scalar_op<T, T, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f3);
+
+  simd_vector_func_name = GetFunctionName(op, dtype, dtype.ToSimdVector(), dtype.ToSimdVector());
+  simd::Vector<T> (*simd_f4)(T, simd::Vector<T>, simd::Vector<T>, uint32_t) =
+      simd::simd_vector_ternary_scalar_vector_vector_op<T, T, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f4);
+  simd_vector_func_name = GetFunctionName(op, dtype, dtype.ToSimdVector(), dtype);
+  simd::Vector<T> (*simd_f5)(T, simd::Vector<T>, T, uint32_t) =
+      simd::simd_vector_ternary_scalar_vector_scalar_op<T, T, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f5);
+  simd_vector_func_name = GetFunctionName(op, dtype, dtype, dtype.ToSimdVector());
+  simd::Vector<T> (*simd_f6)(T, T, simd::Vector<T>, uint32_t) =
+      simd::simd_vector_ternary_scalar_scalar_vector_op<T, T, op>;
+  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f6);
 }
 
 template <typename T>
-static void register_simd_vector_ternary() {
+static void register_ternary_conditional_simd_vector_op() {
+  DType dtype = get_dtype<T>();
+  DType bits_dtype = DType(DATA_BIT).ToSimdVector();
   std::string simd_vector_func_name =
-      fmt::format("simd_vector_ternary_{}_scalar_scalar", get_dtype<T>().GetTypeString());
-  simd::Vector<T> (*simd_f0)(simd::Vector<Bit>, T, T, uint32_t) = simd::simd_ternary_op_scalar_scalar<T>;
+      GetFunctionName(OP_CONDITIONAL, bits_dtype, dtype.ToSimdVector(), dtype.ToSimdVector());
+  simd::Vector<T> (*simd_f0)(simd::Vector<Bit>, simd::Vector<T>, simd::Vector<T>, uint32_t) =
+      simd::simd_vector_ternary_op<Bit, T, OP_CONDITIONAL>;
   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f0);
-  simd_vector_func_name = fmt::format("simd_vector_ternary_{}_vector_vector", get_dtype<T>().GetTypeString());
-  simd::Vector<T> (*simd_f1)(simd::Vector<Bit>, simd::Vector<T>, simd::Vector<T>, uint32_t) =
-      simd::simd_ternary_op_vector_vector<T>;
+
+  simd_vector_func_name = GetFunctionName(OP_CONDITIONAL, bits_dtype, dtype.ToSimdVector(), dtype);
+  simd::Vector<T> (*simd_f1)(simd::Vector<Bit>, simd::Vector<T>, T, uint32_t) =
+      simd::simd_vector_ternary_vector_vector_scalar_op<Bit, T, OP_CONDITIONAL>;
   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f1);
-  simd_vector_func_name = fmt::format("simd_vector_ternary_{}_vector_scalar", get_dtype<T>().GetTypeString());
-  simd::Vector<T> (*simd_f2)(simd::Vector<Bit>, simd::Vector<T>, T, uint32_t) = simd::simd_ternary_op_vector_scalar<T>;
+
+  simd_vector_func_name = GetFunctionName(OP_CONDITIONAL, bits_dtype, dtype, dtype.ToSimdVector());
+  simd::Vector<T> (*simd_f2)(simd::Vector<Bit>, T, simd::Vector<T>, uint32_t) =
+      simd::simd_vector_ternary_vector_scalar_vector_op<Bit, T, OP_CONDITIONAL>;
   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f2);
-  simd_vector_func_name = fmt::format("simd_vector_ternary_{}_scalar_vector", get_dtype<T>().GetTypeString());
-  simd::Vector<T> (*simd_f3)(simd::Vector<Bit>, T, simd::Vector<T>, uint32_t) = simd::simd_ternary_op_scalar_vector<T>;
+
+  simd_vector_func_name = GetFunctionName(OP_CONDITIONAL, bits_dtype, dtype, dtype);
+  simd::Vector<T> (*simd_f3)(simd::Vector<Bit>, T, T, uint32_t) =
+      simd::simd_vector_ternary_vector_scalar_scalar_op<Bit, T, OP_CONDITIONAL>;
   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f3);
 }
 
 template <typename T>
-static void register_simd_vector_add() {
-  register_simd_vector_arithmetic<T, OP_PLUS>();
-}
-template <typename T>
-static void register_simd_vector_sub() {
-  register_simd_vector_arithmetic<T, OP_MINUS>();
-}
-template <typename T>
-static void register_simd_vector_mul() {
-  register_simd_vector_arithmetic<T, OP_MULTIPLY>();
-}
-template <typename T>
-static void register_simd_vector_div() {
-  register_simd_vector_arithmetic<T, OP_DIVIDE>();
-}
-template <typename T>
-static void register_simd_vector_mod() {
-  register_simd_vector_arithmetic<T, OP_MOD>();
-}
-
-template <typename T>
-static void register_simd_vector_gt() {
-  register_simd_vector_cmp<T, OP_GREATER>();
-}
-
-template <typename T>
-static void register_simd_vector_ge() {
-  register_simd_vector_cmp<T, OP_GREATER_EQUAL>();
-}
-
-template <typename T>
-static void register_simd_vector_lt() {
-  register_simd_vector_cmp<T, OP_LESS>();
-}
-
-template <typename T>
-static void register_simd_vector_le() {
-  register_simd_vector_cmp<T, OP_LESS_EQUAL>();
-}
-
-template <typename T>
-static void register_simd_vector_eq() {
-  register_simd_vector_cmp<T, OP_EQUAL>();
-}
-
-template <typename T>
-static void register_simd_vector_neq() {
-  register_simd_vector_cmp<T, OP_NOT_EQUAL>();
-}
-
-template <typename T>
-static void register_simd_vector_and() {
-  register_simd_vector_cmp<T, OP_LOGIC_AND>();
-}
-
-template <typename T>
-static void register_simd_vector_or() {
-  register_simd_vector_cmp<T, OP_LOGIC_OR>();
-}
-
-template <typename T>
 static void register_simd_vector_dot() {
-  std::string simd_vector_func_name = fmt::format("simd_vector_dot_{}", get_dtype<T>().GetTypeString());
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_DOT, dtype.ToSimdVector(), dtype.ToSimdVector());
   T (*simd_f0)(simd::Vector<T>, simd::Vector<T>, uint32_t) = simd::simd_vector_dot<T>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f0);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
   register_builtin_math_func("dot");
 }
 
 template <typename T>
 static void register_simd_vector_iota() {
-  std::string simd_vector_func_name = fmt::format("simd_vector_iota_{}", get_dtype<T>().GetTypeString());
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_IOTA, dtype.ToSimdVector());
   simd::Vector<T> (*simd_f0)(T, uint32_t, uint32_t) = simd::simd_vector_iota<T>;
-  RUDF_FUNC_REGISTER_WITH_NAME(simd_vector_func_name.c_str(), simd_f0);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
   register_builtin_math_func("iota");
 }
 
 void init_builtin_simd_vector_funcs() {
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_add, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_sub, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_mul, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_div, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_mod, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t,
-                             uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_gt, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_ge, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_lt, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_le, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_eq, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_neq, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_and, Bit)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_or, Bit)
-  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_ternary, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                             uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ABS, float, double, int64_t, int32_t, int16_t, int8_t)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_CEIL, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_EXP, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_EXPM1, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_EXP2, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_FLOOR, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_SQRT, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_LOG, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_LOG2, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_LOG10, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_LOG1P, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_SIN, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_COS, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ASIN, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ACOS, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_SINH, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_TANH, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ASINH, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ACOSH, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ATANH, float, double)
+
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_PLUS, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                    uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MINUS, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                    uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MULTIPLY, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                    uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_DIVIDE, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                    uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MOD, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(OP_GREATER_EQUAL, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                         uint32_t, uint16_t, uint8_t, StringView)
+  REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(OP_GREATER, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                         uint32_t, uint16_t, uint8_t, StringView)
+  REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(OP_LESS_EQUAL, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                         uint32_t, uint16_t, uint8_t, StringView)
+  REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(OP_LESS, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                         uint16_t, uint8_t, StringView)
+  REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(OP_NOT_EQUAL, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                         uint32_t, uint16_t, uint8_t, StringView)
+  REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(OP_EQUAL, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                         uint16_t, uint8_t, StringView)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_LOGIC_AND, Bit)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_LOGIC_OR, Bit)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_HYPOT, float, double)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_ATAN2, float, double)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MAX, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                    uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MIN, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                    uint16_t, uint8_t)
+
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_CLAMP, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                     uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_MULADD, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                     uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_MULSUB, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                     uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_MULADDSUB, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                     uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_NEG_MULADD, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                     uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_NEG_MULSUB, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                     uint32_t, uint16_t, uint8_t)
+
   REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_dot, float, double)
   REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_iota, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
                              uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_FUNCS(register_ternary_conditional_simd_vector_op, float, double, int64_t, int32_t, int16_t,
+                             int8_t, uint64_t, uint32_t, uint16_t, uint8_t)
 }
 }  // namespace rapidudf

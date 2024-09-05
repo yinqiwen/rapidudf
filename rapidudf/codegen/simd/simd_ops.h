@@ -30,11 +30,9 @@
 */
 
 #pragma once
-#include "absl/status/statusor.h"
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/optype.h"
 #include "rapidudf/types/simd.h"
-#include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 namespace simd {
@@ -42,37 +40,41 @@ enum ReuseFlag {
   REUSE_NONE = 0,
   REUSE_LEFT = 1,
   REUSE_RIGHT = 2,
+  REUSE_FIRST = 1,
+  REUSE_SECOND = 2,
+  REUSE_THIRD = 3,
 };
 using VectorDataWithDType = std::pair<VectorData, DType>;
 template <typename T, typename R, OpToken op>
-Vector<R> simd_binary_op(Vector<T> left, Vector<T> right, uint32_t reuse);
+Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right, uint32_t reuse);
 template <typename T, typename R, OpToken op>
-Vector<R> simd_binary_scalar_op(Vector<T> left, T right, bool reverse, uint32_t reuse);
+Vector<R> simd_vector_binary_vector_scalar_op(Vector<T> left, T right, uint32_t reuse);
+template <typename T, typename R, OpToken op>
+Vector<R> simd_vector_binary_scalar_vector_op(T left, Vector<T> right, uint32_t reuse);
 
 template <typename T, OpToken op>
-Vector<T> simd_unary_op(Vector<T> left, uint32_t reuse);
+Vector<T> simd_vector_unary_op(Vector<T> left, uint32_t reuse);
 
-template <typename T>
-Vector<T> simd_ternary_op_scalar_scalar(Vector<Bit> cond, T true_val, T false_val, uint32_t reuse);
-template <typename T>
-Vector<T> simd_ternary_op_vector_vector(Vector<Bit> cond, Vector<T> true_val, Vector<T> false_val, uint32_t reuse);
-template <typename T>
-Vector<T> simd_ternary_op_vector_scalar(Vector<Bit> cond, Vector<T> true_val, T false_val, uint32_t reuse);
-template <typename T>
-Vector<T> simd_ternary_op_scalar_vector(Vector<Bit> cond, T true_val, Vector<T> false_val, uint32_t reuse);
-
-template <OpToken op>
-Vector<Bit> simd_vector_string_cmp(Vector<StringView> left, Vector<StringView> right, uint32_t reuse);
-template <OpToken op>
-Vector<Bit> simd_vector_string_cmp_scalar(Vector<StringView> left, StringView right, bool reverse, uint32_t reuse);
+template <typename R, typename T, OpToken op>
+Vector<T> simd_vector_ternary_op(Vector<R> a, Vector<T> b, Vector<T> c, uint32_t reuse);
+template <typename R, typename T, OpToken op>
+Vector<T> simd_vector_ternary_vector_vector_scalar_op(Vector<R> a, Vector<T> b, T c, uint32_t reuse);
+template <typename R, typename T, OpToken op>
+Vector<T> simd_vector_ternary_vector_scalar_vector_op(Vector<R> a, T b, Vector<T> c, uint32_t reuse);
+template <typename R, typename T, OpToken op>
+Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Vector<R> a, T b, T c, uint32_t reuse);
+template <typename R, typename T, OpToken op>
+Vector<T> simd_vector_ternary_scalar_vector_vector_op(R a, Vector<T> b, Vector<T> c, uint32_t reuse);
+template <typename R, typename T, OpToken op>
+Vector<T> simd_vector_ternary_scalar_scalar_vector_op(R a, T b, Vector<T> c, uint32_t reuse);
+template <typename R, typename T, OpToken op>
+Vector<T> simd_vector_ternary_scalar_vector_scalar_op(R a, Vector<T> b, T c, uint32_t reuse);
 
 template <typename T>
 T simd_vector_dot(Vector<T> left, Vector<T> right, uint32_t reuse);
 
 template <typename T>
 Vector<T> simd_vector_iota(T start, uint32_t n, uint32_t reuse);
-
-void init_builtin_simd_funcs();
 
 }  // namespace simd
 }  // namespace rapidudf

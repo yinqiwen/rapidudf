@@ -70,8 +70,7 @@ TEST(JitCompiler, exception) {
   }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  int n = f();
-  ASSERT_TRUE(n == 0);
+  ASSERT_ANY_THROW(f());
 }
 
 TEST(JitCompiler, rethrow_exception) {
@@ -110,7 +109,7 @@ TEST(JitCompiler, member_func_exception) {
   ASSERT_TRUE(rc.ok());
   TestStruct t;
   auto f = std::move(rc.value());
-  f(&t);
+  ASSERT_ANY_THROW(f(&t));
 }
 
 struct Helper {
@@ -140,5 +139,5 @@ TEST(JitCompiler, member_func_bind) {
   ASSERT_TRUE(rc.ok());
   TestStruct t;
   auto f = std::move(rc.value());
-  f(&t);
+  ASSERT_ANY_THROW(f(&t));
 }

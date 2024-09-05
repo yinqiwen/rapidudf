@@ -31,6 +31,7 @@
 
 #include <gtest/gtest.h>
 #include <functional>
+#include <locale>
 #include <stdexcept>
 #include <vector>
 #include "rapidudf/codegen/function.h"
@@ -126,7 +127,7 @@ TEST(JitCompiler, safe_member_func) {
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ExceptionStruct test;
-  f(test);
+  ASSERT_ANY_THROW(f(test));
 }
 
 static void exception_func() { throw std::logic_error("exception_func"); }
@@ -142,7 +143,7 @@ TEST(JitCompiler, safe_func) {
   auto rc = compiler.CompileFunction<void>(source);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  f();
+  ASSERT_ANY_THROW(f());
 }
 
 TEST(JitCompiler, var) {

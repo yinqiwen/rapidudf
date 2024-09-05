@@ -91,19 +91,19 @@ StringView cast_stdstr_to_string_view(const std::string& str) { return StringVie
 StringView cast_fbsstr_to_string_view(const flatbuffers::String& str) { return StringView(str.c_str(), str.size()); }
 StringView cast_stdstrview_to_string_view(std::string_view str) { return StringView(str); }
 
-template <OpToken op>
-static void register_simd_vector_string_cmp() {
-  simd::Vector<Bit> (*simd_f0)(simd::Vector<StringView>, simd::Vector<StringView>, uint32_t) =
-      simd::simd_vector_string_cmp<op>;
-  std::string func_name =
-      GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW).ToSimdVector());
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f0);
+// template <OpToken op>
+// static void register_simd_vector_string_cmp() {
+//   simd::Vector<Bit> (*simd_f0)(simd::Vector<StringView>, simd::Vector<StringView>, uint32_t) =
+//       simd::simd_vector_string_cmp<op>;
+//   std::string func_name =
+//       GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW).ToSimdVector());
+//   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f0);
 
-  simd::Vector<Bit> (*simd_f1)(simd::Vector<StringView>, StringView, bool, uint32_t) =
-      simd::simd_vector_string_cmp_scalar<op>;
-  func_name = GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW));
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f1);
-}
+//   simd::Vector<Bit> (*simd_f1)(simd::Vector<StringView>, StringView, bool, uint32_t) =
+//       simd::simd_vector_string_cmp_scalar<op>;
+//   func_name = GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW));
+//   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f1);
+// }
 
 struct StringViewHelper {
   static size_t size(StringView s) { return s.size(); }
@@ -134,8 +134,6 @@ void init_builtin_string_funcs() {
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrViewToStringView, cast_stdstrview_to_string_view);
-  REGISTER_STRING_FUNCS(register_simd_vector_string_cmp, OP_GREATER, OP_GREATER_EQUAL, OP_LESS_EQUAL, OP_LESS, OP_EQUAL,
-                        OP_NOT_EQUAL)
 }
 
 }  // namespace rapidudf

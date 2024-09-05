@@ -40,8 +40,7 @@
 
 using namespace rapidudf;
 
-TEST(JitCompiler, vector_size) {
-  spdlog::set_level(spdlog::level::debug);
+TEST(JitCompiler, vector_cos) {
   std::vector<float> vec{1, 2, 3};
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
@@ -56,7 +55,6 @@ TEST(JitCompiler, vector_size) {
   // ASSERT_EQ(f(simd_vec), vec.size());
 }
 TEST(JitCompiler, vector_add) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<float> vec{1, 2, 3};
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
@@ -75,7 +73,6 @@ TEST(JitCompiler, vector_add) {
   }
 }
 TEST(JitCompiler, vector_sub) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<float> vec{1, 2, 3};
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
@@ -94,7 +91,6 @@ TEST(JitCompiler, vector_sub) {
   }
 }
 TEST(JitCompiler, vector_mul) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<float> vec{1, 2, 3};
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
@@ -113,7 +109,6 @@ TEST(JitCompiler, vector_mul) {
   }
 }
 TEST(JitCompiler, vector_div) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<float> vec{1, 2, 3};
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
@@ -132,7 +127,6 @@ TEST(JitCompiler, vector_div) {
   }
 }
 TEST(JitCompiler, vector_mod) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   simd::Vector<int> simd_vec(vec);
   JitCompiler compiler;
@@ -152,7 +146,6 @@ TEST(JitCompiler, vector_mod) {
 }
 
 TEST(JitCompiler, vector_cmp) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   simd::Vector<int> simd_vec(vec);
   JitCompiler compiler;
@@ -173,7 +166,6 @@ TEST(JitCompiler, vector_cmp) {
 }
 
 TEST(JitCompiler, vector_add2) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<float> vec{1, 2, 3};
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
@@ -193,7 +185,6 @@ TEST(JitCompiler, vector_add2) {
 }
 
 TEST(JitCompiler, vector_ternary) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3, 4, 1, 5, 6};
   simd::Vector<int> simd_vec(vec);
   JitCompiler compiler(4096, true);
@@ -213,7 +204,6 @@ TEST(JitCompiler, vector_ternary) {
   }
 }
 TEST(JitCompiler, vector_dot) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<float> left{1, 2, 3, 4, 1, 5, 6};
   std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
   simd::Vector<float> simd_left(left);
@@ -236,8 +226,6 @@ TEST(JitCompiler, vector_dot) {
 }
 
 TEST(JitCompiler, vector_iota) {
-  spdlog::set_level(spdlog::level::debug);
-
   JitCompiler compiler(4096, true);
   std::string content = R"(
     simd_vector<f64> test_func(){
@@ -255,7 +243,6 @@ TEST(JitCompiler, vector_iota) {
 }
 
 TEST(JitCompiler, vector_string_cmp) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<std::string> left{"hello0", "hello1", "hello2"};
   std::vector<std::string> right{"afasf", "rwrewe", "qw1231241"};
   auto left_views = StringView::makeVector(left);

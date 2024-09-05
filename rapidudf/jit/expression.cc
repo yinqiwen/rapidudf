@@ -75,31 +75,13 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name, std:
     RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("No func:{} found", name)));
   }
   uint32_t simd_vector_reuse_flag = 0;
-  uint8_t simd_vector_reverse = 0;
-  if (func_desc->is_simd_vector_scalar_func) {
-    if (arg_values.size() == 2) {
-      if (arg_values[0]->GetDType().IsSimdVector()) {
-        simd_vector_reverse = 0;
-      } else {
-        simd_vector_reverse = 1;
-        std::swap(arg_values[0], arg_values[1]);
-      }
-    }
-  }
   for (size_t i = 0; i < arg_values.size(); i++) {
     if (arg_values[i]->GetDType() != func_desc->arg_types[i]) {
       arg_values[i] = arg_values[i]->CastTo(func_desc->arg_types[i]);
     }
-    if (simd_vector_reuse_flag == 0 && arg_values[i]->IsTemp()) {
-      if (i == 0) {
-        simd_vector_reuse_flag = simd::REUSE_LEFT;
-      } else {
-        simd_vector_reuse_flag = simd::REUSE_RIGHT;
-      }
+    if (simd_vector_reuse_flag == 0 && arg_values[i]->IsTemp() && arg_values[i]->GetDType().IsSimdVector()) {
+      simd_vector_reuse_flag = i + 1;
     }
-  }
-  if (func_desc->is_simd_vector_scalar_func) {
-    arg_values.emplace_back(GetCodeGenerator().NewConstValue(DATA_U8, simd_vector_reverse));
   }
   if (func_desc->is_simd_vector_func) {
     arg_values.emplace_back(GetCodeGenerator().NewConstValue(DATA_U32, simd_vector_reuse_flag));
@@ -412,7 +394,8 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::TernaryExprPtr expr
         return false_expr_result.status();
       }
       auto false_expr_val = false_expr_result.value();
-      auto func_name = GetSimdVectorTernaryFunctionName(true_expr_val->GetDType(), false_expr_val->GetDType());
+      auto func_name =
+          GetFunctionName(OP_CONDITIONAL, cond_val->GetDType(), true_expr_val->GetDType(), false_expr_val->GetDType());
       std::vector<ValuePtr> args{cond_val, true_expr_val, false_expr_val};
       auto result = CallFunction(func_name, args);
       if (!result.ok()) {

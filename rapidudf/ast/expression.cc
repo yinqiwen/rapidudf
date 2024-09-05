@@ -354,21 +354,24 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
         if (true_expr_result->dtype == false_expr_result->dtype) {
           ternary_result_dtype = true_expr_result->dtype;
           ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(GetSimdVectorTernaryFunctionName(true_expr_result->dtype, false_expr_result->dtype));
+          ctx.AddBuiltinFuncCall(
+              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
           return VarTag(ternary_result_dtype);
         }
       } else if (true_expr_result->dtype.IsSimdVector() && !false_expr_result->dtype.IsSimdVector()) {
         if (false_expr_result->dtype.CanCastTo(true_expr_result->dtype.Elem())) {
           ternary_result_dtype = true_expr_result->dtype;
           ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(GetSimdVectorTernaryFunctionName(true_expr_result->dtype, false_expr_result->dtype));
+          ctx.AddBuiltinFuncCall(
+              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
           return VarTag(ternary_result_dtype);
         }
       } else if (!true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
         if (true_expr_result->dtype.CanCastTo(false_expr_result->dtype.Elem())) {
           ternary_result_dtype = false_expr_result->dtype;
           ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(GetSimdVectorTernaryFunctionName(true_expr_result->dtype, false_expr_result->dtype));
+          ctx.AddBuiltinFuncCall(
+              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
           return VarTag(ternary_result_dtype);
         }
       } else {
@@ -376,7 +379,8 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
           ternary_result_dtype =
               true_expr_result->dtype >= false_expr_result->dtype ? true_expr_result->dtype : false_expr_result->dtype;
           ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(GetSimdVectorTernaryFunctionName(true_expr_result->dtype, false_expr_result->dtype));
+          ctx.AddBuiltinFuncCall(
+              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
           return VarTag(ternary_result_dtype.ToSimdVector());
         }
       }
@@ -443,16 +447,18 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
         }
       }
     }
-    RUDF_DEBUG("{} is builtin:{}", name, is_builtin_math_func(name));
+    RUDF_INFO("{} is builtin:{} {}", name, is_builtin_math_func(name), largest_dtype);
     if (is_builtin_math_func(name)) {
-      if (name == "iota") {
-        has_simd_vector = true;
-      }
-      if (has_simd_vector) {
+      if (name == kOpTokenStrs[OP_IOTA]) {
         ctx.MarkSimdVectorOperation();
-        name = "simd_vector_" + name + "_" + largest_dtype.Elem().GetTypeString();
+        name = GetFunctionName(name, largest_dtype.ToSimdVector());
+      } else if (has_simd_vector) {
+        ctx.MarkSimdVectorOperation();
+        // name = "simd_vector_" + name + "_" + largest_dtype.Elem().GetTypeString();
+        name = GetFunctionName(name, arg_dtypes);
       } else {
-        name = name + "_" + largest_dtype.GetTypeString();
+        // name = name + "_" + largest_dtype.GetTypeString();
+        name = GetFunctionName(name, largest_dtype);
       }
     }
     auto result = ctx.CheckFuncExist(name);
@@ -461,7 +467,8 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     }
     auto* desc = result.value();
     if (!desc->ValidateArgs(arg_dtypes)) {
-      return ctx.GetErrorStatus(fmt::format("Invalid func call args with invalid args."));
+      return ctx.GetErrorStatus(
+          fmt::format("Invalid func call:{} args with invalid args, simd_vector_func:{}", name, has_simd_vector));
     }
     return desc->return_type;
   } else {
