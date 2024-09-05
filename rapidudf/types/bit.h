@@ -30,12 +30,40 @@
 */
 
 #pragma once
-#include "rapidudf/codegen/dtype.h"
-
+#include <stddef.h>
+#include <cstdint>
 namespace rapidudf {
-struct ReflectValue {
-  uint64_t value = 0;
-  uint64_t ext_value = 0;
-  uint32_t dtype = 0;
+class Bit {
+ public:
+  explicit Bit(bool v) : val_(v) {}
+  Bit operator+(const Bit& other) const { return *this; }
+  Bit operator-(const Bit& other) const { return *this; }
+  Bit operator*(const Bit& other) const { return *this; }
+  Bit operator/(const Bit& other) const { return *this; }
+  Bit operator%(const Bit& other) const { return *this; }
+  Bit operator==(const Bit& other) const { return Bit(val_ == other.val_); }
+  Bit operator==(bool other) const { return Bit(val_ == other); }
+  Bit operator!=(const Bit& other) const { return Bit(val_ != other.val_); }
+  Bit operator>=(const Bit& other) const { return Bit(val_ >= other.val_); }
+  Bit operator<=(const Bit& other) const { return Bit(val_ <= other.val_); }
+  Bit operator>(const Bit& other) const { return Bit(val_ > other.val_); }
+  Bit operator<(const Bit& other) const { return Bit(val_ < other.val_); }
+  Bit operator&&(const Bit& other) const { return Bit(val_ && other.val_); }
+  Bit operator||(const Bit& other) const { return Bit(val_ || other.val_); }
+  operator bool() { return val_; }
+
+ private:
+  bool val_ = false;
 };
+
+inline uint8_t bit_set(uint8_t number, uint8_t n) { return number | ((uint8_t)1 << n); }
+inline uint8_t bit_clear(uint8_t number, uint8_t n) { return number & ~((uint8_t)1 << n); }
+inline size_t get_bits_byte_size(size_t n) { return (n + 7) / 8 + 8; }
+inline size_t get_arena_element_size(size_t n, size_t lanes) {
+  size_t rest = n % lanes;
+  if (rest == 0) {
+    return n;
+  }
+  return n + lanes - rest;
+}
 }  // namespace rapidudf

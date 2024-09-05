@@ -73,7 +73,7 @@ cc_library(
         ":function",
         ":optype",
         ":register",
-        "//rapidudf/codegen/builtin",
+        "//rapidudf/codegen/builtin:builtin_symbols",
         "//rapidudf/codegen/ops:arithmetic_ops",
         "//rapidudf/codegen/ops:cast",
         "//rapidudf/codegen/ops:cmp",

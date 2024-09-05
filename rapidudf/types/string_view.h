@@ -23,6 +23,8 @@
 
 #include <fmt/format.h>
 
+#include "absl/strings/string_view.h"
+
 namespace rapidudf {
 
 // Variable length string or binary type for use in vectors. This has
@@ -170,6 +172,7 @@ struct StringView {
 
   operator std::string_view() && = delete;
   explicit operator std::string_view() const& { return std::string_view(data(), size()); }
+  absl::string_view get_absl_string_view() const { return absl::string_view(data(), size()); }
 
   const char* begin() && = delete;
   const char* begin() const& { return data(); }

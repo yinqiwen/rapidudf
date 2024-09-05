@@ -36,8 +36,8 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
 
     http_archive(
         name = "rules_foreign_cc",
-        strip_prefix = "rules_foreign_cc-0.7.0",
-        url = "https://github.com/bazelbuild/rules_foreign_cc/archive/0.7.0.zip",
+        strip_prefix = "rules_foreign_cc-0.9.0",
+        url = "https://github.com/bazelbuild/rules_foreign_cc/archive/0.9.0.zip",
     )
 
     http_archive(
@@ -217,6 +217,32 @@ cc_library(
         name = "com_google_highway",
         remote = "https://github.com/google/highway.git",
         tag = "1.2.0",
+    )
+
+    _X86_SIMD_SORT_BUILD_FILE = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "make")
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+make(
+    name = "x86_simd_sort",
+    lib_source = ":all_srcs",
+    targets = ["sharedlib","install"],
+    args = ["-j8"],
+    env={"DESTDIR":"$$INSTALLDIR"},
+    out_lib_dir="usr/local/lib64",
+    out_include_dir="usr/local/include",
+    out_shared_libs = ["libx86simdsortcpp.so","libx86simdsortcpp.so.1"],
+)
+"""
+    new_git_repository(
+        name = "x86_simd_sort",
+        remote = "https://github.com/intel/x86-simd-sort.git",
+        branch = "main",
+        build_file_content = _X86_SIMD_SORT_BUILD_FILE,
     )
 
     _EXPRTK_BUILD_FILE = """

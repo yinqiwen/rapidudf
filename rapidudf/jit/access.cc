@@ -29,27 +29,23 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <string_view>
 #include <vector>
-#include "absl/cleanup/cleanup.h"
-#include "rapidudf/codegen/builtin/builtin.h"
+#include "rapidudf/codegen/builtin/builtin_symbols.h"
 #include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/ops/cmp.h"
-#include "rapidudf/codegen/optype.h"
 #include "rapidudf/codegen/value.h"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/reflect/reflect.h"
 #include "rapidudf/types/string_view.h"
+
 namespace rapidudf {
 using namespace Xbyak::util;
 absl::StatusOr<ValuePtr> JitCompiler::CompileFieldAccess(ValuePtr var, const ast::FieldAccess& field) {
-  if (!var->GetDType().IsSimdVector() && !var->GetDType().IsPtr()) {
+  if (!var->GetDType().IsSimdVector() && !var->GetDType().IsPtr() && !var->GetDType().IsStringView()) {
     RUDF_LOG_ERROR_STATUS(
         ast_ctx_.GetErrorStatus(fmt::format("Can NOT access field:{} with dtype:{}", field.field, var->GetDType())));
   }
-  auto accessor = ReflectFactory::GetStructMember(var->GetDType().PtrTo(), field.field);
+  auto accessor = Reflect::GetStructMember(var->GetDType().PtrTo(), field.field);
   if (!accessor) {
     RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
         fmt::format("Can NOT get reflect accessor with dtype:{} & member:{}", var->GetDType().PtrTo(), field.field)));

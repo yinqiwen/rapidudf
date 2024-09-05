@@ -434,7 +434,7 @@ DType get_dtype() {
   if constexpr (std::is_same_v<JsonObject, T>) {
     return DType(DATA_JSON);
   }
-  if constexpr (std::is_same_v<simd::Bit, T>) {
+  if constexpr (std::is_same_v<Bit, T>) {
     return DType(DATA_BIT);
   }
   static uint32_t id = nextTypeId();

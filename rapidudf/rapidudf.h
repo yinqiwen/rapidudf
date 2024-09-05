@@ -31,6 +31,6 @@
 
 #pragma once
 #include "rapidudf/jit/jit.h"
-#include "rapidudf/reflect/reflect.h"
-#include "rapidudf/reflect/struct_access.h"
+#include "rapidudf/reflect/macros.h"
+
 namespace rapidudf {}  // namespace rapidudf

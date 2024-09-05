@@ -33,23 +33,10 @@
 
 #include <string_view>
 #include "flatbuffers/flatbuffers.h"
-#include "rapidudf/codegen/optype.h"
-#include "rapidudf/log/log.h"
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
-static constexpr std::string_view kBuiltinStringViewCmp = "rapidudf_compare_string_view";
-static constexpr std::string_view kBuiltinCastStdStrToStringView = "rapidudf_cast_fbsstr_to_string_view";
-static constexpr std::string_view kBuiltinCastFbsStrToStringView = "rapidudf_cast_stdstr_to_string_view";
-static constexpr std::string_view kBuiltinCastStdStrViewToStringView = "rapidudf_cast_stdstrview_to_string_view";
-static constexpr std::string_view kBuiltinJsonMemberGet = "rapidudf_json_member_get";
-static constexpr std::string_view kBuiltinJsonArrayGet = "rapidudf_json_array_get";
-static constexpr std::string_view kBuiltinJsonCmpString = "rapidudf_json_cmp_string";
-static constexpr std::string_view kBuiltinJsonCmpInt = "rapidudf_json_cmp_int";
-static constexpr std::string_view kBuiltinJsonCmpFloat = "rapidudf_json_cmp_float";
-static constexpr std::string_view kBuiltinJsonCmpBool = "rapidudf_json_cmp_bool";
-static constexpr std::string_view kBuiltinJsonCmpJson = "rapidudf_json_cmp_json";
 
 bool compare_string_view(uint32_t op, StringView left, StringView right);
 StringView cast_stdstr_to_string_view(const std::string& str);
@@ -65,10 +52,12 @@ bool json_cmp_float(uint32_t op, const JsonObject& json, double right, bool reve
 bool json_cmp_json(uint32_t op, const JsonObject& left, const JsonObject& right);
 
 void init_builtin();
-
+void init_builtin_stl_funcs();
 void init_builtin_string_funcs();
 void init_builtin_math_funcs();
 void init_builtin_json_funcs();
+void init_builtin_simd_vector_funcs();
 bool is_builtin_math_func(std::string_view name);
+bool register_builtin_math_func(std::string_view name);
 
 }  // namespace rapidudf

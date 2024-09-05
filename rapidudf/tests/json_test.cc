@@ -37,7 +37,7 @@
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
-#include "rapidudf/reflect/struct_access.h"
+
 #include "rapidudf/types/json_object.h"
 
 using namespace rapidudf;

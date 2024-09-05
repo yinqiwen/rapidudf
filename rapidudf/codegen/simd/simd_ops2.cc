@@ -38,6 +38,12 @@
 #include <type_traits>
 #include <vector>
 
+#undef HWY_TARGET_INCLUDE
+#define HWY_TARGET_INCLUDE "rapidudf/codegen/simd/simd_ops2.cc"  // this file
+
+#include "hwy/foreach_target.h"  // must come before highway.h
+#include "hwy/highway.h"
+
 #include "hwy/bit_set.h"
 #include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/contrib/math/math-inl.h"
@@ -45,7 +51,6 @@
 #include "hwy/contrib/sort/traits-inl.h"
 #include "hwy/contrib/sort/traits128-inl.h"
 #include "hwy/contrib/sort/vqsort.h"
-#include "hwy/highway.h"
 
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
@@ -56,54 +61,14 @@
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/simd.h"
 
-#define DO_SIMD_OP_POST(r, TYPE, ii, post) post();
-
-#define DO_SIMD_UNARY_OP(op, lv, ...)                                                                          \
-  switch (op) {                                                                                                \
-    case OP_SQRT: {                                                                                            \
-      if constexpr (std::is_same_v<number_t, float> || std::is_same_v<number_t, double>) {                     \
-        auto temp = do_simd_unary_op<decltype(lv), OP_SQRT>(lv);                                               \
-        BOOST_PP_SEQ_FOR_EACH_I(DO_SIMD_OP_POST, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                    \
-        break;                                                                                                 \
-      } else {                                                                                                 \
-        return absl::InvalidArgumentError(fmt::format("unsupported op:{} for float/double simd vectors", op)); \
-      }                                                                                                        \
-    }                                                                                                          \
-    case OP_FLOOR: {                                                                                           \
-      if constexpr (std::is_same_v<number_t, float> || std::is_same_v<number_t, double>) {                     \
-        auto temp = do_simd_unary_op<decltype(lv), OP_FLOOR>(lv);                                              \
-        BOOST_PP_SEQ_FOR_EACH_I(DO_SIMD_OP_POST, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                    \
-        break;                                                                                                 \
-      } else {                                                                                                 \
-        return absl::InvalidArgumentError(fmt::format("unsupported op:{} for float/double simd vectors", op)); \
-      }                                                                                                        \
-    }                                                                                                          \
-    case OP_ABS: {                                                                                             \
-      if constexpr (std::is_same_v<number_t, uint64_t> || std::is_same_v<number_t, uint32_t> ||                \
-                    std::is_same_v<number_t, uint16_t> || std::is_same_v<number_t, uint8_t>) {                 \
-        return absl::InvalidArgumentError(fmt::format("unsupported op:{} for uint simd vectors", op));         \
-      } else {                                                                                                 \
-        auto temp = do_simd_unary_op<decltype(lv), OP_ABS>(lv);                                                \
-        BOOST_PP_SEQ_FOR_EACH_I(DO_SIMD_OP_POST, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                    \
-        break;                                                                                                 \
-      }                                                                                                        \
-    }                                                                                                          \
-    case OP_NOT: {                                                                                             \
-      auto temp = do_simd_unary_op<decltype(lv), OP_NOT>(lv);                                                  \
-      BOOST_PP_SEQ_FOR_EACH_I(DO_SIMD_OP_POST, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                      \
-      break;                                                                                                   \
-    }                                                                                                          \
-    default: {                                                                                                 \
-      return absl::InvalidArgumentError(fmt::format("unsupported op:{} for simd vectors", op));                \
-    }                                                                                                          \
-  }
-
+HWY_BEFORE_NAMESPACE();
 namespace rapidudf {
 namespace simd {
+namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
 
 template <typename V, OpToken op>
-static inline auto do_simd_unary_op(V lv) {
+static auto do_simd_unary_op(V lv) {
   if constexpr (op == OP_SQRT) {
     return hn::Sqrt(lv);
   } else if constexpr (op == OP_FLOOR) {
@@ -246,8 +211,6 @@ static inline auto do_residue_op(T lv, T rv) {
     static_assert(sizeof(T) == -1, "unsupported op");
   }
 }
-inline uint8_t bit_set(uint8_t number, uint8_t n) { return number | ((uint8_t)1 << n); }
-inline uint8_t bit_clear(uint8_t number, uint8_t n) { return number & ~((uint8_t)1 << n); }
 template <typename T>
 class VectorDataHelper {
  public:
@@ -306,14 +269,6 @@ class VectorDataHelper {
   hn::ScalableTag<T> d;
 };
 
-static size_t get_bits_byte_size(size_t n) { return (n + 7) / 8 + 8; }
-static size_t get_arena_element_size(size_t n, size_t lanes) {
-  size_t rest = n % lanes;
-  if (rest == 0) {
-    return n;
-  }
-  return n + lanes - rest;
-}
 template <typename T>
 static auto get_constant(T v) {
   if constexpr (std::is_same_v<Bit, T>) {
@@ -753,6 +708,25 @@ DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_VECTOR_STRING_CMP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_VECTOR_STRING_CMP(OP_GREATER_EQUAL, OP_GREATER, OP_LESS_EQUAL, OP_LESS, OP_EQUAL, OP_NOT_EQUAL)
 
-void init_builtin_simd_funcs() {}
+}  // namespace HWY_NAMESPACE
 }  // namespace simd
 }  // namespace rapidudf
+HWY_AFTER_NAMESPACE();
+
+#if HWY_ONCE
+namespace rapidudf {
+namespace simd {
+
+// template <typename T>
+// Vector<T> simd_ternary_op_scalar_scalar(Vector<Bit> cond, T true_val, T false_val, uint32_t reuse) {
+//   return HWY_EXPORT_AND_DYNAMIC_DISPATCH_T(simd_ternary_op_scalar_scalar<T>)(cond, true_val, false_val, reuse);
+// }
+
+// template <typename T, typename R, OpToken op>
+// Vector<R> simd_binary_op(Vector<T> left, Vector<T> right, uint32_t reuse) {
+//   return HWY_EXPORT_AND_DYNAMIC_DISPATCH_T(simd_binary_op<T, R, op>)(left, right, reuse);
+// }
+
+}  // namespace simd
+}  // namespace rapidudf
+#endif  // HWY_ONCE

@@ -35,7 +35,7 @@
 #include <vector>
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/rapidudf.h"
-#include "rapidudf/reflect/struct_access.h"
+#include "rapidudf/reflect/macros.h"
 
 struct TestMethodStruct {
   int a;

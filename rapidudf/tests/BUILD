@@ -63,6 +63,18 @@ cc_test(
 )
 
 cc_test(
+    name = "string_op_test",
+    size = "small",
+    srcs = ["string_op_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "expression_test",
     size = "small",
     srcs = ["expression_test.cc"],

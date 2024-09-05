@@ -37,7 +37,7 @@
 #include "rapidudf/codegen/ops/cast.h"
 #include "rapidudf/codegen/ops/copy.h"
 #include "rapidudf/log/log.h"
-#include "rapidudf/reflect/struct_access.h"
+#include "rapidudf/reflect/struct.h"
 
 #include "xbyak/xbyak_util.h"
 
@@ -86,7 +86,7 @@ TEST(StructAccess, simple_int) {
   x.b = 3.14;
 
   CodeGenerator c(4096, false);
-  auto builder = StructFieldAccess<TestStruct>::GetStructMember("a");
+  auto builder = StructAccess<TestStruct>::GetStructMember("a");
   c.GetCodeGen().mov(rcx, rdi);
   DType dtype;
   auto result = builder->BuildFieldAccess(c);
@@ -105,7 +105,7 @@ TEST(StructAccess, simple_float) {
 
   CodeGenerator c(4096, false);
   c.GetCodeGen().mov(rcx, rdi);
-  auto builder = StructFieldAccess<TestStruct>::GetStructMember("b");
+  auto builder = StructAccess<TestStruct>::GetStructMember("b");
   DType dtype;
   auto result = builder->BuildFieldAccess(c);
   ASSERT_TRUE(result.ok());
@@ -126,7 +126,7 @@ TEST(StructAccess, simple_ptr) {
 
   CodeGenerator c(4096, false);
   c.GetCodeGen().mov(rcx, rdi);
-  auto builder = StructFieldAccess<TestStruct>::GetStructMember("p");
+  auto builder = StructAccess<TestStruct>::GetStructMember("p");
   DType dtype;
   auto result = builder->BuildFieldAccess(c);
   ASSERT_TRUE(result.ok());
@@ -147,7 +147,7 @@ TEST(StructAccess, simple_string_view) {
 
   CodeGenerator c(4096, false);
   c.GetCodeGen().mov(rcx, rdi);
-  auto builder = StructFieldAccess<TestStruct>::GetStructMember("c");
+  auto builder = StructAccess<TestStruct>::GetStructMember("c");
   DType dtype;
   auto result = builder->BuildFieldAccess(c);
   ASSERT_TRUE(result.ok());
@@ -168,7 +168,7 @@ TEST(StructAccess, simple_other) {
 
   CodeGenerator c(4096, false);
   c.GetCodeGen().mov(rcx, rdi);
-  auto builder = StructFieldAccess<TestStruct>::GetStructMember("other");
+  auto builder = StructAccess<TestStruct>::GetStructMember("other");
   DType dtype;
   auto result = builder->BuildFieldAccess(c);
   ASSERT_TRUE(result.ok());
@@ -203,7 +203,7 @@ TEST(StructAccess, get_method) {
   CodeGenerator c(4096, false);
   auto this_val = c.NewValue(DATA_U64);
   this_val->Copy(&rdi);
-  auto builder = StructMethodAccess<TestMethodStruct>::GetStructMember("get_a");
+  auto builder = StructAccess<TestMethodStruct>::GetStructMember("get_a");
   auto result = builder->BuildFuncCall(c, *this_val, {});
   ASSERT_TRUE(result.ok());
 
@@ -222,12 +222,12 @@ TEST(StructAccess, set_method) {
   auto this_val = c.NewValue(DATA_U64);
   this_val->Copy(&rdi);
 
-  auto set_builder = StructMethodAccess<TestMethodStruct>::GetStructMember("set_a");
+  auto set_builder = StructAccess<TestMethodStruct>::GetStructMember("set_a");
   auto val = c.NewConstValue(DATA_I32, 3333);
   auto result = set_builder->BuildFuncCall(c, *this_val, {val});
   ASSERT_TRUE(result.ok());
 
-  auto get_builder = StructMethodAccess<TestMethodStruct>::GetStructMember("get_a");
+  auto get_builder = StructAccess<TestMethodStruct>::GetStructMember("get_a");
   result = get_builder->BuildFuncCall(c, *this_val, {});
   ASSERT_TRUE(result.ok());
   c.Finish();

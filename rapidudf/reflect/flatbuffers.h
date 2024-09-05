@@ -32,8 +32,6 @@
 #pragma once
 #include <type_traits>
 #include "flatbuffers/flatbuffers.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/meta/function.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/reflect/reflect.h"
 namespace rapidudf {
@@ -62,8 +60,8 @@ void try_register_fbs_vector_member_funcs() {
   using remove_ptr_t = std::remove_pointer_t<T>;
   using remove_cv_t = std::remove_cv_t<remove_ptr_t>;
   if constexpr (is_specialization<remove_cv_t, flatbuffers::Vector>::value) {
-    ReflectFactory::AddStructMethodAccessor("get", &FBSVectorHelper<remove_cv_t>::Get);
-    ReflectFactory::AddStructMethodAccessor("size", &FBSVectorHelper<remove_cv_t>::Size);
+    Reflect::AddStructMethodAccessor("get", &FBSVectorHelper<remove_cv_t>::Get);
+    Reflect::AddStructMethodAccessor("size", &FBSVectorHelper<remove_cv_t>::Size);
   }
 }
 }  // namespace rapidudf

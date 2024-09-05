@@ -39,9 +39,10 @@
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/value.h"
-#include "xbyak/xbyak.h"
 
 namespace rapidudf {
+template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename T>
+struct ReflectRegisterHelper {};
 
 struct StructMember {
   std::optional<FunctionDesc> member_func;
@@ -52,21 +53,6 @@ struct StructMember {
     field_name = name;
     member_field_dtype = dtype;
     member_field_offset = offset;
-  }
-  template <typename T, typename RET, typename... Args>
-  StructMember(const std::string& name, RET (T::*f)(Args...)) {
-    FunctionDesc desc;
-    desc.name = name;
-    desc.return_type = get_dtype<RET>();
-    auto this_dtype = get_dtype<T>();
-    this_dtype = this_dtype.ToPtr();
-    desc.arg_types.emplace_back(this_dtype);
-    (desc.arg_types.emplace_back(rapidudf::get_dtype<Args>()), ...);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpmf-conversions"
-    desc.func = reinterpret_cast<void*>(f);
-#pragma GCC diagnostic pop
-    member_func = desc;
   }
   StructMember(const FunctionDesc& f) { member_func = f; }
 
@@ -80,9 +66,8 @@ struct StructMember {
 using StructMemberMap = std::unordered_map<std::string, StructMember>;
 using GlobalStructMemberIndex = std::unordered_map<uint64_t, StructMemberMap>;
 
-class ReflectFactory {
+class Reflect {
  public:
-  static void Init();
   static std::optional<StructMember> GetStructMember(DType dtype, const std::string& name);
 
   static bool AddStructField(DType obj_dtype, const std::string& name, DType field_dtype, uint32_t field_offset);

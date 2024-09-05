@@ -35,6 +35,7 @@
 #include <vector>
 #include "rapidudf/ast/context.h"
 #include "rapidudf/codegen/builtin/builtin.h"
+#include "rapidudf/codegen/builtin/builtin_symbols.h"
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/optype.h"
@@ -101,7 +102,7 @@ absl::StatusOr<std::vector<VarTag>> FuncInvokeArgs::Validate(ParseContext& ctx) 
   return arg_dtypes;
 }
 absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, DType src_dtype) {
-  auto field_accessor = ReflectFactory::GetStructMember(src_dtype.PtrTo(), field);
+  auto field_accessor = Reflect::GetStructMember(src_dtype.PtrTo(), field);
   if (!field_accessor) {
     return ctx.GetErrorStatus(fmt::format("Can NOT get member:{} accessor for dtype:{}", field, src_dtype.PtrTo()));
   }

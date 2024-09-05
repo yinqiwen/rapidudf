@@ -33,12 +33,15 @@
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <string_view>
+#include "absl/strings/match.h"
 #include "rapidudf/codegen/builtin/builtin.h"
+#include "rapidudf/codegen/builtin/builtin_symbols.h"
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/optype.h"
 #include "rapidudf/codegen/simd/simd_ops.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/reflect/macros.h"
 #include "rapidudf/types/simd.h"
 #include "rapidudf/types/string_view.h"
 
@@ -90,19 +93,43 @@ StringView cast_stdstrview_to_string_view(std::string_view str) { return StringV
 
 template <OpToken op>
 static void register_simd_vector_string_cmp() {
-  simd::Vector<simd::Bit> (*simd_f0)(simd::Vector<StringView>, simd::Vector<StringView>, uint32_t) =
+  simd::Vector<Bit> (*simd_f0)(simd::Vector<StringView>, simd::Vector<StringView>, uint32_t) =
       simd::simd_vector_string_cmp<op>;
   std::string func_name =
       GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW).ToSimdVector());
   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f0);
 
-  simd::Vector<simd::Bit> (*simd_f1)(simd::Vector<StringView>, StringView, bool, uint32_t) =
+  simd::Vector<Bit> (*simd_f1)(simd::Vector<StringView>, StringView, bool, uint32_t) =
       simd::simd_vector_string_cmp_scalar<op>;
   func_name = GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW));
   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f1);
 }
 
+struct StringViewHelper {
+  static size_t size(StringView s) { return s.size(); }
+  static bool contains(StringView s, StringView part) {
+    return absl::StrContains(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool starts_with(StringView s, StringView part) {
+    return absl::StartsWith(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool ends_with(StringView s, StringView part) {
+    return absl::EndsWith(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool contains_ignore_case(StringView s, StringView part) {
+    return absl::StrContainsIgnoreCase(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool starts_with_ignore_case(StringView s, StringView part) {
+    return absl::StartsWith(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool ends_with_ignore_case(StringView s, StringView part) {
+    return absl::EndsWith(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+};
+
 void init_builtin_string_funcs() {
+  RUDF_STRUCT_HELPER_METHODS_BIND(StringViewHelper, size, contains, starts_with, ends_with, contains_ignore_case,
+                                  starts_with_ignore_case, ends_with_ignore_case)
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);

@@ -268,8 +268,7 @@ TEST(JitCompiler, vector_string_cmp) {
       return x > y;
     }
   )";
-  auto rc =
-      compiler.CompileFunction<simd::Vector<simd::Bit>, simd::Vector<StringView>, simd::Vector<StringView>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<Bit>, simd::Vector<StringView>, simd::Vector<StringView>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto result = f(simd_left, simd_right);

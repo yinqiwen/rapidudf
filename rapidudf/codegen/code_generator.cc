@@ -38,11 +38,9 @@
 #include <utility>
 #include <vector>
 
-#include "absl/cleanup/cleanup.h"
 #include "rapidudf/codegen/register.h"
 #include "xbyak/xbyak_util.h"
 
-#include "rapidudf/codegen/builtin/builtin.h"
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/value.h"

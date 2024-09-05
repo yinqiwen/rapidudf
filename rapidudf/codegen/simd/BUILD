@@ -10,13 +10,16 @@ package(
 
 cc_library(
     name = "simd_ops",
-    srcs = ["simd_ops.cc"],
+    srcs = [
+        "simd_ops.cc",
+    ],
     hdrs = [
         "simd_ops.h",
     ],
     copts = [
         "-march=westmere",
         "-maes",
+        "-ftree-vectorize",
     ],
     deps = [
         "//rapidudf/codegen:dtype",

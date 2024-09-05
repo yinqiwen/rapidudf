@@ -30,30 +30,37 @@
 */
 
 #include <gtest/gtest.h>
-#include <functional>
 #include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/codegen/dtype.h"
+
 #include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
+#include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
-
-TEST(JitCompiler, vector_size) {
-  spdlog::set_level(spdlog::level::debug);
-  std::vector<int> vec{1, 2, 3};
+TEST(JitCompiler, string_size) {
   JitCompiler compiler;
-  ParseContext ctx;
-  std::string content = R"(
-    int test_func(vector<i32> x){
-      return x.size();
-    }
-  )";
-  auto rc = compiler.CompileFunction<int, std::vector<int>&>(content);
+  std::string content = R"(str.size())";
+  auto rc = compiler.CompileExpression<size_t, StringView>(content, {"str"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(vec), vec.size());
+  ASSERT_EQ(f("hello"), 5);
+  ASSERT_EQ(f("he"), 2);
+}
+TEST(JitCompiler, string_contains) {
+  JitCompiler compiler;
+  std::string content = R"(str.contains("hello"))";
+  auto rc = compiler.CompileExpression<bool, StringView>(content, {"str"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f("hello"), true);
+  ASSERT_EQ(f("he"), false);
+}
+TEST(JitCompiler, string_starts_with) {
+  JitCompiler compiler;
+  std::string content = R"(str.starts_with("hello"))";
+  auto rc = compiler.CompileExpression<bool, StringView>(content, {"str"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f("hello"), true);
+  ASSERT_EQ(f("he"), false);
 }

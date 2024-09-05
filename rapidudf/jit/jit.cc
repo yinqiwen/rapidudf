@@ -54,7 +54,6 @@ JitCompiler::JitCompiler(size_t max_size, bool use_register) {
   max_code_size_ = max_size;
   use_registers_ = use_register;
   init_builtin();
-  ReflectFactory::Init();
   ast::Symbols::Init();
 }
 

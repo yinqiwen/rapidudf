@@ -32,7 +32,6 @@
 #pragma once
 #include <setjmp.h>
 #include <cstdint>
-#include <functional>
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/log/log.h"
 
@@ -289,7 +288,7 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
                                                                rapidudf::fnv1a_hash(name), decltype(func)>; \
     wrapper_t::GetFunc() = func;                                                                            \
     wrapper_t::GetFuncName() = name;                                                                        \
-    rapidudf::ReflectFactory::AddStructMethodAccessor(name, &wrapper_t::Call);                              \
+    rapidudf::Reflect::AddStructMethodAccessor(name, &wrapper_t::Call);                                     \
   } while (0)
 
 #define SAFE_MEMBER_FUNC_WRAPPER(name, func)                                                              \
@@ -298,7 +297,7 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
                                                              rapidudf::fnv1a_hash(name), decltype(func)>; \
     wrapper_t::GetFunc() = func;                                                                          \
     wrapper_t::GetFuncName() = name;                                                                      \
-    rapidudf::ReflectFactory::AddStructMethodAccessor(name, &wrapper_t::SafeCall);                        \
+    rapidudf::Reflect::AddStructMethodAccessor(name, &wrapper_t::SafeCall);                               \
   } while (0)
 
 #define SAFE_FUNC_WRAPPER(name, func)                                                                     \

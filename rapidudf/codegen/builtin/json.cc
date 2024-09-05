@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <string_view>
 #include "rapidudf/codegen/builtin/builtin.h"
+#include "rapidudf/codegen/builtin/builtin_symbols.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/optype.h"
 #include "rapidudf/log/log.h"

@@ -32,26 +32,16 @@
 #include <vector>
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/log/log.h"
-#include "rapidudf/reflect/stl_access.h"
+
 namespace rapidudf {
 using namespace Xbyak::util;
 
-static void init_reflect_builtin() {
-  static bool inited = false;
-  if (inited) {
-    return;
-  }
-  inited = true;
-  init_stl_reflect_access();
-}
-
 static GlobalStructMemberIndex& get_global_reflect_index() {
   static GlobalStructMemberIndex index;
-  init_reflect_builtin();
   return index;
 }
-void ReflectFactory::Init() { init_reflect_builtin(); }
-std::optional<StructMember> ReflectFactory::GetStructMember(DType dtype, const std::string& name) {
+
+std::optional<StructMember> Reflect::GetStructMember(DType dtype, const std::string& name) {
   auto found = get_global_reflect_index().find(dtype.Control());
   if (found == get_global_reflect_index().end()) {
     return {};
@@ -62,8 +52,7 @@ std::optional<StructMember> ReflectFactory::GetStructMember(DType dtype, const s
   }
   return iter->second;
 }
-bool ReflectFactory::AddStructField(DType obj_dtype, const std::string& name, DType field_dtype,
-                                    uint32_t field_offset) {
+bool Reflect::AddStructField(DType obj_dtype, const std::string& name, DType field_dtype, uint32_t field_offset) {
   auto [iter, success] =
       get_global_reflect_index()[obj_dtype.Control()].emplace(name, StructMember(name, field_dtype, field_offset));
   if (!success) {
@@ -77,7 +66,7 @@ bool ReflectFactory::AddStructField(DType obj_dtype, const std::string& name, DT
   }
   return success;
 }
-bool ReflectFactory::AddStructMethodAccessor(DType dtype, const std::string& name, const FunctionDesc& f) {
+bool Reflect::AddStructMethodAccessor(DType dtype, const std::string& name, const FunctionDesc& f) {
   auto [iter, success] = get_global_reflect_index()[dtype.Control()].emplace(name, StructMember(f));
   if (!success) {
     StructMember& entry = iter->second;

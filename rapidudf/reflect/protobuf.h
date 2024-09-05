@@ -30,9 +30,14 @@
 */
 
 #pragma once
+#include <boost/preprocessor/library.hpp>
+#include <boost/preprocessor/seq/for_each.hpp>
+#include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/variadic/to_seq.hpp>
 #include <type_traits>
 #include "google/protobuf/map.h"
-#include "rapidudf/meta/function.h"
+#include "google/protobuf/repeated_field.h"
+#include "google/protobuf/repeated_ptr_field.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/reflect/reflect.h"
 #include "rapidudf/types/string_view.h"
@@ -81,6 +86,42 @@ struct PBMapHelper {
   }
 };
 
+template <typename T>
+struct PBRepeatedPtrFieldHelper {
+  using return_type_t = typename PBGetterReturnType<T>::return_type;
+  static return_type_t Get(const ::google::protobuf::RepeatedPtrField<T>* pb_vec, int i) {
+    if (nullptr == pb_vec) {
+      return PBGetterReturnType<T>::default_value();
+    }
+    const auto& val = pb_vec->Get(i);
+    return PBGetterReturnType<T>::value(val);
+  }
+  static size_t Size(const ::google::protobuf::RepeatedPtrField<T>* pb_vec) {
+    if (nullptr == pb_vec) {
+      return 0;
+    }
+    return pb_vec->size();
+  }
+};
+
+template <typename T>
+struct PBRepeatedFieldHelper {
+  using return_type_t = typename PBGetterReturnType<T>::return_type;
+  static return_type_t Get(const ::google::protobuf::RepeatedField<T>* pb_vec, int i) {
+    if (nullptr == pb_vec) {
+      return PBGetterReturnType<T>::default_value();
+    }
+    const auto& val = pb_vec->Get(i);
+    return PBGetterReturnType<T>::value(val);
+  }
+  static size_t Size(const ::google::protobuf::RepeatedField<T>* pb_vec) {
+    if (nullptr == pb_vec) {
+      return 0;
+    }
+    return pb_vec->size();
+  }
+};
+
 template <typename V>
 struct PBMapHelper<std::string, V> {
   using return_type_t = typename PBGetterReturnType<V>::return_type;
@@ -102,19 +143,6 @@ struct PBMapHelper<std::string, V> {
   }
 };
 
-template <typename T>
-void try_register_pb_map_member_funcs() {
-  using remove_ptr_t = std::remove_pointer_t<T>;
-  using remove_reference_t = std::remove_reference_t<remove_ptr_t>;
-  using remove_cv_t = std::remove_cv_t<remove_reference_t>;
-  if constexpr (is_specialization<remove_cv_t, google::protobuf::Map>::value) {
-    using key_type = typename remove_cv_t::key_type;
-    using mapped_type = typename remove_cv_t::mapped_type;
-    ReflectFactory::AddStructMethodAccessor("get", &PBMapHelper<key_type, mapped_type>::Get);
-    ReflectFactory::AddStructMethodAccessor("size", &PBMapHelper<key_type, mapped_type>::Size);
-  }
-}
-
 template <uint64_t, uint32_t, uint64_t, typename F>
 struct PBSetStringHelper;
 
@@ -134,13 +162,62 @@ struct PBSetStringHelper<SOURCE, LINE, HASH, void (T::*)(std::string&&)> {
     (p->*func)(str.str());
   }
 };
+
+template <typename T>
+void try_register_pb_container_member_funcs(std::string_view member) {
+  using remove_ptr_t = std::remove_pointer_t<T>;
+  using remove_reference_t = std::remove_reference_t<remove_ptr_t>;
+  using remove_cv_t = std::remove_cv_t<remove_reference_t>;
+  if constexpr (is_specialization<remove_cv_t, google::protobuf::Map>::value) {
+    using key_type = typename remove_cv_t::key_type;
+    using mapped_type = typename remove_cv_t::mapped_type;
+    Reflect::AddStructMethodAccessor("get", &PBMapHelper<key_type, mapped_type>::Get);
+    Reflect::AddStructMethodAccessor("size", &PBMapHelper<key_type, mapped_type>::Size);
+  } else if constexpr (is_specialization<remove_cv_t, google::protobuf::RepeatedPtrField>::value) {
+    using value_type = typename remove_cv_t::value_type;
+    Reflect::AddStructMethodAccessor("get", &PBRepeatedPtrFieldHelper<value_type>::Get);
+    Reflect::AddStructMethodAccessor("size", &PBRepeatedPtrFieldHelper<value_type>::Size);
+  } else if constexpr (is_specialization<remove_cv_t, google::protobuf::RepeatedField>::value) {
+    using value_type = typename remove_cv_t::value_type;
+    Reflect::AddStructMethodAccessor("get", &PBRepeatedFieldHelper<value_type>::Get);
+    Reflect::AddStructMethodAccessor("size", &PBRepeatedFieldHelper<value_type>::Size);
+  }
+}
+
 }  // namespace rapidudf
 
-#define PB_SET_STRING_HELPER(name, func)                                                       \
-  do {                                                                                         \
-    using wrapper_t = rapidudf::PBSetStringHelper<rapidudf::fnv1a_hash(__FILE__), __LINE__,    \
-                                                  rapidudf::fnv1a_hash(name), decltype(func)>; \
-    wrapper_t::GetFunc() = func;                                                               \
-    wrapper_t::GetFuncName() = name;                                                           \
-    rapidudf::ReflectFactory::AddStructMethodAccessor(name, &wrapper_t::Call);                 \
-  } while (0)
+#define RUDF_PB_SET_STRING_HELPER(st, member)                                                                     \
+  static ::rapidudf::StructAccessHelperRegister<st> BOOST_PP_CAT(rudf_struct_method_access_, __COUNTER__)([]() {  \
+    using set_func_t = void (st::*)(std::string&&);                                                               \
+    set_func_t set_func = &st::BOOST_PP_CAT(set_, member);                                                        \
+    using wrapper_t =                                                                                             \
+        rapidudf::PBSetStringHelper<rapidudf::fnv1a_hash(__FILE__), __LINE__,                                     \
+                                    rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(member)), decltype(set_func)>;        \
+    wrapper_t::GetFunc() = set_func;                                                                              \
+    wrapper_t::GetFuncName() = BOOST_PP_STRINGIZE(BOOST_PP_CAT(set_, member));                                    \
+    rapidudf::Reflect::AddStructMethodAccessor(BOOST_PP_STRINGIZE(BOOST_PP_CAT(set_, member)), &wrapper_t::Call); \
+  });
+
+#define RUDF_PB_ADD_FIELD_ACCESS_CODE(r, TYPE, i, member)                                          \
+  {                                                                                                \
+    using func_return_t = decltype(((TYPE*)1)->member());                                          \
+    using getter_func_t = func_return_t (TYPE::*)() const;                                         \
+    getter_func_t func = &TYPE::member;                                                            \
+    MEMBER_FUNC_WRAPPER(BOOST_PP_STRINGIZE(member), func);                                         \
+    ::rapidudf::try_register_pb_container_member_funcs<func_return_t>(BOOST_PP_STRINGIZE(member)); \
+  }
+
+#define RUDF_PB_FIELDS(st, ...)                                                                                  \
+  namespace rapidudf {                                                                                           \
+  template <>                                                                                                    \
+  struct ReflectRegisterHelper<rapidudf::fnv1a_hash(__FILE__), __LINE__, 0, st> {                                \
+    template <typename T = void>                                                                                 \
+    static void Init() {                                                                                         \
+      BOOST_PP_SEQ_FOR_EACH_I(RUDF_PB_ADD_FIELD_ACCESS_CODE, st, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))          \
+      ::rapidudf::DTypeFactory::Add<st>();                                                                       \
+    }                                                                                                            \
+  };                                                                                                             \
+  static ::rapidudf::StructAccessHelperRegister<st> BOOST_PP_CAT(rudf_struct_method_access_, __COUNTER__)([]() { \
+    ReflectRegisterHelper<rapidudf::fnv1a_hash(__FILE__), __LINE__, 0, st>::Init<void>();                        \
+  });                                                                                                            \
+  }

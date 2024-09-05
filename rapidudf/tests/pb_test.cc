@@ -30,26 +30,19 @@
 */
 
 #include <gtest/gtest.h>
-#include <functional>
-#include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/codegen/dtype.h"
 #include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/meta/function.h"
+#include "rapidudf/reflect/macros.h"
 #include "rapidudf/reflect/protobuf.h"
-#include "rapidudf/reflect/reflect.h"
-#include "rapidudf/reflect/struct_access.h"
 #include "rapidudf/tests/test_pb.pb.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
 
-RUDF_STRUCT_MEMBER_METHODS(::test::Item, id)
-RUDF_STRUCT_MEMBER_METHODS(::test::Header, id, scene, set_id, item_map, mapping)
+// RUDF_STRUCT_MEMBER_METHODS(::test::Item, id)
+RUDF_PB_FIELDS(::test::Header, id, scene, items, item_map, mapping, items_size)
+RUDF_PB_FIELDS(::test::Item, id)
 
-using TTT = void (test::Header::*)(const std::string&);
+RUDF_STRUCT_MEMBER_METHODS(::test::Header, set_id)
 
 TEST(JitCompiler, pb_access_read_int) {
   spdlog::set_level(spdlog::level::debug);
@@ -112,6 +105,11 @@ TEST(JitCompiler, pb_access_write_int) {
   ASSERT_EQ(pb_header.id(), 1024);
 }
 
+struct A {
+  template <typename T = int>
+  A(T n = {}) {}
+};
+
 TEST(JitCompiler, pb_read_repetead) {
   spdlog::set_level(spdlog::level::debug);
   ::test::Header pb_header;
@@ -121,15 +119,24 @@ TEST(JitCompiler, pb_read_repetead) {
   pb_header.add_items()->set_id(10001);
   // pb_header.mutable_item_map()->insert(1);
 
+  // using mytype_t = decltype(((::test::Header*)0)->items());
+  // RUDF_INFO("##########{}", DType::Demangle(typeid(mytype_t).name()));
+  // using getter_func_t = const mytype_t&(::test::Header*)() const;
+  // getter_func_t func = &(TYPE::member);
   // the only way to bind overload member func
-  using GetItemsFunc = const ::test::Item& (::test::Header::*)(int) const;
-  GetItemsFunc get_func = &::test::Header::items;
-  MEMBER_FUNC_WRAPPER("items", get_func);
+  // using GetItemsFunc = const ::test::Item& (::test::Header::*)(int) const;
+  // GetItemsFunc get_func = &::test::Header::items;
+
+  // using func_return_t = decltype(((::test::Header*)0)->items());
+  // using getter_func_t = func_return_t (::test::Header::*)() const;
+  // getter_func_t xf = &::test::Header::items;
+
+  // MEMBER_FUNC_WRAPPER("items", get_func);
 
   JitCompiler compiler;
   std::string content = R"(
     int test_func(test::Header x){
-      return x.items(0).id();
+      return x.items().get(0).id();
     }
    )";
   auto rc = compiler.CompileFunction<int, test::Header*>(content);
@@ -148,9 +155,9 @@ TEST(JitCompiler, pb_write_string) {
   // pb_header.mutable_item_map()->insert(1);
 
   // the only way to bind overload member func
-  using SetFunc = void (::test::Header::*)(std::string&&);
-  SetFunc set_func = &::test::Header::set_scene;
-  PB_SET_STRING_HELPER("set_scene", set_func);
+  // using SetFunc = void (::test::Header::*)(std::string&&);
+  // SetFunc set_func = &::test::Header::set_scene;
+  RUDF_PB_SET_STRING_HELPER(::test::Header, scene);
 
   JitCompiler compiler;
   std::string content = R"(

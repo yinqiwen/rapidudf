@@ -30,7 +30,7 @@
 */
 
 #pragma once
-
-namespace rapidudf {
-void init_stl_reflect_access();
-}
+#include "rapidudf/reflect/flatbuffers.h"
+#include "rapidudf/reflect/protobuf.h"
+#include "rapidudf/reflect/stl.h"
+#include "rapidudf/reflect/struct.h"

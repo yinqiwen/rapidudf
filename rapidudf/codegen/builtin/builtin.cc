@@ -30,16 +30,16 @@
 */
 #include "rapidudf/codegen/builtin/builtin.h"
 #include <mutex>
-#include "flatbuffers/flatbuffers.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/simd/simd_ops.h"
+
 namespace rapidudf {
 static std::once_flag g_init_builtin_flag;
 void init_builtin() {
   std::call_once(g_init_builtin_flag, []() {
+    init_builtin_stl_funcs();
     init_builtin_math_funcs();
     init_builtin_string_funcs();
     init_builtin_json_funcs();
+    init_builtin_simd_vector_funcs();
   });
 }
 }  // namespace rapidudf

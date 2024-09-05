@@ -30,64 +30,18 @@
 */
 
 #pragma once
-#include <cstdint>
-#include <string>
+
 #include <string_view>
-#include <utility>
-
 namespace rapidudf {
-
-// static void func(std::string&& s) {}
-
-// void test() {
-//   std::string_view ss;
-
-//   func(std::string(ss));
-// }
-
-// template <uint64_t, uint32_t, typename TARG, typename F>
-// struct MemberFunctionWrapper;
-
-// template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
-// struct MemberFunctionWrapper<H, N, R (T::*)(Args...)> {
-//   using return_type = R;
-//   using func_t = R (T::*)(Args...);
-//   static std::string& GetFuncName() {
-//     static std::string func_name;
-//     return func_name;
-//   }
-//   static func_t& GetFunc() {
-//     static func_t func = nullptr;
-//     return func;
-//   }
-//   static R Call(T* p, Args... args) {
-//     auto func = GetFunc();
-//     if constexpr (std::is_same_v<void, R>) {
-//       (p->*func)(std::forward<Args>(args)...);
-//     } else {
-//       return (p->*func)(std::forward<Args>(args)...);
-//     }
-//   }
-// };
-// template <uint64_t H, uint32_t N, typename T, typename R, typename... Args>
-// struct MemberFunctionWrapper<H, N, R (T::*)(Args...) const> {
-//   using return_type = R;
-//   using func_t = R (T::*)(Args...) const;
-//   static std::string& GetFuncName() {
-//     static std::string func_name;
-//     return func_name;
-//   }
-//   static func_t& GetFunc() {
-//     static func_t func = nullptr;
-//     return func;
-//   }
-//   static R Call(const T* p, Args... args) {
-//     auto func = GetFunc();
-//     if constexpr (std::is_same_v<void, R>) {
-//       (p->*func)(std::forward<Args>(args)...);
-//     } else {
-//       return (p->*func)(std::forward<Args>(args)...);
-//     }
-//   }
-// };
+static constexpr std::string_view kBuiltinStringViewCmp = "rapidudf_compare_string_view";
+static constexpr std::string_view kBuiltinCastStdStrToStringView = "rapidudf_cast_fbsstr_to_string_view";
+static constexpr std::string_view kBuiltinCastFbsStrToStringView = "rapidudf_cast_stdstr_to_string_view";
+static constexpr std::string_view kBuiltinCastStdStrViewToStringView = "rapidudf_cast_stdstrview_to_string_view";
+static constexpr std::string_view kBuiltinJsonMemberGet = "rapidudf_json_member_get";
+static constexpr std::string_view kBuiltinJsonArrayGet = "rapidudf_json_array_get";
+static constexpr std::string_view kBuiltinJsonCmpString = "rapidudf_json_cmp_string";
+static constexpr std::string_view kBuiltinJsonCmpInt = "rapidudf_json_cmp_int";
+static constexpr std::string_view kBuiltinJsonCmpFloat = "rapidudf_json_cmp_float";
+static constexpr std::string_view kBuiltinJsonCmpBool = "rapidudf_json_cmp_bool";
+static constexpr std::string_view kBuiltinJsonCmpJson = "rapidudf_json_cmp_json";
 }  // namespace rapidudf

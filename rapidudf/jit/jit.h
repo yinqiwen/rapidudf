@@ -76,7 +76,7 @@ class JitFunction {
 
   const std::string& GetName() const { return name_; }
 
-  void SetRethrowException(bool v = true) { rethrow_ = v; }
+  void SetRethrowException(bool v) { rethrow_ = v; }
   void SetUnsafe(bool v = true) { unsafe_ = v; }
 
   RET UnsafeCall(Args... args) {
@@ -141,7 +141,7 @@ class JitFunction {
   std::vector<std::unique_ptr<std::string>> const_strings_;
   RET (*f_)(Args...) = nullptr;
   bool unsafe_ = false;
-  bool rethrow_ = false;
+  bool rethrow_ = true;
   bool reset_arena_ = false;
   friend class JitCompiler;
 };

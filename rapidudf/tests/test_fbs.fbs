@@ -9,5 +9,8 @@ table Header {
   scene:string;
   tags:[string];
   items:[Item];
+  ints:[uint];
+  strs:[string];
+  item:Item;
 }
 root_type Header;

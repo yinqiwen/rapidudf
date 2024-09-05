@@ -32,13 +32,11 @@
 
 #include <atomic>
 #include <memory>
-#include <type_traits>
 #include <vector>
 #include "rapidudf/codegen/ops/arithmetic_ops.h"
 #include "rapidudf/codegen/optype.h"
-#include "xbyak/xbyak_util.h"
 
-#include "rapidudf/codegen/builtin/builtin.h"
+#include "rapidudf/codegen/builtin/builtin_symbols.h"
 #include "rapidudf/codegen/code_generator.h"
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/ops/cast.h"
