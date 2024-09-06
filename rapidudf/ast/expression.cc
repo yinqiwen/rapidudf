@@ -188,15 +188,15 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         can_binary_op = true;
         break;
       }
+      if (left_var.dtype.IsVoid() && !left_var.name.empty() && op == OP_ASSIGN) {
+        can_binary_op = true;
+        break;
+      }
       if (IsValidSimdVectorBinaryOperands(left_var.dtype, right_result->dtype)) {
         can_binary_op = true;
         break;
       }
 
-      if (left_var.dtype.IsVoid() && !left_var.name.empty() && op == OP_ASSIGN) {
-        can_binary_op = true;
-        break;
-      }
       if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsPrimitive()) {
         can_binary_op = true;
         break;

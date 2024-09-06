@@ -56,6 +56,7 @@ JitCompiler::JitCompiler(size_t max_size, bool use_register) {
   use_registers_ = use_register;
   init_builtin();
   ast::Symbols::Init();
+  RUDF_DEBUG("JitCompiler use_registers:{},max_code_size:{}", use_registers_, max_code_size_);
 }
 
 void JitCompiler::AddCompileContex(const ast::Function& func_ast) {
@@ -105,7 +106,6 @@ absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::s
     }
     func_names.emplace_back(compile_ctxs_[i].desc.name);
   }
-  absl::Cleanup _done([this]() { compile_ctxs_.clear(); });
   return func_names;
 }
 

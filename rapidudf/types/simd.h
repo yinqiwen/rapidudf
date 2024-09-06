@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "rapidudf/types/bit.h"
-#include "rapidudf/types/string_view.h"
 namespace rapidudf {
 namespace simd {
 
@@ -53,13 +52,29 @@ class Vector;
 
 class VectorData {
  public:
-  VectorData(const void* data = nullptr, size_t size = 0) : data_(data), size_(size) {}
-  size_t Size() const { return size_; }
-  const void* Data() const { return data_; }
+  VectorData(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
+      : temporary_(0), size_(size), reserved_(0), bytes_capacity_(bytes_capacity), data_(data) {}
+  inline size_t Size() const { return size_; }
+  inline size_t BytesCapacity() const { return bytes_capacity_; };
+  inline const void* Data() const { return data_; }
+  inline void SetTemporary(bool v) { temporary_ = v ? 1 : 0; }
+  inline bool IsTemporary() const { return temporary_; };
+
+  template <typename T>
+  T* MutableData() {
+    return reinterpret_cast<T*>(const_cast<void*>(data_));
+  }
 
  private:
+  union {
+    struct {
+      uint64_t temporary_ : 1;
+      uint64_t size_ : 31;  // corresponds to logical address
+      uint64_t reserved_ : 1;
+      uint64_t bytes_capacity_ : 31;
+    };
+  };
   const void* data_ = nullptr;
-  size_t size_;
 };
 
 template <typename T>
@@ -67,16 +82,22 @@ class Vector {
  public:
   using value_type = T;
   Vector() {}
-  Vector(const T* data, size_t size) {
-    VectorData vdata(data, size);
+  Vector(const T* data, size_t size, size_t capacity = 0) {
+    if (capacity == 0) {
+      capacity = size;
+    }
+    VectorData vdata(data, size, capacity * sizeof(T));
     vec_data_ = vdata;
   }
   Vector(VectorData vdata) { vec_data_ = vdata; }
   Vector(const std::vector<T>& vec) {
-    VectorData vdata(vec.data(), vec.size());
+    VectorData vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
     vec_data_ = vdata;
   }
+  VectorData RawData() { return vec_data_; }
+  bool IsTemporary() const { return vec_data_.IsTemporary(); }
   size_t Size() const { return vec_data_.Size(); }
+  size_t BytesCapacity() const { return vec_data_.BytesCapacity(); }
   auto Data() const {
     if constexpr (std::is_same_v<Bit, T>) {
       return reinterpret_cast<const uint8_t*>(vec_data_.Data());

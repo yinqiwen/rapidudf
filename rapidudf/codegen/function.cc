@@ -236,16 +236,9 @@ std::vector<const Xbyak::Reg*> GetUnuseFuncArgsRegisters(const std::vector<FuncA
 }
 
 bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
-  if (is_simd_vector_func) {
-    if (arg_types.size() != (ts.size() + 1)) {
-      return false;
-    }
-  } else {
-    if (arg_types.size() != ts.size()) {
-      return false;
-    }
+  if (arg_types.size() != ts.size()) {
+    return false;
   }
-
   for (size_t i = 0; i < ts.size(); i++) {
     if (!ts[i].CanCastTo(arg_types[i])) {
       return false;

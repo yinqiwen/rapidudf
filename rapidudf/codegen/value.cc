@@ -39,6 +39,7 @@
 #include "rapidudf/codegen/builtin/builtin_symbols.h"
 #include "rapidudf/codegen/code_generator.h"
 #include "rapidudf/codegen/dtype.h"
+#include "rapidudf/codegen/ops/bits_ops.h"
 #include "rapidudf/codegen/ops/cast.h"
 #include "rapidudf/codegen/ops/cmp.h"
 #include "rapidudf/codegen/ops/copy.h"
@@ -470,21 +471,29 @@ ValuePtr Value::CastTo(DType dtype) {
   if (dtype_ == dtype) {
     return SelfPtr();
   }
-  if (IsTemp() || IsConst()) {
-    int rc = CastToInplace(dtype);
+  if (!dtype_.IsVoid()) {
+    if (IsTemp() || IsConst()) {
+      int rc = CastToInplace(dtype);
+      if (rc == 0) {
+        return SelfPtr();
+      }
+    }
+  }
+
+  ValuePtr tmp;
+  // no need to copy&cast when dtype is void
+  if (!dtype_.IsVoid()) {
+    tmp = c_->NewValue(dtype_, {}, true);
+    int rc = tmp->Copy(*this);
     if (rc != 0) {
       return {};
     }
-    return SelfPtr();
-  }
-  auto tmp = c_->NewValue(dtype_, {}, true);
-  int rc = tmp->Copy(*this);
-  if (rc != 0) {
-    return {};
-  }
-  rc = tmp->CastToInplace(dtype);
-  if (rc != 0) {
-    return {};
+    rc = tmp->CastToInplace(dtype);
+    if (rc != 0) {
+      return {};
+    }
+  } else {
+    tmp = c_->NewValue(dtype, {}, true);
   }
   return tmp;
 }
@@ -763,6 +772,27 @@ int Value::DoSetStringView(StringView str) {
   }
   uint64_t* data = reinterpret_cast<uint64_t*>(&str);
   return DoSetValue(std::vector<uint64_t>{data[0], data[1]});
+}
+
+int Value::SetSimdVectorTemporary(bool v) {
+  if (!dtype_.IsSimdVector()) {
+    RUDF_ERROR("Invalid dtype:{} to set simd_vector temporary", dtype_);
+    return -1;
+  }
+  if (IsConst()) {
+    RUDF_ERROR("Can NOT set simd_vector temporary on const value.");
+    return -1;
+  } else if (IsRegister() || IsStack()) {
+    int rc = 0;
+    if (v) {
+      rc = bits_set(c_->GetCodeGen(), GetOperand(), 0);
+    } else {
+      rc = bits_clear(c_->GetCodeGen(), GetOperand(), 0);
+    }
+    return rc;
+  }
+  RUDF_ERROR("Can NOT set simd_vector temporary on invalid value.");
+  return -1;
 }
 
 }  // namespace rapidudf

@@ -83,6 +83,7 @@ class Value : public std::enable_shared_from_this<Value> {
   void SetVarName(const std::string& name) { var_name_ = name; }
   uint64_t Id() const { return uniq_id_; }
   bool IsTemp() const { return temp_; }
+  void SetTemp(bool v) { temp_ = v; }
   const Xbyak::Address& GetStackAddress(size_t i = 0) const;
   uint64_t GetConstBin(size_t i = 0) const { return const_values_[i]; }
   const Xbyak::Reg& GetRegister(size_t i = 0) const { return *registers_[i]; }
@@ -106,6 +107,8 @@ class Value : public std::enable_shared_from_this<Value> {
   int UnaryOp(OpToken op, ValuePtr result);
   int Write(const Value& other);
   // int VectorGet(uint32_t idx, ValuePtr result);
+
+  int SetSimdVectorTemporary(bool v);
 
   int Copy(const Xbyak::Reg* reg) {
     auto other = New(c_, dtype_, reg);

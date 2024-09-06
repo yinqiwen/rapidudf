@@ -161,7 +161,8 @@ class JitCompiler {
     auto return_type = get_dtype<RET>();
     std::vector<DType> arg_types;
     (arg_types.emplace_back(get_dtype<Args>()), ...);
-    for (auto& ctx : compile_ctxs_) {
+    for (size_t i = 0; i < compile_ctxs_.size(); i++) {
+      auto& ctx = compile_ctxs_[i];
       if (ctx.desc.name == name) {
         if (!ctx.code_gen) {
           RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("Func:{} already loaded before.", name)));
@@ -172,8 +173,10 @@ class JitCompiler {
           return absl::InvalidArgumentError(err);
         }
 
-        return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
-                                         ctx.has_simd_vector_operations);
+        auto func = JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
+                                              ctx.has_simd_vector_operations);
+        compile_ctxs_.erase(compile_ctxs_.begin() + i);
+        return func;
       }
     }
     return absl::NotFoundError(fmt::format("No function:{} found in compuled functions.", name));

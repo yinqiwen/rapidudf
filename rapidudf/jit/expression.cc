@@ -74,18 +74,18 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name, std:
   if (nullptr == func_desc) {
     RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("No func:{} found", name)));
   }
-  uint32_t simd_vector_reuse_flag = 0;
+  // uint32_t simd_vector_reuse_flag = 0;
   for (size_t i = 0; i < arg_values.size(); i++) {
     if (arg_values[i]->GetDType() != func_desc->arg_types[i]) {
       arg_values[i] = arg_values[i]->CastTo(func_desc->arg_types[i]);
     }
-    if (simd_vector_reuse_flag == 0 && arg_values[i]->IsTemp() && arg_values[i]->GetDType().IsSimdVector()) {
-      simd_vector_reuse_flag = i + 1;
-    }
+    // if (simd_vector_reuse_flag == 0 && arg_values[i]->IsTemp() && arg_values[i]->GetDType().IsSimdVector()) {
+    //   simd_vector_reuse_flag = i + 1;
+    // }
   }
-  if (func_desc->is_simd_vector_func) {
-    arg_values.emplace_back(GetCodeGenerator().NewConstValue(DATA_U32, simd_vector_reuse_flag));
-  }
+  // if (func_desc->is_simd_vector_func) {
+  //   arg_values.emplace_back(GetCodeGenerator().NewConstValue(DATA_U32, simd_vector_reuse_flag));
+  // }
   ValuePtr result = GetCodeGenerator().CallFunction(*func_desc, arg_values);
   if (result) {
     for (auto& arg : arg_values) {
@@ -153,21 +153,49 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
         if (left->GetVarName().empty()) {
           RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Can NOT assgin value to non var value.")));
         }
-        // auto right_val = right->CastTo(left->GetDType());
+        bool need_copy = true;
+        if (left->GetDType().IsVoid()) {
+          if (right->IsTemp()) {
+            left->Swap(*right);
+            left->SetTemp(false);
+            need_copy = false;
+          } else {
+            auto new_left = left->CastTo(right->GetDType());
+            if (!new_left) {
+              RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Can NOT assgin value since cast failed.")));
+            }
+            if (left.get() != new_left.get()) {
+              new_left->SetVarName(left->GetVarName());
+              new_left->SetTemp(false);
+              // GetCompileContext().local_vars[left->GetVarName()] = new_left;
+              GetCodeGenerator().DropTmpValue(left);
+              GetCompileContext().local_vars[new_left->GetVarName()] = new_left;
+            }
+            left = new_left;
+          }
 
-        int rc = left->CastToInplace(right->GetDType());
-        if (0 != rc) {
-          RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
-              fmt::format("Can NOT do op:{} cast with left:{}, right:{}", op, left->GetDType(), right->GetDType())));
+        } else {
+          int rc = left->CastToInplace(right->GetDType());
+          if (0 != rc) {
+            RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+                fmt::format("Can NOT do op:{} cast with left:{}, right:{}", op, left->GetDType(), right->GetDType())));
+          }
         }
-        rc = left->Copy(*right);
-        if (0 != rc) {
-          RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
-              fmt::format("Can NOT do oassign with left:{}, right:{}", left->GetDType(), right->GetDType())));
+        if (need_copy) {
+          int rc = left->Copy(*right);
+          if (0 != rc) {
+            RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+                fmt::format("Can NOT do assign with left:{}, right:{}", left->GetDType(), right->GetDType())));
+          }
+        }
+
+        if (left->GetDType().IsSimdVector()) {
+          int rc = left->SetSimdVectorTemporary(false);
+          if (0 != rc) {
+            RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Can NOT clear temporary flag")));
+          }
         }
         GetCodeGenerator().DropTmpValue(right);
-        // GetCodeGenerator().DropTmpValue(right_val);
-        // return left;
         break;
       }
       case OP_EQUAL:

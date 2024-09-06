@@ -75,6 +75,7 @@ cc_library(
         ":register",
         "//rapidudf/codegen/builtin:builtin_symbols",
         "//rapidudf/codegen/ops:arithmetic_ops",
+        "//rapidudf/codegen/ops:bits_ops",
         "//rapidudf/codegen/ops:cast",
         "//rapidudf/codegen/ops:cmp",
         "//rapidudf/codegen/ops:copy",

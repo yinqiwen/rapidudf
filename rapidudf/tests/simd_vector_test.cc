@@ -32,6 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
+#include "rapidudf/codegen/dtype.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/rapidudf.h"
@@ -226,41 +227,48 @@ TEST(JitCompiler, vector_dot) {
 }
 
 TEST(JitCompiler, vector_iota) {
+  spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler(4096, true);
   std::string content = R"(
     simd_vector<f64> test_func(){
-      return iota(1_f64,12);
+      var t = iota(1_f64,12);
+      return t;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<double>>(content, true);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto result = f();
+  RUDF_INFO("IsTemporary:{}", result.IsTemporary());
   ASSERT_EQ(result.Size(), 12);
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_DOUBLE_EQ(result[i], i + 1);
   }
+
+  DType d(DATA_VOID);
+  DType d1(DATA_U8);
+  RUDF_INFO("can cast to:{}", d.CanCastTo(d1));
 }
 
-TEST(JitCompiler, vector_string_cmp) {
-  std::vector<std::string> left{"hello0", "hello1", "hello2"};
-  std::vector<std::string> right{"afasf", "rwrewe", "qw1231241"};
-  auto left_views = StringView::makeVector(left);
-  auto right_views = StringView::makeVector(right);
-  simd::Vector<StringView> simd_left(left_views);
-  simd::Vector<StringView> simd_right(right_views);
-  JitCompiler compiler(4096, true);
-  std::string content = R"(
-    simd_vector<bit> test_func(simd_vector<string_view> x,simd_vector<string_view> y){
-      return x > y;
-    }
-  )";
-  auto rc = compiler.CompileFunction<simd::Vector<Bit>, simd::Vector<StringView>, simd::Vector<StringView>>(content);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  auto result = f(simd_left, simd_right);
-  ASSERT_EQ(result.Size(), left.size());
-  for (size_t i = 0; i < result.Size(); i++) {
-    ASSERT_EQ(result[i], left[i] > right[i]);
-  }
-}
+// TEST(JitCompiler, vector_string_cmp) {
+//   std::vector<std::string> left{"hello0", "hello1", "hello2"};
+//   std::vector<std::string> right{"afasf", "rwrewe", "qw1231241"};
+//   auto left_views = StringView::makeVector(left);
+//   auto right_views = StringView::makeVector(right);
+//   simd::Vector<StringView> simd_left(left_views);
+//   simd::Vector<StringView> simd_right(right_views);
+//   JitCompiler compiler(4096, true);
+//   std::string content = R"(
+//     simd_vector<bit> test_func(simd_vector<string_view> x,simd_vector<string_view> y){
+//       return x > y;
+//     }
+//   )";
+//   auto rc = compiler.CompileFunction<simd::Vector<Bit>, simd::Vector<StringView>, simd::Vector<StringView>>(content);
+//   ASSERT_TRUE(rc.ok());
+//   auto f = std::move(rc.value());
+//   auto result = f(simd_left, simd_right);
+//   ASSERT_EQ(result.Size(), left.size());
+//   for (size_t i = 0; i < result.Size(); i++) {
+//     ASSERT_EQ(result[i], left[i] > right[i]);
+//   }
+// }

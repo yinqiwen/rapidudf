@@ -36,6 +36,19 @@ cc_library(
 )
 
 cc_library(
+    name = "bits_ops",
+    srcs = ["bits_ops.cc"],
+    hdrs = [
+        "bits_ops.h",
+    ],
+    deps = [
+        "//rapidudf/codegen:dtype",
+        "//rapidudf/log",
+        "@com_github_xbyak//:xbyak",
+    ],
+)
+
+cc_library(
     name = "cmp",
     srcs = ["cmp.cc"],
     hdrs = [

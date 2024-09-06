@@ -43,6 +43,7 @@ absl::Status JitCompiler::CompileStatement(const ast::ReturnStatement& statement
       return val_result.status();
     }
     auto val = val_result.value();
+
     auto ret_val = val->CastTo(GetCompileContext().desc.return_type);
     if (!ret_val) {
       RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format(

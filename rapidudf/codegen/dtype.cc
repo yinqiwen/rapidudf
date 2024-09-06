@@ -160,6 +160,9 @@ bool DType::CanCastTo(DType other) const {
   if (*this == other) {
     return true;
   }
+  if (IsVoid()) {
+    return true;
+  }
   if (IsNumber() && other.IsNumber()) {
     return true;
   }

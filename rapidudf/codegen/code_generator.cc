@@ -79,8 +79,8 @@ int CodeGenerator::Finish() {
 CodeGenerator::~CodeGenerator() {}
 
 int CodeGenerator::ReturnValue(ValuePtr val) {
-  RUDF_DEBUG("return  dtype:{},bits:{} with value register:{}, stack:{}, const:{}", val->GetDType(),
-             val->GetDType().Bits(), val->IsRegister(), val->IsStack(), val->IsConst());
+  RUDF_INFO("return  dtype:{},bits:{} with value register:{}, stack:{}, const:{}", val->GetDType(),
+            val->GetDType().Bits(), val->IsRegister(), val->IsStack(), val->IsConst());
   if (val->GetDType().IsFloat()) {
     val->Mov(xmm0);
   } else {
@@ -223,6 +223,7 @@ void CodeGenerator::RestoreCalleeSavedRegisters() {
 }
 
 const Xbyak::Reg* CodeGenerator::AllocateRegister(const std::vector<RegisterId>& exclude_regs) {
+  RUDF_DEBUG("Before allocate register, free registers:{}", free_registers_.size());
   if (free_registers_.empty()) {
     return nullptr;
   }
@@ -260,12 +261,15 @@ const Xbyak::Reg* CodeGenerator::AllocateRegister(const std::vector<RegisterId>&
       SaveRegister(allocated_reg);
     }
   }
+  RUDF_DEBUG("Allocate register:{}", allocated_reg->toString());
   return allocated_reg;
 }
 
 void CodeGenerator::RecycleRegister(const Xbyak::Reg* reg) {
   if (reg != nullptr) {
-    if (1 == inuse_registers_.erase(reg)) {
+    auto n = inuse_registers_.erase(reg);
+    RUDF_DEBUG("Recycle reg:{}, inuse:{}", reg->toString(), n);
+    if (n == 1) {
       free_registers_.emplace_back(reg);
     }
   }
@@ -328,9 +332,18 @@ ValuePtr CodeGenerator::AllocateValue(DType dtype, uint32_t len, const std::vect
       }
     }
     case 16: {
-      auto [stack_offset, stack_len] = AllocateStack(dtype, len);
-      auto value = Value::New(this, dtype, stack_offset, stack_len, temp);
-      return value;
+      const Xbyak::Reg* reg0 = with_register ? AllocateRegister(exlucde_regs) : nullptr;
+      const Xbyak::Reg* reg1 = with_register ? AllocateRegister(exlucde_regs) : nullptr;
+      if (reg0 != nullptr && reg1 != nullptr) {
+        auto value = Value::New(this, dtype, {reg0, reg1}, temp);
+        return value;
+      } else {
+        RecycleRegister(reg0);
+        RecycleRegister(reg1);
+        auto [stack_offset, stack_len] = AllocateStack(dtype, len);
+        auto value = Value::New(this, dtype, stack_offset, stack_len, temp);
+        return value;
+      }
     }
     default: {
       RUDF_ERROR("Can NOT allocate value with len:{} for dtype:{}", len, dtype);
@@ -353,8 +366,12 @@ ValuePtr CodeGenerator::NewConstValue(DType dtype, uint64_t val) {
 }
 
 ValuePtr CodeGenerator::NewValue(DType dtype, const std::vector<RegisterId>& exlucde_regs, bool temp) {
-  auto val = AllocateValue(dtype, dtype.ByteSize(), exlucde_regs, true, temp);
-  return val;
+  if (dtype.IsVoid()) {
+    return NewConstValue(dtype, 0);
+  } else {
+    auto val = AllocateValue(dtype, dtype.ByteSize(), exlucde_regs, true, temp);
+    return val;
+  }
 }
 
 ValuePtr CodeGenerator::CallFunction(const FunctionDesc& desc, const std::vector<const Value*>& args) {

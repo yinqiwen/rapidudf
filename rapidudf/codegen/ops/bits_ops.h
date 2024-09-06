@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -29,51 +29,10 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "rapidudf/jit/jit.h"
-#include <gtest/gtest.h>
-
-using namespace rapidudf;
-TEST(JitCompiler, simple) {
-  JitCompiler compiler;
-  std::string content = R"(
-    int test_func(){ 
-      var x = -7;
-      var y = 4;
-      var d = x%y;
-      return d;
-    }
-  )";
-
-  auto rc = compiler.CompileFunction<int>(content, true);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_DOUBLE_EQ(f(), -3);
-}
-
-TEST(JitCompiler, str) {
-  JitCompiler compiler;
-  std::string content = R"(
-    string_view test_func(){
-     return "hello,world";
-    }
-  )";
-
-  auto rc = compiler.CompileFunction<StringView>(content, true);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_EQ(f(), "hello,world");
-}
-
-TEST(JitCompiler, bool_test) {
-  JitCompiler compiler;
-  std::string content = R"(
-    bool test_func(){
-     return !(2>=5);
-    }
-  )";
-
-  auto rc = compiler.CompileFunction<bool>(content, true);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_EQ(f(), true);
-}
+#pragma once
+#include "rapidudf/codegen/dtype.h"
+#include "xbyak/xbyak.h"
+namespace rapidudf {
+int bits_set(Xbyak::CodeGenerator& c, const Xbyak::Operand& val, uint8_t n);
+int bits_clear(Xbyak::CodeGenerator& c, const Xbyak::Operand& val, uint8_t n);
+}  // namespace rapidudf
