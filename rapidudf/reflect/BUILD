@@ -18,6 +18,7 @@ cc_library(
         "macros.h",
         "protobuf.h",
         "reflect.h",
+        "simd_vector.h",
         "stl.h",
         "struct.h",
     ],

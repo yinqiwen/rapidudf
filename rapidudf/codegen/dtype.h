@@ -323,11 +323,15 @@ DType get_dtype() {
     v.SetCollectionType(COLLECTION_VECTOR);
     return v;
   }
-  if constexpr (is_specialization<T, std::set>::value) {
+  if constexpr (is_specialization<T, std::set>::value || is_specialization<T, std::unordered_set>::value) {
     using val_type = typename T::value_type;
     RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
     auto v = get_dtype<typename T::value_type>();
-    v.SetCollectionType(COLLECTION_SET);
+    if constexpr (is_specialization<T, std::set>::value) {
+      v.SetCollectionType(COLLECTION_SET);
+    } else {
+      v.SetCollectionType(COLLECTION_UNORDERED_SET);
+    }
     return v;
   }
   if constexpr (is_specialization<T, absl::Span>::value) {
@@ -337,7 +341,7 @@ DType get_dtype() {
     v.SetCollectionType(COLLECTION_ABSL_SPAN);
     return v;
   }
-  if constexpr (is_specialization<T, std::map>::value) {
+  if constexpr (is_specialization<T, std::map>::value || is_specialization<T, std::unordered_map>::value) {
     using key_type = typename T::key_type;
     using val_type = typename T::mapped_type;
     RETURN_IF_NOT_FUNDAMENTAL_TYPE(key_type)
@@ -345,9 +349,14 @@ DType get_dtype() {
     auto key_v = get_dtype<key_type>();
     auto value_v = get_dtype<val_type>();
     DType v(key_v.GetFundamentalType(), value_v.GetFundamentalType());
-    v.SetCollectionType(COLLECTION_MAP);
+    if constexpr (is_specialization<T, std::map>::value) {
+      v.SetCollectionType(COLLECTION_MAP);
+    } else {
+      v.SetCollectionType(COLLECTION_UNORDERED_MAP);
+    }
     return v;
   }
+
   if constexpr (is_specialization<T, std::pair>::value) {
     using first_type = typename T::first_type;
     using second_type = typename T::second_type;

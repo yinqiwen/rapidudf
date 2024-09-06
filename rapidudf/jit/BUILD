@@ -29,6 +29,7 @@ cc_library(
         "//rapidudf/codegen/simd:simd_ops",
         "//rapidudf/log",
         "//rapidudf/reflect",
+        "@com_google_absl//absl/cleanup",
     ],
 )
 

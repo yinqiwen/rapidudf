@@ -38,6 +38,7 @@
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/optype.h"
 #include "rapidudf/codegen/simd/simd_ops.h"
+#include "rapidudf/reflect/simd_vector.h"
 #include "rapidudf/types/simd.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
@@ -60,6 +61,10 @@ namespace rapidudf {
 #define REGISTER_SIMD_VECTOR_TERNARY_FUNC_WITH_TYPE(r, op, i, type) register_ternary_simd_vector_op<type, op>();
 #define REGISTER_SIMD_VECTOR_TERNARY_FUNCS(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_TERNARY_FUNC_WITH_TYPE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define RUDF_STL_REFLECT_HELPER_INIT(r, STL_HELPER, i, TYPE) STL_HELPER<TYPE>::Init();
+#define RUDF_STL_REFLECT_HELPER(STL_HELPER, ...) \
+  BOOST_PP_SEQ_FOR_EACH_I(RUDF_STL_REFLECT_HELPER_INIT, STL_HELPER, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 template <typename T, OpToken op>
 static void register_unary_simd_vector_op() {
@@ -232,5 +237,8 @@ void init_builtin_simd_vector_funcs() {
                              uint32_t, uint16_t, uint8_t)
   REGISTER_SIMD_VECTOR_FUNCS(register_ternary_conditional_simd_vector_op, float, double, int64_t, int32_t, int16_t,
                              int8_t, uint64_t, uint32_t, uint16_t, uint8_t)
+
+  RUDF_STL_REFLECT_HELPER(reflect::SimdVectorHelper, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+                          int64_t, float, double, Bit, StringView)
 }
 }  // namespace rapidudf

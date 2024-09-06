@@ -28,23 +28,25 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <boost/preprocessor/library.hpp>
-#include <boost/preprocessor/seq/for_each.hpp>
-#include <boost/preprocessor/seq/for_each_product.hpp>
-#include <boost/preprocessor/stringize.hpp>
-#include <boost/preprocessor/variadic/to_seq.hpp>
 
-#include "rapidudf/reflect/stl.h"
-#include "rapidudf/types/string_view.h"
-namespace rapidudf {
+#include <gtest/gtest.h>
+#include <functional>
+#include <vector>
+#include "absl/strings/str_join.h"
+#include "rapidudf/ast/context.h"
+#include "rapidudf/ast/grammar.h"
+#include "rapidudf/codegen/dtype.h"
+#include "rapidudf/jit/jit.h"
+#include "rapidudf/log/log.h"
+#include "rapidudf/reflect/macros.h"
+#include "x86simdsort.h"
 
-#define STL_DTYPES                                                                                             \
-  (uint8_t)(int8_t)(uint16_t)(int16_t)(uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)(std::string_view)( \
-      std::string)(StringView)
+using namespace rapidudf;
+using namespace rapidudf::ast;
 
-#define RUDF_STL_REFLECT_HELPER_INIT(r, STL_HELPER, i, TYPE) STL_HELPER<TYPE>::Init();
-#define RUDF_STL_REFLECT_HELPER(STL_HELPER, ...) \
-  BOOST_PP_SEQ_FOR_EACH_I(RUDF_STL_REFLECT_HELPER_INIT, STL_HELPER, STL_DTYPES)
+TEST(JitCompiler, simd_sort) {
+  std::vector<float> data{1.1, 2.2, 0.1, 0.2, 0.3};
+  auto result = x86simdsort::argsort(data.data(), data.size(), false, true);
 
-void init_builtin_stl_vectors_funcs() { RUDF_STL_REFLECT_HELPER(reflect::StdVectorHelper) }
-}  // namespace rapidudf
+  RUDF_INFO("result:[{}], data:[{}]", absl::StrJoin(result, ","), absl::StrJoin(data, ","));
+}

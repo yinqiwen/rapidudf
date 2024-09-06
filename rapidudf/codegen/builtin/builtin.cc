@@ -32,10 +32,19 @@
 #include <mutex>
 
 namespace rapidudf {
+extern void init_builtin_stl_sets_funcs();
+extern void init_builtin_stl_maps_funcs();
+extern void init_builtin_stl_vectors_funcs();
+extern void init_builtin_string_funcs();
+extern void init_builtin_math_funcs();
+extern void init_builtin_json_funcs();
+extern void init_builtin_simd_vector_funcs();
 static std::once_flag g_init_builtin_flag;
 void init_builtin() {
   std::call_once(g_init_builtin_flag, []() {
-    init_builtin_stl_funcs();
+    init_builtin_stl_vectors_funcs();
+    init_builtin_stl_maps_funcs();
+    init_builtin_stl_sets_funcs();
     init_builtin_math_funcs();
     init_builtin_string_funcs();
     init_builtin_json_funcs();

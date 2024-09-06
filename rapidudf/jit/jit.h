@@ -39,6 +39,9 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+#include "absl/cleanup/cleanup.h"
+
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/ast/block.h"
 #include "rapidudf/ast/context.h"
@@ -197,6 +200,7 @@ class JitCompiler {
       GetCodeGenerator().DumpAsm();
     }
     auto& ctx = compile_ctxs_[compile_function_idx_];
+    absl::Cleanup _done([this]() { compile_ctxs_.clear(); });
     return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
                                      ctx.has_simd_vector_operations);
   }
@@ -236,6 +240,7 @@ class JitCompiler {
       GetCodeGenerator().DumpAsm();
     }
     auto& ctx = compile_ctxs_[compile_function_idx_];
+    absl::Cleanup _done([this]() { compile_ctxs_.clear(); });
     return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
                                      ctx.has_simd_vector_operations);
   }

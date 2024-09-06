@@ -52,11 +52,6 @@ bool json_cmp_float(uint32_t op, const JsonObject& json, double right, bool reve
 bool json_cmp_json(uint32_t op, const JsonObject& left, const JsonObject& right);
 
 void init_builtin();
-void init_builtin_stl_funcs();
-void init_builtin_string_funcs();
-void init_builtin_math_funcs();
-void init_builtin_json_funcs();
-void init_builtin_simd_vector_funcs();
 bool is_builtin_math_func(std::string_view name);
 bool register_builtin_math_func(std::string_view name);
 

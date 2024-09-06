@@ -33,18 +33,20 @@
 #include <boost/preprocessor/seq/for_each_product.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
+#include "rapidudf/codegen/builtin/builtin.h"
 
 #include "rapidudf/reflect/stl.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
 
-#define STL_DTYPES                                                                                             \
-  (uint8_t)(int8_t)(uint16_t)(int16_t)(uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)(std::string_view)( \
-      std::string)(StringView)
+#define STL_DTYPES (uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)(std::string_view)(std::string)(StringView)
 
 #define RUDF_STL_REFLECT_HELPER_INIT(r, STL_HELPER, i, TYPE) STL_HELPER<TYPE>::Init();
 #define RUDF_STL_REFLECT_HELPER(STL_HELPER, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(RUDF_STL_REFLECT_HELPER_INIT, STL_HELPER, STL_DTYPES)
 
-void init_builtin_stl_vectors_funcs() { RUDF_STL_REFLECT_HELPER(reflect::StdVectorHelper) }
+void init_builtin_stl_sets_funcs() {
+  RUDF_STL_REFLECT_HELPER(reflect::StdSetHelper)
+  RUDF_STL_REFLECT_HELPER(reflect::StdUnorderedSetHelper)
+}
 }  // namespace rapidudf

@@ -30,30 +30,42 @@
 */
 
 #include <gtest/gtest.h>
-#include <functional>
 #include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/codegen/dtype.h"
 #include "rapidudf/jit/jit.h"
 #include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
+#include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
 
-TEST(JitCompiler, vector_size) {
+TEST(JitCompiler, vector_access) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  ParseContext ctx;
-  std::string content = R"(
-    int test_func(vector<i32> x){
-      return x.size();
-    }
-  )";
-  auto rc = compiler.CompileFunction<int, std::vector<int>&>(content);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
+  auto result = compiler.CompileExpression<int, std::vector<int>&>("x.size()", {"x"});
+  ASSERT_TRUE(result.ok());
+  auto f = std::move(result.value());
   ASSERT_EQ(f(vec), vec.size());
+
+  std::vector<std::string> str_vec{"hello", "world"};
+  auto str_f_result = compiler.CompileExpression<StringView, std::vector<std::string>&>("x.get(1)", {"x"});
+  ASSERT_TRUE(str_f_result.ok());
+  auto str_f = std::move(str_f_result.value());
+  ASSERT_EQ(str_f(str_vec), "world");
+}
+
+TEST(JitCompiler, map_access) {
+  spdlog::set_level(spdlog::level::debug);
+  std::map<std::string, std::string> map{{"t0", "v0"}, {"t1", "v1"}};
+  JitCompiler compiler;
+  auto result = compiler.CompileExpression<int, std::map<std::string, std::string>&>("x.size()", {"x"});
+  ASSERT_TRUE(result.ok());
+  auto f = std::move(result.value());
+  ASSERT_EQ(f(map), map.size());
+
+  auto get_f_result =
+      compiler.CompileExpression<StringView, std::map<std::string, std::string>&>(R"(x.get("t1"))", {"x"});
+  ASSERT_TRUE(get_f_result.ok());
+  auto str_f = std::move(get_f_result.value());
+  ASSERT_EQ(str_f(map), "v1");
 }

@@ -12,6 +12,7 @@ cc_library(
     name = "simd_ops",
     srcs = [
         "simd_ops.cc",
+        "simd_sort.cc",
     ],
     hdrs = [
         "simd_ops.h",

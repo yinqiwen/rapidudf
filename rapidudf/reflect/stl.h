@@ -38,133 +38,140 @@
 #include <unordered_set>
 #include <vector>
 
-#include "rapidudf/meta/type_traits.h"
-#include "rapidudf/reflect/reflect.h"
+#include "rapidudf/reflect/struct.h"
+#include "rapidudf/types/simd.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 namespace reflect {
 template <typename T, typename Enable = void>
-struct STLGetterReturnType {
-  using return_type = const T*;
-  static return_type value(const T& v) { return &v; }
-  static return_type default_value() {
+struct STLArgType {
+  using arg_type = const T*;
+  static arg_type value(const T& v) { return &v; }
+  static arg_type default_value() {
     static T empty;
     return &empty;
   }
 };
 template <typename T>
-struct STLGetterReturnType<
-    T, typename std::enable_if<std::is_integral_v<T> || std::is_floating_point_v<T> ||
-                               std::is_same_v<std::string_view, T> || std::is_same_v<StringView, T>>::type> {
-  using return_type = T;
-  static return_type value(const T& v) { return v; }
-  static return_type default_value() { return {}; }
+struct STLArgType<T,
+                  typename std::enable_if<std::is_integral_v<T> || std::is_floating_point_v<T> ||
+                                          std::is_pointer_v<T> || std::is_same_v<std::string_view, T> ||
+                                          std::is_same_v<StringView, T> || std::is_same_v<std::string_view, T>>::type> {
+  using arg_type = T;
+  static arg_type value(const T& v) { return v; }
+  static arg_type default_value() { return {}; }
+  static T from(arg_type v) { return v; }
 };
 template <>
-struct STLGetterReturnType<std::string> {
-  using return_type = std::string_view;
-  static return_type value(const std::string& v) { return v; }
-};
-template <>
-struct STLGetterReturnType<std::string_view> {
-  using return_type = std::string_view;
-  static return_type value(const std::string& v) { return v; }
+struct STLArgType<std::string> {
+  using arg_type = StringView;
+  static arg_type value(const std::string& v) { return StringView(v); }
+  static std::string from(arg_type v) { return v.str(); }
+  static arg_type default_value() { return ""; }
 };
 
-template <typename T>
+template <typename VEC>
 struct VectorHelper {
-  using return_type_t = typename STLGetterReturnType<T>::return_type;
-  static return_type_t get(std::vector<T>* v, size_t i) {
+  using value_type = typename VEC::value_type;
+  using arg_type_t = typename STLArgType<value_type>::arg_type;
+  static arg_type_t get(VEC* v, size_t i) {
     if (nullptr == v) {
-      return STLGetterReturnType<T>::default_value();
+      return STLArgType<value_type>::default_value();
     }
-    return STLGetterReturnType<T>::value(v->at(i));
+    return STLArgType<value_type>::value(v->at(i));
   }
-  static void add(std::vector<T>* vec, T val) { vec->emplace_back(val); }
-  static void set(std::vector<T>* vec, size_t i, T val) {
+  static void add(VEC* vec, arg_type_t val) { vec->emplace_back(STLArgType<value_type>::from(val)); }
+  static void set(VEC* vec, size_t i, arg_type_t val) {
     if (vec->size() > i) {
-      vec->at(i) = val;
+      vec->at(i) = STLArgType<value_type>::from(val);
     }
   }
-  static size_t size(std::vector<T>* vec) {
+  static size_t size(VEC* vec) {
     if (nullptr == vec) {
       return 0;
     }
     return vec->size();
   }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(VectorHelper<VEC>, get, set, add, size) }
 };
+
+template <typename T>
+using StdVectorHelper = VectorHelper<std::vector<T>>;
 
 template <typename Set>
 struct SetHelper {
   using key_type = typename Set::key_type;
-  static bool contains(Set* v, key_type val) {
+  using arg_type_t = typename STLArgType<key_type>::arg_type;
+  static bool contains(Set* v, arg_type_t val) {
     if (nullptr == v) {
       return false;
     }
-    return v->find(val) != v->end();
+    return v->find(STLArgType<key_type>::from(val)) != v->end();
   }
-  //   static bool insert(Set* vec, key_type val) {
-  //     if (nullptr == vec) {
-  //       return false;
-  //     }
-  //     return vec->insert(val).second;
-  //   }
+  static bool insert(Set* vec, arg_type_t val) {
+    if (nullptr == vec) {
+      return false;
+    }
+    return vec->insert(STLArgType<key_type>::from(val)).second;
+  }
   static size_t size(Set* vec) {
     if (nullptr == vec) {
       return 0;
     }
     return vec->size();
   }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SetHelper<Set>, contains, insert, size) }
 };
 
-template <template <class, class> class Map, class K, class V>
+template <typename T>
+using StdSetHelper = SetHelper<std::set<T>>;
+
+template <typename T>
+using StdUnorderedSetHelper = SetHelper<std::unordered_set<T>>;
+
+template <typename Map>
 struct MapHelper {
-  static bool contains(Map<K, V>* v, K key) {
+  using key_type = typename Map::key_type;
+  using value_type = typename Map::mapped_type;
+  using arg_key_type_t = typename STLArgType<key_type>::arg_type;
+  using arg_value_type_t = typename STLArgType<value_type>::arg_type;
+  static bool contains(Map* v, arg_key_type_t key) {
     if (nullptr == v) {
       return false;
     }
-    return v->find(key) != v->end();
+    return v->find(STLArgType<key_type>::from(key)) != v->end();
   }
-  static V get(Map<K, V>* v, K key) {
+  static arg_value_type_t get(Map* v, arg_key_type_t key) {
     if (nullptr == v) {
       return {};
     }
-    auto found = v->find(key);
+    auto found = v->find(STLArgType<key_type>::from(key));
     if (found == v->end()) {
       return {};
     }
-    return found->second;
+    return STLArgType<value_type>::value(found->second);
   }
-  static bool insert(Map<K, V>* map, K key, V val) {
+  static bool insert(Map* map, arg_key_type_t key, arg_value_type_t val) {
     if (nullptr == map) {
       return false;
     }
-    return map->emplace(key, val).second;
+    return map->emplace(STLArgType<key_type>::from(key), STLArgType<value_type>::from(val)).second;
   }
-  static size_t size(Map<K, V>* map) {
+  static size_t size(Map* map) {
     if (nullptr == map) {
       return 0;
     }
     return map->size();
   }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(MapHelper<Map>, contains, get, insert, size) }
 };
 
-template <typename T>
-void try_register_stl_collection_member_funcs() {
-  using remove_ptr_t = std::remove_pointer_t<T>;
-  using remove_reference_t = std::remove_reference_t<remove_ptr_t>;
-  using remove_cv_t = std::remove_cv_t<remove_reference_t>;
-  if constexpr (is_specialization<remove_cv_t, std::vector>::value) {
-    using key_type = typename remove_cv_t::value_type;
-    Reflect::AddStructMethodAccessor("get", &VectorHelper<key_type>::get);
-    Reflect::AddStructMethodAccessor("size", &VectorHelper<key_type>::size);
-  } else if constexpr (is_specialization<remove_cv_t, std::set>::value) {
-    using key_type = typename remove_cv_t::key_type;
-    Reflect::AddStructMethodAccessor("contains", &SetHelper<std::set<key_type>>::contains);
-    Reflect::AddStructMethodAccessor("size", &SetHelper<std::set<key_type>>::size);
-  }
-}
+template <typename K, typename V>
+using StdMapHelper = MapHelper<std::map<K, V>>;
+
+template <typename K, typename V>
+using StdUnorderedMapHelper = MapHelper<std::unordered_map<K, V>>;
 
 }  // namespace reflect
 }  // namespace rapidudf

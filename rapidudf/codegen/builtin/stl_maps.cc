@@ -38,13 +38,13 @@
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
 
-#define STL_DTYPES                                                                                             \
-  (uint8_t)(int8_t)(uint16_t)(int16_t)(uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)(std::string_view)( \
-      std::string)(StringView)
+#define STL_DTYPES (uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)(std::string_view)(std::string)(StringView)
 
-#define RUDF_STL_REFLECT_HELPER_INIT(r, STL_HELPER, i, TYPE) STL_HELPER<TYPE>::Init();
-#define RUDF_STL_REFLECT_HELPER(STL_HELPER, ...) \
-  BOOST_PP_SEQ_FOR_EACH_I(RUDF_STL_REFLECT_HELPER_INIT, STL_HELPER, STL_DTYPES)
+#define RUDF_STL_MAP_REFLECT_HELPER_INIT(r, kv)                                      \
+  reflect::StdMapHelper<BOOST_PP_SEQ_ELEM(0, kv), BOOST_PP_SEQ_ELEM(1, kv)>::Init(); \
+  reflect::StdUnorderedMapHelper<BOOST_PP_SEQ_ELEM(0, kv), BOOST_PP_SEQ_ELEM(1, kv)>::Init();
 
-void init_builtin_stl_vectors_funcs() { RUDF_STL_REFLECT_HELPER(reflect::StdVectorHelper) }
+void init_builtin_stl_maps_funcs() {
+  BOOST_PP_SEQ_FOR_EACH_PRODUCT(RUDF_STL_MAP_REFLECT_HELPER_INIT, (STL_DTYPES)(STL_DTYPES))
+}
 }  // namespace rapidudf

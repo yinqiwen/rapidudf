@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,23 +28,18 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <boost/preprocessor/library.hpp>
-#include <boost/preprocessor/seq/for_each.hpp>
-#include <boost/preprocessor/seq/for_each_product.hpp>
-#include <boost/preprocessor/stringize.hpp>
-#include <boost/preprocessor/variadic/to_seq.hpp>
 
-#include "rapidudf/reflect/stl.h"
-#include "rapidudf/types/string_view.h"
+#pragma once
+#include "rapidudf/reflect/struct.h"
+#include "rapidudf/types/simd.h"
 namespace rapidudf {
+namespace reflect {
+template <typename T>
+struct SimdVectorHelper {
+  static T get(simd::Vector<T> v, size_t i) { return v[i]; }
+  static size_t size(simd::Vector<T> v) { return v.Size(); }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size) }
+};
+}  // namespace reflect
 
-#define STL_DTYPES                                                                                             \
-  (uint8_t)(int8_t)(uint16_t)(int16_t)(uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)(std::string_view)( \
-      std::string)(StringView)
-
-#define RUDF_STL_REFLECT_HELPER_INIT(r, STL_HELPER, i, TYPE) STL_HELPER<TYPE>::Init();
-#define RUDF_STL_REFLECT_HELPER(STL_HELPER, ...) \
-  BOOST_PP_SEQ_FOR_EACH_I(RUDF_STL_REFLECT_HELPER_INIT, STL_HELPER, STL_DTYPES)
-
-void init_builtin_stl_vectors_funcs() { RUDF_STL_REFLECT_HELPER(reflect::StdVectorHelper) }
 }  // namespace rapidudf

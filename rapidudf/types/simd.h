@@ -39,24 +39,6 @@
 namespace rapidudf {
 namespace simd {
 
-// struct Bit {
-//   bool val;
-//   Bit(bool v) : val(v) {}
-//   Bit operator+(const Bit& other) const { return *this; }
-//   Bit operator-(const Bit& other) const { return *this; }
-//   Bit operator*(const Bit& other) const { return *this; }
-//   Bit operator/(const Bit& other) const { return *this; }
-//   Bit operator%(const Bit& other) const { return *this; }
-//   Bit operator==(const Bit& other) const { return Bit(val == other.val); }
-//   Bit operator!=(const Bit& other) const { return Bit(val != other.val); }
-//   Bit operator>=(const Bit& other) const { return Bit(val >= other.val); }
-//   Bit operator<=(const Bit& other) const { return Bit(val <= other.val); }
-//   Bit operator>(const Bit& other) const { return Bit(val > other.val); }
-//   Bit operator<(const Bit& other) const { return Bit(val < other.val); }
-//   Bit operator&&(const Bit& other) const { return Bit(val && other.val); }
-//   Bit operator||(const Bit& other) const { return Bit(val || other.val); }
-//   operator bool() { return val; }
-// };
 template <typename T>
 struct InternalType {
   using internal_type = T;

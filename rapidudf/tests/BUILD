@@ -255,3 +255,15 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "simd_sort_test",
+    size = "small",
+    srcs = ["simd_sort_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS + ["-lx86simdsortcpp"],
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)

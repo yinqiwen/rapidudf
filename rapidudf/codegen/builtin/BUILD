@@ -15,6 +15,8 @@ cc_library(
         "math.cc",
         "simd_vector.cc",
         "stl.cc",
+        "stl_maps.cc",
+        "stl_sets.cc",
         "string.cc",
     ],
     hdrs = ["builtin.h"],

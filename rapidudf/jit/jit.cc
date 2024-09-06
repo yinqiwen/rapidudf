@@ -32,6 +32,7 @@
 #include <exception>
 #include <memory>
 #include <vector>
+
 #include "rapidudf/ast/function.h"
 #include "rapidudf/ast/grammar.h"
 #include "rapidudf/ast/statement.h"
@@ -104,6 +105,7 @@ absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::s
     }
     func_names.emplace_back(compile_ctxs_[i].desc.name);
   }
+  absl::Cleanup _done([this]() { compile_ctxs_.clear(); });
   return func_names;
 }
 
@@ -203,6 +205,7 @@ absl::Status JitCompiler::DoCompileExpression(const std::string& source, ast::Fu
   return_statement.expr = *f;
   gen_func_ast.body.statements.emplace_back(return_statement);
   AddCompileContex(gen_func_ast);
+
   return DoCompileFunctionAst(compile_ctxs_[0]);
 }
 

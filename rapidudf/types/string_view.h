@@ -228,3 +228,12 @@ struct formatter<rapidudf::StringView> : private formatter<string_view> {
 };
 
 }  // namespace fmt
+
+namespace std {
+template <>
+struct hash<::rapidudf::StringView> {
+  size_t operator()(const ::rapidudf::StringView view) const {
+    return std::hash<std::string_view>{}({view.data(), view.size()});
+  }
+};
+}  // namespace std
