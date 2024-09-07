@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -29,32 +29,34 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#pragma once
-#include <functional>
+#include <gtest/gtest.h>
 #include <vector>
-#include "google/protobuf/arena.h"
-namespace rapidudf {
-class Arena {
- public:
-  using CleanupFunc = std::function<void()>;
-  uint8_t* Allocate(size_t n) { return google::protobuf::Arena::CreateArray<uint8_t>(&arena_, n); }
-  void Reset() {
-    arena_.Reset();
-    for (auto& f : cleanups_) {
-      f();
-    }
-    cleanups_.clear();
-  }
+#include "absl/strings/str_join.h"
+#include "rapidudf/jit/jit.h"
+#include "rapidudf/log/log.h"
+#include "rapidudf/types/string_view.h"
 
-  template <typename T>
-  void Own(std::unique_ptr<T>&& p) {
-    auto* pp = p.release();
-    auto f = [pp] { delete pp; };
-    cleanups_.emplace_back(std::move(f));
+using namespace rapidudf;
+using namespace rapidudf::ast;
+static void print_span(absl::Span<StringView> x) {
+  RUDF_ERROR("@@@{}", x.size());
+  for (auto v : x) {
+    RUDF_ERROR("{}", v);
   }
-
- private:
-  google::protobuf::Arena arena_;
-  std::vector<CleanupFunc> cleanups_;
-};
-}  // namespace rapidudf
+}
+RUDF_FUNC_REGISTER(print_span)
+TEST(JitCompiler, array_simple) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  std::string source = R"(
+     print_span(["ehllo", "adas", "aas"])
+  )";
+  auto result = compiler.CompileExpression<void>(source, {});
+  if (!result.ok()) {
+    RUDF_ERROR("{}", result.status().ToString());
+  }
+  ASSERT_TRUE(result.ok());
+  auto f = std::move(result.value());
+  f();
+}

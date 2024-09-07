@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "rapidudf/types/bit.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
 namespace simd {
 
@@ -114,6 +115,27 @@ class Vector {
       return Bit(v > 0);
     } else {
       return Data()[idx];
+    }
+  }
+  auto ToStdVector() const {
+    if constexpr (std::is_same_v<Bit, T>) {
+      std::vector<uint8_t> bits;
+      size_t bytes = Size() / 8;
+      if (Size() % 8 > 0) {
+        bytes++;
+      }
+      bits.assign(Data(), Data() + bytes);
+      return bits;
+    } else if constexpr (std::is_same_v<StringView, T>) {
+      std::vector<std::string> strs;
+      for (size_t i = 0; i < Size(); i++) {
+        strs.emplace_back((Data() + i)->str());
+      }
+      return strs;
+    } else {
+      std::vector<T> datas;
+      datas.assign(Data(), Data() + Size());
+      return datas;
     }
   }
 

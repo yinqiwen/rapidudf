@@ -51,9 +51,6 @@ TEST(JitCompiler, cmp_greater) {
     }
   )";
   auto rc = compiler.CompileFunction<int, int, int>(content);
-  // ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, int, int>(true);
-  // ASSERT_TRUE(f != nullptr);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(10, 1), 1);

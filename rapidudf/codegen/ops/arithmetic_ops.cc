@@ -288,8 +288,8 @@ int arithmetic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, const Xbyak:
     return -1;
   }
   uint32_t bits = dtype.Bits();
-  RUDF_DEBUG("op:{}, result bits:{}  left_reg:{}, left_xmm:{},right_reg:{}, right_xmm:{}", op, bits, left.isREG(),
-             left.isXMM(), right.isREG(), right.isXMM());
+  RUDF_DEBUG("op:{}, result bits:{},left:{},right:{},result:{}", op, bits, left.toString(), right.toString(),
+             result.toString());
   if (dtype == DATA_F32 || dtype == DATA_F64) {
     copy_value(c, dtype, left, xmm0);
     copy_value(c, dtype, right, xmm1);
@@ -300,8 +300,15 @@ int arithmetic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, const Xbyak:
     return rc;
   } else {
     if (right.isXMM()) {
-      copy_value(c, dtype, right, rcx.changeBit(bits));
-      return arithmetic_op(c, op, dtype, left, rcx.changeBit(bits), result);
+      const Xbyak::Reg* new_right = &rcx;
+      if (left.isREG() && left.getIdx() == rcx.getIdx()) {
+        copy_value(c, dtype, left, rax.changeBit(bits));
+        copy_value(c, dtype, right, new_right->changeBit(bits));
+        return arithmetic_op(c, op, dtype, rax.changeBit(bits), new_right->changeBit(bits), result);
+      } else {
+        copy_value(c, dtype, right, new_right->changeBit(bits));
+        return arithmetic_op(c, op, dtype, left, new_right->changeBit(bits), result);
+      }
     }
     if (!is_rax(left)) {
       copy_value(c, dtype, left, rax.changeBit(bits));

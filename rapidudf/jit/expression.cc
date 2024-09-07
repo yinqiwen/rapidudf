@@ -61,6 +61,8 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileOperand(const ast::Operand& expr) {
           } else {
             return CompileConstants(arg.dv);
           }
+        } else if constexpr (std::is_same_v<T, ast::Array>) {
+          return CompileExpression(arg);
         } else {
           static_assert(sizeof(arg) == -1, "non-exhaustive visitor!");
           ValuePtr empty;
@@ -134,6 +136,12 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
 
         auto result =
             GetCodeGenerator().NewValue(left->GetDType() > right->GetDType() ? left->GetDType() : right->GetDType());
+        RUDF_DEBUG("before op:{}, left:{}, right:{}", op, left->IsConst(), right->IsRegister());
+        if (left->IsRegister() && right->IsRegister()) {
+          RUDF_DEBUG("before op:{}, left:{}, right:{}", op, left->GetOperand().toString(),
+                     right->GetOperand().toString());
+        }
+
         int rc = left->ArithmeticOp(op, *right, result);
         if (0 != rc) {
           RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
@@ -437,5 +445,31 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::TernaryExprPtr expr
   } else {
     return cond_result;
   }
+}
+
+absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(const ast::Array& expr) {
+  ast_ctx_.SetPosition(expr.position);
+  auto span_val = GetCodeGenerator().NewValue(expr.dtype, {}, false);
+  auto stack_vals = GetCodeGenerator().NewArrayValue(expr.dtype, expr.elements.size());
+  for (size_t i = 0; i < expr.elements.size(); i++) {
+    auto result = CompileExpression(expr.elements[i]);
+    if (!result.ok()) {
+      return result.status();
+    }
+    int rc = stack_vals[i]->Copy(*result.value());
+    if (0 != rc) {
+      RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("copy array[{}] stack element failed.", i)));
+    }
+  }
+  size_t span_len = expr.elements.size();
+  int rc = span_val->SetSpanSize(span_len);
+  if (0 == rc) {
+    rc = span_val->SetSpanStackPtr(stack_vals[0]->GetStackOffset());
+  }
+  if (0 != rc) {
+    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("set span size/ptr failed.")));
+  }
+
+  return span_val;
 }
 }  // namespace rapidudf

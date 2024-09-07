@@ -145,17 +145,32 @@ TEST(Grammar, expression) {
   }
 }
 
-// // TEST(Grammar, obj_func_call) {
-// //   ParseContext ctx;
-// //   std::string content = R"(
-// //     int test_func(int a){
-// //      a.size();
-// //      a.copy(1,2);
-// //      var x = a.b.c;
-// //      return 1;
-// //     }
-// //   )";
+TEST(Grammar, or_equals) {
+  // spdlog::set_level(spdlog::level::debug);
+  ParseContext ctx;
+  std::string content = R"(
+    int test_func(int a){  
+     return a||==1;
+    }
+  )";
 
-// //   auto f = parse_function_ast(ctx, content);
-// //   ASSERT_TRUE(f.ok());
-// // }
+  auto f = parse_function_ast(ctx, content);
+  if (!f.ok()) {
+    RUDF_ERROR("{}", f.status().ToString());
+  }
+  ASSERT_FALSE(f.ok());
+}
+
+TEST(Grammar, array) {
+  ParseContext ctx;
+  std::string content = R"(
+    int test_func(int a){  
+     return a==[1,2,a];
+    }
+  )";
+  auto f = parse_function_ast(ctx, content);
+  if (!f.ok()) {
+    RUDF_ERROR("{}", f.status().ToString());
+  }
+  ASSERT_FALSE(f.ok());
+}

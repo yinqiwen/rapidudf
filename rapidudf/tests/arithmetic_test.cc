@@ -46,12 +46,10 @@ TEST(JitCompiler, add) {
       return x+y;
     }
   )";
-  // auto func = parse_function_ast(ctx, content);
-  // ASSERT_TRUE(func.has_value());
+
   auto rc = compiler.CompileFunction<int, int, int>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, int, int>(true);
-  // ASSERT_TRUE(f != nullptr);
+
   auto f = std::move(rc.value());
   ASSERT_EQ(f(1, 2), 3);
   ASSERT_EQ(f(111, 222), 333);
@@ -67,8 +65,7 @@ TEST(JitCompiler, sub) {
   )";
   auto rc = compiler.CompileFunction<float, float, float>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<float, float, float>(true);
-  // ASSERT_TRUE(f != nullptr);
+
   auto f = std::move(rc.value());
   ASSERT_FLOAT_EQ(f(3.1, 1.2), 1.9);
   ASSERT_FLOAT_EQ(f(5.9, 1.2), 4.7);
@@ -85,8 +82,7 @@ TEST(JitCompiler, multiply) {
   )";
   auto rc = compiler.CompileFunction<uint64_t, uint64_t, uint64_t>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<uint64_t, uint64_t, uint64_t>(true);
-  // ASSERT_TRUE(f != nullptr);
+
   auto f = std::move(rc.value());
   ASSERT_FLOAT_EQ(f(10, 20), 200);
   ASSERT_FLOAT_EQ(f(1, 111), 111);
@@ -103,8 +99,7 @@ TEST(JitCompiler, divid) {
   )";
   auto rc = compiler.CompileFunction<uint64_t, uint64_t, uint64_t>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<uint64_t, uint64_t, uint64_t>(true);
-  // ASSERT_TRUE(f != nullptr);
+
   auto f = std::move(rc.value());
   ASSERT_FLOAT_EQ(f(100, 20), 5);
   ASSERT_FLOAT_EQ(f(1, 111), 0);
@@ -121,8 +116,7 @@ TEST(JitCompiler, mod) {
   )";
   auto rc = compiler.CompileFunction<uint64_t, uint64_t, uint64_t>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<uint64_t, uint64_t, uint64_t>(true);
-  // ASSERT_TRUE(f != nullptr);
+
   auto f = std::move(rc.value());
   ASSERT_FLOAT_EQ(f(100, 20), 0);
   ASSERT_FLOAT_EQ(f(7, 5), 2);

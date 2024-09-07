@@ -68,8 +68,15 @@ struct VarAccessor;
 using BinaryExprPtr = std::shared_ptr<BinaryExpr>;
 using UnaryExprPtr = std::shared_ptr<UnaryExpr>;
 using TernaryExprPtr = std::shared_ptr<TernaryExpr>;
+struct Array {
+  std::vector<BinaryExprPtr> elements;
+  DType dtype;
+  uint32_t position = 0;
+  absl::StatusOr<VarTag> Validate(ParseContext& ctx);
+};
+
 using Operand = std::variant<bool, ConstantNumber, std::string, VarAccessor, TernaryExprPtr, BinaryExprPtr,
-                             UnaryExprPtr, VarDefine>;
+                             UnaryExprPtr, VarDefine, Array>;
 using Expression = BinaryExprPtr;
 
 struct FuncInvokeArgs {

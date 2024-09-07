@@ -35,6 +35,7 @@ cc_library(
         "@com_google_highway//:hwy",
         "@com_google_highway//:math",
         "@com_google_highway//hwy/contrib/sort:vqsort",
+        "@x86_simd_sort",
     ],
 )
 

@@ -172,6 +172,12 @@ class DType {
     result.container_type_ = COLLECTION_VECTOR;
     return result;
   }
+  DType ToAbslSpan() const {
+    DType result;
+    result.control_ = control_;
+    result.container_type_ = COLLECTION_ABSL_SPAN;
+    return result;
+  }
   uint32_t TupleSize() const;
   std::vector<DType> ExtractTupleDtypes() const;
 

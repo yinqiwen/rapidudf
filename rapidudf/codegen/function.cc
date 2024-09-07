@@ -261,11 +261,11 @@ bool FunctionFactory::Register(FunctionDesc&& desc) {
     RUDF_CRITICAL("Duplicate func name:{}", desc.name);
     return false;
   }
-  if (desc.name.find(kSimdVectorFuncPrefix) == 0) {
-    desc.is_simd_vector_func = true;
-  }
+  // if (desc.name.find(kSimdVectorFuncPrefix) == 0) {
+  //   desc.is_simd_vector_func = true;
+  // }
   // printf("Registe func name:%s\n", desc.name.c_str());
-  RUDF_DEBUG("Registe func name:{}, is_simd_vector:{}", desc.name, desc.is_simd_vector_func);
+  // RUDF_DEBUG("Registe func name:{}");
   return g_regs->emplace(desc.name, desc).second;
 }
 const FunctionDesc* FunctionFactory::GetFunction(const std::string& name) {

@@ -31,6 +31,7 @@
 
 #include <gtest/gtest.h>
 #include "rapidudf/jit/jit.h"
+
 #include "rapidudf/reflect/macros.h"
 #include "rapidudf/reflect/protobuf.h"
 #include "rapidudf/tests/test_pb.pb.h"
@@ -43,8 +44,6 @@ RUDF_PB_FIELDS(::test::Header, id, scene, items, item_map, mapping, items_size)
 RUDF_PB_FIELDS(::test::Item, id)
 
 RUDF_PB_SET_FIELDS(::test::Header, id, scene)
-
-// RUDF_STRUCT_MEMBER_METHODS(::test::Header, set_id)
 
 TEST(JitCompiler, pb_access_read_int) {
   spdlog::set_level(spdlog::level::debug);
@@ -81,8 +80,6 @@ TEST(JitCompiler, pb_access_read_str) {
    )";
   auto rc = compiler.CompileFunction<StringView, const test::Header*>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<std::string_view, const test::Header*>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
   ASSERT_EQ(f(&pb_header), "hello,world");
 }
@@ -119,21 +116,6 @@ TEST(JitCompiler, pb_read_repetead) {
   pb_header.set_id(101);
   pb_header.set_scene("hello,world");
   pb_header.add_items()->set_id(10001);
-  // pb_header.mutable_item_map()->insert(1);
-
-  // using mytype_t = decltype(((::test::Header*)0)->items());
-  // RUDF_INFO("##########{}", DType::Demangle(typeid(mytype_t).name()));
-  // using getter_func_t = const mytype_t&(::test::Header*)() const;
-  // getter_func_t func = &(TYPE::member);
-  // the only way to bind overload member func
-  // using GetItemsFunc = const ::test::Item& (::test::Header::*)(int) const;
-  // GetItemsFunc get_func = &::test::Header::items;
-
-  // using func_return_t = decltype(((::test::Header*)0)->items());
-  // using getter_func_t = func_return_t (::test::Header::*)() const;
-  // getter_func_t xf = &::test::Header::items;
-
-  // MEMBER_FUNC_WRAPPER("items", get_func);
 
   JitCompiler compiler;
   std::string content = R"(
@@ -154,13 +136,6 @@ TEST(JitCompiler, pb_write_string) {
   pb_header.set_id(101);
   pb_header.set_scene("hello,world");
   pb_header.add_items()->set_id(10001);
-
-  // pb_header.mutable_item_map()->insert(1);
-
-  // the only way to bind overload member func
-  // using SetFunc = void (::test::Header::*)(std::string&&);
-  // SetFunc set_func = &::test::Header::set_scene;
-  // RUDF_PB_SET_STRING_HELPER(::test::Header, scene);
 
   JitCompiler compiler;
   std::string content = R"(

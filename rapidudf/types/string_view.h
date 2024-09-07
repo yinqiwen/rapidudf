@@ -23,6 +23,7 @@
 
 #include <fmt/format.h>
 
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
 namespace rapidudf {
@@ -190,6 +191,25 @@ struct StringView {
   /// expects up to 31 bytes of addressable padding after out of
   /// line strings. This is the case for velox Buffers.
   static int32_t linearSearch(StringView key, const StringView* strings, const int32_t* indices, int32_t numStrings);
+
+  static bool contains(StringView s, StringView part) {
+    return absl::StrContains(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool starts_with(StringView s, StringView part) {
+    return absl::StartsWith(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool ends_with(StringView s, StringView part) {
+    return absl::EndsWith(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool contains_ignore_case(StringView s, StringView part) {
+    return absl::StrContainsIgnoreCase(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool starts_with_ignore_case(StringView s, StringView part) {
+    return absl::StartsWith(s.get_absl_string_view(), part.get_absl_string_view());
+  }
+  static bool ends_with_ignore_case(StringView s, StringView part) {
+    return absl::EndsWith(s.get_absl_string_view(), part.get_absl_string_view());
+  }
 
  private:
   inline int64_t sizeAndPrefixAsInt64() const { return reinterpret_cast<const int64_t*>(this)[0]; }

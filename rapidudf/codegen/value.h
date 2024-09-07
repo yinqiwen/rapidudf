@@ -84,6 +84,7 @@ class Value : public std::enable_shared_from_this<Value> {
   uint64_t Id() const { return uniq_id_; }
   bool IsTemp() const { return temp_; }
   void SetTemp(bool v) { temp_ = v; }
+  uint32_t GetStackOffset() const { return stack_offset_; }
   const Xbyak::Address& GetStackAddress(size_t i = 0) const;
   uint64_t GetConstBin(size_t i = 0) const { return const_values_[i]; }
   const Xbyak::Reg& GetRegister(size_t i = 0) const { return *registers_[i]; }
@@ -118,6 +119,11 @@ class Value : public std::enable_shared_from_this<Value> {
   void Swap(Value& other);
 
   void Drop();
+
+  int SetSpanSize(uint64_t size);
+  int SetSpanStackPtr(uint32_t offset);
+
+  std::string ToString() const;
 
   template <typename T>
   int Set(T val) {

@@ -127,7 +127,7 @@ void Value::Drop() {
 
 int Value::ToStack() {
   if (IsRegister()) {
-    auto [stack_offset, stack_len] = c_->AllocateStack(dtype_, dtype_.ByteSize());
+    auto [stack_offset, stack_len] = c_->AllocateStack(dtype_.ByteSize());
     if (dtype_.QwordSize() == 1) {
       int rc = copy_value(c_->GetCodeGen(), dtype_, GetRegister(), c_->GetStackAddr(dtype_, stack_offset));
       if (0 != rc) {
@@ -699,7 +699,7 @@ int Value::MovValue(std::vector<const Xbyak::Reg*> dsts) {
   }
   if (IsConst()) {
     for (size_t i = 0; i < dsts.size(); i++) {
-      int rc = copy_value(c_->GetCodeGen(), i == 0 ? dtype_ : DATA_U64, const_values_[i], *dsts[i]);
+      int rc = copy_value(c_->GetCodeGen(), dsts.size() == 1 ? dtype_ : DATA_U64, const_values_[i], *dsts[i]);
       if (0 != rc) {
         return rc;
       }
@@ -707,7 +707,7 @@ int Value::MovValue(std::vector<const Xbyak::Reg*> dsts) {
     return 0;
   } else if (IsStack()) {
     for (size_t i = 0; i < dsts.size(); i++) {
-      int rc = copy_value(c_->GetCodeGen(), i == 0 ? dtype_ : DATA_U64, GetStackAddress(i), *dsts[i]);
+      int rc = copy_value(c_->GetCodeGen(), dsts.size() == 1 ? dtype_ : DATA_U64, GetStackAddress(i), *dsts[i]);
       if (0 != rc) {
         return rc;
       }
@@ -715,7 +715,7 @@ int Value::MovValue(std::vector<const Xbyak::Reg*> dsts) {
     return 0;
   } else if (IsRegister()) {
     for (size_t i = 0; i < dsts.size(); i++) {
-      int rc = copy_value(c_->GetCodeGen(), i == 0 ? dtype_ : DATA_U64, GetRegister(i), *dsts[i]);
+      int rc = copy_value(c_->GetCodeGen(), dsts.size() == 1 ? dtype_ : DATA_U64, GetRegister(i), *dsts[i]);
       if (0 != rc) {
         return rc;
       }
@@ -793,6 +793,44 @@ int Value::SetSimdVectorTemporary(bool v) {
   }
   RUDF_ERROR("Can NOT set simd_vector temporary on invalid value.");
   return -1;
+}
+
+int Value::SetSpanSize(uint64_t size) {
+  if (!dtype_.IsAbslSpan()) {
+    RUDF_ERROR("Can NOT set span size on dtype:{}", dtype_);
+    return -1;
+  }
+  if (IsConst()) {
+    const_values_.resize(2);
+    const_values_[1] = size;
+    return 0;
+  } else if (IsRegister() || IsStack()) {
+    return copy_value(c_->GetCodeGen(), DATA_U64, size, GetOperand(1));
+  }
+  RUDF_ERROR("Can NOT set span size on non const/stack/register value.");
+  return -1;
+}
+int Value::SetSpanStackPtr(uint32_t offset) {
+  if (!dtype_.IsAbslSpan()) {
+    RUDF_ERROR("Can NOT set span ptr on dtype:{}", dtype_);
+    return -1;
+  }
+  if (IsRegister() || IsStack()) {
+    c_->GetCodeGen().mov(rax, rbp);
+    c_->GetCodeGen().sub(rax, offset);
+    return copy_value(c_->GetCodeGen(), DATA_U64, rax, GetOperand(0));
+  }
+  RUDF_ERROR("Can NOT set span ptr on non stack/register value.");
+  return -1;
+}
+std::string Value::ToString() const {
+  std::string str;
+  if (IsRegister()) {
+    for (auto reg : registers_) {
+      str.append(reg->toString()).append(",");
+    }
+  }
+  return str;
 }
 
 }  // namespace rapidudf

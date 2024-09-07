@@ -33,8 +33,6 @@
 #include <fmt/core.h>
 
 #include <boost/parser/parser.hpp>
-#include <iostream>
-#include <type_traits>
 #include <unordered_set>
 
 #include "rapidudf/ast/block.h"
@@ -42,9 +40,6 @@
 #include "rapidudf/ast/function.h"
 #include "rapidudf/ast/statement.h"
 #include "rapidudf/ast/symbols.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/optype.h"
-#include "rapidudf/log/log.h"
 
 namespace rapidudf {
 namespace ast {
@@ -100,6 +95,7 @@ bp::rule<struct dynamic_param_access, DynamicParamAccess> dynamic_param_access =
 bp::rule<struct member_access, std::vector<MemberAccess>> member_access = "member_access";
 bp::rule<struct var_accessor, VarAccessor> var_accessor = "var_accessor";
 bp::rule<struct constant_number, ConstantNumber> constant_number = "constant_number";
+bp::rule<struct array, Array> array = "array";
 
 auto func_convert = [](auto& ctx) {
   Function f;
@@ -141,7 +137,6 @@ auto binary_expr_func = [](auto& ctx) {
 auto ternary_expr_func = [](auto& ctx) {
   auto v = std::make_shared<TernaryExpr>();
   v->cond = std::get<0>(_attr(ctx));
-  // v->right = std::get<1>(_attr(ctx));
   v->true_false_operands = std::get<1>(_attr(ctx));
   v->position = _where(ctx).begin() - _begin(ctx);
   _val(ctx) = v;
@@ -160,13 +155,20 @@ auto var_accessor_func = [](auto& ctx) {
   f.position = _where(ctx).begin() - _begin(ctx);
   _val(ctx) = f;
 };
+auto array_func = [](auto& ctx) {
+  Array v;
+  v.elements = _attr(ctx);
+  v.position = _where(ctx).begin() - _begin(ctx);
+  _val(ctx) = v;
+};
 
 auto const constant_number_def = bp::lexeme[bp::double_ > -('_' > Symbols::kNumberSymbols)];
 // const auto dynamic_param_access_def = identifier > *('[' > (bp::quoted_string | bp::uint_) > ']');
 auto const var_declare_def = ("var" > identifier)[var_declare_func];
 auto const var_ref_def = identifier[var_ref_func];
+auto const array_def = ('[' > (expression % ',') > ']')[array_func];
 auto const operand_def =
-    constant_number | bp::bool_ | bp::quoted_string | var_declare | var_accessor | ('(' >> expression >> ')');
+    constant_number | bp::bool_ | bp::quoted_string | var_declare | var_accessor | ('(' >> expression >> ')') | array;
 auto const func_invoke_args_def = '(' > -(expression % ',') > ')';
 auto const expression_def = assign;
 auto const assign_def = (ternary_expr >> -(Symbols::kAssignOpSymbols >> expression))[binary_expr_func];
@@ -186,7 +188,7 @@ auto const var_accessor_def = (identifier > -(member_access | func_invoke_args))
 
 BOOST_PARSER_DEFINE_RULES(constant_number, var_declare, var_ref, var_accessor, filed_access, dynamic_param_access,
                           operand, func_invoke_args, member_access, unary_expr, assign, logic_expr, cmp_expr,
-                          additive_expr, multiplicative_expr, expression, ternary_expr);
+                          additive_expr, multiplicative_expr, expression, ternary_expr, array);
 
 bp::rule<struct statements, std::vector<Statement>> statements = "statements";
 bp::rule<struct return_statement, ReturnStatement> return_statement = "return_statement";

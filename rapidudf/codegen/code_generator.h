@@ -56,7 +56,7 @@ class CodeGenerator {
   ~CodeGenerator();
 
   void AddFreeRegisters(const std::vector<const Xbyak::Reg*>& regs, bool head = true);
-
+  std::vector<ValuePtr> NewArrayValue(DType dtype, size_t n);
   ValuePtr NewValue(DType dtype, const std::vector<RegisterId>& exlucde_regs = {}, bool temp = true);
   ValuePtr NewValueByRegister(DType dtype, const Xbyak::Reg& reg);
   ValuePtr NewValueByRegister(DType dtype, const std::vector<const Xbyak::Reg*>& regs);
@@ -101,7 +101,7 @@ class CodeGenerator {
   Xbyak::Address GetStackAddr(DType dtype, uint32_t offset);
 
  private:
-  std::pair<uint32_t, uint32_t> AllocateStack(DType dtype, uint32_t len);
+  std::pair<uint32_t, uint32_t> AllocateStack(uint32_t len);
   ValuePtr AllocateValue(DType dtype, uint32_t len, const std::vector<RegisterId>& exlucde_regs, bool with_register,
                          bool temp);
 

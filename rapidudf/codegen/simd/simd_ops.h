@@ -36,15 +36,7 @@
 
 namespace rapidudf {
 namespace simd {
-enum ReuseFlag {
-  REUSE_NONE = 0,
-  REUSE_LEFT = 1,
-  REUSE_RIGHT = 2,
-  REUSE_FIRST = 1,
-  REUSE_SECOND = 2,
-  REUSE_THIRD = 3,
-};
-using VectorDataWithDType = std::pair<VectorData, DType>;
+
 template <typename T, typename R, OpToken op>
 Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right);
 template <typename T, typename R, OpToken op>
@@ -75,6 +67,22 @@ T simd_vector_dot(Vector<T> left, Vector<T> right);
 
 template <typename T>
 Vector<T> simd_vector_iota(T start, uint32_t n);
+
+template <typename T>
+void sort(Vector<T> data, bool descending, bool hasnan);
+template <typename T>
+void select(Vector<T> data, size_t k, bool descending, bool hasnan);
+template <typename T>
+void topk(Vector<T> data, size_t k, bool descending, bool hasnan);
+template <typename T>
+Vector<size_t> argsort(Vector<T> data, bool descending, bool hasnan);
+template <typename T>
+Vector<size_t> argselect(Vector<T> data, size_t k, bool descending, bool hasnan);
+
+template <typename K, typename V>
+void sort_key_value(Vector<K> key, Vector<V> value, bool descending, bool hasnan);
+template <typename K, typename V>
+void topk_key_value(Vector<K> key, Vector<V> value, size_t k, bool descending, bool hasnan);
 
 }  // namespace simd
 }  // namespace rapidudf

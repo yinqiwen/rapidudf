@@ -250,25 +250,25 @@ TEST(JitCompiler, vector_iota) {
   RUDF_INFO("can cast to:{}", d.CanCastTo(d1));
 }
 
-// TEST(JitCompiler, vector_string_cmp) {
-//   std::vector<std::string> left{"hello0", "hello1", "hello2"};
-//   std::vector<std::string> right{"afasf", "rwrewe", "qw1231241"};
-//   auto left_views = StringView::makeVector(left);
-//   auto right_views = StringView::makeVector(right);
-//   simd::Vector<StringView> simd_left(left_views);
-//   simd::Vector<StringView> simd_right(right_views);
-//   JitCompiler compiler(4096, true);
-//   std::string content = R"(
-//     simd_vector<bit> test_func(simd_vector<string_view> x,simd_vector<string_view> y){
-//       return x > y;
-//     }
-//   )";
-//   auto rc = compiler.CompileFunction<simd::Vector<Bit>, simd::Vector<StringView>, simd::Vector<StringView>>(content);
-//   ASSERT_TRUE(rc.ok());
-//   auto f = std::move(rc.value());
-//   auto result = f(simd_left, simd_right);
-//   ASSERT_EQ(result.Size(), left.size());
-//   for (size_t i = 0; i < result.Size(); i++) {
-//     ASSERT_EQ(result[i], left[i] > right[i]);
-//   }
-// }
+TEST(JitCompiler, vector_string_cmp) {
+  std::vector<std::string> left{"hello0", "hello1", "hello2"};
+  std::vector<std::string> right{"afasf", "rwrewe", "qw1231241"};
+  auto left_views = StringView::makeVector(left);
+  auto right_views = StringView::makeVector(right);
+  simd::Vector<StringView> simd_left(left_views);
+  simd::Vector<StringView> simd_right(right_views);
+  JitCompiler compiler(4096, true);
+  std::string content = R"(
+    simd_vector<bit> test_func(simd_vector<string_view> x,simd_vector<string_view> y){
+      return x > y;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<Bit>, simd::Vector<StringView>, simd::Vector<StringView>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_left, simd_right);
+  ASSERT_EQ(result.Size(), left.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_EQ(result[i], left[i] > right[i]);
+  }
+}

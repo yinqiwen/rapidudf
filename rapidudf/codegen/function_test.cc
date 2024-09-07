@@ -75,7 +75,13 @@ std::pair<int, float> test_pair3() {}
 std::tuple<float, float, float, int> test_pair4() {}
 std::tuple<int, std::string_view, float> test_pair5() {}
 TEST(Function, ret_pair) {
-  RUDF_FUNC_REGISTER(test_pair0);
+  // FunctionFlags f;
+  // f.use_arena_alloctor = 1;
+  // uint8_t* v = (uint8_t*)(&f);
+
+  // RUDF_INFO("flags size:{} {}", sizeof(f), *v);
+
+  RUDF_FUNC_REGISTER2(test_pair0, kFuncUseArenaAllocator);
   RUDF_FUNC_REGISTER(test_pair1);
   RUDF_FUNC_REGISTER(test_pair2);
   RUDF_FUNC_REGISTER(test_pair3);

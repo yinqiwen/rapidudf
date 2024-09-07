@@ -45,8 +45,20 @@ using namespace rapidudf;
 using namespace rapidudf::ast;
 
 TEST(JitCompiler, simd_sort) {
-  std::vector<float> data{1.1, 2.2, 0.1, 0.2, 0.3};
-  auto result = x86simdsort::argsort(data.data(), data.size(), false, true);
-
+  std::vector<float> data{1.1, 2.2, 0.1, 0.3, 0.2, 11, 12, 3, 423, 12, 12312, 12, 4124};
+  auto result = x86simdsort::argsort(data.data(), data.size(), false, false);
   RUDF_INFO("result:[{}], data:[{}]", absl::StrJoin(result, ","), absl::StrJoin(data, ","));
+
+  auto result1 = x86simdsort::argselect(data.data(), 2, data.size(), false);
+  RUDF_INFO("result:[{}], data:[{}]", absl::StrJoin(result1, ","), absl::StrJoin(data, ","));
+
+  size_t n = 16;
+  std::vector<int> vals;
+  std::vector<float> keys;
+  for (size_t i = 0; i < n; i++) {
+    keys.emplace_back(100.0 - 1.1 - i);
+    vals.emplace_back(i);
+  }
+  x86simdsort::keyvalue_qsort(keys.data(), vals.data(), keys.size());
+  RUDF_INFO("key:[{}], val:[{}]", absl::StrJoin(keys, ","), absl::StrJoin(vals, ","));
 }

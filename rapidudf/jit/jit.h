@@ -174,7 +174,7 @@ class JitCompiler {
         }
 
         auto func = JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
-                                              ctx.has_simd_vector_operations);
+                                              ctx.use_arena_allocator);
         compile_ctxs_.erase(compile_ctxs_.begin() + i);
         return func;
       }
@@ -205,7 +205,7 @@ class JitCompiler {
     auto& ctx = compile_ctxs_[compile_function_idx_];
     absl::Cleanup _done([this]() { compile_ctxs_.clear(); });
     return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
-                                     ctx.has_simd_vector_operations);
+                                     ctx.use_arena_allocator);
   }
 
   template <typename RET, typename... Args>
@@ -226,6 +226,7 @@ class JitCompiler {
     if (!arg_names.empty()) {
       gen_func_ast.args = std::vector<ast::FunctionArg>{};
     }
+    ast_ctx_.ReserveFunctionParseContext(1);
     for (size_t i = 0; i < arg_names.size(); i++) {
       if (!ast_ctx_.AddLocalVar(arg_names[i], arg_types[i])) {
         return absl::InvalidArgumentError(fmt::format("Duplicate arg name:{}", arg_names[i]));
@@ -237,6 +238,7 @@ class JitCompiler {
     }
     auto status = DoCompileExpression(source, gen_func_ast);
     if (!status.ok()) {
+      RUDF_INFO("CompileExpression failed");
       return status;
     }
     if (dump_asm) {
@@ -245,7 +247,7 @@ class JitCompiler {
     auto& ctx = compile_ctxs_[compile_function_idx_];
     absl::Cleanup _done([this]() { compile_ctxs_.clear(); });
     return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
-                                     ctx.has_simd_vector_operations);
+                                     ctx.use_arena_allocator);
   }
 
  private:
@@ -256,7 +258,7 @@ class JitCompiler {
     std::vector<std::unique_ptr<std::string>> const_strings;
     std::unordered_map<std::string, ValuePtr> local_vars;
     FunctionDesc desc;
-    bool has_simd_vector_operations = false;
+    bool use_arena_allocator = false;
   };
   const FunctionDesc* GetFunction(const std::string& name);
   CodeGenerator& GetCodeGenerator() { return *compile_ctxs_[compile_function_idx_].code_gen; }
@@ -277,6 +279,7 @@ class JitCompiler {
   absl::StatusOr<ValuePtr> CompileExpression(ast::TernaryExprPtr expr);
   absl::StatusOr<ValuePtr> CompileExpression(const ast::VarAccessor& expr);
   absl::StatusOr<ValuePtr> CompileExpression(const ast::VarDefine& expr);
+  absl::StatusOr<ValuePtr> CompileExpression(const ast::Array& expr);
 
   absl::StatusOr<ValuePtr> CompileOperand(const ast::Operand& expr);
 

@@ -68,6 +68,8 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
             return absl::StatusOr<VarTag>(get_dtype<int64_t>());
           }
           return absl::StatusOr<VarTag>(get_dtype<double>());
+        } else if constexpr (std::is_same_v<T, Array>) {
+          return arg.Validate(ctx);
         } else {
           static_assert(sizeof(arg) == -1, "No avaialble!");
           return absl::InvalidArgumentError("No avaialble");
@@ -75,6 +77,22 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
       },
       v);
 }
+absl::StatusOr<VarTag> Array::Validate(ParseContext& ctx) {
+  if (elements.empty()) {
+    return absl::InvalidArgumentError("array can not be empty");
+  }
+  for (size_t i = 0; i < elements.size(); i++) {
+    auto result = elements[i]->Validate(ctx);
+    if (!result.ok()) {
+      return result.status();
+    }
+    if (i == 0) {
+      dtype = result->dtype.ToAbslSpan();
+    }
+  }
+  return dtype;
+}
+
 absl::StatusOr<VarTag> VarRef::Validate(ParseContext& ctx) {
   ctx.SetPosition(position);
   return ctx.IsVarExist(name, false);
@@ -235,7 +253,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           if (!left_var.dtype.IsSimdVector()) {
             left_var.dtype = right_result->dtype;
           }
-          ctx.MarkSimdVectorOperation();
+          // ctx.MarkSimdVectorOperation();
           ctx.AddBuiltinFuncCall(GetFunctionName(op, left_var.dtype, right_result->dtype));
           break;
         }
@@ -288,7 +306,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           ctx.AddBuiltinFuncCall(kBuiltinJsonCmpJson);
         } else if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           ctx.AddBuiltinFuncCall(GetFunctionName(op, left_var.dtype, right_result->dtype));
-          ctx.MarkSimdVectorOperation();
+          // ctx.MarkSimdVectorOperation();
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
           break;
         }
@@ -316,7 +334,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         break;
       }
       default: {
-        return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
+        return ctx.GetErrorStatus(fmt::format("Unimplemented {} with left dtype:{}, right dtype:{}", op,
                                               left_result->dtype, right_result->dtype));
       }
     }
@@ -353,7 +371,7 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
       if (true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
         if (true_expr_result->dtype == false_expr_result->dtype) {
           ternary_result_dtype = true_expr_result->dtype;
-          ctx.MarkSimdVectorOperation();
+          // ctx.MarkSimdVectorOperation();
           ctx.AddBuiltinFuncCall(
               GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
           return VarTag(ternary_result_dtype);
@@ -361,7 +379,7 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
       } else if (true_expr_result->dtype.IsSimdVector() && !false_expr_result->dtype.IsSimdVector()) {
         if (false_expr_result->dtype.CanCastTo(true_expr_result->dtype.Elem())) {
           ternary_result_dtype = true_expr_result->dtype;
-          ctx.MarkSimdVectorOperation();
+          // ctx.MarkSimdVectorOperation();
           ctx.AddBuiltinFuncCall(
               GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
           return VarTag(ternary_result_dtype);
@@ -369,7 +387,7 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
       } else if (!true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
         if (true_expr_result->dtype.CanCastTo(false_expr_result->dtype.Elem())) {
           ternary_result_dtype = false_expr_result->dtype;
-          ctx.MarkSimdVectorOperation();
+          // ctx.MarkSimdVectorOperation();
           ctx.AddBuiltinFuncCall(
               GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
           return VarTag(ternary_result_dtype);
@@ -378,7 +396,7 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
         if (true_expr_result->dtype.IsNumber() && false_expr_result->dtype.IsNumber()) {
           ternary_result_dtype =
               true_expr_result->dtype >= false_expr_result->dtype ? true_expr_result->dtype : false_expr_result->dtype;
-          ctx.MarkSimdVectorOperation();
+          // ctx.MarkSimdVectorOperation();
           ctx.AddBuiltinFuncCall(
               GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
           return VarTag(ternary_result_dtype.ToSimdVector());
@@ -447,13 +465,12 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
         }
       }
     }
-    RUDF_INFO("{} is builtin:{} {}", name, is_builtin_math_func(name), largest_dtype);
     if (is_builtin_math_func(name)) {
       if (name == kOpTokenStrs[OP_IOTA]) {
-        ctx.MarkSimdVectorOperation();
-        name = GetFunctionName(name, largest_dtype.ToSimdVector());
+        // ctx.MarkSimdVectorOperation();
+        name = GetFunctionName(name, arg_dtypes[0]);
       } else if (has_simd_vector) {
-        ctx.MarkSimdVectorOperation();
+        // ctx.MarkSimdVectorOperation();
         // name = "simd_vector_" + name + "_" + largest_dtype.Elem().GetTypeString();
         name = GetFunctionName(name, arg_dtypes);
       } else {
@@ -470,6 +487,9 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
       return ctx.GetErrorStatus(
           fmt::format("Invalid func call:{} args with invalid args, simd_vector_func:{}", name, has_simd_vector));
     }
+    // if (desc->is_simd_vector_func) {
+    //   ctx.MarkSimdVectorOperation();
+    // }
     return desc->return_type;
   } else {
     return ctx.IsVarExist(name, false);

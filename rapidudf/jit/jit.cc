@@ -42,7 +42,6 @@
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/register.h"
 #include "rapidudf/codegen/value.h"
-#include "rapidudf/reflect/reflect.h"
 
 #include "rapidudf/log/log.h"
 
@@ -119,6 +118,9 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
       RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("Can NOT allocate registers for func:{}.", name)));
     }
     all_func_arg_registers.insert(all_func_arg_registers.end(), arg_registers.begin(), arg_registers.end());
+    if (func_call->attrs.UseArenaAllocator()) {
+      ctx.use_arena_allocator = true;
+    }
   }
 
   for (const auto& builtin_func_call : ast_ctx_.GetAllBuiltinFuncCalls(compile_function_idx_)) {
@@ -126,6 +128,9 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
     auto* func_call = FunctionFactory::GetFunction(builtin_func_call);
     if (nullptr == func_call) {
       RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("No buitlin func:{} found.", builtin_func_call)));
+    }
+    if (func_call->attrs.UseArenaAllocator()) {
+      ctx.use_arena_allocator = true;
     }
     auto arg_registers = func_call->GetArgsRegisters();
     if (arg_registers.empty() && !func_call->arg_types.empty()) {
@@ -139,7 +144,7 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   GetCodeGenerator().AddFreeRegisters(unused_registers);
 
   ctx.desc = ctx.func_ast.ToFuncDesc();
-  ctx.has_simd_vector_operations = ast_ctx_.HasSimdVectorOperation(compile_function_idx_);
+  // ctx.has_simd_vector_operations = ast_ctx_.HasSimdVectorOperation(compile_function_idx_);
 
   auto arg_registers = ctx.desc.GetArgsRegisters();
   if (!ctx.desc.arg_types.empty() && arg_registers.empty()) {
@@ -200,7 +205,7 @@ absl::Status JitCompiler::DoCompileExpression(const std::string& source, ast::Fu
     RUDF_DEBUG("x:{}", ast_ctx_.IsVarExist("x", false).ok());
     RUDF_LOG_ERROR_STATUS(f.status());
   }
-
+  // RUDF_INFO("after ast parse, {}", ast_ctx_.)
   ast::ReturnStatement return_statement;
   return_statement.expr = *f;
   gen_func_ast.body.statements.emplace_back(return_statement);

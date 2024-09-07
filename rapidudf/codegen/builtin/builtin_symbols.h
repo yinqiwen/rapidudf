@@ -34,8 +34,8 @@
 #include <string_view>
 namespace rapidudf {
 static constexpr std::string_view kBuiltinStringViewCmp = "rapidudf_compare_string_view";
-static constexpr std::string_view kBuiltinCastStdStrToStringView = "rapidudf_cast_fbsstr_to_string_view";
-static constexpr std::string_view kBuiltinCastFbsStrToStringView = "rapidudf_cast_stdstr_to_string_view";
+static constexpr std::string_view kBuiltinCastStdStrToStringView = "rapidudf_cast_stdstr_to_string_view";
+static constexpr std::string_view kBuiltinCastFbsStrToStringView = "rapidudf_cast_fbsstr_to_string_view";
 static constexpr std::string_view kBuiltinCastStdStrViewToStringView = "rapidudf_cast_stdstrview_to_string_view";
 static constexpr std::string_view kBuiltinJsonMemberGet = "rapidudf_json_member_get";
 static constexpr std::string_view kBuiltinJsonArrayGet = "rapidudf_json_array_get";

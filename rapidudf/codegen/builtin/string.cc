@@ -87,7 +87,10 @@ bool compare_string_view(uint32_t op, StringView left, StringView right) {
   return result;
 }
 
-StringView cast_stdstr_to_string_view(const std::string& str) { return StringView(str); }
+StringView cast_stdstr_to_string_view(const std::string& str) {
+  RUDF_DEBUG("cast string:{}", str);
+  return StringView(str);
+}
 StringView cast_fbsstr_to_string_view(const flatbuffers::String& str) { return StringView(str.c_str(), str.size()); }
 StringView cast_stdstrview_to_string_view(std::string_view str) { return StringView(str); }
 
@@ -107,23 +110,15 @@ StringView cast_stdstrview_to_string_view(std::string_view str) { return StringV
 
 struct StringViewHelper {
   static size_t size(StringView s) { return s.size(); }
-  static bool contains(StringView s, StringView part) {
-    return absl::StrContains(s.get_absl_string_view(), part.get_absl_string_view());
-  }
-  static bool starts_with(StringView s, StringView part) {
-    return absl::StartsWith(s.get_absl_string_view(), part.get_absl_string_view());
-  }
-  static bool ends_with(StringView s, StringView part) {
-    return absl::EndsWith(s.get_absl_string_view(), part.get_absl_string_view());
-  }
-  static bool contains_ignore_case(StringView s, StringView part) {
-    return absl::StrContainsIgnoreCase(s.get_absl_string_view(), part.get_absl_string_view());
-  }
+  static bool contains(StringView s, StringView part) { return StringView::contains(s, part); }
+  static bool starts_with(StringView s, StringView part) { return StringView::starts_with(s, part); }
+  static bool ends_with(StringView s, StringView part) { return StringView::ends_with(s, part); }
+  static bool contains_ignore_case(StringView s, StringView part) { return StringView::contains_ignore_case(s, part); }
   static bool starts_with_ignore_case(StringView s, StringView part) {
-    return absl::StartsWith(s.get_absl_string_view(), part.get_absl_string_view());
+    return StringView::starts_with_ignore_case(s, part);
   }
   static bool ends_with_ignore_case(StringView s, StringView part) {
-    return absl::EndsWith(s.get_absl_string_view(), part.get_absl_string_view());
+    return StringView::ends_with_ignore_case(s, part);
   }
 };
 

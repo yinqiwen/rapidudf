@@ -79,8 +79,8 @@ int CodeGenerator::Finish() {
 CodeGenerator::~CodeGenerator() {}
 
 int CodeGenerator::ReturnValue(ValuePtr val) {
-  RUDF_INFO("return  dtype:{},bits:{} with value register:{}, stack:{}, const:{}", val->GetDType(),
-            val->GetDType().Bits(), val->IsRegister(), val->IsStack(), val->IsConst());
+  RUDF_INFO("return  dtype:{},bits:{} with value register:{}, stack:{} {}", val->GetDType(), val->GetDType().Bits(),
+            val->IsRegister(), val->IsStack(), val->ToString());
   if (val->GetDType().IsFloat()) {
     val->Mov(xmm0);
   } else {
@@ -168,8 +168,19 @@ void CodeGenerator::AddFreeRegisters(const std::vector<const Xbyak::Reg*>& regs,
       free_registers_.emplace_back(reg);
     }
   }
-
-  RUDF_INFO("Total free registers num:{} after add {} registers.", free_registers_.size(), regs.size());
+  std::sort(free_registers_.begin(), free_registers_.end(), [](const Xbyak::Reg* left, const Xbyak::Reg* right) {
+    if (left->getKind() < right->getKind()) {
+      return true;
+    }
+    if (left->getKind() > right->getKind()) {
+      return false;
+    }
+    return left->getIdx() < right->getIdx();
+  });
+  RUDF_INFO("Total free registers num:{} after add {} registers.,head:{}", free_registers_.size(), regs.size(), head);
+  for (auto reg : free_registers_) {
+    RUDF_INFO("Free:{}", reg->toString());
+  }
 }
 
 void CodeGenerator::SaveRegister(const Xbyak::Reg* reg) {
@@ -301,7 +312,7 @@ void CodeGenerator::DropTmpValue(const std::vector<ValuePtr> tmps) {
   }
 }
 
-std::pair<uint32_t, uint32_t> CodeGenerator::AllocateStack(DType dtype, uint32_t len) {
+std::pair<uint32_t, uint32_t> CodeGenerator::AllocateStack(uint32_t len) {
   uint32_t allign = 8;
   uint32_t allign_rest = stack_cursor_ % allign;
   uint32_t stack_offset_inc = 0;
@@ -310,7 +321,6 @@ std::pair<uint32_t, uint32_t> CodeGenerator::AllocateStack(DType dtype, uint32_t
   }
   stack_offset_inc += len;
   stack_cursor_ += stack_offset_inc;
-  RUDF_DEBUG("Allocate stack {}/{} for dtype:{}", stack_cursor_, stack_offset_inc, dtype);
   return {stack_cursor_, stack_offset_inc};
 }
 
@@ -326,7 +336,7 @@ ValuePtr CodeGenerator::AllocateValue(DType dtype, uint32_t len, const std::vect
         auto value = Value::New(this, dtype, reg, temp);
         return value;
       } else {
-        auto [stack_offset, stack_len] = AllocateStack(dtype, len);
+        auto [stack_offset, stack_len] = AllocateStack(len);
         auto value = Value::New(this, dtype, stack_offset, stack_len, temp);
         return value;
       }
@@ -340,7 +350,7 @@ ValuePtr CodeGenerator::AllocateValue(DType dtype, uint32_t len, const std::vect
       } else {
         RecycleRegister(reg0);
         RecycleRegister(reg1);
-        auto [stack_offset, stack_len] = AllocateStack(dtype, len);
+        auto [stack_offset, stack_len] = AllocateStack(len);
         auto value = Value::New(this, dtype, stack_offset, stack_len, temp);
         return value;
       }
@@ -350,6 +360,18 @@ ValuePtr CodeGenerator::AllocateValue(DType dtype, uint32_t len, const std::vect
       return nullptr;
     }
   }
+}
+
+std::vector<ValuePtr> CodeGenerator::NewArrayValue(DType dtype, size_t n) {
+  size_t stack_len = dtype.Elem().ByteSize() * n;
+  std::vector<ValuePtr> vals(n);
+  auto [stack_offset, actual_stack_len] = AllocateStack(stack_len);
+  for (size_t i = 0; i < n; i++) {
+    auto value = Value::New(this, dtype.Elem(), stack_offset, dtype.Elem().ByteSize(), false);
+    stack_offset -= dtype.Elem().ByteSize();
+    vals[i] = value;
+  }
+  return vals;
 }
 
 ValuePtr CodeGenerator::NewValueByRegister(DType dtype, const Xbyak::Reg& reg) {
@@ -376,7 +398,7 @@ ValuePtr CodeGenerator::NewValue(DType dtype, const std::vector<RegisterId>& exl
 
 ValuePtr CodeGenerator::CallFunction(const FunctionDesc& desc, const std::vector<const Value*>& args) {
   SaveInuseRegisters();
-
+  RUDF_DEBUG("Func:{} call args:{}, return {}", desc.name, args.size(), desc.return_type);
   if (desc.arg_types.size() != args.size()) {
     RUDF_ERROR("Func:{} mismatch args size {}/{}", desc.arg_types.size(), args.size());
     return {};
@@ -402,6 +424,7 @@ ValuePtr CodeGenerator::CallFunction(const FunctionDesc& desc, const std::vector
     auto arg_value = Value::New(this, args[i]->GetDType(), arg_registers[i], false);
     int rc = arg_value->Copy(*args[i]);
     if (0 != rc) {
+      RUDF_ERROR("####{}", rc);
       return {};
     }
   }

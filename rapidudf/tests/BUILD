@@ -260,10 +260,24 @@ cc_test(
     name = "simd_sort_test",
     size = "small",
     srcs = ["simd_sort_test.cc"],
-    linkopts = RUDF_DEFAULT_LINKOPTS + ["-lx86simdsortcpp"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         "//rapidudf",
         "@com_google_googletest//:gtest_main",
+        "@x86_simd_sort",
+    ],
+)
+
+cc_test(
+    name = "array_test",
+    size = "small",
+    srcs = ["array_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+        "@x86_simd_sort",
     ],
 )

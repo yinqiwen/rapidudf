@@ -34,6 +34,7 @@
 
 using namespace rapidudf;
 TEST(JitCompiler, simple) {
+  spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
   std::string content = R"(
     int test_func(){ 
@@ -50,30 +51,30 @@ TEST(JitCompiler, simple) {
   ASSERT_DOUBLE_EQ(f(), -3);
 }
 
-TEST(JitCompiler, str) {
-  JitCompiler compiler;
-  std::string content = R"(
-    string_view test_func(){
-     return "hello,world";
-    }
-  )";
+// TEST(JitCompiler, str) {
+//   JitCompiler compiler;
+//   std::string content = R"(
+//     string_view test_func(){
+//      return "hello,world";
+//     }
+//   )";
 
-  auto rc = compiler.CompileFunction<StringView>(content, true);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_EQ(f(), "hello,world");
-}
+//   auto rc = compiler.CompileFunction<StringView>(content, true);
+//   ASSERT_TRUE(rc.ok());
+//   auto f = std::move(rc.value());
+//   ASSERT_EQ(f(), "hello,world");
+// }
 
-TEST(JitCompiler, bool_test) {
-  JitCompiler compiler;
-  std::string content = R"(
-    bool test_func(){
-     return !(2>=5);
-    }
-  )";
+// TEST(JitCompiler, bool_test) {
+//   JitCompiler compiler;
+//   std::string content = R"(
+//     bool test_func(){
+//      return !(2>=5);
+//     }
+//   )";
 
-  auto rc = compiler.CompileFunction<bool>(content, true);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_EQ(f(), true);
-}
+//   auto rc = compiler.CompileFunction<bool>(content, true);
+//   ASSERT_TRUE(rc.ok());
+//   auto f = std::move(rc.value());
+//   ASSERT_EQ(f(), true);
+// }

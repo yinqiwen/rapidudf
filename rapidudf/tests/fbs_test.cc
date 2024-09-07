@@ -144,29 +144,6 @@ TEST(JitCompiler, fbs_access_read_str) {
    )";
   auto rc = compiler.CompileFunction<bool, const test_fbs::Header*>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<std::string_view, const test_fbs::Header*>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
   ASSERT_TRUE(f(fbs_ptr));
 }
-// TEST(JitCompiler, pb_access_write_int) {
-//   spdlog::set_level(spdlog::level::debug);
-//   ::test::Header pb_header;
-//   pb_header.set_scene("");
-//   pb_header.set_id(101);
-//   pb_header.set_scene("hello,world");
-
-//   JitCompiler compiler;
-//   std::string content = R"(
-//     int test_func(test::Header x, int y){
-//       x.set_id(y);
-//       return x.id();
-//     }
-//    )";
-//   auto rc = compiler.CompileFunction(content);
-//   ASSERT_TRUE(rc.ok());
-//   auto f = compiler.GetFunc<int, test::Header*, int>(true);
-//   ASSERT_TRUE(f != nullptr);
-//   ASSERT_EQ(f(&pb_header, 1024), 1024);
-//   ASSERT_EQ(pb_header.id(), 1024);
-// }

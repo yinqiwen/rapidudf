@@ -158,9 +158,9 @@ static void register_simd_vector_dot() {
 template <typename T>
 static void register_simd_vector_iota() {
   DType dtype = get_dtype<T>();
-  std::string func_name = GetFunctionName(OP_IOTA, dtype.ToSimdVector());
+  std::string func_name = GetFunctionName(OP_IOTA, dtype);
   simd::Vector<T> (*simd_f0)(T, uint32_t) = simd::simd_vector_iota<T>;
-  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
+  RUDF_FUNC_REGISTER_WITH_NAME2(func_name.c_str(), simd_f0, kFuncUseArenaAllocator);
   register_builtin_math_func("iota");
 }
 
