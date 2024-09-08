@@ -39,10 +39,8 @@
 #include "rapidudf/codegen/dtype.h"
 #include "rapidudf/codegen/function.h"
 #include "rapidudf/codegen/optype.h"
-#include "rapidudf/codegen/simd/simd_ops.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/reflect/macros.h"
-#include "rapidudf/types/simd.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
@@ -125,10 +123,10 @@ struct StringViewHelper {
 void init_builtin_string_funcs() {
   RUDF_STRUCT_HELPER_METHODS_BIND(StringViewHelper, size, contains, starts_with, ends_with, contains_ignore_case,
                                   starts_with_ignore_case, ends_with_ignore_case)
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrViewToStringView, cast_stdstrview_to_string_view);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrViewToStringView, cast_stdstrview_to_string_view, kFuncNoAttrs);
 }
 
 }  // namespace rapidudf

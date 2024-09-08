@@ -38,13 +38,13 @@
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
-static void print_span(absl::Span<StringView> x) {
+static void print_span(absl::Span<const StringView> x) {
   RUDF_ERROR("@@@{}", x.size());
   for (auto v : x) {
     RUDF_ERROR("{}", v);
   }
 }
-RUDF_FUNC_REGISTER(print_span)
+RUDF_FUNC_REGISTER(print_span, kFuncNoAttrs)
 TEST(JitCompiler, array_simple) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};

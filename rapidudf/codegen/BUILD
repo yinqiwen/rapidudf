@@ -25,7 +25,7 @@ cc_library(
         "//rapidudf/log",
         "//rapidudf/meta",
         "//rapidudf/types",
-        "//rapidudf/types:simd",
+        "//rapidudf/types:simd_vector",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_github_xbyak//:xbyak",
         "@com_google_absl//absl/types:span",

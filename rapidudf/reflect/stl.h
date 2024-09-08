@@ -39,7 +39,7 @@
 #include <vector>
 
 #include "rapidudf/reflect/struct.h"
-#include "rapidudf/types/simd.h"
+#include "rapidudf/types/simd_vector.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {

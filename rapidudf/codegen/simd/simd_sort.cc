@@ -34,7 +34,7 @@
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include "rapidudf/meta/function.h"
-#include "rapidudf/types/simd.h"
+#include "rapidudf/types/simd_vector.h"
 #include "x86simdsort.h"
 namespace rapidudf {
 namespace simd {
@@ -91,26 +91,26 @@ void select_key_value(Vector<K> key, Vector<V> value, size_t k, bool descending,
   template void func<TYPE>(Vector<TYPE> data, bool descending, bool hasnan);
 #define DEFINE_SORT_OP(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SORT_OP_TEMPLATE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
-DEFINE_SORT_OP(sort, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t)
+DEFINE_SORT_OP(sort, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t)
 
 #define DEFINE_SELECT_OP_TEMPLATE(r, func, ii, TYPE) \
   template void func<TYPE>(Vector<TYPE> data, size_t k, bool descending, bool hasnan);
 #define DEFINE_SELECT_OP(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SELECT_OP_TEMPLATE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
-DEFINE_SELECT_OP(select, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t)
-DEFINE_SELECT_OP(topk, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t)
+DEFINE_SELECT_OP(select, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t)
+DEFINE_SELECT_OP(topk, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t)
 
 #define DEFINE_ARGSORT_OP_TEMPLATE(r, func, ii, TYPE) \
   template Vector<size_t> func<TYPE>(Vector<TYPE> data, bool descending, bool hasnan);
 #define DEFINE_ARGSORT_OP(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_ARGSORT_OP_TEMPLATE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
-DEFINE_ARGSORT_OP(argsort, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t)
+DEFINE_ARGSORT_OP(argsort, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t)
 
 #define DEFINE_ARGSELECT_OP_TEMPLATE(r, func, ii, TYPE) \
   template Vector<size_t> func<TYPE>(Vector<TYPE> data, size_t, bool descending, bool hasnan);
 #define DEFINE_ARGSELECT_OP(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_ARGSELECT_OP_TEMPLATE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
-DEFINE_ARGSELECT_OP(argselect, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t)
+DEFINE_ARGSELECT_OP(argselect, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t)
 
 #define KEY_VALUE_SORT_DTYPES (uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)
 #define DEFINE_KEY_VALUE_SORT_FUNC(r, kv)                                                                          \

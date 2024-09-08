@@ -136,11 +136,8 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
 
         auto result =
             GetCodeGenerator().NewValue(left->GetDType() > right->GetDType() ? left->GetDType() : right->GetDType());
-        RUDF_DEBUG("before op:{}, left:{}, right:{}", op, left->IsConst(), right->IsRegister());
-        if (left->IsRegister() && right->IsRegister()) {
-          RUDF_DEBUG("before op:{}, left:{}, right:{}", op, left->GetOperand().toString(),
-                     right->GetOperand().toString());
-        }
+        RUDF_DEBUG("before op:{}, left {},{}, right {},{}", op, left->GetDType(), left->StorageInfo(),
+                   right->GetDType(), right->StorageInfo());
 
         int rc = left->ArithmeticOp(op, *right, result);
         if (0 != rc) {

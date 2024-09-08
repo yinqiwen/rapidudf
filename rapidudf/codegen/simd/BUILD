@@ -27,7 +27,6 @@ cc_library(
         "//rapidudf/codegen:function",
         "//rapidudf/codegen:optype",
         "//rapidudf/log",
-        "//rapidudf/types:simd",
         "@com_github_xbyak//:xbyak",
         "@com_google_absl//absl/status:statusor",
         "@com_google_highway//:bit_set",

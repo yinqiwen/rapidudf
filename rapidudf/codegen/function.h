@@ -92,7 +92,7 @@ class FunctionFactory {
   static constexpr std::string_view kSimdVectorTernaryFuncPrefix = "simd_vector_ternary";
   static constexpr std::string_view kSimdVectorFuncPrefix = "simd_vector";
   template <typename RET, typename... Args>
-  bool Register(std::string_view name, RET (*f)(Args...), FunctionAttrs attrs = {}) {
+  bool Register(std::string_view name, RET (*f)(Args...), FunctionAttrs attrs) {
     FunctionDesc desc;
     desc.name = std::string(name);
     desc.func = reinterpret_cast<void*>(f);
@@ -110,7 +110,7 @@ template <typename SAFE_WRAPPER = void>
 class FuncRegister {
  public:
   template <typename RET, typename... Args>
-  FuncRegister(std::string_view name, RET (*f)(Args...), FunctionAttrs attrs = {}) {
+  FuncRegister(std::string_view name, RET (*f)(Args...), FunctionAttrs attrs) {
     FunctionDesc desc;
     desc.name = std::string(name);
     if constexpr (std::is_void_v<SAFE_WRAPPER>) {
@@ -136,27 +136,23 @@ std::string GetFunctionName(std::string_view op, const std::vector<DType>& arg_d
 
 }  // namespace rapidudf
 
-#define RUDF_FUNC_REGISTER(f) \
-  static ::rapidudf::FuncRegister<void> BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f);
-#define RUDF_FUNC_REGISTER2(f, attrs) \
+#define RUDF_FUNC_REGISTER(f, attrs) \
   static ::rapidudf::FuncRegister<void> BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f, attrs);
 
-#define RUDF_SAFE_FUNC_REGISTER(f)                                                                         \
+#define RUDF_SAFE_FUNC_REGISTER(f, attrs)                                                                  \
   static ::rapidudf::FuncRegister<rapidudf::SafeFunctionWrapper<                                           \
       rapidudf::fnv1a_hash(__FILE__), __LINE__, rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(f)), decltype(f)>> \
-      BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f);
+      BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f, attrs);
 
-#define RUDF_FUNC_REGISTER_WITH_NAME(NAME, f) \
-  static ::rapidudf::FuncRegister BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f);
-#define RUDF_FUNC_REGISTER_WITH_NAME2(NAME, f, attrs) \
+#define RUDF_FUNC_REGISTER_WITH_NAME(NAME, f, attrs) \
   static ::rapidudf::FuncRegister BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);
 
-#define RUDF_SAFE_FUNC_REGISTER_WITH_NAME(NAME, f)                                                                     \
+#define RUDF_SAFE_FUNC_REGISTER_WITH_NAME(NAME, f, attrs)                                                              \
   static ::rapidudf::FuncRegister <                                                                                    \
       rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__, rapidudf::fnv1a_hash(NAME), decltype(f)> \
-          BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f);
+          BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);
 
-#define RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(hash, NAME, f)                                 \
+#define RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(hash, NAME, f, attrs)                          \
   static ::rapidudf::FuncRegister<                                                                \
       rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__, hash, decltype(f)>> \
-      BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f);
+      BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);

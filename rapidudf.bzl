@@ -230,12 +230,13 @@ filegroup(
 make(
     name = "x86_simd_sort",
     lib_source = ":all_srcs",
-    targets = ["sharedlib","install"],
+    targets = ["staticlib","install"],
     args = ["-j8"],
     env={"DESTDIR":"$$INSTALLDIR"},
     out_lib_dir="usr/local/lib64",
     out_include_dir="usr/local/include",
-    out_shared_libs = ["libx86simdsortcpp.so","libx86simdsortcpp.so.1"],
+    out_static_libs = ["libx86simdsortcpp.a"],
+    visibility = ["//visibility:public"],
 )
 """
     new_git_repository(

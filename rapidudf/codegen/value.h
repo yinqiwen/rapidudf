@@ -123,7 +123,7 @@ class Value : public std::enable_shared_from_this<Value> {
   int SetSpanSize(uint64_t size);
   int SetSpanStackPtr(uint32_t offset);
 
-  std::string ToString() const;
+  std::string StorageInfo() const;
 
   template <typename T>
   int Set(T val) {

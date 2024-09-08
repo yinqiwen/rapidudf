@@ -31,7 +31,7 @@
 
 #pragma once
 #include "rapidudf/reflect/struct.h"
-#include "rapidudf/types/simd.h"
+
 namespace rapidudf {
 namespace reflect {
 template <typename T>

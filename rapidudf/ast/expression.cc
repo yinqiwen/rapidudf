@@ -465,7 +465,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
         }
       }
     }
-    if (is_builtin_math_func(name)) {
+    if (is_builtin_function(name)) {
       if (name == kOpTokenStrs[OP_IOTA]) {
         // ctx.MarkSimdVectorOperation();
         name = GetFunctionName(name, arg_dtypes[0]);

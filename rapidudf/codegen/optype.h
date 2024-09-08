@@ -104,6 +104,16 @@ enum OpToken {
   OP_MULADDSUB,
   OP_NEG_MULADD,
   OP_NEG_MULSUB,
+  OP_SORT,
+  OP_SELECT,
+  OP_TOPK,
+  OP_SORT_KV,
+  OP_SELECT_KV,
+  OP_TOPK_KV,
+  OP_ARG_SORT,
+  OP_ARG_SELECT,
+  OP_SUM,
+  OP_CLONE,
   OP_END,
 };
 constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {"invalid",      "assign",
@@ -139,7 +149,12 @@ constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {"invalid",      "
                                                                "dot",          "iota",
                                                                "clamp",        "muladd",
                                                                "mulsub",       "muladdsub",
-                                                               "neg_muladd",   "neg_mulsub"};
+                                                               "neg_muladd",   "neg_mulsub",
+                                                               "sort",         "select",
+                                                               "topk",         "sort_kv",
+                                                               "select_kv",    "topk_kv",
+                                                               "argsort",      "argselect",
+                                                               "sum",          "clone"};
 }  // namespace rapidudf
 
 template <>

@@ -67,13 +67,21 @@ std::string GetFunctionName(std::string_view op, DType dtype) {
 }
 std::string GetFunctionName(std::string_view op, DType a, DType b) {
   std::string fname(op);
-  DType ele_type;
-  if (a.IsSimdVector()) {
-    ele_type = a.Elem();
+  std::string arg_types;
+  if (a.IsSimdVector() && b.IsSimdVector()) {
+    if (a.Elem() != b.Elem()) {
+      arg_types = a.Elem().GetTypeString() + "_" + b.Elem().GetTypeString();
+    } else {
+      arg_types = a.Elem().GetTypeString();
+    }
+  } else if (a.IsSimdVector()) {
+    arg_types = a.Elem().GetTypeString();
+  } else if (b.IsSimdVector()) {
+    arg_types = b.Elem().GetTypeString();
   } else {
-    ele_type = b.Elem();
+    arg_types = b.Elem().GetTypeString();
   }
-  fname = fname + "_" + ele_type.GetTypeString();
+  fname = fname + "_" + arg_types;
   if (a.IsSimdVector() || b.IsSimdVector()) {
     fname = std::string(FunctionFactory::kSimdVectorBinaryFuncPrefix) + "_" + fname;
     return fname + get_simd_vector_func_suffix({a, b});
@@ -261,11 +269,7 @@ bool FunctionFactory::Register(FunctionDesc&& desc) {
     RUDF_CRITICAL("Duplicate func name:{}", desc.name);
     return false;
   }
-  // if (desc.name.find(kSimdVectorFuncPrefix) == 0) {
-  //   desc.is_simd_vector_func = true;
-  // }
-  // printf("Registe func name:%s\n", desc.name.c_str());
-  // RUDF_DEBUG("Registe func name:{}");
+  RUDF_DEBUG("Registe function:{}", desc.name);
   return g_regs->emplace(desc.name, desc).second;
 }
 const FunctionDesc* FunctionFactory::GetFunction(const std::string& name) {

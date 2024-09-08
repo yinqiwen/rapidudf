@@ -149,13 +149,13 @@ bool json_cmp_json(uint32_t op, const JsonObject& left, const JsonObject& right)
   }
 }
 void init_builtin_json_funcs() {
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonMemberGet, json_member_get);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonArrayGet, json_array_get);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpString, json_cmp_string);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpInt, json_cmp_int);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpFloat, json_cmp_float);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpBool, json_cmp_bool);
-  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpJson, json_cmp_json);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonMemberGet, json_member_get, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonArrayGet, json_array_get, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpString, json_cmp_string, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpInt, json_cmp_int, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpFloat, json_cmp_float, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpBool, json_cmp_bool, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinJsonCmpJson, json_cmp_json, kFuncNoAttrs);
 }
 
 }  // namespace rapidudf

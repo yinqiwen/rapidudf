@@ -823,12 +823,24 @@ int Value::SetSpanStackPtr(uint32_t offset) {
   RUDF_ERROR("Can NOT set span ptr on non stack/register value.");
   return -1;
 }
-std::string Value::ToString() const {
+std::string Value::StorageInfo() const {
   std::string str;
   if (IsRegister()) {
-    for (auto reg : registers_) {
-      str.append(reg->toString()).append(",");
+    str.append("registers:[");
+    for (size_t i = 0; i < registers_.size(); i++) {
+      str.append(registers_[i]->toString());
+      if (i != registers_.size() - 1) {
+        str.append(",");
+      }
     }
+    str.append("]");
+  } else if (IsStack()) {
+    str.append("stack:[");
+    str.append("offset:").append(std::to_string(stack_offset_));
+    str.append(",length:").append(std::to_string(stack_len_));
+    str.append("]");
+  } else {
+    str = fmt::format("constants[{}]", dtype_.GetTypeString());
   }
   return str;
 }

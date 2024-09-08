@@ -60,10 +60,10 @@ int test_func(int a, double b, short c, bool x) {
   RUDF_INFO("invoke test_func:{} {} {} {} ", a, b, c, x);
   return a + 10;
 }
-RUDF_FUNC_REGISTER(noop);
-RUDF_FUNC_REGISTER(test_func0);
-RUDF_FUNC_REGISTER(test_func);
-RUDF_FUNC_REGISTER(print_rsp);
+RUDF_FUNC_REGISTER(noop, kFuncNoAttrs);
+RUDF_FUNC_REGISTER(test_func0, kFuncNoAttrs);
+RUDF_FUNC_REGISTER(test_func, kFuncNoAttrs);
+RUDF_FUNC_REGISTER(print_rsp, kFuncNoAttrs);
 
 // TEST(codegen, simple) {
 //   CodeGenerator c(40960, true);

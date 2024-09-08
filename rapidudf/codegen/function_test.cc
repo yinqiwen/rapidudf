@@ -81,12 +81,12 @@ TEST(Function, ret_pair) {
 
   // RUDF_INFO("flags size:{} {}", sizeof(f), *v);
 
-  RUDF_FUNC_REGISTER2(test_pair0, kFuncUseArenaAllocator);
-  RUDF_FUNC_REGISTER(test_pair1);
-  RUDF_FUNC_REGISTER(test_pair2);
-  RUDF_FUNC_REGISTER(test_pair3);
-  RUDF_FUNC_REGISTER(test_pair4);
-  RUDF_FUNC_REGISTER(test_pair5);
+  RUDF_FUNC_REGISTER(test_pair0, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER(test_pair1, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER(test_pair2, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER(test_pair3, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER(test_pair4, kFuncNoAttrs);
+  RUDF_FUNC_REGISTER(test_pair5, kFuncNoAttrs);
   auto desc = FunctionFactory::GetFunction("test_pair0");
   uint32_t total_bits = 0;
   auto regs = desc->GetReturnValueRegisters(total_bits);

@@ -53,7 +53,6 @@
 #include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/types/bit.h"
-#include "rapidudf/types/simd.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
@@ -71,6 +70,7 @@ static inline VectorData arena_new_vector(size_t n) {
   uint8_t* arena_data = GetArena().Allocate(byte_size);
   VectorData vec(arena_data, n, byte_size);
   vec.SetTemporary(true);
+  RUDF_DEBUG("Arena allocator create vector with {}bytes", byte_size);
   return vec;
 }
 
@@ -143,7 +143,7 @@ static inline auto do_simd_unary_op(V lv) {
 }
 
 template <typename T, OpToken op, bool is_bit>
-static inline auto do_simd_op(T lv, T rv) {
+static inline auto do_simd_binary_op(T lv, T rv) {
   if constexpr (op == OP_PLUS) {
     if constexpr (is_bit) {
       return hn::Or(lv, rv);
@@ -194,7 +194,7 @@ static inline auto do_simd_op(T lv, T rv) {
 }
 
 template <typename R, typename T, OpToken op>
-static inline auto do_simd_op(R a, T b, T c) {
+static inline auto do_simd_ternary_op(R a, T b, T c) {
   if constexpr (op == OP_CLAMP) {
     return hn::Clamp(a, b, c);
   } else if constexpr (op == OP_CONDITIONAL) {
@@ -381,7 +381,7 @@ Vector<R> simd_vector_binary_scalar_op(Vector<T> left, T right, bool reverse) {
   size_t i = 0;
   for (; (i) < left.Size(); i += lanes) {
     auto lv = hn::LoadU(d, left.Data() + i);
-    auto temp = do_simd_op<decltype(lv), op, is_bit>(reverse ? rv : lv, reverse ? lv : rv);
+    auto temp = do_simd_binary_op<decltype(lv), op, is_bit>(reverse ? rv : lv, reverse ? lv : rv);
     if constexpr (std::is_same_v<MaskType, decltype(temp)>) {
       helper.AddMask(temp);
     } else {
@@ -496,7 +496,7 @@ Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right) {
     for (; (i) < left.Size(); i += lanes) {
       auto lv = hn::LoadU(d, left.Data() + i);
       auto rv = hn::LoadU(d, right.Data() + i);
-      auto temp = do_simd_op<decltype(lv), op, is_bit>(lv, rv);
+      auto temp = do_simd_binary_op<decltype(lv), op, is_bit>(lv, rv);
       if constexpr (std::is_same_v<MaskType, decltype(temp)>) {
         helper.AddMask(temp);
       } else {
@@ -505,6 +505,47 @@ Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right) {
     }
     return Vector<R>(result_data);
   }
+}
+
+template <typename T, OpToken logic, OpToken cmp>
+Vector<Bit> simd_vector_logic_cmp(Vector<T> left, absl::Span<const T> right) {
+  using number_t = typename InternalType<T>::internal_type;
+  const hn::ScalableTag<number_t> d;
+  using Vec = hn::Vec<decltype(d)>;
+  using MaskType = hn::Mask<decltype(d)>;
+  constexpr auto lanes = hn::Lanes(d);
+  std::vector<Vec> right_vals;
+  for (auto v : right) {
+    right_vals.emplace_back(hn::Set(d, v));
+  }
+  VectorData result_data;
+  if (left.IsTemporary()) {
+    result_data = left.RawData();
+  } else {
+    result_data = arena_new_vector<Bit>(left.Size());
+  }
+  VectorDataHelper<T> helper(result_data.MutableData<Bit>());
+  size_t i = 0;
+  for (; (i) < left.Size(); i += lanes) {
+    auto lv = hn::LoadU(d, left.Data() + i);
+    MaskType mask;
+    for (size_t j = 0; j < right_vals.size(); j++) {
+      auto cmp_mask = do_simd_binary_op<decltype(lv), cmp, false>(lv, right_vals[j]);
+      if (j == 0) {
+        mask = cmp_mask;
+      } else {
+        if constexpr (logic == OP_LOGIC_AND) {
+          mask = hn::And(cmp_mask, mask);
+        } else if constexpr (logic == OP_LOGIC_OR) {
+          mask = hn::Or(cmp_mask, mask);
+        } else {
+          static_assert(sizeof(T) == -1, "unsupported logic op");
+        }
+      }
+    }
+    helper.AddMask(mask);
+  }
+  return Vector<Bit>(result_data);
 }
 
 template <typename T, typename D>
@@ -557,7 +598,7 @@ Vector<T> simd_vector_ternary_op(Vector<R> a, Vector<T> b, Vector<T> c) {
       auto av = hn::LoadU(d, a.Data() + i);
       auto bv = hn::LoadU(d, b.Data() + i);
       auto cv = hn::LoadU(d, c.Data() + i);
-      auto temp = do_simd_op<decltype(av), decltype(bv), op>(av, bv, cv);
+      auto temp = do_simd_ternary_op<decltype(av), decltype(bv), op>(av, bv, cv);
       helper.Add(temp);
     }
   }
@@ -586,7 +627,7 @@ Vector<T> simd_vector_ternary_vector_vector_scalar_op(Vector<R> a, Vector<T> b, 
     } else {
       auto av = hn::LoadU(d, a.Data() + i);
       auto bv = hn::LoadU(d, b.Data() + i);
-      auto temp = do_simd_op<decltype(av), decltype(bv), op>(av, bv, cv);
+      auto temp = do_simd_ternary_op<decltype(av), decltype(bv), op>(av, bv, cv);
       helper.Add(temp);
     }
   }
@@ -614,7 +655,7 @@ Vector<T> simd_vector_ternary_vector_scalar_vector_op(Vector<R> a, T b, Vector<T
       helper.Add(select_ternary_value<T, decltype(d)>(a, bv, cv, i));
     } else {
       auto av = hn::LoadU(d, a.Data() + i);
-      auto temp = do_simd_op<decltype(av), decltype(av), op>(av, bv, cv);
+      auto temp = do_simd_ternary_op<decltype(av), decltype(av), op>(av, bv, cv);
       helper.Add(temp);
     }
   }
@@ -640,7 +681,7 @@ Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Vector<R> a, T b, T c) {
       helper.Add(select_ternary_value<T, decltype(d)>(a, bv, cv, i));
     } else {
       auto av = hn::LoadU(d, a.Data() + i);
-      auto temp = do_simd_op<decltype(av), decltype(bv), op>(av, bv, cv);
+      auto temp = do_simd_ternary_op<decltype(av), decltype(bv), op>(av, bv, cv);
       helper.Add(temp);
     }
   }
@@ -665,7 +706,7 @@ Vector<T> simd_vector_ternary_scalar_vector_vector_op(R a, Vector<T> b, Vector<T
   for (; (i) < b.Size(); i += lanes) {
     auto cv = hn::LoadU(d, c.Data() + i);
     auto bv = hn::LoadU(d, b.Data() + i);
-    auto temp = do_simd_op<decltype(av), decltype(av), op>(av, bv, cv);
+    auto temp = do_simd_ternary_op<decltype(av), decltype(av), op>(av, bv, cv);
     helper.Add(temp);
   }
 
@@ -688,7 +729,7 @@ Vector<T> simd_vector_ternary_scalar_scalar_vector_op(R a, T b, Vector<T> c) {
   VectorDataHelper<number_t> helper(result_data.MutableData<T>());
   for (; (i) < c.Size(); i += lanes) {
     auto cv = hn::LoadU(d, c.Data() + i);
-    auto temp = do_simd_op<decltype(av), decltype(av), op>(av, bv, cv);
+    auto temp = do_simd_ternary_op<decltype(av), decltype(av), op>(av, bv, cv);
     helper.Add(temp);
   }
   return Vector<T>(result_data);
@@ -710,7 +751,7 @@ Vector<T> simd_vector_ternary_scalar_vector_scalar_op(R a, Vector<T> b, T c) {
   VectorDataHelper<number_t> helper(result_data.MutableData<T>());
   for (; (i) < b.Size(); i += lanes) {
     auto bv = hn::LoadU(d, b.Data() + i);
-    auto temp = do_simd_op<decltype(av), decltype(av), op>(av, bv, cv);
+    auto temp = do_simd_ternary_op<decltype(av), decltype(av), op>(av, bv, cv);
     helper.Add(temp);
   }
   return Vector<T>(result_data);
@@ -750,6 +791,26 @@ T simd_vector_dot(Vector<T> left, Vector<T> right) {
 }
 
 template <typename T>
+T simd_vector_sum(Vector<T> left) {
+  using number_t = typename InternalType<T>::internal_type;
+  T sum = {};
+  const hn::ScalableTag<number_t> d;
+  constexpr auto lanes = hn::Lanes(d);
+  size_t i = 0;
+  for (; (i + lanes) < left.Size(); i += lanes) {
+    auto lv = hn::LoadU(d, left.Data() + i);
+    auto sum_v = hn::ReduceSum(d, lv);
+    sum += sum_v;
+  }
+  if (i < left.Size()) {
+    for (; i < left.Size(); i++) {
+      sum += left[i];
+    }
+  }
+  return sum;
+}
+
+template <typename T>
 Vector<T> simd_vector_iota(T start, uint32_t n) {
   auto result_data = arena_new_vector<T>(n);
   const hn::ScalableTag<T> d;
@@ -760,6 +821,13 @@ Vector<T> simd_vector_iota(T start, uint32_t n) {
     auto v = hn::Iota(d, start + i);
     hn::StoreU(v, d, reinterpret_cast<T*>(arena_data + i * sizeof(T)));
   }
+  return Vector<T>(result_data);
+}
+
+template <typename T>
+Vector<T> simd_vector_clone(Vector<T> data) {
+  auto result_data = arena_new_vector<T>(data.Size());
+  memcpy(result_data.template MutableData<uint8_t>(), data.Data(), result_data.BytesCapacity());
   return Vector<T>(result_data);
 }
 
@@ -887,5 +955,17 @@ DEFINE_SIMD_DOT_OP(float, double);
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_IOTA_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 
+#define DEFINE_SIMD_CLONE_OP_TEMPLATE(r, op, ii, TYPE) template Vector<TYPE> simd_vector_clone(Vector<TYPE> data);
+#define DEFINE_SIMD_CLONE_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_CLONE_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_CLONE_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
+
+#define DEFINE_SIMD_SUM_OP_TEMPLATE(r, op, ii, TYPE) template TYPE simd_vector_sum(Vector<TYPE> vec);
+#define DEFINE_SIMD_SUM_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_SUM_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_SUM_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
+
+template Vector<Bit> simd_vector_logic_cmp<float, OP_LOGIC_OR, OP_EQUAL>(Vector<float> left,
+                                                                         absl::Span<const float> right);
 }  // namespace simd
 }  // namespace rapidudf

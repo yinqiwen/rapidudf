@@ -28,24 +28,7 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/types/simd.h"
+#include "rapidudf/types/simd_vector.h"
 namespace rapidudf {
-namespace simd {
-// IntermediateData IntermediateData::New(bool mask, size_t vec_element_size, size_t vec_size, size_t
-// residue_element_size,
-//                                        size_t residue_size) {
-//   IntermediateData tmp(Private{});
-//   tmp.is_mask_ = mask;
-//   auto& arena = Arena::Get();
-//   tmp.vecs_ = arena.Allocate(vec_element_size * vec_size);
-//   tmp.residues_ = arena.Allocate(residue_element_size * residue_size);
-//   return tmp;
-// }
-// VectorData* VectorData::New(size_t size, size_t bytes) {
-//   auto& arena = Arena::Get();
-//   VectorData* tmp = reinterpret_cast<VectorData*>(arena.Allocate(sizeof(VectorData)));
-//   tmp->size_ = size;
-//   return tmp;
-// }
-}  // namespace simd
+namespace simd {}  // namespace simd
 }  // namespace rapidudf

@@ -19,10 +19,10 @@ cc_library(
 )
 
 cc_library(
-    name = "simd",
-    srcs = ["simd.cc"],
+    name = "simd_vector",
+    srcs = ["simd_vector.cc"],
     hdrs = [
-        "simd.h",
+        "simd_vector.h",
     ],
     deps = [
         ":types",

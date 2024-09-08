@@ -288,8 +288,6 @@ int arithmetic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, const Xbyak:
     return -1;
   }
   uint32_t bits = dtype.Bits();
-  RUDF_DEBUG("op:{}, result bits:{},left:{},right:{},result:{}", op, bits, left.toString(), right.toString(),
-             result.toString());
   if (dtype == DATA_F32 || dtype == DATA_F64) {
     copy_value(c, dtype, left, xmm0);
     copy_value(c, dtype, right, xmm1);

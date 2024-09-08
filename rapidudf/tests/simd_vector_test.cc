@@ -36,7 +36,6 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/rapidudf.h"
-#include "rapidudf/types/simd.h"
 #include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
@@ -270,5 +269,33 @@ TEST(JitCompiler, vector_string_cmp) {
   ASSERT_EQ(result.Size(), left.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_EQ(result[i], left[i] > right[i]);
+  }
+}
+
+TEST(JitCompiler, complex) {
+  JitCompiler compiler(4096, true);
+  std::string source = R"(
+    simd_vector<f64> test_func(simd_vector<f64> x,simd_vector<f64> y, double pi){
+      return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<double>, simd::Vector<double>, simd::Vector<double>, double>(source);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+
+  double pi = 3.14159265358979323846264338327950288419716939937510;
+  std::vector<double> xx, yy;
+  size_t n = 1024;
+  for (size_t i = 0; i < n; i++) {
+    xx.emplace_back(i + 1);
+    yy.emplace_back(i + 101);
+  }
+  auto result = f(xx, yy, pi);
+  ASSERT_EQ(result.Size(), xx.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    double x = xx[i];
+    double y = yy[i];
+    double actual = (x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y);
+    ASSERT_EQ(result[i], actual);
   }
 }

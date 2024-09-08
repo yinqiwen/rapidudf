@@ -54,7 +54,7 @@
 
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/json_object.h"
-#include "rapidudf/types/simd.h"
+#include "rapidudf/types/simd_vector.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
