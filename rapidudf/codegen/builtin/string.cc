@@ -85,26 +85,9 @@ bool compare_string_view(uint32_t op, StringView left, StringView right) {
   return result;
 }
 
-StringView cast_stdstr_to_string_view(const std::string& str) {
-  RUDF_DEBUG("cast string:{}", str);
-  return StringView(str);
-}
+StringView cast_stdstr_to_string_view(const std::string& str) { return StringView(str); }
 StringView cast_fbsstr_to_string_view(const flatbuffers::String& str) { return StringView(str.c_str(), str.size()); }
 StringView cast_stdstrview_to_string_view(std::string_view str) { return StringView(str); }
-
-// template <OpToken op>
-// static void register_simd_vector_string_cmp() {
-//   simd::Vector<Bit> (*simd_f0)(simd::Vector<StringView>, simd::Vector<StringView>, uint32_t) =
-//       simd::simd_vector_string_cmp<op>;
-//   std::string func_name =
-//       GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW).ToSimdVector());
-//   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f0);
-
-//   simd::Vector<Bit> (*simd_f1)(simd::Vector<StringView>, StringView, bool, uint32_t) =
-//       simd::simd_vector_string_cmp_scalar<op>;
-//   func_name = GetFunctionName(op, DType(DATA_STRING_VIEW).ToSimdVector(), DType(DATA_STRING_VIEW));
-//   RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f1);
-// }
 
 struct StringViewHelper {
   static size_t size(StringView s) { return s.size(); }

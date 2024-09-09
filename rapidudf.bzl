@@ -154,6 +154,40 @@ cc_library(
         tag = "v{ver}".format(ver = json_ver),
     )
 
+    _FMTLIB_BUILD_FILE = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+cmake(
+    name = "fmt",
+    generate_args = [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DFMT_TEST=OFF",
+        "-DFMT_DOC=OFF",
+    ],
+    lib_source = ":all_srcs",
+    out_lib_dir = "lib64",
+    out_static_libs = [
+        "libfmt.a",
+    ],
+    visibility = ["//visibility:public"],
+)
+"""
+    fmtlib_ver = kwargs.get("fmtlib_ver", "11.0.2")
+    fmtlib_name = "fmt-{ver}".format(ver = fmtlib_ver)
+    http_archive(
+        name = "com_github_fmtlib",
+        strip_prefix = fmtlib_name,
+        urls = [
+            "https://github.com/fmtlib/fmt/archive/refs/tags/{ver}.tar.gz".format(ver = fmtlib_ver),
+        ],
+        build_file_content = _FMTLIB_BUILD_FILE,
+    )
+
     _SPDLOG_BUILD_FILE = """
 cc_library(
     name = "spdlog",
@@ -165,6 +199,7 @@ cc_library(
     ]),
     defines = ["SPDLOG_FMT_EXTERNAL", "SPDLOG_COMPILED_LIB"],
     includes = ["include"],
+    deps = ["@com_github_fmtlib//:fmt"],
     visibility = ["//visibility:public"],
 )
 """
