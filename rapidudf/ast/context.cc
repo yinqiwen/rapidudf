@@ -33,6 +33,7 @@
 #include <variant>
 #include <vector>
 #include "rapidudf/codegen/optype.h"
+#include "rapidudf/log/log.h"
 namespace rapidudf {
 namespace ast {
 void ParseContext::Clear() {
@@ -96,7 +97,7 @@ bool ParseContext::AddLocalVar(const std::string& name, DType dtype) {
 
 absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::string& name) {
   const FunctionDesc* desc = nullptr;
-  for (uint32_t i = 0; i < current_function_cursor_; i++) {
+  for (uint32_t i = 0; i <= current_function_cursor_; i++) {
     if (GetFunctionParseContext(i).desc.name == name) {
       desc = &(GetFunctionParseContext(i).desc);
       break;

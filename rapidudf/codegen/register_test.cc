@@ -45,7 +45,7 @@ using namespace rapidudf;
 using namespace Xbyak::util;
 
 TEST(register_mov, xmm_high) {
-  CodeGenerator c(4096, true);
+  CodeGenerator c;
   Register src(c.GetCodeGen(), &rdi, false);
   Register inter(c.GetCodeGen(), &xmm14, false);
   Register dst(c.GetCodeGen(), &xmm14, true);

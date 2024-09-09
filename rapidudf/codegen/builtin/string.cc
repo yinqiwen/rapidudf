@@ -85,7 +85,10 @@ bool compare_string_view(uint32_t op, StringView left, StringView right) {
   return result;
 }
 
-StringView cast_stdstr_to_string_view(const std::string& str) { return StringView(str); }
+StringView cast_stdstr_to_string_view(const std::string& str) {
+  RUDF_DEBUG("cast_stdstr_to_string_view #{}#", str);
+  return StringView(str);
+}
 StringView cast_fbsstr_to_string_view(const flatbuffers::String& str) { return StringView(str.c_str(), str.size()); }
 StringView cast_stdstrview_to_string_view(std::string_view str) { return StringView(str); }
 

@@ -81,6 +81,22 @@ struct VectorHelper {
     }
     return STLArgType<value_type>::value(v->at(i));
   }
+  static int find(VEC* v, arg_type_t val) {
+    if (nullptr == v) {
+      return -1;
+    }
+    for (size_t i = 0; i < v->size(); i++) {
+      auto element_v = STLArgType<value_type>::value(v->at(i));
+      if (element_v == val) {
+        return static_cast<int>(i);
+      }
+    }
+    return -1;
+  }
+  static bool contains(VEC* v, arg_type_t val) {
+    int idx = find(v, val);
+    return idx > -1;
+  }
   static void add(VEC* vec, arg_type_t val) { vec->emplace_back(STLArgType<value_type>::from(val)); }
   static void set(VEC* vec, size_t i, arg_type_t val) {
     if (vec->size() > i) {
@@ -93,7 +109,7 @@ struct VectorHelper {
     }
     return vec->size();
   }
-  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(VectorHelper<VEC>, get, set, add, size) }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(VectorHelper<VEC>, get, set, add, size, find, contains) }
 };
 
 template <typename T>

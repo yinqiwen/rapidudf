@@ -50,18 +50,24 @@
 #endif
 
 namespace rapidudf {
-JitCompiler::JitCompiler(size_t max_size, bool use_register) {
-  max_code_size_ = max_size;
-  use_registers_ = use_register;
+JitCompiler::JitCompiler(Options opts) : opts_(opts) {
   init_builtin();
   ast::Symbols::Init();
-  RUDF_DEBUG("JitCompiler use_registers:{},max_code_size:{}", use_registers_, max_code_size_);
 }
 
 void JitCompiler::AddCompileContex(const ast::Function& func_ast) {
   CompileContext ctx;
   ctx.func_ast = func_ast;
-  ctx.code_gen = std::make_unique<CodeGenerator>(max_code_size_, use_registers_);
+  typename CodeGenerator::Options codegen_opts;
+  codegen_opts.max_code_size = opts_.max_code_size;
+  codegen_opts.use_registers = opts_.use_registers;
+  if (ast_ctx_.GetAllFuncCalls(compile_function_idx_).size() > 0 ||
+      ast_ctx_.GetAllBuiltinFuncCalls(compile_function_idx_).size() > 0) {
+    codegen_opts.use_callee_saved_registers = true;
+  } else {
+    codegen_opts.use_callee_saved_registers = false;
+  }
+  ctx.code_gen = std::make_unique<CodeGenerator>(codegen_opts);
   compile_ctxs_.emplace_back(std::move(ctx));
 }
 
@@ -70,6 +76,12 @@ const FunctionDesc* JitCompiler::GetFunction(const std::string& name) {
     if (compile_ctxs_[i].desc.name == name) {
       return &compile_ctxs_[i].desc;
     }
+  }
+  if (name == compile_ctxs_[compile_function_idx_].desc.name) {
+    // self call
+    const uint8_t* code = GetCodeGenerator().GetCodeGen().getCode();
+    compile_ctxs_[compile_function_idx_].desc.func = const_cast<void*>(reinterpret_cast<const void*>(code));
+    return &compile_ctxs_[compile_function_idx_].desc;
   }
   return FunctionFactory::GetFunction(name);
 }

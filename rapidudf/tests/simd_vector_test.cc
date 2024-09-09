@@ -187,7 +187,7 @@ TEST(JitCompiler, vector_add2) {
 TEST(JitCompiler, vector_ternary) {
   std::vector<int> vec{1, 2, 3, 4, 1, 5, 6};
   simd::Vector<int> simd_vec(vec);
-  JitCompiler compiler(4096, true);
+  JitCompiler compiler({.use_registers = true});
   std::string content = R"(
     simd_vector<i32> test_func(simd_vector<i32> x){
       return x>2?1:0;
@@ -208,7 +208,7 @@ TEST(JitCompiler, vector_dot) {
   std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
   simd::Vector<float> simd_left(left);
   simd::Vector<float> simd_right(right);
-  JitCompiler compiler(4096, true);
+  JitCompiler compiler({.use_registers = true});
   std::string content = R"(
     f32 test_func(simd_vector<f32> x,simd_vector<f32> y){
       return dot(x,y);
@@ -227,7 +227,7 @@ TEST(JitCompiler, vector_dot) {
 
 TEST(JitCompiler, vector_iota) {
   spdlog::set_level(spdlog::level::debug);
-  JitCompiler compiler(4096, true);
+  JitCompiler compiler({.use_registers = true});
   std::string content = R"(
     simd_vector<f64> test_func(){
       var t = iota(1_f64,12);
@@ -256,7 +256,7 @@ TEST(JitCompiler, vector_string_cmp) {
   auto right_views = StringView::makeVector(right);
   simd::Vector<StringView> simd_left(left_views);
   simd::Vector<StringView> simd_right(right_views);
-  JitCompiler compiler(4096, true);
+  JitCompiler compiler({.use_registers = true});
   std::string content = R"(
     simd_vector<bit> test_func(simd_vector<string_view> x,simd_vector<string_view> y){
       return x > y;
@@ -273,7 +273,7 @@ TEST(JitCompiler, vector_string_cmp) {
 }
 
 TEST(JitCompiler, complex) {
-  JitCompiler compiler(4096, true);
+  JitCompiler compiler({.use_registers = true});
   std::string source = R"(
     simd_vector<f64> test_func(simd_vector<f64> x,simd_vector<f64> y, double pi){
       return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;

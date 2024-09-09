@@ -68,7 +68,9 @@ boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID
                                                         {"string", DType(DATA_STRING).ToPtr()},
                                                         {"string_view", DType(DATA_STRING_VIEW)}};
 
-boost::parser::symbols<OpToken> Symbols::kAssignOpSymbols = {{"=", OP_ASSIGN}};
+boost::parser::symbols<OpToken> Symbols::kAssignOpSymbols = {{"=", OP_ASSIGN},         {"+=", OP_PLUS_ASSIGN},
+                                                             {"-=", OP_MINUS_ASSIGN},  {"*=", OP_MULTIPLY_ASSIGN},
+                                                             {"/=", OP_DIVIDE_ASSIGN}, {"+=", OP_MOD_ASSIGN}};
 boost::parser::symbols<OpToken> Symbols::kLogicOpSymbols = {
     {"||", OP_LOGIC_OR},
     {"&&", OP_LOGIC_AND},

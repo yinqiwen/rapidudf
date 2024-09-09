@@ -35,7 +35,7 @@
 using namespace rapidudf;
 TEST(JitCompiler, simple) {
   spdlog::set_level(spdlog::level::debug);
-  JitCompiler compiler(4096, false);
+  JitCompiler compiler;
   std::string content = R"(
     int test_func(){ 
       var x = -7;

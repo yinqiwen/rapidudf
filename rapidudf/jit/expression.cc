@@ -76,18 +76,14 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name, std:
   if (nullptr == func_desc) {
     RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("No func:{} found", name)));
   }
-  // uint32_t simd_vector_reuse_flag = 0;
   for (size_t i = 0; i < arg_values.size(); i++) {
     if (arg_values[i]->GetDType() != func_desc->arg_types[i]) {
       arg_values[i] = arg_values[i]->CastTo(func_desc->arg_types[i]);
     }
-    // if (simd_vector_reuse_flag == 0 && arg_values[i]->IsTemp() && arg_values[i]->GetDType().IsSimdVector()) {
-    //   simd_vector_reuse_flag = i + 1;
-    // }
   }
-  // if (func_desc->is_simd_vector_func) {
-  //   arg_values.emplace_back(GetCodeGenerator().NewConstValue(DATA_U32, simd_vector_reuse_flag));
-  // }
+  if (nullptr == func_desc->func) {
+    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Empty func ptr for name:", name)));
+  }
   ValuePtr result = GetCodeGenerator().CallFunction(*func_desc, arg_values);
   if (result) {
     for (auto& arg : arg_values) {
@@ -122,7 +118,12 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
       case OP_MINUS:
       case OP_MULTIPLY:
       case OP_DIVIDE:
-      case OP_MOD: {
+      case OP_MOD:
+      case OP_PLUS_ASSIGN:
+      case OP_MINUS_ASSIGN:
+      case OP_MULTIPLY_ASSIGN:
+      case OP_DIVIDE_ASSIGN:
+      case OP_MOD_ASSIGN: {
         if (left->GetDType().IsSimdVector() || right->GetDType().IsSimdVector()) {
           auto func_name = GetFunctionName(op, left->GetDType(), right->GetDType());
           std::vector<ValuePtr> args{left, right};
@@ -130,12 +131,21 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
           if (!result.ok()) {
             return result.status();
           }
+          if (result.value().get() != left.get()) {
+            GetCodeGenerator().DropTmpValue(left);
+          }
           left = result.value();
           break;
         }
 
-        auto result =
-            GetCodeGenerator().NewValue(left->GetDType() > right->GetDType() ? left->GetDType() : right->GetDType());
+        ValuePtr result;
+        if (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN ||
+            op == OP_MOD_ASSIGN) {
+          result = left;
+        } else {
+          result =
+              GetCodeGenerator().NewValue(left->GetDType() > right->GetDType() ? left->GetDType() : right->GetDType());
+        }
         RUDF_DEBUG("before op:{}, left {},{}, right {},{}", op, left->GetDType(), left->StorageInfo(),
                    right->GetDType(), right->StorageInfo());
 
@@ -144,8 +154,9 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::BinaryExprPtr expr)
           RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
               fmt::format("Can NOT do op:{} with left:{}, right:{}", op, left->GetDType(), right->GetDType())));
         }
-        // return result;
-        GetCodeGenerator().DropTmpValue(left);
+        if (result.get() != left.get()) {
+          GetCodeGenerator().DropTmpValue(left);
+        }
         left = result;
         break;
       }

@@ -35,11 +35,7 @@
 #include <memory>
 #include <string>
 
-// #include "fmt/core.h"
-// #define SPDLOG_FMT_EXTERNAL 1
 #include "spdlog/spdlog.h"
-
-// #include "fmt/ostream.h"
 
 namespace rapidudf {
 extern std::shared_ptr<spdlog::logger> g_default_looger;
@@ -57,6 +53,7 @@ spdlog::logger* get_default_raw_logger();
     }                                                                                                 \
   } while (0)
 
+#define RUDF_TRACE(...) RUDF_LOG(spdlog::level::trace, __VA_ARGS__)
 #define RUDF_DEBUG(...) RUDF_LOG(spdlog::level::debug, __VA_ARGS__)
 #define RUDF_INFO(...) RUDF_LOG(spdlog::level::info, __VA_ARGS__)
 #define RUDF_WARN(...) RUDF_LOG(spdlog::level::warn, __VA_ARGS__)

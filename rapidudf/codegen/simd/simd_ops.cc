@@ -144,23 +144,23 @@ static inline auto do_simd_unary_op(V lv) {
 
 template <typename T, OpToken op, bool is_bit>
 static inline auto do_simd_binary_op(T lv, T rv) {
-  if constexpr (op == OP_PLUS) {
+  if constexpr (op == OP_PLUS || op == OP_PLUS_ASSIGN) {
     if constexpr (is_bit) {
       return hn::Or(lv, rv);
     } else {
       return hn::Add(lv, rv);
     }
-  } else if constexpr (op == OP_MINUS) {
+  } else if constexpr (op == OP_MINUS || op == OP_MINUS_ASSIGN) {
     if constexpr (is_bit) {
       return hn::And(lv, hn::Not(rv));
     } else {
       return hn::Sub(lv, rv);
     }
-  } else if constexpr (op == OP_MULTIPLY) {
+  } else if constexpr (op == OP_MULTIPLY || op == OP_MULTIPLY_ASSIGN) {
     return hn::Mul(lv, rv);
-  } else if constexpr (op == OP_DIVIDE) {
+  } else if constexpr (op == OP_DIVIDE || op == OP_DIVIDE_ASSIGN) {
     return hn::Div(lv, rv);
-  } else if constexpr (op == OP_MOD) {
+  } else if constexpr (op == OP_MOD || op == OP_MOD_ASSIGN) {
     return hn::Mod(lv, rv);
   } else if constexpr (op == OP_LOGIC_OR) {
     return hn::Or(lv, rv);
@@ -354,28 +354,17 @@ Vector<R> simd_vector_binary_scalar_op(Vector<T> left, T right, bool reverse) {
   using MaskType = hn::Mask<decltype(d)>;
 
   VectorData result_data;
-  if (left.IsTemporary()) {
+  if constexpr (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN ||
+                op == OP_MOD_ASSIGN) {
     result_data = left.RawData();
   } else {
-    result_data = arena_new_vector<R>(left.Size());
+    if (left.IsTemporary()) {
+      result_data = left.RawData();
+    } else {
+      result_data = arena_new_vector<R>(left.Size());
+    }
   }
-  // DType result_dtype = get_dtype<T>();
-  // size_t result_size = left.Size();
-  // size_t element_size = get_arena_element_size(left.Size(), lanes);
-  // uint32_t byte_size = sizeof(number_t) * element_size;
-  // if (op >= OP_NOT && op <= OP_LOGIC_OR) {
-  //   // use bits array
-  //   byte_size = get_bits_byte_size(left.Size());
-  //   result_dtype = DType(DATA_BIT);
-  // }
-  // uint8_t* arena_data = nullptr;
-  // RUDF_DEBUG("op:{},reuse:{},size:{}", static_cast<int>(op), left.Size());
-  // if (left.IsTemporary()) {
-  //   arena_data = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(left.Data()));
-  // } else {
-  //   arena_data = GetArena().Allocate(byte_size);
-  // }
-  // uint8_t* arena_data = Arena::Get().Allocate(byte_size);
+
   VectorDataHelper<number_t> helper(result_data.MutableData<R>());
   auto rv = hn::Set(d, get_constant(right));
   size_t i = 0;
@@ -485,13 +474,19 @@ Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right) {
     using MaskType = hn::Mask<decltype(d)>;
     VectorData result_data;
     size_t i = 0;
-    if (left.IsTemporary()) {
+    if constexpr (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN ||
+                  op == OP_MOD_ASSIGN) {
       result_data = left.RawData();
-    } else if (right.IsTemporary()) {
-      result_data = right.RawData();
     } else {
-      result_data = arena_new_vector<R>(left.Size());
+      if (left.IsTemporary()) {
+        result_data = left.RawData();
+      } else if (right.IsTemporary()) {
+        result_data = right.RawData();
+      } else {
+        result_data = arena_new_vector<R>(left.Size());
+      }
     }
+
     VectorDataHelper<number_t> helper(result_data.MutableData<R>());
     for (; (i) < left.Size(); i += lanes) {
       auto lv = hn::LoadU(d, left.Data() + i);
@@ -848,6 +843,15 @@ DEFINE_SIMD_BINARY_MATH_OP(OP_MULTIPLY, float, double, uint64_t, int64_t, uint32
 DEFINE_SIMD_BINARY_MATH_OP(OP_DIVIDE, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
                            int8_t);
 DEFINE_SIMD_BINARY_MATH_OP(OP_MOD, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
+DEFINE_SIMD_BINARY_MATH_OP(OP_PLUS_ASSIGN, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t,
+                           uint8_t, int8_t, Bit);
+DEFINE_SIMD_BINARY_MATH_OP(OP_MINUS_ASSIGN, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t,
+                           uint8_t, int8_t, Bit);
+DEFINE_SIMD_BINARY_MATH_OP(OP_MULTIPLY_ASSIGN, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t,
+                           uint8_t, int8_t);
+DEFINE_SIMD_BINARY_MATH_OP(OP_DIVIDE_ASSIGN, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t,
+                           uint8_t, int8_t);
+DEFINE_SIMD_BINARY_MATH_OP(OP_MOD_ASSIGN, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 DEFINE_SIMD_BINARY_MATH_OP(OP_MAX, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
                            int8_t);
 DEFINE_SIMD_BINARY_MATH_OP(OP_MIN, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,

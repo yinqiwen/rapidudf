@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,10 +28,28 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include "rapidudf/rapidudf.h"
 
-#pragma once
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
+int main() {
+  // 1. 如果需要, 可以设置rapidudf logger
+  //   std::shared_ptr<spdlog::logger> mylogger;
+  //   rapidudf::set_default_logger(mylogger);
 
-namespace rapidudf {}  // namespace rapidudf
+  // 2. expression string
+  std::string expression = "x >= 1 && y < 10";
+
+  // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
+  rapidudf::JitCompiler compiler;
+  // CompileExpression的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
+  auto result = compiler.CompileExpression<bool, int, int>(expression, {"x", "y"});
+  if (!result.ok()) {
+    RUDF_ERROR("{}", result.status().ToString());
+    return -1;
+  }
+
+  // 4. 执行function
+  rapidudf::JitFunction<bool, int, int> f = std::move(result.value());
+  bool v = f(2, 3);  // true
+  v = f(0, 1);       // false
+  return 0;
+};

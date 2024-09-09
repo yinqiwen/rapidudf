@@ -269,7 +269,7 @@ bool FunctionFactory::Register(FunctionDesc&& desc) {
     RUDF_CRITICAL("Duplicate func name:{}", desc.name);
     return false;
   }
-  RUDF_DEBUG("Registe function:{}", desc.name);
+  // RUDF_DEBUG("Registe function:{}", desc.name);
   return g_regs->emplace(desc.name, desc).second;
 }
 const FunctionDesc* FunctionFactory::GetFunction(const std::string& name) {

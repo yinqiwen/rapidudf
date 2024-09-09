@@ -128,7 +128,11 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, DType src_dtype)
     if (!field_accessor->HasField()) {
       return ctx.GetErrorStatus(fmt::format("Can NOT get field:{} accessor for dtype:{}", field, src_dtype));
     }
-    return *field_accessor->member_field_dtype;
+    DType field_dtype = *field_accessor->member_field_dtype;
+    if (!field_dtype.IsPrimitive() && !field_dtype.IsPtr() && !field_dtype.IsSimdVector()) {
+      field_dtype = field_dtype.ToPtr();
+    }
+    return field_dtype;
   } else {
     if (!field_accessor->HasMemberFunc()) {
       return ctx.GetErrorStatus(fmt::format("Can NOT get member func:{} accessor for dtype:{}", field, src_dtype));
@@ -248,7 +252,12 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       case OP_MINUS:
       case OP_MULTIPLY:
       case OP_DIVIDE:
-      case OP_MOD: {
+      case OP_MOD:
+      case OP_PLUS_ASSIGN:
+      case OP_MINUS_ASSIGN:
+      case OP_MULTIPLY_ASSIGN:
+      case OP_DIVIDE_ASSIGN:
+      case OP_MOD_ASSIGN: {
         if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           if (!left_var.dtype.IsSimdVector()) {
             left_var.dtype = right_result->dtype;

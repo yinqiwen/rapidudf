@@ -60,22 +60,20 @@ class JitCompiler;
 template <typename RET, typename... Args>
 class JitFunction {
  public:
-  JitFunction(const std::string& name, std::unique_ptr<CodeGenerator>&& code_gen,
-              std::vector<std::unique_ptr<std::string>>&& const_vals, bool reset_arena)
+  JitFunction() = default;
+  explicit JitFunction(const std::string& name, std::unique_ptr<CodeGenerator>&& code_gen,
+                       std::vector<std::unique_ptr<std::string>>&& const_vals, bool reset_arena)
       : name_(name), code_gen_(std::move(code_gen)), const_strings_(std::move(const_vals)) {
     f_ = reinterpret_cast<RET (*)(Args...)>(const_cast<uint8_t*>(code_gen_->GetCodeGen().getCode()));
   }
-  JitFunction(JitFunction&& other) {
-    name_ = std::move(other.name_);
-    code_gen_ = std::move(other.code_gen_);
-    const_strings_ = std::move(other.const_strings_);
-    f_ = other.f_;
-    rethrow_ = other.rethrow_;
-    unsafe_ = other.unsafe_;
-  }
+  JitFunction(JitFunction&& other) { MoveFrom(std::move(other)); }
   ~JitFunction() {}
   JitFunction(const JitFunction&) = delete;
   JitFunction& operator=(const JitFunction&) = delete;
+  JitFunction& operator=(JitFunction&& other) {
+    MoveFrom(std::move(other));
+    return *this;
+  }
 
   const std::string& GetName() const { return name_; }
 
@@ -147,11 +145,24 @@ class JitFunction {
   bool rethrow_ = true;
   bool reset_arena_ = false;
   friend class JitCompiler;
+
+  void MoveFrom(JitFunction&& other) {
+    name_ = std::move(other.name_);
+    code_gen_ = std::move(other.code_gen_);
+    const_strings_ = std::move(other.const_strings_);
+    f_ = other.f_;
+    rethrow_ = other.rethrow_;
+    unsafe_ = other.unsafe_;
+  }
 };
 
 class JitCompiler {
  public:
-  explicit JitCompiler(size_t max_size = 4096, bool use_register = true);
+  struct Options {
+    size_t max_code_size = 4096;
+    bool use_registers = true;
+  };
+  explicit JitCompiler(Options opts = {.max_code_size = 4096, .use_registers = true});
 
   absl::StatusOr<std::vector<std::string>> CompileSource(const std::string& source, bool dump_asm = false);
 
@@ -300,11 +311,11 @@ class JitCompiler {
 
   uint32_t GetLabelCursor() { return label_cursor_++; }
 
+  Options opts_;
+
   std::mutex jit_mutex_;
   // std::unique_ptr<CodeGenerator> code_gen_;
 
-  uint32_t max_code_size_ = 4096;
-  bool use_registers_ = false;
   ast::ParseContext ast_ctx_;
   std::vector<CompileContext> compile_ctxs_;
 

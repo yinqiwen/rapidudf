@@ -34,8 +34,6 @@
 #include <deque>
 #include <map>
 #include <memory>
-#include <optional>
-#include <type_traits>
 #include <unordered_map>
 #include <vector>
 #include "xbyak/xbyak.h"
@@ -52,7 +50,17 @@ class Value;
 
 class CodeGenerator {
  public:
-  explicit CodeGenerator(size_t max_size = 4096, bool use_register = false);
+  struct Options {
+    size_t max_code_size = 4096;
+    bool use_registers = true;
+    bool use_callee_saved_registers = true;
+    // Options() : max_code_size(4096), use_registers(true), use_callee_saved_registers(true) {}
+  };
+  explicit CodeGenerator(Options opts = Options{
+                             .max_code_size = 4096, .use_registers = true, .use_callee_saved_registers = true});
+  explicit CodeGenerator(size_t code_size, bool use_registers)
+      : CodeGenerator(
+            Options{.max_code_size = code_size, .use_registers = use_registers, .use_callee_saved_registers = true}) {}
   ~CodeGenerator();
 
   void AddFreeRegisters(const std::vector<const Xbyak::Reg*>& regs, bool head = true);
@@ -117,6 +125,8 @@ class CodeGenerator {
   const Xbyak::Reg* AllocateRegister(const std::vector<RegisterId>& exlucde_regs);
   void RecycleRegister(const Xbyak::Reg* reg);
 
+  Options opts_;
+
   std::unique_ptr<Xbyak::CodeGenerator> jit_;
 
   uint32_t stack_cursor_ = 0;
@@ -128,10 +138,8 @@ class CodeGenerator {
   std::set<const Xbyak::Reg*> inuse_registers_;
 
   std::set<const Xbyak::Reg*> callee_saved_registers_;
-  std::set<const Xbyak::Reg*> used_callee_saved_registers_;
 
   std::unordered_map<const Xbyak::Reg*, uint32_t> saved_registers_;
-  bool use_register_ = true;
 
   friend class Value;
 };

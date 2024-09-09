@@ -257,6 +257,18 @@ void init_builtin_simd_vector_funcs() {
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_DIVIDE, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
                                     uint16_t, uint8_t)
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MOD, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t, uint8_t)
+
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_PLUS_ASSIGN, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                    uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MINUS_ASSIGN, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                    uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MULTIPLY_ASSIGN, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                    uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_DIVIDE_ASSIGN, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                                    uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MOD_ASSIGN, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t,
+                                    uint8_t)
+
   REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(OP_GREATER_EQUAL, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
                                          uint32_t, uint16_t, uint8_t, StringView)
   REGISTER_SIMD_VECTOR_BINARY_BOOL_FUNCS(OP_GREATER, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,

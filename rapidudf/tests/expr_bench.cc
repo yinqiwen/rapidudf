@@ -36,7 +36,7 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
-static std::vector<rapidudf::JitFunction<double, double, double, double>> g_expr_funcs;
+static rapidudf::JitFunction<double, double, double, double> g_expr_func;
 static std::vector<rapidudf::JitFunction<rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>,
                                          rapidudf::simd::Vector<double>, double>>
     g_vector_expr_funcs;
@@ -49,7 +49,7 @@ static void DoRapidUDFExprSetup(const benchmark::State& state) {
   )";
   rapidudf::JitCompiler compiler;
   auto result = compiler.CompileFunction<double, double, double, double>(source, false);
-  g_expr_funcs.emplace_back(std::move(result.value()));
+  g_expr_func = std::move(result.value());
 }
 
 static void DoRapidUDFExprTeardown(const benchmark::State& state) {}
@@ -58,7 +58,7 @@ static void BM_rapidudf_expr_func(benchmark::State& state) {
   double result = 0;
   size_t n = 0;
   for (auto _ : state) {
-    result += g_expr_funcs[0](100, 102, pi);
+    result += g_expr_func(100, 102, pi);
     n++;
   }
   double x = 100;

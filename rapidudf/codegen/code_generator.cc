@@ -57,18 +57,22 @@ namespace rapidudf {
 using namespace Xbyak::util;
 static inline uint32_t allgin16(uint32_t x) { return (x + 15) & ~15; }
 
-CodeGenerator::CodeGenerator(size_t max_size, bool use_register) : use_register_(use_register) {
-  jit_ = std::make_unique<Xbyak::CodeGenerator>(max_size);
-  if (use_register_) {
+CodeGenerator::CodeGenerator(Options opts) : opts_(opts) {
+  RUDF_DEBUG("New CodeGenerator with max_code_size:{}, use_registers:{}, use_callee_saved_registers:{}",
+             opts_.max_code_size, opts_.use_registers, opts_.use_callee_saved_registers);
+  jit_ = std::make_unique<Xbyak::CodeGenerator>(opts_.max_code_size);
+  if (opts_.use_registers) {
     InitFreeRegisters();
   }
-
-  // RUDF_INFO("Free registers num:{}", free_registers_.size());
 
   jit_->push(rbp);
   jit_->mov(rbp, rsp);
 
-  // jit_->sub(rsp, 24);
+  if (opts_.use_registers && opts_.use_callee_saved_registers) {
+    for (auto reg : callee_saved_registers_) {
+      SaveRegister(reg);
+    }
+  }
 }
 int CodeGenerator::Finish() {
   RestoreCalleeSavedRegisters();
@@ -136,15 +140,14 @@ int CodeGenerator::Jump(const std::string& label, OpToken cmp) {
 }
 
 void CodeGenerator::InitFreeRegisters() {
-  free_registers_.emplace_back(&rbx);
-  free_registers_.emplace_back(&r12);
-  free_registers_.emplace_back(&r13);
-  free_registers_.emplace_back(&r14);
-  free_registers_.emplace_back(&r15);
+  // free_registers_.emplace_back(&rbx);
+  // free_registers_.emplace_back(&r12);
+  // free_registers_.emplace_back(&r13);
+  // free_registers_.emplace_back(&r14);
+  // free_registers_.emplace_back(&r15);
 #define ADD_FREE_XMM_REG_HIGH(z, n, text) free_registers_.emplace_back(&BOOST_PP_CAT(text, n));
 #define ADD_FREE_XMM_REG_LOW(z, n, text) free_registers_.emplace_back(&BOOST_PP_CAT(text, n));
   BOOST_PP_REPEAT_FROM_TO(8, 16, ADD_FREE_XMM_REG_LOW, xmm)
-  // BOOST_PP_REPEAT_FROM_TO(0, 16, ADD_FREE_XMM_REG_HIGH, xmm)
 #undef ADD_FREE_XMM_REG_HIGH
 #undef ADD_FREE_XMM_REG_LOW
 
@@ -156,7 +159,7 @@ void CodeGenerator::InitFreeRegisters() {
 }
 
 void CodeGenerator::AddFreeRegisters(const std::vector<const Xbyak::Reg*>& regs, bool head) {
-  if (!use_register_) {
+  if (!opts_.use_registers) {
     return;
   }
   if (head) {
@@ -177,10 +180,15 @@ void CodeGenerator::AddFreeRegisters(const std::vector<const Xbyak::Reg*>& regs,
     }
     return left->getIdx() < right->getIdx();
   });
+  // std::random_device rd;
+  // std::mt19937 g(rd());
+  // std::shuffle(free_registers_.begin(), free_registers_.end(), g);
 
-  std::random_device rd;
-  std::mt19937 g(rd());
-  std::shuffle(free_registers_.begin(), free_registers_.end(), g);
+  if (opts_.use_callee_saved_registers) {
+    for (auto reg : callee_saved_registers_) {
+      free_registers_.emplace_front(reg);
+    }
+  }
   std::string reg_strs;
   for (auto reg : free_registers_) {
     reg_strs.append(reg->toString()).append(",");
@@ -198,6 +206,7 @@ void CodeGenerator::SaveRegister(const Xbyak::Reg* reg) {
     jit_->mov(addr, *reg);
   }
   saved_registers_.emplace(reg, stack_cursor_);
+  RUDF_DEBUG("save register:{} with stack offset:{}", reg->toString(), stack_cursor_);
 }
 void CodeGenerator::LoadRegister(const Xbyak::Reg* reg) {
   auto found = saved_registers_.find(reg);
@@ -219,7 +228,10 @@ void CodeGenerator::SaveInuseRegisters() {
   for (auto iter = inuse_registers_.begin(); iter != inuse_registers_.end(); iter++) {
     auto reg = *iter;
     if (callee_saved_registers_.count(reg) == 0) {
+      RUDF_DEBUG("Save caller saved register:{}", reg->toString());
       SaveRegister(reg);
+    } else {
+      RUDF_DEBUG("No need to save register:{}", reg->toString());
     }
   }
 }
@@ -227,14 +239,22 @@ void CodeGenerator::RestoreInuseRegisters() {
   for (auto iter = inuse_registers_.rbegin(); iter != inuse_registers_.rend(); iter++) {
     auto reg = *iter;
     if (callee_saved_registers_.count(reg) == 0) {
-      // RUDF_DEBUG("restore reg:{} {} {} {}", reg->isREG(), reg->getIdx(), reg == &rax, rax.getIdx());
+      RUDF_DEBUG("Restore caller saved register:{}", reg->toString());
       LoadRegister(reg);
+    } else {
+      RUDF_DEBUG("No need to restore callee saved register:{}", reg->toString());
     }
   }
 }
 void CodeGenerator::RestoreCalleeSavedRegisters() {
-  for (auto reg : used_callee_saved_registers_) {
-    LoadRegister(reg);
+  // for (auto reg : used_callee_saved_registers_) {
+  //   RUDF_DEBUG("Restore callee saved register:{}", reg->toString());
+  //   LoadRegister(reg);
+  // }
+  if (opts_.use_registers && opts_.use_callee_saved_registers) {
+    for (auto reg : callee_saved_registers_) {
+      LoadRegister(reg);
+    }
   }
 }
 
@@ -271,11 +291,12 @@ const Xbyak::Reg* CodeGenerator::AllocateRegister(const std::vector<RegisterId>&
   }
 
   inuse_registers_.insert(allocated_reg);
-  if (callee_saved_registers_.count(allocated_reg) == 1) {
-    if (used_callee_saved_registers_.insert(allocated_reg).second) {
-      SaveRegister(allocated_reg);
-    }
-  }
+  // if (callee_saved_registers_.count(allocated_reg->toString()) == 1) {
+  //   if (used_callee_saved_registers_.insert(allocated_reg).second) {
+  //     RUDF_DEBUG("Save callee saved register:{} when first allocated", allocated_reg->toString());
+  //     // SaveRegister(allocated_reg);
+  //   }
+  // }
   RUDF_DEBUG("Allocate register:{}, {} free left.", allocated_reg->toString(), free_registers_.size());
   return allocated_reg;
 }
