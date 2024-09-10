@@ -144,4 +144,22 @@ static void BM_exprtk_expr_func(benchmark::State& state) {
 }
 BENCHMARK(BM_exprtk_expr_func)->Setup(DoExprtkExprSetup)->Teardown(DooExprtkExprTeardown);
 
+static void DoNativeFuncSetup(const benchmark::State& state) { init_test_numbers(); }
+
+static void DoNativeFuncTeardown(const benchmark::State& state) {}
+
+static void BM_native_func(benchmark::State& state) {
+  double results = 0;
+  for (auto _ : state) {
+    for (size_t i = 0; i < test_n; i++) {
+      double x = xx[i];
+      double y = yy[i];
+      double result = x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
+      results += result;
+    }
+  }
+  RUDF_INFO("Native result:{}", results);
+}
+BENCHMARK(BM_native_func)->Setup(DoNativeFuncSetup)->Teardown(DoNativeFuncTeardown);
+
 BENCHMARK_MAIN();

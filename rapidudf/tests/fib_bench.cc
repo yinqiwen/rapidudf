@@ -28,15 +28,17 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include <benchmark/benchmark.h>
+#include <cmath>
+#include <vector>
+
+#include "rapidudf/jit/jit.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
-int main() {
-  spdlog::set_level(spdlog::level::debug);
-  // 1. 如果需要, 可以设置rapidudf logger
-  //   std::shared_ptr<spdlog::logger> mylogger;
-  //   rapidudf::set_default_logger(mylogger);
+static rapidudf::JitFunction<int, int> g_expr_func;
 
-  // 2. UDF string
+static void DoRapidUDFFibSetup(const benchmark::State& state) {
   std::string source = R"(
     int fib(int n) 
     { 
@@ -46,20 +48,42 @@ int main() {
        return fib(n - 1) + fib(n - 2); //递归调用
     } 
   )";
-
-  // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
   rapidudf::JitCompiler compiler({.use_registers = false});
-  // CompileExpression的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
-  auto result = compiler.CompileFunction<int, int>(source, true);
-  if (!result.ok()) {
-    RUDF_ERROR("{}", result.status().ToString());
-    return -1;
-  }
+  auto result = compiler.CompileFunction<int, int>(source, false);
+  g_expr_func = std::move(result.value());
+}
 
-  // 4. 执行function
-  rapidudf::JitFunction<int, int> f = std::move(result.value());
-  int n = 9;
-  int x = f(n);  // 34
-  RUDF_INFO("fib({}):{}", n, x);
-  return 0;
-};
+static void DoRapidUDFFibTeardown(const benchmark::State& state) {}
+
+static void BM_rapidudf_fib_func(benchmark::State& state) {
+  uint64_t result = 0;
+  size_t n = 0;
+  for (auto _ : state) {
+    result += g_expr_func(20);
+    n++;
+  }
+}
+BENCHMARK(BM_rapidudf_fib_func)->Setup(DoRapidUDFFibSetup)->Teardown(DoRapidUDFFibTeardown);
+
+static void DoNativeFibSetup(const benchmark::State& state) {}
+
+static void DooNativeFibTeardown(const benchmark::State& state) {}
+
+static int __attribute__((noinline)) fib(int n) {
+  if (n <= 1) {
+    return n;
+  }
+  return fib(n - 1) + fib(n - 2);  // 递归调用
+}
+
+static void BM_native_fib_func(benchmark::State& state) {
+  uint64_t result = 0;
+  size_t n = 0;
+  for (auto _ : state) {
+    result += fib(20);
+    n++;
+  }
+}
+BENCHMARK(BM_native_fib_func)->Setup(DoNativeFibSetup)->Teardown(DooNativeFibTeardown);
+
+BENCHMARK_MAIN();

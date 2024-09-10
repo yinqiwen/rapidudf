@@ -36,6 +36,16 @@ cc_binary(
     ],
 )
 
+cc_binary(
+    name = "fib_bench",
+    srcs = ["fib_bench.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        "//rapidudf",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
 cc_test(
     name = "pb_test",
     size = "small",
