@@ -32,8 +32,8 @@
 #include <fmt/format.h>
 #include <variant>
 #include <vector>
-#include "rapidudf/codegen/optype.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace ast {
 void ParseContext::Clear() {

@@ -32,9 +32,8 @@
 #include <gtest/gtest.h>
 #include <vector>
 #include "absl/strings/str_join.h"
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/types/string_view.h"
+
+#include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;

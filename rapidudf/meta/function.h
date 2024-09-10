@@ -32,8 +32,14 @@
 #pragma once
 #include <setjmp.h>
 #include <cstdint>
+
+#include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/stringize.hpp>
+
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
 
@@ -62,6 +68,81 @@ constexpr uint64_t fnv1a_hash(const char* str) {
   return hash;
 }
 constexpr uint64_t fnv1a_hash(std::string_view str) { return fnv1a_hash(str.data()); }
+
+enum FuncAttrs : uint8_t {
+  kFuncNoAttrs = 0,
+  kFuncUseArenaAllocator = 1,
+};
+class FunctionAttrs {
+ public:
+  FunctionAttrs(FuncAttrs attrs = kFuncNoAttrs) { attrs_ = attrs; }
+  FunctionAttrs(uint8_t attrs) { attrs_ = static_cast<FuncAttrs>(attrs); }
+  bool UseArenaAllocator() const { return (attrs_ & kFuncUseArenaAllocator) > 0; }
+
+ private:
+  FuncAttrs attrs_;
+};
+
+struct FunctionDesc {
+  std::string name;
+  // return types
+  DType return_type;
+  // args types
+  std::vector<DType> arg_types;
+  void* func = nullptr;
+  FunctionAttrs attrs;
+
+  bool ValidateArgs(const std::vector<DType>& ts) const;
+};
+
+class FunctionFactory {
+ public:
+  static constexpr std::string_view kSimdVectorUnaryFuncPrefix = "simd_vector_unary";
+  static constexpr std::string_view kSimdVectorBinaryFuncPrefix = "simd_vector_binary";
+  static constexpr std::string_view kSimdVectorTernaryFuncPrefix = "simd_vector_ternary";
+  static constexpr std::string_view kSimdVectorFuncPrefix = "simd_vector";
+  template <typename RET, typename... Args>
+  bool Register(std::string_view name, RET (*f)(Args...), FunctionAttrs attrs) {
+    FunctionDesc desc;
+    desc.name = std::string(name);
+    desc.func = reinterpret_cast<void*>(f);
+    desc.return_type = get_dtype<RET>();
+    desc.attrs = attrs;
+    (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
+    return Register(std::move(desc));
+  }
+
+  static bool Register(FunctionDesc&& desc);
+  static const FunctionDesc* GetFunction(const std::string& name);
+};
+
+template <typename SAFE_WRAPPER = void>
+class FuncRegister {
+ public:
+  template <typename RET, typename... Args>
+  FuncRegister(std::string_view name, RET (*f)(Args...), FunctionAttrs attrs) {
+    FunctionDesc desc;
+    desc.name = std::string(name);
+    if constexpr (std::is_void_v<SAFE_WRAPPER>) {
+      desc.func = reinterpret_cast<void*>(f);
+    } else {
+      SAFE_WRAPPER::GetFunc() = f;
+      SAFE_WRAPPER::GetFuncName() = std::string(name);
+      desc.func = reinterpret_cast<void*>(SAFE_WRAPPER::SafeCall);
+    }
+    desc.return_type = get_dtype<RET>();
+    desc.attrs = attrs;
+    (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
+    FunctionFactory::Register(std::move(desc));
+  }
+};
+std::string GetFunctionName(OpToken op, DType dtype);
+std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype);
+std::string GetFunctionName(OpToken op, DType a, DType b, DType c);
+std::string GetFunctionName(std::string_view op, DType dtype);
+std::string GetFunctionName(std::string_view op, DType left_dtype, DType right_dtype);
+std::string GetFunctionName(std::string_view op, DType a, DType b, DType c);
+std::string GetFunctionName(std::string_view op, const std::vector<DType>& arg_dtypes);
 
 template <uint64_t, uint32_t, uint64_t, typename F>
 struct MemberFunctionWrapper;
@@ -308,3 +389,24 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
     wrapper_t::GetFuncName() = name;                                                                      \
     func = wrapper_t::SafeCall;                                                                           \
   } while (0)
+
+#define RUDF_FUNC_REGISTER(f, attrs) \
+  static ::rapidudf::FuncRegister<void> BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f, attrs);
+
+#define RUDF_SAFE_FUNC_REGISTER(f, attrs)                                                                  \
+  static ::rapidudf::FuncRegister<rapidudf::SafeFunctionWrapper<                                           \
+      rapidudf::fnv1a_hash(__FILE__), __LINE__, rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(f)), decltype(f)>> \
+      BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f, attrs);
+
+#define RUDF_FUNC_REGISTER_WITH_NAME(NAME, f, attrs) \
+  static ::rapidudf::FuncRegister BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);
+
+#define RUDF_SAFE_FUNC_REGISTER_WITH_NAME(NAME, f, attrs)                                                              \
+  static ::rapidudf::FuncRegister <                                                                                    \
+      rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__, rapidudf::fnv1a_hash(NAME), decltype(f)> \
+          BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);
+
+#define RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(hash, NAME, f, attrs)                          \
+  static ::rapidudf::FuncRegister<                                                                \
+      rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__, hash, decltype(f)>> \
+      BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);

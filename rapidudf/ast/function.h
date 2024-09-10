@@ -35,8 +35,9 @@
 #include <vector>
 #include "rapidudf/ast/block.h"
 #include "rapidudf/ast/context.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/function.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/function.h"
+#include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
 namespace ast {

@@ -34,12 +34,12 @@
 #include <variant>
 #include <vector>
 #include "rapidudf/ast/context.h"
-#include "rapidudf/codegen/builtin/builtin.h"
-#include "rapidudf/codegen/builtin/builtin_symbols.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/optype.h"
+#include "rapidudf/builtin/builtin.h"
+#include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/function.h"
+#include "rapidudf/meta/optype.h"
 #include "rapidudf/reflect/reflect.h"
 namespace rapidudf {
 namespace ast {

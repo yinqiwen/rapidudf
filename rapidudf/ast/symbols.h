@@ -31,8 +31,8 @@
 
 #pragma once
 #include <boost/parser/parser.hpp>
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/optype.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace ast {
 

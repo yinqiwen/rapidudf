@@ -33,9 +33,9 @@
 #include <mutex>
 #include <string_view>
 #include <vector>
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/optype.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace ast {
 static std::vector<std::unique_ptr<std::string>>& get_symbol_token_cache() {

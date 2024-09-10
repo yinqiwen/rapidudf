@@ -33,11 +33,8 @@
 #include <functional>
 #include <string_view>
 #include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/types/string_view.h"
+
+#include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
@@ -51,6 +48,7 @@ TEST(JitCompiler, cmp_greater) {
     }
   )";
   auto rc = compiler.CompileFunction<int, int, int>(content);
+
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(10, 1), 1);

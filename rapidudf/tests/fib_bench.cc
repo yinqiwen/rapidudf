@@ -32,8 +32,6 @@
 #include <cmath>
 #include <vector>
 
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 static rapidudf::JitFunction<int, int> g_expr_func;

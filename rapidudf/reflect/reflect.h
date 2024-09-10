@@ -35,10 +35,11 @@
 #include <unordered_map>
 #include <vector>
 #include "absl/status/statusor.h"
-#include "rapidudf/codegen/code_generator.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/value.h"
+// #include "rapidudf/codegen/code_generator.h"
+#include "rapidudf/meta/function.h"
+// #include "rapidudf/codegen/value.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
 template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename T>
@@ -58,10 +59,6 @@ struct StructMember {
 
   bool HasField() const { return member_field_dtype.has_value(); }
   bool HasMemberFunc() const { return member_func.has_value(); }
-
-  absl::StatusOr<ValuePtr> BuildFuncCall(CodeGenerator& codegen, const Value& this_arg,
-                                         const std::vector<ValuePtr>& args = {});
-  absl::StatusOr<ValuePtr> BuildFieldAccess(CodeGenerator& codegen);
 };
 using StructMemberMap = std::unordered_map<std::string, StructMember>;
 using GlobalStructMemberIndex = std::unordered_map<uint64_t, StructMemberMap>;

@@ -281,6 +281,38 @@ make(
         build_file_content = _X86_SIMD_SORT_BUILD_FILE,
     )
 
+    _SLEEF_BUILD_FILE = """
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+cmake(
+    name = "sleef",
+    generate_args = [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DSLEEF_BUILD_TESTS=OFF",
+        "-DFMT_DOC=OFF",
+    ],
+    lib_source = ":all_srcs",
+    out_lib_dir = "lib64",
+    out_static_libs = [
+        "libsleef.a",
+        "libsleefgnuabi.a",
+    ],
+    visibility = ["//visibility:public"],
+)
+"""
+
+    new_git_repository(
+        name = "sleef",
+        remote = "https://github.com/shibatch/sleef.git",
+        branch = "master",
+        build_file_content = _SLEEF_BUILD_FILE,
+    )
+
     _EXPRTK_BUILD_FILE = """
 cc_library(
     name = "exprtk",

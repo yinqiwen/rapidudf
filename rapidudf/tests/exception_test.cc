@@ -35,13 +35,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
+#include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
@@ -60,7 +54,7 @@ TEST(JitCompiler, exception) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  ParseContext ctx;
+
   std::string content = R"(
       test_user_func()
   )";

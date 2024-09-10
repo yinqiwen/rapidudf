@@ -37,7 +37,7 @@
 #include <functional>
 #include <string>
 
-#include "rapidudf/codegen/dtype.h"
+#include "rapidudf/meta/dtype.h"
 #include "rapidudf/reflect/flatbuffers.h"
 #include "rapidudf/reflect/protobuf.h"
 #include "rapidudf/reflect/reflect.h"

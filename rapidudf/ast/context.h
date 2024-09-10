@@ -36,9 +36,9 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/optype.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/function.h"
+#include "rapidudf/meta/optype.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
