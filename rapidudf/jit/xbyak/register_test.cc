@@ -41,7 +41,7 @@
 #include "xbyak/xbyak_util.h"
 
 using namespace rapidudf;
-
+using namespace rapidudf::xbyak;
 using namespace Xbyak::util;
 
 TEST(register_mov, xmm_high) {

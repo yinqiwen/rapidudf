@@ -31,6 +31,7 @@
 #include "rapidudf/jit/xbyak/register.h"
 #include "rapidudf/log/log.h"
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 
 static void mov_reg_to_reg(Xbyak::CodeGenerator* code_gen, const Xbyak::Reg* dst, const Xbyak::Reg* src) {
@@ -187,4 +188,5 @@ int Register::Mov(const Register& src, uint32_t bits) {
   }
   return 0;
 }
+}  // namespace xbyak
 }  // namespace rapidudf

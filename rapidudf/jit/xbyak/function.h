@@ -40,11 +40,12 @@
 #include "xbyak/xbyak.h"
 
 namespace rapidudf {
-
+namespace xbyak {
 using FuncArgRegister = std::vector<const Xbyak::Reg*>;
 
 std::vector<const Xbyak::Reg*> GetFuncReturnValueRegisters(DType dtype, uint32_t& total_bits);
 std::vector<FuncArgRegister> GetFuncArgsRegistersByDTypes(const std::vector<DType>& arg_types);
 std::vector<const Xbyak::Reg*> GetUnuseFuncArgsRegisters(const std::vector<FuncArgRegister>& used_regs);
+}  // namespace xbyak
 
 }  // namespace rapidudf

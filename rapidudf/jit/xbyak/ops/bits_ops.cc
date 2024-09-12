@@ -32,6 +32,7 @@
 #include <cstdint>
 #include "rapidudf/log/log.h"
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 int bits_set(Xbyak::CodeGenerator& c, const Xbyak::Operand& op, uint8_t n) {
   if (n >= 64) {
@@ -101,4 +102,5 @@ int bits_clear(Xbyak::CodeGenerator& c, const Xbyak::Operand& op, uint8_t n) {
     return -1;
   }
 }
+}  // namespace xbyak
 }  // namespace rapidudf

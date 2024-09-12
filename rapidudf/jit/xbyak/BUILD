@@ -97,6 +97,7 @@ cc_library(
         "//rapidudf/ast",
         "//rapidudf/builtin",
         "//rapidudf/builtin/simd_vector:simd_ops",
+        "//rapidudf/jit:function",
         "//rapidudf/log",
         "//rapidudf/reflect",
         "@com_google_absl//absl/cleanup",

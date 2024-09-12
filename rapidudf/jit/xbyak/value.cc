@@ -46,6 +46,7 @@
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 static std::atomic<uint64_t> g_uniq_id_seed{0};
 Value::Value(Private, CodeGenerator* c, DType dtype, uint32_t stack_offset, uint32_t stack_len, bool temp) {
@@ -843,5 +844,5 @@ std::string Value::StorageInfo() const {
   }
   return str;
 }
-
+}  // namespace xbyak
 }  // namespace rapidudf

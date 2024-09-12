@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,43 +28,26 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/jit/llvm_jit.h"
+
+#pragma once
+
+#include <memory>
+#include "llvm/IR/Function.h"
+#include "rapidudf/meta/function.h"
+
 namespace rapidudf {
-LLVMJitCompiler::LLVMJitCompiler() { Init(); }
-void LLVMJitCompiler::Init() {
-  // Open a new context and module.
-  context_ = std::make_unique<llvm::LLVMContext>();
-  module_ = std::make_unique<llvm::Module>("RapidUDF", *context_);
-  // Create a new builder for the module.
-  builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);
-}
+namespace llvm {
+struct GlobalFunction {
+  FunctionDesc desc;
+  ::llvm::FunctionType* func_type = nullptr;
+  ::llvm::Function* func = nullptr;
+};
+using GlobalFunctionPtr = std::shared_ptr<GlobalFunction>;
 
-// llvm::Function* LLVMJitCompiler::DefineFunction() {
-//   llvm::FunctionPassManager ff;
-//   std::vector<llvm::Type*> arg_types;
-//   //   FunctionType *FT =
-//   //       FunctionType::get(Type::getDoubleTy(*TheContext), Doubles, false);
-//   llvm::FunctionType* ftype = nullptr;
-//   llvm::Function* f = llvm::Function::Create(ftype, llvm::Function::ExternalLinkage, "Name", module_.get());
+class GlobalFunctionRegistry {
+ private:
+  std::unordered_map<std::string, GlobalFunctionPtr> funcs_;
+};
 
-//   // Set names for all arguments.
-//   for (auto& arg : f->args()) {
-//     // arg.setName(const Twine &Name);
-//   }
-//   return nullptr;
-//   //   unsigned Idx = 0;
-//   //   for (auto &Arg : F->args())
-//   //     Arg.setName(Args[Idx++]);
-
-//   //   return F;
-// }
-void LLVMJitCompiler::Dump() {
-  //   auto t = llvm::Type::getIntNTy(*context_, 4);
-  //   printf("###%d\n", t->getIntegerBitWidth());
-
-  //   auto sp = llvm::StructType::create(*context_, "a");
-  //   sp->setBody(t);
-
-  module_->print(llvm::errs(), nullptr);
-}
+}  // namespace llvm
 }  // namespace rapidudf

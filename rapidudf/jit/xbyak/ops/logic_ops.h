@@ -35,6 +35,7 @@
 #include "rapidudf/meta/optype.h"
 #include "xbyak/xbyak.h"
 namespace rapidudf {
+namespace xbyak {
 int logic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, const Xbyak::Operand& left, const Xbyak::Operand& right,
              const Xbyak::Operand& result);
 int logic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, uint64_t left, const Xbyak::Operand& right,
@@ -44,5 +45,5 @@ int logic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, const Xbyak::Oper
 int logic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, uint64_t left, uint64_t right, bool& result);
 int logic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, uint64_t left, uint64_t right,
              const Xbyak::Operand& result);
-
+}  // namespace xbyak
 }  // namespace rapidudf

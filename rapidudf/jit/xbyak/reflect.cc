@@ -32,7 +32,7 @@
 #include "xbyak/xbyak.h"
 
 namespace rapidudf {
-
+namespace xbyak {
 using namespace Xbyak::util;
 
 absl::StatusOr<ValuePtr> BuildStructFieldAccess(CodeGenerator& codegen, const StructMember& member) {
@@ -108,5 +108,5 @@ absl::StatusOr<ValuePtr> BuildStructFuncCall(CodeGenerator& codegen, const Struc
   }
   return result;
 }
-
+}  // namespace xbyak
 }  // namespace rapidudf

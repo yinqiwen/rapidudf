@@ -30,13 +30,14 @@
 */
 
 #pragma once
-#include "rapidudf/meta/dtype.h"
 
-#include "xbyak/xbyak.h"
-namespace rapidudf {
-namespace xbyak {
-int static_cast_value(Xbyak::CodeGenerator& c, const Xbyak::Reg& reg, DType src_dtype, DType dst_dtype);
-int static_cast_value(Xbyak::CodeGenerator& c, Xbyak::Address src_addr, DType src_dtype, Xbyak::Address dst_addr,
-                      DType dst_dtype);
-}  // namespace xbyak
-}  // namespace rapidudf
+#define RUDF_LOG_RETURN_LLVM_ERROR(err)               \
+  do {                                                \
+    if (err) {                                        \
+      std::string err_str;                            \
+      ::llvm::raw_string_ostream err_stream(err_str); \
+      err_stream << err;                              \
+      RUDF_ERROR("{}", err_str);                      \
+      return absl::InvalidArgumentError(err_str);     \
+    }                                                 \
+  } while (0)

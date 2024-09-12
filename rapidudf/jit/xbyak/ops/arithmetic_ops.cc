@@ -38,6 +38,7 @@
 #include "rapidudf/jit/xbyak/ops/copy.h"
 #include "rapidudf/log/log.h"
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 
 static bool is_valid_operand(const Xbyak::Operand& operand) {
@@ -435,5 +436,6 @@ int arithmetic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, uint64_t lef
   }
   return copy_value(c, dtype, result_bin, result);
 }
+}  // namespace xbyak
 
 }  // namespace rapidudf

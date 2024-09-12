@@ -38,6 +38,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 using FuncRegMap = std::unordered_map<std::string, FunctionDesc>;
 static std::unique_ptr<FuncRegMap> g_regs = nullptr;
@@ -164,5 +165,5 @@ std::vector<const Xbyak::Reg*> GetUnuseFuncArgsRegisters(const std::vector<FuncA
 
 // std::vector<FuncArgRegister> FunctionDesc::GetArgsRegisters() const { return GetFuncArgsRegistersByDTypes(arg_types);
 // }
-
+}  // namespace xbyak
 }  // namespace rapidudf

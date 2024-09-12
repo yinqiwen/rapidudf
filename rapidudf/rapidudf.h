@@ -34,4 +34,7 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/reflect/macros.h"
 
-namespace rapidudf {}  // namespace rapidudf
+namespace rapidudf {
+
+using JitCompiler = xbyak::JitCompiler;
+}  // namespace rapidudf

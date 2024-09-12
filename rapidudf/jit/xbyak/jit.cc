@@ -51,6 +51,7 @@
 #endif
 
 namespace rapidudf {
+namespace xbyak {
 JitCompiler::JitCompiler(Options opts) : opts_(opts) {
   init_builtin();
   ast::Symbols::Init();
@@ -63,7 +64,7 @@ void JitCompiler::AddCompileContex(const ast::Function& func_ast) {
   codegen_opts.max_code_size = opts_.max_code_size;
   codegen_opts.use_registers = opts_.use_registers;
   if (ast_ctx_.GetAllFuncCalls(compile_function_idx_).size() > 0 ||
-      ast_ctx_.GetAllBuiltinFuncCalls(compile_function_idx_).size() > 0) {
+      ast_ctx_.GetAllImplicitFuncCalls(compile_function_idx_).size() > 0) {
     codegen_opts.use_callee_saved_registers = true;
   } else {
     codegen_opts.use_callee_saved_registers = false;
@@ -124,7 +125,10 @@ absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::s
 absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
   ctx.local_vars.clear();
   std::vector<FuncArgRegister> all_func_arg_registers;
-  for (const auto& [name, func_call] : ast_ctx_.GetAllFuncCalls(compile_function_idx_)) {
+  auto all_func_calls = ast_ctx_.GetAllFuncCalls(compile_function_idx_);
+  auto implicit_func_calls = ast_ctx_.GetAllImplicitFuncCalls(compile_function_idx_);
+  all_func_calls.merge(implicit_func_calls);
+  for (const auto& [name, func_call] : all_func_calls) {
     auto arg_registers = GetFuncArgsRegistersByDTypes(func_call->arg_types);
     RUDF_DEBUG("Normal funcation call:{} with registers:{}", name, arg_registers.size());
     if (arg_registers.empty() && !func_call->arg_types.empty()) {
@@ -136,22 +140,22 @@ absl::Status JitCompiler::DoCompileFunctionAst(CompileContext& ctx) {
     }
   }
 
-  for (const auto& builtin_func_call : ast_ctx_.GetAllBuiltinFuncCalls(compile_function_idx_)) {
-    RUDF_DEBUG("Buitin funcation call:{}", builtin_func_call);
-    auto* func_call = FunctionFactory::GetFunction(builtin_func_call);
-    if (nullptr == func_call) {
-      RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("No buitlin func:{} found.", builtin_func_call)));
-    }
-    if (func_call->attrs.UseArenaAllocator()) {
-      ctx.use_arena_allocator = true;
-    }
-    auto arg_registers = GetFuncArgsRegistersByDTypes(func_call->arg_types);
-    if (arg_registers.empty() && !func_call->arg_types.empty()) {
-      RUDF_LOG_ERROR_STATUS(
-          absl::NotFoundError(fmt::format("Can NOT allocate registers for func:{}.", builtin_func_call)));
-    }
-    all_func_arg_registers.insert(all_func_arg_registers.end(), arg_registers.begin(), arg_registers.end());
-  }
+  // for (const auto& builtin_func_call : ast_ctx_.GetAllBuiltinFuncCalls(compile_function_idx_)) {
+  //   RUDF_DEBUG("Buitin funcation call:{}", builtin_func_call);
+  //   auto* func_call = FunctionFactory::GetFunction(builtin_func_call);
+  //   if (nullptr == func_call) {
+  //     RUDF_LOG_ERROR_STATUS(absl::NotFoundError(fmt::format("No buitlin func:{} found.", builtin_func_call)));
+  //   }
+  //   if (func_call->attrs.UseArenaAllocator()) {
+  //     ctx.use_arena_allocator = true;
+  //   }
+  //   auto arg_registers = GetFuncArgsRegistersByDTypes(func_call->arg_types);
+  //   if (arg_registers.empty() && !func_call->arg_types.empty()) {
+  //     RUDF_LOG_ERROR_STATUS(
+  //         absl::NotFoundError(fmt::format("Can NOT allocate registers for func:{}.", builtin_func_call)));
+  //   }
+  //   all_func_arg_registers.insert(all_func_arg_registers.end(), arg_registers.begin(), arg_registers.end());
+  // }
 
   auto unused_registers = GetUnuseFuncArgsRegisters(all_func_arg_registers);
   GetCodeGenerator().AddFreeRegisters(unused_registers);
@@ -236,5 +240,5 @@ absl::Status JitCompiler::CompileBody(const ast::Block& block) {
   }
   return absl::OkStatus();
 }
-
+}  // namespace xbyak
 }  // namespace rapidudf

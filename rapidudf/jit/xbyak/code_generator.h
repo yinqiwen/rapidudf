@@ -45,7 +45,7 @@
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
-
+namespace xbyak {
 class Value;
 
 class CodeGenerator {
@@ -143,5 +143,5 @@ class CodeGenerator {
 
   friend class Value;
 };
-
+}  // namespace xbyak
 }  // namespace rapidudf

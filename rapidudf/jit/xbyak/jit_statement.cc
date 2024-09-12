@@ -37,6 +37,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
+namespace xbyak {
 absl::Status JitCompiler::CompileStatement(const ast::ReturnStatement& statement) {
   if (statement.expr.has_value()) {
     auto val_result = CompileExpression(*statement.expr);
@@ -191,4 +192,5 @@ absl::Status JitCompiler::CompileStatement(const ast::ExpressionStatement& state
   GetCodeGenerator().DropTmpValue(val.value());
   return absl::OkStatus();
 }
+}  // namespace xbyak
 }  // namespace rapidudf

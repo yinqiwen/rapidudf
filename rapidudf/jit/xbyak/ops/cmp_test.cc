@@ -41,6 +41,7 @@
 #include "xbyak/xbyak_util.h"
 
 using namespace rapidudf;
+using namespace rapidudf::xbyak;
 using namespace Xbyak::util;
 template <typename T>
 static int std_cmp(T left, T right) {

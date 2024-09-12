@@ -38,6 +38,7 @@
 #include "rapidudf/meta/dtype.h"
 
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 static void stack_cast_int_to_int(Xbyak::CodeGenerator& c, Xbyak::Address src_addr, Xbyak::Address dst_addr) {
   c.mov(rax.changeBit(src_addr.getBit()), src_addr);
@@ -280,4 +281,5 @@ int static_cast_value(Xbyak::CodeGenerator& c, Xbyak::Address src_addr, DType sr
   }
   return 0;
 }
+}  // namespace xbyak
 }  // namespace rapidudf

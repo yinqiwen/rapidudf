@@ -39,19 +39,22 @@
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 absl::StatusOr<ValuePtr> JitCompiler::CompileFieldAccess(ValuePtr var, const ast::FieldAccess& field) {
-  if (!var->GetDType().IsSimdVector() && !var->GetDType().IsPtr() && !var->GetDType().IsStringView()) {
-    RUDF_LOG_ERROR_STATUS(
-        ast_ctx_.GetErrorStatus(fmt::format("Can NOT access field:{} with dtype:{}", field.field, var->GetDType())));
-  }
-  auto accessor = Reflect::GetStructMember(var->GetDType().PtrTo(), field.field);
-  if (!accessor) {
-    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
-        fmt::format("Can NOT get reflect accessor with dtype:{} & member:{}", var->GetDType().PtrTo(), field.field)));
-  }
+  // auto accessor = Reflect::GetStructMember(var->GetDType().PtrTo(), field.field);
+  // if (!accessor) {
+  //   RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+  //       fmt::format("Can NOT get reflect accessor with dtype:{} & member:{}", var->GetDType().PtrTo(),
+  //       field.field)));
+  // }
+  auto accessor = field.struct_member;
   if (field.func_args.has_value()) {
-    if (!accessor->HasMemberFunc()) {
+    if (!var->GetDType().IsSimdVector() && !var->GetDType().IsPtr() && !var->GetDType().IsStringView()) {
+      RUDF_LOG_ERROR_STATUS(
+          ast_ctx_.GetErrorStatus(fmt::format("Can NOT access field:{} with dtype:{}", field.field, var->GetDType())));
+    }
+    if (!accessor.HasMemberFunc()) {
       RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
           fmt::format("Can NOT get reflect accessor with dtype:{} & member func:{}", var->GetDType(), field.field)));
     }
@@ -66,7 +69,7 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileFieldAccess(ValuePtr var, const ast
       }
     }
 
-    auto result = BuildStructFuncCall(GetCodeGenerator(), *accessor, *var, arg_values);
+    auto result = BuildStructFuncCall(GetCodeGenerator(), accessor, *var, arg_values);
     if (!result.ok()) {
       return result.status();
     }
@@ -78,15 +81,19 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileFieldAccess(ValuePtr var, const ast
     }
     return result_value;
   } else {
-    if (!accessor->HasField()) {
+    if (!var->GetDType().IsPtr()) {
+      RUDF_LOG_ERROR_STATUS(
+          ast_ctx_.GetErrorStatus(fmt::format("Can NOT access field:{} with dtype:{}", field.field, var->GetDType())));
+    }
+    if (!accessor.HasField()) {
       RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
           fmt::format("Can NOT get reflect accessor with dtype:{} & field:{}", var->GetDType(), field.field)));
     }
     auto rcx_val = Value::New(&GetCodeGenerator(), var->GetDType(), &rcx, false);
     rcx_val->Copy(*var);
-    DType field_read_dtype = *accessor->member_field_dtype;
+    DType field_read_dtype = *accessor.member_field_dtype;
     RUDF_DEBUG("Access dtype:{} field:{} with dtype:{}", var->GetDType(), field.field, field_read_dtype);
-    auto result = BuildStructFieldAccess(GetCodeGenerator(), *accessor);
+    auto result = BuildStructFieldAccess(GetCodeGenerator(), accessor);
     if (!result.ok()) {
       return result.status();
     }
@@ -171,4 +178,5 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileJsonAccess(ValuePtr var, const ast:
   }
   return json_result;
 }
+}  // namespace xbyak
 }  // namespace rapidudf

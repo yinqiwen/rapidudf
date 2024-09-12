@@ -81,6 +81,21 @@ bool DTypeFactory::AddNameDType(const std::string& name, DType dtype) {
   }
   return r;
 }
+
+bool DType::IsSigned() const {
+  switch (t0_) {
+    case DATA_I8:
+    case DATA_I16:
+    case DATA_I32:
+    case DATA_I64:
+    case DATA_F32:
+    case DATA_F64: {
+      return true;
+    }
+      return false;
+  }
+}
+
 DType DType::Key() const {
   DType result;
   if (container_type_ == COLLECTION_MAP || container_type_ == COLLECTION_UNORDERED_MAP) {

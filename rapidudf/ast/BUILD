@@ -15,6 +15,7 @@ cc_library(
         "context.h",
     ],
     deps = [
+        "//rapidudf/builtin:builtin_symbols",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",

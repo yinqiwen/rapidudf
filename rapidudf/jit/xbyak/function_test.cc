@@ -39,6 +39,7 @@
 struct TestStruct {};
 
 using namespace rapidudf;
+using namespace rapidudf::xbyak;
 using namespace Xbyak::util;
 
 int test_func(int a, std::string_view b, float c) { return 0; }

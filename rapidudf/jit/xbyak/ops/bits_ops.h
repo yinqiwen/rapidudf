@@ -33,6 +33,8 @@
 #include "rapidudf/meta/dtype.h"
 #include "xbyak/xbyak.h"
 namespace rapidudf {
+namespace xbyak {
 int bits_set(Xbyak::CodeGenerator& c, const Xbyak::Operand& val, uint8_t n);
 int bits_clear(Xbyak::CodeGenerator& c, const Xbyak::Operand& val, uint8_t n);
+}  // namespace xbyak
 }  // namespace rapidudf

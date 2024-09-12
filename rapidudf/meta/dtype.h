@@ -146,6 +146,7 @@ class DType {
   bool IsF64() const { return IsFundamental() && t0_ == DATA_F64; }
   bool IsFloat() const { return IsF32() || IsF64(); }
   bool IsInteger() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_I64); }
+  bool IsSigned() const;
   bool IsVoid() const { return t0_ == DATA_VOID; }
   bool IsBool() const { return IsFundamental() && t0_ == DATA_U8; }
   bool IsStringView() const { return IsFundamental() && t0_ == DATA_STRING_VIEW; }
@@ -646,3 +647,10 @@ struct fmt::formatter<Xbyak::Reg64> : formatter<std::string> {
     return formatter<std::string>::format(view, ctx);
   }
 };
+
+namespace std {
+template <>
+struct hash<::rapidudf::DType> {
+  size_t operator()(const ::rapidudf::DType dtype) const { return std::hash<uint64_t>{}(dtype.Control()); }
+};
+}  // namespace std

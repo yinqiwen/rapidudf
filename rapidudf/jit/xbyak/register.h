@@ -32,7 +32,7 @@
 #pragma once
 #include "xbyak/xbyak.h"
 namespace rapidudf {
-
+namespace xbyak {
 struct RegisterId {
   Xbyak::Operand::Kind kind;
   uint32_t index = 0;
@@ -55,4 +55,5 @@ class Register {
   bool is_xmm_high_ = false;
   bool is_xmm_low_ = false;
 };
+}  // namespace xbyak
 }  // namespace rapidudf

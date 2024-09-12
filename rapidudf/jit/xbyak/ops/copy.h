@@ -35,9 +35,9 @@
 
 #include "xbyak/xbyak.h"
 namespace rapidudf {
-
+namespace xbyak {
 int copy_value(Xbyak::CodeGenerator& c, DType dtype, uint64_t bin, const Xbyak::Operand& dst, bool ptr = false);
 int copy_value(Xbyak::CodeGenerator& c, DType dtype, const Xbyak::Operand& src, const Xbyak::Operand& dst,
                bool ptr = false);
-
+}  // namespace xbyak
 }  // namespace rapidudf

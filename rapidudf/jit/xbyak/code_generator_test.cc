@@ -43,6 +43,7 @@
 struct TestStruct {};
 
 using namespace rapidudf;
+using namespace rapidudf::xbyak;
 
 using namespace Xbyak::util;
 

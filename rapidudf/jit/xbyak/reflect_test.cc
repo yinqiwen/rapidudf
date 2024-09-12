@@ -45,6 +45,7 @@
 
 using namespace Xbyak::util;
 using namespace rapidudf;
+using namespace rapidudf::xbyak;
 
 struct TestBase {
   float y = 2.79;

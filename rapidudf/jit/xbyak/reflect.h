@@ -38,8 +38,9 @@
 #include "rapidudf/reflect/reflect.h"
 
 namespace rapidudf {
-
+namespace xbyak {
 absl::StatusOr<ValuePtr> BuildStructFuncCall(CodeGenerator& codegen, const StructMember& member, const Value& this_arg,
                                              const std::vector<ValuePtr>& args = {});
 absl::StatusOr<ValuePtr> BuildStructFieldAccess(CodeGenerator& codegen, const StructMember& member);
+}  // namespace xbyak
 }  // namespace rapidudf

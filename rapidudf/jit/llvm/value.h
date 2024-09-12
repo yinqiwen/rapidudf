@@ -30,13 +30,55 @@
 */
 
 #pragma once
-#include "rapidudf/meta/dtype.h"
+#include <memory>
+#include "absl/status/status.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Value.h"
 
-#include "xbyak/xbyak.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
-namespace xbyak {
-int static_cast_value(Xbyak::CodeGenerator& c, const Xbyak::Reg& reg, DType src_dtype, DType dst_dtype);
-int static_cast_value(Xbyak::CodeGenerator& c, Xbyak::Address src_addr, DType src_dtype, Xbyak::Address dst_addr,
-                      DType dst_dtype);
-}  // namespace xbyak
+namespace llvm {
+
+class JitCompiler;
+class Value;
+using ValuePtr = std::shared_ptr<Value>;
+class Value : public std::enable_shared_from_this<Value> {
+ private:
+  struct Private {
+    explicit Private() = default;
+  };
+
+ public:
+  Value(Private, DType dtype, JitCompiler* c, ::llvm::Value* val, const std::string& name);
+
+  static ValuePtr New(DType dtype, JitCompiler* c, ::llvm::Value* val, const std::string& name = "") {
+    return std::make_shared<Value>(Private(), dtype, c, val, name);
+  }
+  ~Value() {}
+
+  const std::string& GetName() const { return name_; }
+  ::llvm::Value* GetValue() { return val_; }
+  DType GetDType() { return dtype_; }
+
+  ValuePtr UnaryOp(OpToken op);
+  ValuePtr BinaryOp(OpToken op, ValuePtr right);
+  ValuePtr Select(ValuePtr true_val, ValuePtr false_val);
+
+  ValuePtr CastTo(DType dtype);
+  absl::Status CopyFrom(ValuePtr other);
+
+ private:
+  ValuePtr SelfPtr() { return shared_from_this(); }
+
+  DType dtype_;
+  JitCompiler* compiler_ = nullptr;
+  ::llvm::IRBuilder<>* ir_builder_ = nullptr;
+  ::llvm::Value* val_ = nullptr;
+
+  std::string name_;
+
+  std::vector<uint64_t> const_values_;
+};
+}  // namespace llvm
 }  // namespace rapidudf

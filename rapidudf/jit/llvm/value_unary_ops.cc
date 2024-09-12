@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,15 +28,54 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-#pragma once
-#include "rapidudf/meta/dtype.h"
-
-#include "xbyak/xbyak.h"
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Use.h>
+#include "llvm/Support/MathExtras.h"
+#include "rapidudf/jit/llvm/value.h"
+#include "rapidudf/log/log.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
-namespace xbyak {
-int static_cast_value(Xbyak::CodeGenerator& c, const Xbyak::Reg& reg, DType src_dtype, DType dst_dtype);
-int static_cast_value(Xbyak::CodeGenerator& c, Xbyak::Address src_addr, DType src_dtype, Xbyak::Address dst_addr,
-                      DType dst_dtype);
-}  // namespace xbyak
+namespace llvm {
+
+ValuePtr Value::UnaryOp(OpToken op) {
+  ::llvm::Value* result_val = nullptr;
+  switch (op) {
+    case OP_NEGATIVE: {
+      if (!dtype_.IsNumber()) {
+        RUDF_ERROR("Can NOT do negative op on non number value:{}", dtype_);
+        return {};
+      }
+      if (dtype_.IsFloat()) {
+        result_val = ir_builder_->CreateFNeg(val_);
+      } else {
+        result_val = ir_builder_->CreateNeg(val_);
+      }
+      break;
+    }
+    case OP_NOT: {
+      if (!dtype_.IsBool()) {
+        RUDF_ERROR("Can NOT do negative op on non u8 value:{}", dtype_);
+        return {};
+      }
+      result_val = ir_builder_->CreateNot(val_);
+      break;
+    }
+    case OP_SQRT: {
+      ::llvm::Function* sqrt_func =
+          ::llvm::Intrinsic::getDeclaration(ir_builder_->GetInsertBlock()->getModule(), ::llvm::Intrinsic::sqrt,
+                                            {::llvm::Type::getDoubleTy(ir_builder_->getContext())});
+      result_val = ir_builder_->CreateCall(sqrt_func, val_, "sqrt");
+      break;
+    }
+    default: {
+      RUDF_ERROR("Unsupported unary op:{}", op);
+      break;
+    }
+  }
+  if (!result_val) {
+    RUDF_ERROR("Can NOT do {} for val:{}", op, dtype_);
+  }
+  return New(dtype_, compiler_, result_val);
+}
+}  // namespace llvm
 }  // namespace rapidudf

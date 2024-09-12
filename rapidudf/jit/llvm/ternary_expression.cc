@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -29,41 +29,44 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#pragma once
-
-#include <map>
-#include <memory>
-
-#include "absl/status/statusor.h"
-
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Verifier.h"
+#include <fmt/core.h>
+#include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
 namespace rapidudf {
-class LLVMJitCompiler {
- public:
-  LLVMJitCompiler();
+namespace llvm {
 
-  void Dump();
+absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast::TernaryExprPtr expr) {
+  ast_ctx_.SetPosition(expr->position);
+  auto cond_result = BuildIR(ctx, expr->cond);
+  if (expr->true_false_operands.has_value()) {
+    if (!cond_result.ok()) {
+      return cond_result.status();
+    }
+    auto cond_val = cond_result.value();
+    auto [true_expr, false_expr] = *(expr->true_false_operands);
+    if (cond_val->GetDType().IsBool()) {
+      auto true_val_result = BuildIR(ctx, true_expr);
+      if (!true_val_result.ok()) {
+        return true_val_result.status();
+      }
+      auto false_val_result = BuildIR(ctx, false_expr);
+      if (!false_val_result.ok()) {
+        return false_val_result.status();
+      }
+      auto result = cond_val->Select(true_val_result.value(), false_val_result.value());
+      if (!result) {
+        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Can NOT do select true:{}, false:{}",
+                                                                  true_val_result.value()->GetDType(),
+                                                                  false_val_result.value()->GetDType())));
+      }
+      return result;
+    }
+    return absl::UnimplementedError("TernaryExprPtr");
+  } else {
+    return cond_result;
+  }
+}
 
-  //   template <typename RET, typename... Args>
-  //   absl::Status CompileFunction(const std::string& source, bool dump_asm = false) {
-  //     Init();
-  //   }
-
- private:
-  void Init();
-  std::unique_ptr<llvm::LLVMContext> context_;
-  std::unique_ptr<llvm::Module> module_;
-  std::unique_ptr<llvm::IRBuilder<>> builder_;
-  std::map<std::string, llvm::Value*> mamed_values_;
-};
+}  // namespace llvm
 }  // namespace rapidudf

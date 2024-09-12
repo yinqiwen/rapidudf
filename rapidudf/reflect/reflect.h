@@ -50,12 +50,13 @@ struct StructMember {
   std::optional<DType> member_field_dtype;
   std::string field_name;
   uint32_t member_field_offset = 0;
-  StructMember(const std::string& name, DType dtype, uint32_t offset) {
+  StructMember() = default;
+  explicit StructMember(const std::string& name, DType dtype, uint32_t offset) {
     field_name = name;
     member_field_dtype = dtype;
     member_field_offset = offset;
   }
-  StructMember(const FunctionDesc& f) { member_func = f; }
+  explicit StructMember(const FunctionDesc& f) { member_func = f; }
 
   bool HasField() const { return member_field_dtype.has_value(); }
   bool HasMemberFunc() const { return member_func.has_value(); }

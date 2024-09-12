@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,15 +28,40 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include "rapidudf/jit/llvm/value.h"
+#include <fmt/core.h>
+#include <llvm/IR/Use.h>
+#include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/jit/llvm/type.h"
+#include "rapidudf/log/log.h"
+#include "rapidudf/meta/optype.h"
 
-#pragma once
-#include "rapidudf/meta/dtype.h"
-
-#include "xbyak/xbyak.h"
 namespace rapidudf {
-namespace xbyak {
-int static_cast_value(Xbyak::CodeGenerator& c, const Xbyak::Reg& reg, DType src_dtype, DType dst_dtype);
-int static_cast_value(Xbyak::CodeGenerator& c, Xbyak::Address src_addr, DType src_dtype, Xbyak::Address dst_addr,
-                      DType dst_dtype);
-}  // namespace xbyak
+namespace llvm {
+Value::Value(Private, DType dtype, JitCompiler* c, ::llvm::Value* val, const std::string& name)
+    : dtype_(dtype), compiler_(c), val_(val), name_(name) {
+  ir_builder_ = compiler_->GetIRBuilder();
+}
+absl::Status Value::CopyFrom(ValuePtr other) {
+  if (!dtype_.IsVoid()) {
+    if (dtype_ != other->dtype_) {
+      return absl::InvalidArgumentError(
+          fmt::format("Can not copy from dtype:{} while current dtype:{}", other->dtype_, dtype_));
+    }
+  }
+  dtype_ = other->dtype_;
+  val_ = other->val_;
+  // ir_builder_->CreateStore(other->val_, val_->getP);
+  return absl::OkStatus();
+}
+ValuePtr Value::Select(ValuePtr true_val, ValuePtr false_val) {
+  if (true_val->dtype_ != false_val->dtype_) {
+    RUDF_ERROR("Can NOT select since true_val dtype:{} is not eqaul with false_val dtype:{}", true_val->GetDType(),
+               false_val->GetDType());
+    return {};
+  }
+  auto new_val = ir_builder_->CreateSelect(val_, true_val->GetValue(), false_val->GetValue());
+  return New(true_val->GetDType(), compiler_, new_val);
+}
+}  // namespace llvm
 }  // namespace rapidudf

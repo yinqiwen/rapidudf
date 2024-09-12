@@ -49,6 +49,7 @@
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
+namespace xbyak {
 // #define ADD_REG(z, n, text) tmp_xmm_regs_.emplace_back(std::make_shared<Xbyak::Xmm>(BOOST_PP_CAT(text, n)));
 #define ADD_FLOAT_ARG_REG(z, n, text) func_arg_xmm_regs_.emplace_back(&BOOST_PP_CAT(text, n));
 #define ADD_TMP_REG(z, n, text) free_tmp_regs.emplace_back(&BOOST_PP_CAT(text, n));
@@ -541,4 +542,5 @@ Xbyak::Address CodeGenerator::GetStackAddr(DType dtype, uint32_t offset) {
     }
   }
 }
+}  // namespace xbyak
 }  // namespace rapidudf

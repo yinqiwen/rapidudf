@@ -38,6 +38,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 static std::atomic<uint32_t> g_label_cursor{0};
 
@@ -250,5 +251,5 @@ int store_cmp_result(Xbyak::CodeGenerator& c, OpToken op, const Xbyak::Operand& 
   c.nop();
   return 0;
 }
-
+}  // namespace xbyak
 }  // namespace rapidudf

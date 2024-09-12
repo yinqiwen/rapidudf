@@ -42,7 +42,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
-
+namespace xbyak {
 absl::StatusOr<ValuePtr> JitCompiler::CompileOperand(const ast::Operand& expr) {
   // RUDF_DEBUG("CompileOperand readonly:{}", flags);
   return std::visit(
@@ -480,4 +480,5 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(const ast::Array& expr) 
 
   return span_val;
 }
+}  // namespace xbyak
 }  // namespace rapidudf

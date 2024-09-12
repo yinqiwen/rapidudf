@@ -33,6 +33,7 @@
 #include <gtest/gtest.h>
 
 using namespace rapidudf;
+using namespace rapidudf::xbyak;
 TEST(JitCompiler, simple) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;

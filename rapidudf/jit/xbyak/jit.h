@@ -48,114 +48,15 @@
 #include "rapidudf/ast/expression.h"
 #include "rapidudf/ast/function.h"
 #include "rapidudf/ast/statement.h"
+#include "rapidudf/jit/function.h"
 #include "rapidudf/jit/xbyak/code_generator.h"
 #include "rapidudf/jit/xbyak/function.h"
 #include "rapidudf/jit/xbyak/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
-#include "rapidudf/meta/optype.h"
 namespace rapidudf {
-
-class JitCompiler;
-template <typename RET, typename... Args>
-class JitFunction {
- public:
-  JitFunction() = default;
-  explicit JitFunction(const std::string& name, std::unique_ptr<CodeGenerator>&& code_gen,
-                       std::vector<std::unique_ptr<std::string>>&& const_vals, bool reset_arena)
-      : name_(name), code_gen_(std::move(code_gen)), const_strings_(std::move(const_vals)) {
-    f_ = reinterpret_cast<RET (*)(Args...)>(const_cast<uint8_t*>(code_gen_->GetCodeGen().getCode()));
-  }
-  JitFunction(JitFunction&& other) { MoveFrom(std::move(other)); }
-  ~JitFunction() {}
-  JitFunction(const JitFunction&) = delete;
-  JitFunction& operator=(const JitFunction&) = delete;
-  JitFunction& operator=(JitFunction&& other) {
-    MoveFrom(std::move(other));
-    return *this;
-  }
-
-  const std::string& GetName() const { return name_; }
-
-  void SetRethrowException(bool v) { rethrow_ = v; }
-  void SetUnsafe(bool v = true) { unsafe_ = v; }
-
-  RET UnsafeCall(Args... args) {
-    if (reset_arena_) {
-      GetArena().Reset();
-    }
-    if constexpr (std::is_same_v<void, RET>) {
-      f_(args...);
-    } else {
-      RET r = f_(args...);
-      return r;
-    }
-  }
-
-  RET SafeCall(Args... args) {
-    auto& func_ctx = FunctionCallContext::Get(true);
-    if (reset_arena_) {
-      func_ctx.arena.Reset();
-    }
-    if (func_ctx.invoke_frame_id == 1) {  // first
-      if (setjmp(func_ctx.jmp_env) == 0) {
-        if constexpr (std::is_same_v<void, RET>) {
-          f_(args...);
-          func_ctx.invoke_frame_id = 0;
-        } else {
-          RET r = f_(args...);
-          func_ctx.invoke_frame_id = 0;
-          return r;
-        }
-      } else {
-        func_ctx.invoke_frame_id = 0;
-        if (rethrow_) {
-          throw func_ctx.run_ex;
-        }
-        RUDF_DEBUG("JitFunction exception captured, return default value.");
-        if constexpr (std::is_same_v<void, RET>) {
-        } else {
-          return {};
-        }
-      }
-    } else {
-      if constexpr (std::is_same_v<void, RET>) {
-        f_(args...);
-      } else {
-        RET r = f_(args...);
-        return r;
-      }
-    }
-  }
-
-  RET operator()(Args... args) {
-    if (unsafe_) {
-      return UnsafeCall(args...);
-    } else {
-      return SafeCall(args...);
-    }
-  }
-
- private:
-  std::string name_;
-  std::unique_ptr<CodeGenerator> code_gen_;
-  std::vector<std::unique_ptr<std::string>> const_strings_;
-  RET (*f_)(Args...) = nullptr;
-  bool unsafe_ = false;
-  bool rethrow_ = true;
-  bool reset_arena_ = false;
-  friend class JitCompiler;
-
-  void MoveFrom(JitFunction&& other) {
-    name_ = std::move(other.name_);
-    code_gen_ = std::move(other.code_gen_);
-    const_strings_ = std::move(other.const_strings_);
-    f_ = other.f_;
-    rethrow_ = other.rethrow_;
-    unsafe_ = other.unsafe_;
-  }
-};
+namespace xbyak {
 
 class JitCompiler {
  public:
@@ -163,6 +64,7 @@ class JitCompiler {
     size_t max_code_size = 4096;
     bool use_registers = true;
   };
+
   explicit JitCompiler(Options opts = {.max_code_size = 4096, .use_registers = true});
 
   absl::StatusOr<std::vector<std::string>> CompileSource(const std::string& source, bool dump_asm = false);
@@ -184,9 +86,11 @@ class JitCompiler {
           RUDF_ERROR("{}", err);
           return absl::InvalidArgumentError(err);
         }
-
-        auto func = JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
-                                              ctx.use_arena_allocator);
+        const uint8_t* code = ctx.code_gen->GetCodeGen().getCode();
+        auto func = JitFunction<RET, Args...>(
+            ctx.desc.name, code,
+            std::make_shared<CompilerResource>(std::move(ctx.code_gen), std::move(ctx.const_strings)),
+            ctx.use_arena_allocator);
         compile_ctxs_.erase(compile_ctxs_.begin() + i);
         return func;
       }
@@ -216,8 +120,10 @@ class JitCompiler {
     }
     auto& ctx = compile_ctxs_[compile_function_idx_];
     absl::Cleanup _done([this]() { compile_ctxs_.clear(); });
-    return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
-                                     ctx.use_arena_allocator);
+    const uint8_t* code = ctx.code_gen->GetCodeGen().getCode();
+    return JitFunction<RET, Args...>(
+        ctx.desc.name, code, std::make_shared<CompilerResource>(std::move(ctx.code_gen), std::move(ctx.const_strings)),
+        ctx.use_arena_allocator);
   }
 
   template <typename RET, typename... Args>
@@ -258,12 +164,21 @@ class JitCompiler {
     }
     auto& ctx = compile_ctxs_[compile_function_idx_];
     absl::Cleanup _done([this]() { compile_ctxs_.clear(); });
-    return JitFunction<RET, Args...>(ctx.desc.name, std::move(ctx.code_gen), std::move(ctx.const_strings),
-                                     ctx.use_arena_allocator);
+    const uint8_t* code = ctx.code_gen->GetCodeGen().getCode();
+    return JitFunction<RET, Args...>(
+        ctx.desc.name, code, std::make_shared<CompilerResource>(std::move(ctx.code_gen), std::move(ctx.const_strings)),
+        ctx.use_arena_allocator);
   }
 
  private:
   static constexpr std::string_view kFuncExistLabel = "func_exit";
+
+  struct CompilerResource {
+    std::unique_ptr<CodeGenerator> code_gen_;
+    std::vector<std::unique_ptr<std::string>> const_strings_;
+    CompilerResource(std::unique_ptr<CodeGenerator>&& code_gen, std::vector<std::unique_ptr<std::string>>&& const_vals)
+        : code_gen_(std::move(code_gen)), const_strings_(std::move(const_vals)) {}
+  };
   struct CompileContext {
     ast::Function func_ast;
     std::unique_ptr<CodeGenerator> code_gen;
@@ -323,4 +238,5 @@ class JitCompiler {
   uint32_t compile_function_idx_ = 0;
   uint32_t label_cursor_ = 0;
 };
+}  // namespace xbyak
 }  // namespace rapidudf

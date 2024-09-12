@@ -38,6 +38,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 static std::atomic<uint32_t> g_label_cursor{0};
 static bool verify_logic_op_args(OpToken op, DType dtype) {
@@ -138,4 +139,5 @@ int logic_op(Xbyak::CodeGenerator& c, OpToken op, DType dtype, uint64_t left, ui
   }
   return copy_value(c, DATA_U8, result_b ? 1 : 0, result);
 }
+}  // namespace xbyak
 }  // namespace rapidudf

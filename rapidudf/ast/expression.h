@@ -39,6 +39,7 @@
 #include "rapidudf/ast/context.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/reflect/reflect.h"
 
 namespace rapidudf {
 namespace ast {
@@ -87,6 +88,9 @@ struct FuncInvokeArgs {
 struct FieldAccess {
   std::string field;
   std::optional<FuncInvokeArgs> func_args;
+  uint32_t position = 0;
+
+  StructMember struct_member;
   absl::StatusOr<VarTag> Validate(ParseContext& ctx, DType src_dtype);
 };
 using DynamicParamAccess = std::variant<std::string, uint32_t, VarRef>;

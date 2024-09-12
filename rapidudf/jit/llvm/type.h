@@ -30,13 +30,15 @@
 */
 
 #pragma once
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Type.h>
+
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 
-#include "xbyak/xbyak.h"
 namespace rapidudf {
-namespace xbyak {
-int static_cast_value(Xbyak::CodeGenerator& c, const Xbyak::Reg& reg, DType src_dtype, DType dst_dtype);
-int static_cast_value(Xbyak::CodeGenerator& c, Xbyak::Address src_addr, DType src_dtype, Xbyak::Address dst_addr,
-                      DType dst_dtype);
-}  // namespace xbyak
+namespace llvm {
+::llvm::Type* get_type(::llvm::LLVMContext& ctx, DType dtype);
+void init_buitin_types(::llvm::LLVMContext& ctx);
+}  // namespace llvm
 }  // namespace rapidudf

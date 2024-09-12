@@ -30,10 +30,9 @@
 */
 #include "rapidudf/ast/context.h"
 #include <fmt/format.h>
-#include <variant>
 #include <vector>
-#include "rapidudf/log/log.h"
-#include "rapidudf/meta/optype.h"
+#include "rapidudf/builtin/builtin_symbols.h"
+
 namespace rapidudf {
 namespace ast {
 void ParseContext::Clear() {
@@ -51,8 +50,9 @@ void ParseContext::SetSource(const std::string& src, bool clear_vars) {
     function_parse_ctxs_.clear();
   } else {
     for (auto& ctx : function_parse_ctxs_) {
-      ctx.builtin_func_calls.clear();
+      // ctx.builtin_func_calls.clear();
       ctx.func_calls.clear();
+      ctx.implicit_func_calls.clear();
     }
   }
   ast_err_.clear();
@@ -95,7 +95,28 @@ bool ParseContext::AddLocalVar(const std::string& name, DType dtype) {
   return success;
 }
 
-absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::string& name) {
+bool ParseContext::CanCastTo(DType from_dtype, DType to_dtype) {
+  bool v = from_dtype.CanCastTo(to_dtype);
+  if (v) {
+    std::string implicit_func_call;
+    if (to_dtype.IsStringView()) {
+      if (from_dtype.IsStringPtr()) {
+        implicit_func_call = kBuiltinCastStdStrToStringView;
+      } else if (from_dtype.IsFlatbuffersStringPtr()) {
+        implicit_func_call = kBuiltinCastStdStrToStringView;
+      } else if (from_dtype.IsStdStringView()) {
+        implicit_func_call = kBuiltinCastStdStrViewToStringView;
+      }
+    }
+    if (!implicit_func_call.empty()) {
+      auto _ = CheckFuncExist(implicit_func_call, true);
+    }
+  }
+
+  return v;
+}
+
+absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::string& name, bool implicit) {
   const FunctionDesc* desc = nullptr;
   for (uint32_t i = 0; i <= current_function_cursor_; i++) {
     if (GetFunctionParseContext(i).desc.name == name) {
@@ -109,8 +130,17 @@ absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::stri
   if (desc == nullptr) {
     return absl::NotFoundError(fmt::format("func:{} not exist at {}'", name, GetErrorLine()));
   }
-  GetFunctionParseContext(current_function_cursor_).func_calls.emplace(name, desc);
+  if (implicit) {
+    GetFunctionParseContext(current_function_cursor_).implicit_func_calls.emplace(name, desc);
+  } else {
+    GetFunctionParseContext(current_function_cursor_).func_calls.emplace(name, desc);
+  }
+
   return desc;
+}
+
+void ParseContext::AddMemberFuncCall(DType dtype, const std::string& name, FunctionDesc desc) {
+  GetFunctionParseContext(current_function_cursor_).member_func_calls[dtype][name] = desc;
 }
 
 }  // namespace ast

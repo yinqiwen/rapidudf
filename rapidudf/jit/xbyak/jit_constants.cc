@@ -38,6 +38,7 @@
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 
 absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(double v, DType dtype) {
@@ -81,4 +82,5 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileConstants(const std::string& v) {
   }
   return val;
 }
+}  // namespace xbyak
 }  // namespace rapidudf

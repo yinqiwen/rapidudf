@@ -42,6 +42,7 @@
 #include "xbyak/xbyak_util.h"
 
 using namespace rapidudf;
+using namespace rapidudf::xbyak;
 using namespace Xbyak::util;
 template <typename F, typename T>
 static std::pair<T, T> test_int_cast_int(F x, bool dump_asm = false) {

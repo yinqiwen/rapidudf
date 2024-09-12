@@ -37,6 +37,7 @@
 #include "rapidudf/meta/dtype.h"
 
 namespace rapidudf {
+namespace xbyak {
 using namespace Xbyak::util;
 int copy_value(Xbyak::CodeGenerator& c, DType dtype, uint64_t bin, const Xbyak::Operand& dst, bool is_ptr) {
   uint32_t bits = dtype.Bits();
@@ -235,4 +236,5 @@ int copy_value(Xbyak::CodeGenerator& c, DType dtype, const Xbyak::Operand& src, 
              static_cast<int>(dst.getKind()));
   return -1;
 }
+}  // namespace xbyak
 }  // namespace rapidudf

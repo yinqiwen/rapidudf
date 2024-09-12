@@ -31,12 +31,13 @@
 #include "rapidudf/ast/expression.h"
 #include <fmt/core.h>
 #include <cstdint>
+#include <string_view>
+#include <type_traits>
 #include <variant>
 #include <vector>
 #include "rapidudf/ast/context.h"
 #include "rapidudf/builtin/builtin.h"
 #include "rapidudf/builtin/builtin_symbols.h"
-#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
@@ -124,24 +125,26 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, DType src_dtype)
   if (!field_accessor) {
     return ctx.GetErrorStatus(fmt::format("Can NOT get member:{} accessor for dtype:{}", field, src_dtype.PtrTo()));
   }
+  struct_member = field_accessor.value();
   if (!func_args.has_value()) {
-    if (!field_accessor->HasField()) {
+    if (!struct_member.HasField()) {
       return ctx.GetErrorStatus(fmt::format("Can NOT get field:{} accessor for dtype:{}", field, src_dtype));
     }
-    DType field_dtype = *field_accessor->member_field_dtype;
+    DType field_dtype = *struct_member.member_field_dtype;
     if (!field_dtype.IsPrimitive() && !field_dtype.IsPtr() && !field_dtype.IsSimdVector()) {
       field_dtype = field_dtype.ToPtr();
     }
     return field_dtype;
   } else {
-    if (!field_accessor->HasMemberFunc()) {
+    if (!struct_member.HasMemberFunc()) {
       return ctx.GetErrorStatus(fmt::format("Can NOT get member func:{} accessor for dtype:{}", field, src_dtype));
     }
     auto func_arg_dtypes = func_args->Validate(ctx);
     if (!func_arg_dtypes.ok()) {
       return func_arg_dtypes.status();
     }
-    return field_accessor->member_func->return_type;
+    ctx.AddMemberFuncCall(src_dtype.PtrTo(), field, *struct_member.member_func);
+    return struct_member.member_func->return_type;
   }
 }
 absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
@@ -227,7 +230,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         can_binary_op = true;
         break;
       }
-      if (!left_var.dtype.CanCastTo(right_result->dtype) && !right_result->dtype.CanCastTo(left_result->dtype)) {
+      if (!ctx.CanCastTo(left_var.dtype, right_result->dtype) && !ctx.CanCastTo(right_result->dtype, left_var.dtype)) {
         can_binary_op = false;
         break;
       }
@@ -236,11 +239,19 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       } else {
         right_result->dtype = left_var.dtype;
       }
+      std::string_view implicit_func_call;
       if (left_var.dtype.IsStringPtr() || right_result->dtype.IsStringPtr()) {
-        ctx.AddBuiltinFuncCall(kBuiltinCastStdStrToStringView);
+        implicit_func_call = kBuiltinCastStdStrToStringView;
       } else if (left_var.dtype.IsFlatbuffersStringPtr() || right_result->dtype.IsFlatbuffersStringPtr()) {
-        ctx.AddBuiltinFuncCall(kBuiltinCastFbsStrToStringView);
+        implicit_func_call = kBuiltinCastFbsStrToStringView;
       }
+      if (!implicit_func_call.empty()) {
+        auto result = ctx.CheckFuncExist(implicit_func_call, true);
+        if (!result.ok()) {
+          return result.status();
+        }
+      }
+
     } while (0);
     if (!can_binary_op) {
       return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} by expression validate ",
@@ -262,8 +273,11 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           if (!left_var.dtype.IsSimdVector()) {
             left_var.dtype = right_result->dtype;
           }
-          // ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(GetFunctionName(op, left_var.dtype, right_result->dtype));
+          auto result = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype, right_result->dtype), true);
+          if (!result.ok()) {
+            return result.status();
+          }
+
           break;
         }
         if (!left_var.dtype.IsNumber() || !right_result->dtype.IsNumber()) {
@@ -276,7 +290,6 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         if (!left_result->name.empty()) {
           ctx.AddLocalVar(left_result->name, right_result->dtype);
         }
-        // return right_result;
         left_var = right_result.value();
         break;
       }
@@ -287,64 +300,76 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       case OP_GREATER:
       case OP_GREATER_EQUAL: {
         bool can_cmp = false;
+        std::string implicit_func_call;
         if (left_var.dtype.IsNumber() && right_result->dtype.IsNumber()) {
           can_cmp = true;
         } else if (left_var.dtype.IsStringView() && right_result->dtype.IsStringView()) {
           can_cmp = true;
-          ctx.AddBuiltinFuncCall(kBuiltinStringViewCmp);
+          implicit_func_call = kBuiltinStringViewCmp;
         } else if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsPrimitive()) {
           can_cmp = true;
           if (right_result->dtype.IsFloat()) {
-            ctx.AddBuiltinFuncCall(kBuiltinJsonCmpFloat);
+            implicit_func_call = kBuiltinJsonCmpFloat;
           } else if (right_result->dtype.IsStringView()) {
-            ctx.AddBuiltinFuncCall(kBuiltinJsonCmpString);
+            implicit_func_call = kBuiltinJsonCmpString;
           } else {
-            ctx.AddBuiltinFuncCall(kBuiltinJsonCmpInt);
+            implicit_func_call = kBuiltinJsonCmpInt;
           }
         } else if (left_var.dtype.IsPrimitive() && right_result->dtype.IsJsonPtr()) {
           can_cmp = true;
           if (left_result->dtype.IsFloat()) {
-            ctx.AddBuiltinFuncCall(kBuiltinJsonCmpFloat);
+            implicit_func_call = kBuiltinJsonCmpFloat;
           } else if (left_result->dtype.IsStringView()) {
-            ctx.AddBuiltinFuncCall(kBuiltinJsonCmpString);
+            implicit_func_call = kBuiltinJsonCmpString;
           } else {
-            ctx.AddBuiltinFuncCall(kBuiltinJsonCmpInt);
+            implicit_func_call = kBuiltinJsonCmpInt;
           }
         } else if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsJsonPtr()) {
           can_cmp = true;
-          ctx.AddBuiltinFuncCall(kBuiltinJsonCmpJson);
+          implicit_func_call = kBuiltinJsonCmpJson;
         } else if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
-          ctx.AddBuiltinFuncCall(GetFunctionName(op, left_var.dtype, right_result->dtype));
-          // ctx.MarkSimdVectorOperation();
+          can_cmp = true;
+          implicit_func_call = GetFunctionName(op, left_var.dtype, right_result->dtype);
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
-          break;
         }
         if (!can_cmp) {
-          // RUDF_DEBUG("#### {}:{} {}", *left_result, left_result->dtype.IsJsonPtr(),
-          // right_result->dtype.IsPrimitive());
           return ctx.GetErrorStatus(
               fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op, left_var.dtype, right_result->dtype));
         }
-        left_var = VarTag(DType(DATA_U8));
+        if (!implicit_func_call.empty()) {
+          auto result = ctx.CheckFuncExist(implicit_func_call, true);
+          if (!result.ok()) {
+            return result.status();
+          }
+        }
+        if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
+          left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+        } else {
+          left_var = VarTag(DType(DATA_U8));
+        }
         break;
       }
       case OP_LOGIC_AND:
       case OP_LOGIC_OR: {
-        if (left_result->dtype.IsSimdVectorBit() && right_result->dtype.IsSimdVectorBit()) {
+        if (left_var.dtype.IsSimdVectorBit() || right_result->dtype.IsSimdVectorBit()) {
+          std::string implicit_func_call = GetFunctionName(op, left_var.dtype, right_result->dtype);
+          auto result = ctx.CheckFuncExist(implicit_func_call, true);
+          if (!result.ok()) {
+            return result.status();
+          }
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
-          break;
+        } else {
+          if (!left_var.dtype.IsBool() || !right_result->dtype.IsBool()) {
+            return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
+                                                  left_var.dtype, right_result->dtype));
+          }
+          left_var = VarTag(DType(DATA_U8));
         }
-        if (!left_result->dtype.IsBool() || !right_result->dtype.IsBool()) {
-          return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
-                                                left_result->dtype, right_result->dtype));
-        }
-        // return DType(DATA_U8);
-        left_var = VarTag(DType(DATA_U8));
         break;
       }
       default: {
-        return ctx.GetErrorStatus(fmt::format("Unimplemented {} with left dtype:{}, right dtype:{}", op,
-                                              left_result->dtype, right_result->dtype));
+        return ctx.GetErrorStatus(fmt::format("Unimplemented {} with left dtype:{}, right dtype:{}", op, left_var.dtype,
+                                              right_result->dtype));
       }
     }
   }
@@ -369,47 +394,54 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
       return false_expr_result.status();
     }
     if (cond_result->dtype.IsBool()) {
-      if (true_expr_result->dtype.CanCastTo(false_expr_result->dtype)) {
+      if (ctx.CanCastTo(true_expr_result->dtype, false_expr_result->dtype)) {
         ternary_result_dtype = false_expr_result->dtype;
         return VarTag(ternary_result_dtype);
-      } else if (false_expr_result->dtype.CanCastTo(true_expr_result->dtype)) {
+      } else if (ctx.CanCastTo(false_expr_result->dtype, true_expr_result->dtype)) {
         ternary_result_dtype = true_expr_result->dtype;
         return VarTag(ternary_result_dtype);
       }
     } else if (cond_result->dtype.IsSimdVectorBit()) {
+      bool can_select = false;
+      std::string implicit_func_call;
       if (true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
         if (true_expr_result->dtype == false_expr_result->dtype) {
           ternary_result_dtype = true_expr_result->dtype;
-          // ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(
-              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
-          return VarTag(ternary_result_dtype);
+          can_select = true;
+          implicit_func_call =
+              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype);
         }
       } else if (true_expr_result->dtype.IsSimdVector() && !false_expr_result->dtype.IsSimdVector()) {
-        if (false_expr_result->dtype.CanCastTo(true_expr_result->dtype.Elem())) {
+        if (ctx.CanCastTo(false_expr_result->dtype, true_expr_result->dtype.Elem())) {
           ternary_result_dtype = true_expr_result->dtype;
-          // ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(
-              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
-          return VarTag(ternary_result_dtype);
+          can_select = true;
+          implicit_func_call =
+              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype);
         }
       } else if (!true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
-        if (true_expr_result->dtype.CanCastTo(false_expr_result->dtype.Elem())) {
+        if (ctx.CanCastTo(true_expr_result->dtype, false_expr_result->dtype.Elem())) {
           ternary_result_dtype = false_expr_result->dtype;
-          // ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(
-              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
-          return VarTag(ternary_result_dtype);
+          can_select = true;
+          implicit_func_call =
+              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype);
         }
       } else {
         if (true_expr_result->dtype.IsNumber() && false_expr_result->dtype.IsNumber()) {
           ternary_result_dtype =
               true_expr_result->dtype >= false_expr_result->dtype ? true_expr_result->dtype : false_expr_result->dtype;
-          // ctx.MarkSimdVectorOperation();
-          ctx.AddBuiltinFuncCall(
-              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
-          return VarTag(ternary_result_dtype.ToSimdVector());
+          can_select = true;
+          implicit_func_call =
+              GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype);
         }
+      }
+      if (can_select) {
+        if (!implicit_func_call.empty()) {
+          auto result = ctx.CheckFuncExist(implicit_func_call, true);
+          if (!result.ok()) {
+            return result.status();
+          }
+        }
+        return VarTag(ternary_result_dtype.ToSimdVector());
       }
     }
     return ctx.GetErrorStatus(
@@ -440,6 +472,36 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
                     if (!var_dtype.dtype.IsPtr() || !var_dtype.dtype.PtrTo().IsJson()) {
                       return absl::StatusOr<VarTag>(absl::InvalidArgumentError(
                           fmt::format("invalid dtype:{} to do json dynamic access", var_dtype.dtype)));
+                    }
+                    using T = std::decay_t<decltype(dynamic_arg)>;
+                    bool get_by_member = true;
+                    if constexpr (std::is_same_v<uint32_t, T>) {
+                      get_by_member = false;
+                    } else if constexpr (std::is_same_v<std::string, T>) {
+                    } else {
+                      auto result = dynamic_arg.Validate(ctx);
+                      if (!result.ok()) {
+                        return absl::StatusOr<VarTag>(result.status());
+                      }
+                      auto var_ref_dtype = result.value().dtype;
+                      if (var_ref_dtype.IsInteger()) {
+                        get_by_member = false;
+                      } else if (var_ref_dtype.IsStringView() || var_ref_dtype.IsStdStringView()) {
+                        get_by_member = true;
+                      } else {
+                        return absl::StatusOr<VarTag>(
+                            absl::InvalidArgumentError(fmt::format("Can NOT do json get by dtype:{}", var_ref_dtype)));
+                      }
+                    }
+                    std::string_view implicit_func_call;
+                    if (get_by_member) {
+                      implicit_func_call = kBuiltinJsonMemberGet;
+                    } else {
+                      implicit_func_call = kBuiltinJsonArrayGet;
+                    }
+                    auto result = ctx.CheckFuncExist(implicit_func_call, true);
+                    if (!result.ok()) {
+                      return absl::StatusOr<VarTag>(result.status());
                     }
                     DType json_dtype(DATA_JSON);
                     DType json_ptr_dtype = json_dtype.ToPtr();
@@ -476,14 +538,10 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     }
     if (is_builtin_function(name)) {
       if (name == kOpTokenStrs[OP_IOTA]) {
-        // ctx.MarkSimdVectorOperation();
         name = GetFunctionName(name, arg_dtypes[0]);
       } else if (has_simd_vector) {
-        // ctx.MarkSimdVectorOperation();
-        // name = "simd_vector_" + name + "_" + largest_dtype.Elem().GetTypeString();
         name = GetFunctionName(name, arg_dtypes);
       } else {
-        // name = name + "_" + largest_dtype.GetTypeString();
         name = GetFunctionName(name, largest_dtype);
       }
     }
@@ -496,9 +554,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
       return ctx.GetErrorStatus(
           fmt::format("Invalid func call:{} args with invalid args, simd_vector_func:{}", name, has_simd_vector));
     }
-    // if (desc->is_simd_vector_func) {
-    //   ctx.MarkSimdVectorOperation();
-    // }
+
     return desc->return_type;
   } else {
     return ctx.IsVarExist(name, false);

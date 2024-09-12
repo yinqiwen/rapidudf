@@ -43,7 +43,7 @@
 #include "xbyak/xbyak.h"
 
 namespace rapidudf {
-
+namespace xbyak {
 class Value;
 using ValuePtr = std::shared_ptr<Value>;
 class CodeGenerator;
@@ -207,6 +207,6 @@ class Value : public std::enable_shared_from_this<Value> {
 
   friend class codegen;
 };
-
+}  // namespace xbyak
 // static_assert(sizeof(Value) == 16, "sizeof(Value) != 16");
 }  // namespace rapidudf

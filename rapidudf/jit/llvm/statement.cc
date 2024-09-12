@@ -28,63 +28,49 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/ast/statement.h"
+
 #include <fmt/core.h>
-#include "rapidudf/builtin/builtin_symbols.h"
+#include <variant>
+#include <vector>
+#include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
-namespace ast {
-static absl::Status check_statements(ParseContext& ctx, std::vector<Statement>& statements) {
-  for (auto& statement : statements) {
-    auto status = std::visit([&](auto&& arg) { return arg.Validate(ctx); }, statement);
-    if (!status.ok()) {
-      return status;
+namespace llvm {
+absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::ReturnStatement& statement) {
+  if (statement.expr.has_value()) {
+    auto val_result = BuildIR(ctx, *statement.expr);
+    if (!val_result.ok()) {
+      return val_result.status();
     }
+    ValuePtr val = val_result.value();
+    auto ret_val = val->CastTo(current_compile_functon_ctx_->desc.return_type);
+    if (!ret_val) {
+      RUDF_LOG_ERROR_STATUS(
+          ast_ctx_.GetErrorStatus(fmt::format("Can NOT cast to return dtype:{} from dtype:{}",
+                                              current_compile_functon_ctx_->desc.return_type, val->GetDType())));
+    }
+    ir_builder_->CreateRet(ret_val->GetValue());
+  } else {
+    ir_builder_->CreateRetVoid();
   }
   return absl::OkStatus();
 }
-absl::Status ChoiceStatement::Validate(ParseContext& ctx) {
-  auto result = expr->Validate(ctx);
-  if (!result.ok()) {
-    return result.status();
-  }
-  if (!result->dtype.IsBool()) {
-    return ctx.GetErrorStatus(fmt::format("Can NOT do if/elif/while on non bool expression:{}", result.value().dtype));
-  }
-  return check_statements(ctx, statements);
-}
+absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfElseStatement& statement) {
+  RUDF_DEBUG("Start compile ifelse statement.");
 
-absl::Status IfElseStatement::Validate(ParseContext& ctx) {
-  absl::Status rc = if_statement.Validate(ctx);
-  if (!rc.ok()) {
-    return rc;
-  }
-  for (auto& st : elif_statements) {
-    rc = st.Validate(ctx);
-    if (!rc.ok()) {
-      return rc;
-    }
-  }
-  if (else_statements) {
-    return check_statements(ctx, *else_statements);
+  return absl::OkStatus();
+}
+absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::WhileStatement& statement) {
+  return absl::OkStatus();
+}
+absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::ExpressionStatement& statement) {
+  auto val = BuildIR(ctx, statement.expr);
+  if (!val.ok()) {
+    return val.status();
   }
   return absl::OkStatus();
 }
-
-absl::Status ReturnStatement::Validate(ParseContext& ctx) {
-  absl::Status status = absl::OkStatus();
-  if (expr) {
-    auto expr_result = (*expr)->Validate(ctx);
-    if (!expr_result.ok()) {
-      return expr_result.status();
-    }
-    if (!ctx.CanCastTo(expr_result->dtype, ctx.GetFuncReturnDType())) {
-      return ctx.GetErrorStatus(fmt::format("Can NOT return invalid dtype:{}, while func return dtype:{}",
-                                            expr_result->dtype, ctx.GetFuncReturnDType()));
-    }
-    return absl::OkStatus();
-  }
-  return status;
-}
-
-}  // namespace ast
+}  // namespace llvm
 }  // namespace rapidudf

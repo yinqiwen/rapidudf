@@ -162,6 +162,14 @@ auto array_func = [](auto& ctx) {
   _val(ctx) = v;
 };
 
+auto field_access_func = [](auto& ctx) {
+  FieldAccess v;
+  v.field = std::get<0>(_attr(ctx));
+  v.func_args = std::get<1>(_attr(ctx));
+  v.position = _where(ctx).begin() - _begin(ctx);
+  _val(ctx) = v;
+};
+
 auto const constant_number_def = bp::lexeme[bp::double_ > -('_' > Symbols::kNumberSymbols)];
 // const auto dynamic_param_access_def = identifier > *('[' > (bp::quoted_string | bp::uint_) > ']');
 auto const var_declare_def = ("var" > identifier)[var_declare_func];
@@ -181,7 +189,7 @@ auto const multiplicative_expr_def =
     (unary_expr >> *(Symbols::kMultiplicativeOpSymbols >> unary_expr))[binary_expr_func];
 auto const unary_expr_def = (-Symbols::kUnaryOpSymbols >> operand)[unary_expr_func];
 
-auto const filed_access_def = ('.' > identifier > -func_invoke_args);
+auto const filed_access_def = (('.' > identifier > -func_invoke_args))[field_access_func];
 auto const dynamic_param_access_def = ('[' > (bp::quoted_string | bp::uint_ | var_ref) > ']');
 auto const member_access_def = +(filed_access | dynamic_param_access);
 auto const var_accessor_def = (identifier > -(member_access | func_invoke_args))[var_accessor_func];

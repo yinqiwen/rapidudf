@@ -35,7 +35,7 @@
 #include "rapidudf/meta/optype.h"
 #include "xbyak/xbyak.h"
 namespace rapidudf {
-
+namespace xbyak {
 int cmp_value(Xbyak::CodeGenerator& c, DType dtype, const Xbyak::Operand& left, const Xbyak::Operand& right,
               bool reverse = false);
 int cmp_value(Xbyak::CodeGenerator& c, DType dtype, const Xbyak::Operand& left, uint64_t right, bool reverse = false);
@@ -45,5 +45,5 @@ int store_cmp_result(Xbyak::CodeGenerator& c, OpToken op, const Xbyak::Operand& 
 int cmp_value(Xbyak::CodeGenerator& c, OpToken op, DType dtype, uint64_t left, uint64_t right,
               const Xbyak::Operand& result);
 int cmp_value(Xbyak::CodeGenerator& c, OpToken op, DType dtype, uint64_t left, uint64_t right, bool& result);
-
+}  // namespace xbyak
 }  // namespace rapidudf
