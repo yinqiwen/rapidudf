@@ -34,9 +34,11 @@
 #include <llvm/IR/Argument.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Use.h>
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/Mangler.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"

@@ -32,8 +32,7 @@
 #pragma once
 
 #include <fmt/core.h>
-#include <llvm/IR/Use.h>
-#include <map>
+
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -41,7 +40,8 @@
 
 #include "absl/status/statusor.h"
 
-#include "llvm/ADT/APFloat.h"
+#include "llvm/Analysis/CGSCCPassManager.h"
+#include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -50,8 +50,8 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/IR/Use.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 
 #include "rapidudf/ast/block.h"

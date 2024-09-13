@@ -46,9 +46,9 @@ struct TestStruct {
   void test_funcx() { throw std::logic_error("aaa"); }
 };
 
-RUDF_SAFE_FUNC_REGISTER(test_user_func, kFuncNoAttrs)
+RUDF_FUNC_REGISTER(test_user_func, kFuncNoAttrs)
 
-RUDF_STRUCT_SAFE_MEMBER_METHODS(TestStruct, test_funcx)
+RUDF_STRUCT_MEMBER_METHODS(TestStruct, test_funcx)
 
 TEST(JitCompiler, exception) {
   spdlog::set_level(spdlog::level::debug);
@@ -81,7 +81,6 @@ TEST(JitCompiler, rethrow_exception) {
   }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  f.SetRethrowException(true);
   try {
     f();
     ASSERT_TRUE(1 == 0);
@@ -117,7 +116,7 @@ struct Helper {
   }
 };
 
-RUDF_STRUCT_SAFE_HELPER_METHODS_BIND(Helper, test0, test1)
+RUDF_STRUCT_HELPER_METHODS_BIND(Helper, test0, test1)
 
 TEST(JitCompiler, member_func_bind) {
   spdlog::set_level(spdlog::level::debug);

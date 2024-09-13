@@ -73,7 +73,7 @@ enum FuncAttrs : uint64_t {
   kFuncNoAttrs = 0,
   kBuiltinFunc = 1,
   kFuncUseArenaAllocator = 2,
-  kFuncWithCtx = 4,
+  kFunc = 4,
 };
 class FunctionAttrs {
  public:
@@ -193,10 +193,10 @@ struct MemberFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
 };
 
 template <uint64_t, uint32_t, uint64_t, typename F>
-struct SafeFunctionWrapper;
+struct FunctionWrapper;
 
 template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename R, typename... Args>
-struct SafeFunctionWrapper<SOURCE, LINE, HASH, R(Args...)> {
+struct FunctionWrapper<SOURCE, LINE, HASH, R(Args...)> {
   using return_type = R;
   using func_t = R (*)(Args...);
   static std::string& GetFuncName() {
@@ -209,36 +209,16 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R(Args...)> {
   }
   static R SafeCall(Args... args) {
     auto func = GetFunc();
-    try {
-      if constexpr (std::is_same_v<void, R>) {
-        func(std::forward<Args>(args)...);
-      } else {
-        return func(std::forward<Args>(args)...);
-      }
-    } catch (...) {
-      auto& func_ctx = FunctionCallContext::Get(false);
-      try {
-        throw;
-      } catch (const std::exception& e) {
-        RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), typeid(e).name(), e.what());
-        func_ctx.run_ex = e;
-      } catch (...) {
-        RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
-      }
-      if (func_ctx.invoke_frame_id > 0) {
-        longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
-      }
-      if constexpr (std::is_same_v<void, R>) {
-        // nothing
-      } else {
-        return {};
-      }
+    if constexpr (std::is_same_v<void, R>) {
+      func(std::forward<Args>(args)...);
+    } else {
+      return func(std::forward<Args>(args)...);
     }
   }
 };
 
 template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename R, typename... Args>
-struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (*)(Args...)> {
+struct FunctionWrapper<SOURCE, LINE, HASH, R (*)(Args...)> {
   using return_type = R;
   using func_t = R (*)(Args...);
   static std::string& GetFuncName() {
@@ -251,36 +231,16 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (*)(Args...)> {
   }
   static R SafeCall(Args... args) {
     auto func = GetFunc();
-    try {
-      if constexpr (std::is_same_v<void, R>) {
-        func(std::forward<Args>(args)...);
-      } else {
-        return func(std::forward<Args>(args)...);
-      }
-    } catch (...) {
-      auto& func_ctx = FunctionCallContext::Get(false);
-      try {
-        throw;
-      } catch (const std::exception& e) {
-        RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), typeid(e).name(), e.what());
-        func_ctx.run_ex = e;
-      } catch (...) {
-        RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
-      }
-      if (func_ctx.invoke_frame_id > 0) {
-        longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
-      }
-      if constexpr (std::is_same_v<void, R>) {
-        // nothing
-      } else {
-        return {};
-      }
+    if constexpr (std::is_same_v<void, R>) {
+      func(std::forward<Args>(args)...);
+    } else {
+      return func(std::forward<Args>(args)...);
     }
   }
 };
 
 template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename T, typename R, typename... Args>
-struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...)> {
+struct FunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...)> {
   using return_type = R;
   using arguments = std::tuple<Args...>;
   using func_t = R (T::*)(Args...);
@@ -293,37 +253,17 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...)> {
     return func;
   }
   static R SafeCall(T* p, Args... args) {
-    try {
-      auto func = GetFunc();
-      if constexpr (std::is_same_v<void, R>) {
-        (p->*func)(std::forward<Args>(args)...);
-      } else {
-        return (p->*func)(std::forward<Args>(args)...);
-      }
-    } catch (...) {
-      auto& func_ctx = FunctionCallContext::Get(false);
-      try {
-        throw;
-      } catch (const std::exception& e) {
-        RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), typeid(e).name(), e.what());
-        func_ctx.run_ex = e;
-      } catch (...) {
-        RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
-      }
-      if (func_ctx.invoke_frame_id > 0) {
-        longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
-      }
-      if constexpr (std::is_same_v<void, R>) {
-        // nothing
-      } else {
-        return {};
-      }
+    auto func = GetFunc();
+    if constexpr (std::is_same_v<void, R>) {
+      (p->*func)(std::forward<Args>(args)...);
+    } else {
+      return (p->*func)(std::forward<Args>(args)...);
     }
   }
 };
 
 template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename T, typename R, typename... Args>
-struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
+struct FunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
   using return_type = R;
   using func_t = R (T::*)(Args...) const;
   static std::string& GetFuncName() {
@@ -335,31 +275,11 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
     return func;
   }
   static R SafeCall(const T* p, Args... args) {
-    try {
-      auto func = GetFunc();
-      if constexpr (std::is_same_v<void, R>) {
-        (p->*func)(std::forward<Args>(args)...);
-      } else {
-        return (p->*func)(std::forward<Args>(args)...);
-      }
-    } catch (...) {
-      auto& func_ctx = FunctionCallContext::Get(false);
-      try {
-        throw;
-      } catch (const std::exception& e) {
-        RUDF_ERROR("func:{} invoke exception type:[{}], msg:{}", GetFuncName(), typeid(e).name(), e.what());
-        func_ctx.run_ex = e;
-      } catch (...) {
-        RUDF_ERROR("func:{} invoke unknown eception cpature!", GetFuncName());
-      }
-      if (func_ctx.invoke_frame_id > 0) {
-        longjmp(func_ctx.jmp_env, 1);  // Jump out of deep nested calls
-      }
-      if constexpr (std::is_same_v<void, R>) {
-        // nothing
-      } else {
-        return {};
-      }
+    auto func = GetFunc();
+    if constexpr (std::is_same_v<void, R>) {
+      (p->*func)(std::forward<Args>(args)...);
+    } else {
+      return (p->*func)(std::forward<Args>(args)...);
     }
   }
 };
@@ -395,20 +315,10 @@ struct SafeFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
 #define RUDF_FUNC_REGISTER(f, attrs) \
   static ::rapidudf::FuncRegister<void> BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f, attrs);
 
-#define RUDF_SAFE_FUNC_REGISTER(f, attrs)                                                                  \
-  static ::rapidudf::FuncRegister<rapidudf::SafeFunctionWrapper<                                           \
-      rapidudf::fnv1a_hash(__FILE__), __LINE__, rapidudf::fnv1a_hash(BOOST_PP_STRINGIZE(f)), decltype(f)>> \
-      BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f, attrs);
-
 #define RUDF_FUNC_REGISTER_WITH_NAME(NAME, f, attrs) \
   static ::rapidudf::FuncRegister BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);
 
-#define RUDF_SAFE_FUNC_REGISTER_WITH_NAME(NAME, f, attrs)                                                              \
-  static ::rapidudf::FuncRegister <                                                                                    \
-      rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__, rapidudf::fnv1a_hash(NAME), decltype(f)> \
-          BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);
-
-#define RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(hash, NAME, f, attrs)                          \
-  static ::rapidudf::FuncRegister<                                                                \
-      rapidudf::SafeFunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__, hash, decltype(f)>> \
+#define RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(hash, NAME, f, attrs)                           \
+  static ::rapidudf::FuncRegister<                                                            \
+      rapidudf::FunctionWrapper<rapidudf::fnv1a_hash(__FILE__), __LINE__, hash, decltype(f)>> \
       BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f, attrs);

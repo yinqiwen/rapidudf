@@ -56,12 +56,10 @@ class JitFunction {
 
   const std::string& GetName() const { return name_; }
 
-  void SetRethrowException(bool v) { rethrow_ = v; }
-  void SetUnsafe(bool v = true) { unsafe_ = v; }
-
-  RET UnsafeCall(Args... args) {
+  RET operator()(Args... args) {
+    auto& func_ctx = FunctionCallContext::Get(true);
     if (reset_arena_) {
-      GetArena().Reset();
+      func_ctx.arena.Reset();
     }
     if constexpr (std::is_same_v<void, RET>) {
       f_(args...);
@@ -71,64 +69,17 @@ class JitFunction {
     }
   }
 
-  RET SafeCall(Args... args) {
-    auto& func_ctx = FunctionCallContext::Get(true);
-    if (reset_arena_) {
-      func_ctx.arena.Reset();
-    }
-    if (func_ctx.invoke_frame_id == 1) {  // first
-      if (setjmp(func_ctx.jmp_env) == 0) {
-        if constexpr (std::is_same_v<void, RET>) {
-          f_(args...);
-          func_ctx.invoke_frame_id = 0;
-        } else {
-          RET r = f_(args...);
-          func_ctx.invoke_frame_id = 0;
-          return r;
-        }
-      } else {
-        func_ctx.invoke_frame_id = 0;
-        if (rethrow_) {
-          throw func_ctx.run_ex;
-        }
-        RUDF_DEBUG("JitFunction exception captured, return default value.");
-        if constexpr (std::is_same_v<void, RET>) {
-        } else {
-          return {};
-        }
-      }
-    } else {
-      if constexpr (std::is_same_v<void, RET>) {
-        f_(args...);
-      } else {
-        RET r = f_(args...);
-        return r;
-      }
-    }
-  }
-
-  RET operator()(Args... args) {
-    if (unsafe_) {
-      return UnsafeCall(args...);
-    } else {
-      return SafeCall(args...);
-    }
-  }
-
  private:
   std::string name_;
   std::shared_ptr<void> resource_;
   RET (*f_)(Args...) = nullptr;
-  bool unsafe_ = false;
-  bool rethrow_ = true;
+
   bool reset_arena_ = false;
 
   void MoveFrom(JitFunction&& other) {
     name_ = std::move(other.name_);
     resource_ = std::move(other.resource_);
     f_ = other.f_;
-    rethrow_ = other.rethrow_;
-    unsafe_ = other.unsafe_;
   }
 };
 }  // namespace rapidudf

@@ -112,7 +112,7 @@ TEST(JitCompiler, cpp_func) {
 struct ExceptionStruct {
   void test() { throw std::logic_error("test"); }
 };
-RUDF_STRUCT_SAFE_MEMBER_METHODS(ExceptionStruct, test);
+RUDF_STRUCT_MEMBER_METHODS(ExceptionStruct, test);
 TEST(JitCompiler, safe_member_func) {
   spdlog::set_level(spdlog::level::debug);
   rapidudf::JitCompiler compiler;
@@ -129,7 +129,7 @@ TEST(JitCompiler, safe_member_func) {
 }
 
 static void exception_func() { throw std::logic_error("exception_func"); }
-RUDF_SAFE_FUNC_REGISTER(exception_func, rapidudf::kFuncNoAttrs)
+RUDF_FUNC_REGISTER(exception_func, rapidudf::kFuncNoAttrs)
 TEST(JitCompiler, safe_func) {
   spdlog::set_level(spdlog::level::debug);
   rapidudf::JitCompiler compiler;

@@ -79,13 +79,13 @@ static void register_binary_simd_vector_op() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype.ToSimdVector());
   simd::Vector<R> (*simd_f)(simd::Vector<T>, simd::Vector<T>) = simd::simd_vector_binary_op<T, R, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f, kFuncUseArenaAllocator);
   func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype);
   simd::Vector<R> (*simd_f1)(simd::Vector<T>, T) = simd::simd_vector_binary_vector_scalar_op<T, R, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f1, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f1, kFuncUseArenaAllocator);
   func_name = GetFunctionName(op, dtype, dtype.ToSimdVector());
   simd::Vector<R> (*simd_f2)(T, simd::Vector<T>) = simd::simd_vector_binary_scalar_vector_op<T, R, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f2, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(op, func_name.c_str(), simd_f2, kFuncUseArenaAllocator);
 }
 
 template <typename T, OpToken op>
@@ -95,29 +95,29 @@ static void register_ternary_simd_vector_op() {
       GetFunctionName(op, dtype.ToSimdVector(), dtype.ToSimdVector(), dtype.ToSimdVector());
   simd::Vector<T> (*simd_f0)(simd::Vector<T>, simd::Vector<T>, simd::Vector<T>) =
       simd::simd_vector_ternary_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f0, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f0, kFuncUseArenaAllocator);
   simd_vector_func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype.ToSimdVector(), dtype);
   simd::Vector<T> (*simd_f1)(simd::Vector<T>, simd::Vector<T>, T) =
       simd::simd_vector_ternary_vector_vector_scalar_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f1, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f1, kFuncUseArenaAllocator);
   simd_vector_func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype, dtype.ToSimdVector());
   simd::Vector<T> (*simd_f2)(simd::Vector<T>, T, simd::Vector<T>) =
       simd::simd_vector_ternary_vector_scalar_vector_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f2, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f2, kFuncUseArenaAllocator);
   simd_vector_func_name = GetFunctionName(op, dtype.ToSimdVector(), dtype, dtype);
   simd::Vector<T> (*simd_f3)(simd::Vector<T>, T, T) = simd::simd_vector_ternary_vector_scalar_scalar_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f3, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f3, kFuncUseArenaAllocator);
 
   simd_vector_func_name = GetFunctionName(op, dtype, dtype.ToSimdVector(), dtype.ToSimdVector());
   simd::Vector<T> (*simd_f4)(T, simd::Vector<T>, simd::Vector<T>) =
       simd::simd_vector_ternary_scalar_vector_vector_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f4, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f4, kFuncUseArenaAllocator);
   simd_vector_func_name = GetFunctionName(op, dtype, dtype.ToSimdVector(), dtype);
   simd::Vector<T> (*simd_f5)(T, simd::Vector<T>, T) = simd::simd_vector_ternary_scalar_vector_scalar_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f5, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f5, kFuncUseArenaAllocator);
   simd_vector_func_name = GetFunctionName(op, dtype, dtype, dtype.ToSimdVector());
   simd::Vector<T> (*simd_f6)(T, T, simd::Vector<T>) = simd::simd_vector_ternary_scalar_scalar_vector_op<T, T, op>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f6, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f6, kFuncUseArenaAllocator);
 }
 
 template <typename T>
@@ -128,22 +128,22 @@ static void register_ternary_conditional_simd_vector_op() {
       GetFunctionName(OP_CONDITIONAL, bits_dtype, dtype.ToSimdVector(), dtype.ToSimdVector());
   simd::Vector<T> (*simd_f0)(simd::Vector<Bit>, simd::Vector<T>, simd::Vector<T>) =
       simd::simd_vector_ternary_op<Bit, T, OP_CONDITIONAL>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f0, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f0, kFuncUseArenaAllocator);
 
   simd_vector_func_name = GetFunctionName(OP_CONDITIONAL, bits_dtype, dtype.ToSimdVector(), dtype);
   simd::Vector<T> (*simd_f1)(simd::Vector<Bit>, simd::Vector<T>, T) =
       simd::simd_vector_ternary_vector_vector_scalar_op<Bit, T, OP_CONDITIONAL>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f1, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f1, kFuncUseArenaAllocator);
 
   simd_vector_func_name = GetFunctionName(OP_CONDITIONAL, bits_dtype, dtype, dtype.ToSimdVector());
   simd::Vector<T> (*simd_f2)(simd::Vector<Bit>, T, simd::Vector<T>) =
       simd::simd_vector_ternary_vector_scalar_vector_op<Bit, T, OP_CONDITIONAL>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f2, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f2, kFuncUseArenaAllocator);
 
   simd_vector_func_name = GetFunctionName(OP_CONDITIONAL, bits_dtype, dtype, dtype);
   simd::Vector<T> (*simd_f3)(simd::Vector<Bit>, T, T) =
       simd::simd_vector_ternary_vector_scalar_scalar_op<Bit, T, OP_CONDITIONAL>;
-  RUDF_SAFE_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f3, kFuncUseArenaAllocator);
+  RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(0, simd_vector_func_name.c_str(), simd_f3, kFuncUseArenaAllocator);
 }
 
 template <typename T>
