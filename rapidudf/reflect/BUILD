@@ -17,9 +17,9 @@ cc_library(
         "struct.h",
     ],
     deps = [
-        "//rapidudf/jit/xbyak:code_generator",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
+        "//rapidudf/meta:function",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_github_xbyak//:xbyak",
         "@com_google_absl//absl/status:statusor",

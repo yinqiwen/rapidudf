@@ -31,7 +31,7 @@
 
 #pragma once
 #include "rapidudf/jit/llvm/jit.h"
-#include "rapidudf/jit/xbyak/jit.h"
+// #include "rapidudf/jit/xbyak/jit.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/reflect/macros.h"
 
