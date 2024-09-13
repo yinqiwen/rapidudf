@@ -100,6 +100,10 @@ class ParseContext {
 
   bool CanCastTo(DType from_dtype, DType to_dtype);
 
+  void EnterLoop();
+  bool IsInLoop();
+  void ExitLoop();
+
  private:
   using LocalVarMap = std::unordered_map<std::string, DType>;
 
@@ -111,6 +115,7 @@ class ParseContext {
     FunctionCallMap implicit_func_calls;
     MemberFuncCallMap member_func_calls;
     FunctionDesc desc;
+    uint32_t in_loop = 0;
   };
   const FunctionParseContext& GetFunctionParseContext(uint32_t idx) const { return function_parse_ctxs_[idx]; }
   FunctionParseContext& GetFunctionParseContext(uint32_t idx) {

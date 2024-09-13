@@ -50,15 +50,14 @@ class Value : public std::enable_shared_from_this<Value> {
   };
 
  public:
-  Value(Private, DType dtype, JitCompiler* c, ::llvm::Value* val, const std::string& name);
+  Value(Private, DType dtype, JitCompiler* c, ::llvm::Value* val, ::llvm::Type* t);
 
-  static ValuePtr New(DType dtype, JitCompiler* c, ::llvm::Value* val, const std::string& name = "") {
-    return std::make_shared<Value>(Private(), dtype, c, val, name);
+  static ValuePtr New(DType dtype, JitCompiler* c, ::llvm::Value* val, ::llvm::Type* t = nullptr) {
+    return std::make_shared<Value>(Private(), dtype, c, val, t);
   }
   ~Value() {}
 
-  const std::string& GetName() const { return name_; }
-  ::llvm::Value* GetValue() { return val_; }
+  ::llvm::Value* GetValue();
   DType GetDType() { return dtype_; }
 
   ValuePtr UnaryOp(OpToken op);
@@ -76,7 +75,7 @@ class Value : public std::enable_shared_from_this<Value> {
   ::llvm::IRBuilder<>* ir_builder_ = nullptr;
   ::llvm::Value* val_ = nullptr;
 
-  std::string name_;
+  ::llvm::Type* type_ = nullptr;
 
   std::vector<uint64_t> const_values_;
 };

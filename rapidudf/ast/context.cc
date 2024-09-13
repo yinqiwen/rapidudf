@@ -43,6 +43,10 @@ void ParseContext::Clear() {
   validate_posistion_ = 0;
 }
 
+void ParseContext::EnterLoop() { GetFunctionParseContext(current_function_cursor_).in_loop++; }
+bool ParseContext::IsInLoop() { return GetFunctionParseContext(current_function_cursor_).in_loop > 0; }
+void ParseContext::ExitLoop() { GetFunctionParseContext(current_function_cursor_).in_loop--; }
+
 void ParseContext::SetSource(const std::string& src, bool clear_vars) {
   source_ = src;
   source_lines_.clear();

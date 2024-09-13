@@ -200,6 +200,8 @@ class JitCompiler {
   absl::Status CompileStatement(const ast::IfElseStatement& statement);
   absl::Status CompileStatement(const ast::WhileStatement& statement);
   absl::Status CompileStatement(const ast::ExpressionStatement& statement);
+  absl::Status CompileStatement(const ast::ContinueStatement& statement);
+  absl::Status CompileStatement(const ast::BreakStatement& statement);
 
   absl::StatusOr<ValuePtr> CompileExpression(ast::UnaryExprPtr expr);
   absl::StatusOr<ValuePtr> CompileExpression(ast::BinaryExprPtr expr);

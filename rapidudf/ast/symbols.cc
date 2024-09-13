@@ -79,7 +79,8 @@ boost::parser::symbols<OpToken> Symbols::kAdditiveOpSymbols = {{"+", OP_PLUS}, {
 boost::parser::symbols<OpToken> Symbols::kMultiplicativeOpSymbols = {
     {"*", OP_MULTIPLY}, {"/", OP_DIVIDE}, {"%", OP_MOD}};
 boost::parser::symbols<OpToken> Symbols::kUnaryOpSymbols = {{"-", OP_NEGATIVE}, {"!", OP_NOT}};
-
+boost::parser::symbols<uint32_t> Symbols::kContinueSymbols = {{"continue", 0}};
+boost::parser::symbols<uint32_t> Symbols::kBreakSymbols = {{"break", 0}};
 // void Symbols::AddDType(const std::string& name, DType dtype) { kDtypeSymbols.insert_for_next_parse(name, dtype); }
 void Symbols::Init() {
   static std::mutex mutex;

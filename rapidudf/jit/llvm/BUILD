@@ -31,7 +31,6 @@ cc_library(
         "binary_expression.cc",
         "constants.cc",
         "jit.cc",
-        "jit_var.cc",
         "statement.cc",
         "ternary_expression.cc",
         "type.cc",
@@ -40,6 +39,7 @@ cc_library(
         "value_binary_ops.cc",
         "value_cast.cc",
         "value_unary_ops.cc",
+        "var.cc",
     ],
     hdrs = [
         "jit.h",

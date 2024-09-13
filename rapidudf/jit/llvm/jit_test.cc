@@ -158,3 +158,59 @@ RUDF_FUNC_REGISTER(test_extern_func, rapidudf::kFuncNoAttrs)
 //   ASSERT_EQ(f(2), 0);
 //   ASSERT_EQ(f(5), 1);
 // }
+
+// TEST(JitCompiler, ifelse) {
+//   spdlog::set_level(spdlog::level::debug);
+//   JitCompiler compiler;
+//   std::string content = R"(
+//     int test_func(int x){
+//       if(x >10){
+//         return 3;
+//       }elif (x > 5){
+//          return  2;
+//       }elif(x>3){
+//          return  1;
+//       }else{
+
+//       }
+//       x+ 11;
+//       return x;
+//      }
+//   )";
+
+//   auto rc = compiler.CompileFunction<int, int>(content, true);
+//   if (!rc.ok()) {
+//     RUDF_ERROR("####{}", rc.status().ToString());
+//   }
+//   ASSERT_TRUE(rc.ok());
+//   TestA t;
+//   auto f = std::move(rc.value());
+//   ASSERT_EQ(f(11), 3);
+//   ASSERT_EQ(f(1), 1);
+// }
+
+TEST(JitCompiler, while_test) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  std::string content = R"(
+    int test_func(int x){
+      while(x < 10){
+        x+=1;
+        if(x == 6){
+           break;
+        }
+      }
+      return x;
+     }
+  )";
+
+  auto rc = compiler.CompileFunction<int, int>(content, true);
+  if (!rc.ok()) {
+    RUDF_ERROR("####{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  TestA t;
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(11), 11);
+  ASSERT_EQ(f(1), 6);
+}

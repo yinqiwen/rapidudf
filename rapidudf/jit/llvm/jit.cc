@@ -102,8 +102,8 @@ void JitCompiler::Init() {
                                     *module_analysis_manager_);
 }
 
-ValuePtr JitCompiler::NewValue(DType dtype, ::llvm::Value* val, const std::string& name) {
-  return Value::New(dtype, this, val, name);
+ValuePtr JitCompiler::NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type) {
+  return Value::New(dtype, this, val, type);
 }
 
 typename JitCompiler::JitTypeArray& JitCompiler::AllocateJitTypes() {
@@ -189,10 +189,19 @@ absl::StatusOr<typename JitCompiler::FunctionCompileContextPtr> JitCompiler::Com
   // Add a basic block to the function. As before, it automatically inserts
   // because of the last argument.
   ::llvm::BasicBlock* entry_block = ::llvm::BasicBlock::Create(*context_, "entry", f);
+  func_compile_ctx->exit_block = ::llvm::BasicBlock::Create(*context_, "exit");
+  ir_builder_->SetInsertPoint(entry_block);
+  if (!function.return_type.IsVoid()) {
+    auto return_type_result = GetType(function.return_type);
+    if (!return_type_result.ok()) {
+      return return_type_result.status();
+    }
+    func_compile_ctx->return_type = return_type_result.value();
+    func_compile_ctx->return_value = ir_builder_->CreateAlloca(return_type_result.value());
+  }
 
   // Create a basic block builder with default parameters.  The builder will
   // automatically append instructions to the basic block `BB'.
-  ir_builder_->SetInsertPoint(entry_block);
 
   current_compile_functon_ctx_ = func_compile_ctx;
 
@@ -202,13 +211,24 @@ absl::StatusOr<typename JitCompiler::FunctionCompileContextPtr> JitCompiler::Com
       std::string name = (*function.args)[i].name;
       DType dtype = (*function.args)[i].dtype;
       arg->setName(name);
-      func_compile_ctx->named_values[name] = NewValue(dtype, arg, name);
+      // func_compile_ctx->named_values[name] = NewValue(dtype, arg, arg->getType());
+      auto* arg_val = ir_builder_->CreateAlloca(arg->getType());
+      ir_builder_->CreateStore(arg, arg_val);
+      func_compile_ctx->named_values[name] = NewValue(dtype, arg_val, arg->getType());
     }
   }
   func_compile_ctx->func = f;
   auto status = BuildIR(func_compile_ctx, function.body);
   if (!status.ok()) {
     return status;
+  }
+  if (ir_builder_->GetInsertBlock()->getTerminator() == nullptr) {
+    ir_builder_->CreateBr(func_compile_ctx->exit_block);
+  }
+  func_compile_ctx->exit_block->insertInto(f);
+  ir_builder_->SetInsertPoint(func_compile_ctx->exit_block);
+  if (nullptr != func_compile_ctx->return_value) {
+    ir_builder_->CreateRet(ir_builder_->CreateLoad(func_compile_ctx->return_type, func_compile_ctx->return_value));
   }
 
   // Validate the generated code, checking for consistency.
@@ -227,13 +247,7 @@ absl::StatusOr<typename JitCompiler::FunctionCompileContextPtr> JitCompiler::Com
 }
 
 absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Block& block) {
-  for (auto& statement : block.statements) {
-    auto rc = std::visit([&](auto&& arg) { return BuildIR(ctx, arg); }, statement);
-    if (!rc.ok()) {
-      return rc;
-    }
-  }
-  return absl::OkStatus();
+  return BuildIR(ctx, block.statements);
 }
 
 absl::Status JitCompiler::Compile() {

@@ -38,9 +38,15 @@
 
 namespace rapidudf {
 namespace llvm {
-Value::Value(Private, DType dtype, JitCompiler* c, ::llvm::Value* val, const std::string& name)
-    : dtype_(dtype), compiler_(c), val_(val), name_(name) {
+Value::Value(Private, DType dtype, JitCompiler* c, ::llvm::Value* val, ::llvm::Type* t)
+    : dtype_(dtype), compiler_(c), val_(val), type_(t) {
   ir_builder_ = compiler_->GetIRBuilder();
+}
+::llvm::Value* Value::GetValue() {
+  if (type_ != nullptr) {
+    return ir_builder_->CreateLoad(type_, val_);
+  }
+  return val_;
 }
 absl::Status Value::CopyFrom(ValuePtr other) {
   if (!dtype_.IsVoid()) {
@@ -50,8 +56,11 @@ absl::Status Value::CopyFrom(ValuePtr other) {
     }
   }
   dtype_ = other->dtype_;
-  val_ = other->val_;
-  // ir_builder_->CreateStore(other->val_, val_->getP);
+  if (type_ != nullptr) {
+    ir_builder_->CreateStore(other->val_, val_);
+  } else {
+    val_ = other->val_;
+  }
   return absl::OkStatus();
 }
 ValuePtr Value::Select(ValuePtr true_val, ValuePtr false_val) {

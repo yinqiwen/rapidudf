@@ -132,7 +132,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
 
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::VarDefine& expr) {
   ast_ctx_.SetPosition(expr.position);
-  auto var = NewValue(DATA_VOID, nullptr, expr.name);
+  auto var = NewValue(DATA_VOID, nullptr);
   GetCompileContext().named_values.emplace(expr.name, var);
   return var;
 }

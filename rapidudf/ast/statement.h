@@ -45,7 +45,20 @@ struct ReturnStatement;
 struct ExpressionStatement;
 struct WhileStatement;
 struct IfElseStatement;
-using Statement = std::variant<ReturnStatement, ExpressionStatement, WhileStatement, IfElseStatement>;
+struct ContinueStatement;
+struct BreakStatement;
+using Statement = std::variant<ReturnStatement, ExpressionStatement, WhileStatement, IfElseStatement, ContinueStatement,
+                               BreakStatement>;
+
+struct ContinueStatement {
+  uint32_t position = 0;
+  absl::Status Validate(ParseContext& ctx);
+};
+struct BreakStatement {
+  uint32_t position = 0;
+  absl::Status Validate(ParseContext& ctx);
+};
+
 struct ChoiceStatement {
   BinaryExprPtr expr;
   std::vector<Statement> statements;
@@ -71,7 +84,7 @@ struct ExpressionStatement {
 
 struct WhileStatement {
   ChoiceStatement body;
-  absl::Status Validate(ParseContext& ctx) { return body.Validate(ctx); }
+  absl::Status Validate(ParseContext& ctx);
 };
 
 struct ReturnStatement {

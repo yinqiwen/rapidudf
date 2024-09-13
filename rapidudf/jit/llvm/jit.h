@@ -31,9 +31,11 @@
 
 #pragma once
 
+#include <llvm/IR/Use.h>
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -120,13 +122,18 @@ class JitCompiler {
     ::llvm::Function* func = nullptr;
   };
   using ExternFunctionPtr = std::shared_ptr<ExternFunction>;
+  using LoopBlocks = std::pair<::llvm::BasicBlock*, ::llvm::BasicBlock*>;
   struct FunctionCompileContext {
     FunctionDesc desc;
     ast::Function func_ast;
     ::llvm::Function* func = nullptr;
     std::vector<::llvm::Type*> func_arg_types;
+    ::llvm::Type* return_type = nullptr;
+    ::llvm::Value* return_value = nullptr;
+    ::llvm::BasicBlock* exit_block = nullptr;
     std::unordered_map<std::string, ValuePtr> named_values;
     std::vector<std::unique_ptr<std::string>> const_strings;
+    std::vector<LoopBlocks> loop_blocks;
   };
   using FunctionCompileContextPtr = std::shared_ptr<FunctionCompileContext>;
 
@@ -139,7 +146,7 @@ class JitCompiler {
 
   absl::Status Compile();
 
-  ValuePtr NewValue(DType dtype, ::llvm::Value* val, const std::string& name = "");
+  ValuePtr NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type = nullptr);
 
   absl::StatusOr<FunctionCompileContextPtr> CompileFunction(const std::string& source);
   absl::StatusOr<FunctionCompileContextPtr> CompileFunction(const ast::Function& function);
@@ -149,10 +156,13 @@ class JitCompiler {
 
   absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::Block& block);
 
+  absl::Status BuildIR(FunctionCompileContextPtr ctx, const std::vector<ast::Statement>& statements);
   absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::ReturnStatement& statement);
   absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::IfElseStatement& statement);
   absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::WhileStatement& statement);
   absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::ExpressionStatement& statement);
+  absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::ContinueStatement& statement);
+  absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::BreakStatement& statement);
 
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ast::UnaryExprPtr expr);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ast::BinaryExprPtr expr);
@@ -186,6 +196,8 @@ class JitCompiler {
 
   FunctionCompileContext& GetCompileContext() { return *current_compile_functon_ctx_; }
 
+  uint32_t GetLabelCursor() { return label_cursor_++; }
+
   ast::ParseContext ast_ctx_;
 
   std::unique_ptr<::llvm::orc::LLJIT> jit_;
@@ -209,6 +221,8 @@ class JitCompiler {
 
   std::vector<JitTypeArrayPtr> jit_types_;
   std::vector<JitValueArrayPtr> jit_values_;
+
+  uint32_t label_cursor_ = 0;
 
   friend class Value;
 };

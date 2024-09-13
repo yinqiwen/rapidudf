@@ -86,5 +86,28 @@ absl::Status ReturnStatement::Validate(ParseContext& ctx) {
   return status;
 }
 
+absl::Status WhileStatement::Validate(ParseContext& ctx) {
+  ctx.EnterLoop();
+  auto status = body.Validate(ctx);
+  ctx.ExitLoop();
+  return status;
+}
+
+absl::Status ContinueStatement::Validate(ParseContext& ctx) {
+  ctx.SetPosition(position);
+  if (ctx.IsInLoop()) {
+    return absl::OkStatus();
+  } else {
+    return ctx.GetErrorStatus(fmt::format("Can NOT continue in non loop block"));
+  }
+}
+absl::Status BreakStatement::Validate(ParseContext& ctx) {
+  ctx.SetPosition(position);
+  if (ctx.IsInLoop()) {
+    return absl::OkStatus();
+  } else {
+    return ctx.GetErrorStatus(fmt::format("Can NOT break in non loop block"));
+  }
+}
 }  // namespace ast
 }  // namespace rapidudf

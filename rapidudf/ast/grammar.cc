@@ -170,6 +170,17 @@ auto field_access_func = [](auto& ctx) {
   _val(ctx) = v;
 };
 
+auto continue_func = [](auto& ctx) {
+  ContinueStatement v;
+  v.position = _where(ctx).begin() - _begin(ctx);
+  _val(ctx) = v;
+};
+auto break_func = [](auto& ctx) {
+  BreakStatement v;
+  v.position = _where(ctx).begin() - _begin(ctx);
+  _val(ctx) = v;
+};
+
 auto const constant_number_def = bp::lexeme[bp::double_ > -('_' > Symbols::kNumberSymbols)];
 // const auto dynamic_param_access_def = identifier > *('[' > (bp::quoted_string | bp::uint_) > ']');
 auto const var_declare_def = ("var" > identifier)[var_declare_func];
@@ -204,10 +215,15 @@ bp::rule<struct expr_statement, ExpressionStatement> expr_statement = "expr_stat
 bp::rule<struct while_statement, WhileStatement> while_statement = "while_statement";
 bp::rule<struct ifelse_statement, IfElseStatement> ifelse_statement = "ifelse_statement";
 bp::rule<struct choice_statement, ChoiceStatement> choice_statement = "choice_statement";
+bp::rule<struct continue_statement, ContinueStatement> continue_statement = "continue_statement";
+bp::rule<struct break_statement, BreakStatement> break_statement = "break_statement";
 bp::rule<struct block, Block> block = "block";
 
-auto const statements_def = *(return_statement | while_statement | ifelse_statement | expr_statement);
+auto const statements_def =
+    *(continue_statement | break_statement | return_statement | while_statement | ifelse_statement | expr_statement);
 auto const return_statement_def = ("return" > -expression > ';');
+auto const continue_statement_def = (Symbols::kContinueSymbols > ';')[continue_func];
+auto const break_statement_def = (Symbols::kBreakSymbols > ';')[break_func];
 auto const expr_statement_def = expression > ';';
 auto const while_statement_def = "while" > choice_statement;
 auto const choice_statement_def = ('(' > expression > ')' > '{' > statements > '}');
@@ -224,7 +240,8 @@ bp::rule<struct funcs, std::vector<Function>> funcs = "funcs";
 auto const func_def = (Symbols::kDtypeSymbols > identifier > '(' > -func_args >> ')' > block)[func_convert];
 auto const funcs_def = +func;
 BOOST_PARSER_DEFINE_RULES(comment, block, func_arg, func_args, func, funcs, return_statement, statements,
-                          expr_statement, while_statement, choice_statement, ifelse_statement);
+                          expr_statement, while_statement, choice_statement, ifelse_statement, break_statement,
+                          continue_statement);
 
 absl::StatusOr<Function> parse_function_ast(ParseContext& ctx, const std::string& source) {
   ctx.SetSource(source);

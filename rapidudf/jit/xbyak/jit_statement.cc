@@ -38,6 +38,12 @@
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace xbyak {
+absl::Status JitCompiler::CompileStatement(const ast::ContinueStatement& statement) {
+  return absl::UnimplementedError("ContinueStatement");
+}
+absl::Status JitCompiler::CompileStatement(const ast::BreakStatement& statement) {
+  return absl::UnimplementedError("BreakStatement");
+}
 absl::Status JitCompiler::CompileStatement(const ast::ReturnStatement& statement) {
   if (statement.expr.has_value()) {
     auto val_result = CompileExpression(*statement.expr);
