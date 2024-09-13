@@ -32,12 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
+#include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
@@ -115,8 +110,6 @@ TEST(JitCompiler, struct_access_ptr) {
   )";
   auto rc = compiler.CompileFunction<int, const TestB*>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, const TestB*>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
   ASSERT_EQ(f(&t), t.base->a);
 }
@@ -134,6 +127,6 @@ TEST(JitCompiler, struct_write) {
       return x.internal.a;
     }
   )";
-  auto rc = compiler.CompileFunction<int, TestStruct&>(content);
+  auto rc = compiler.CompileFunction<int, TestStruct&>(content, true);
   ASSERT_FALSE(rc.ok());
 }

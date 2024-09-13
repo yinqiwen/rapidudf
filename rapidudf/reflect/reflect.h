@@ -35,10 +35,11 @@
 #include <unordered_map>
 #include <vector>
 #include "absl/status/statusor.h"
-#include "rapidudf/codegen/code_generator.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/value.h"
+// #include "rapidudf/codegen/code_generator.h"
+#include "rapidudf/meta/function.h"
+// #include "rapidudf/codegen/value.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
 template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename T>
@@ -49,19 +50,16 @@ struct StructMember {
   std::optional<DType> member_field_dtype;
   std::string field_name;
   uint32_t member_field_offset = 0;
-  StructMember(const std::string& name, DType dtype, uint32_t offset) {
+  StructMember() = default;
+  explicit StructMember(const std::string& name, DType dtype, uint32_t offset) {
     field_name = name;
     member_field_dtype = dtype;
     member_field_offset = offset;
   }
-  StructMember(const FunctionDesc& f) { member_func = f; }
+  explicit StructMember(const FunctionDesc& f) { member_func = f; }
 
   bool HasField() const { return member_field_dtype.has_value(); }
   bool HasMemberFunc() const { return member_func.has_value(); }
-
-  absl::StatusOr<ValuePtr> BuildFuncCall(CodeGenerator& codegen, const Value& this_arg,
-                                         const std::vector<ValuePtr>& args = {});
-  absl::StatusOr<ValuePtr> BuildFieldAccess(CodeGenerator& codegen);
 };
 using StructMemberMap = std::unordered_map<std::string, StructMember>;
 using GlobalStructMemberIndex = std::unordered_map<uint64_t, StructMemberMap>;
@@ -75,23 +73,25 @@ class Reflect {
   template <typename T, typename RET, typename... Args>
   static bool AddStructMethodAccessor(const std::string& name, RET (*f)(T*, Args...)) {
     void* ff = reinterpret_cast<void*>(f);
-    return AddStructMethod<T, RET, Args...>(name, ff);
+    return AddStructMethod<T, RET, Args...>(name, ff, true);
   }
   template <typename T, typename RET, typename... Args>
   static bool AddStructMethodAccessor(const std::string& name, RET (*f)(T, Args...)) {
     void* ff = reinterpret_cast<void*>(f);
-    return AddStructMethod<T, RET, Args...>(name, ff);
+    return AddStructMethod<T, RET, Args...>(name, ff, false);
   }
 
  private:
   static bool AddStructMethodAccessor(DType dtype, const std::string& name, const FunctionDesc& f);
   template <typename T, typename RET, typename... Args>
-  static bool AddStructMethod(const std::string& name, void* f) {
+  static bool AddStructMethod(const std::string& name, void* f, bool ptr) {
     FunctionDesc desc;
     desc.name = name;
     desc.return_type = get_dtype<RET>();
     auto this_dtype = get_dtype<T>();
-    this_dtype = this_dtype.ToPtr();
+    if (ptr) {
+      this_dtype = this_dtype.ToPtr();
+    }
     desc.arg_types.emplace_back(this_dtype);
     (desc.arg_types.emplace_back(rapidudf::get_dtype<Args>()), ...);
     desc.func = reinterpret_cast<void*>(f);

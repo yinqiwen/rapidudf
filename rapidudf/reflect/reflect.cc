@@ -30,8 +30,9 @@
 */
 #include "rapidudf/reflect/reflect.h"
 #include <vector>
-#include "rapidudf/codegen/dtype.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
 using namespace Xbyak::util;
@@ -76,80 +77,6 @@ bool Reflect::AddStructMethodAccessor(DType dtype, const std::string& name, cons
     }
   }
   return success;
-}
-
-absl::StatusOr<ValuePtr> StructMember::BuildFieldAccess(CodeGenerator& codegen) {
-  if (!member_field_dtype.has_value()) {
-    RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError("member_field_dtype is null to build field access"));
-  }
-
-  uint32_t bits = member_field_dtype->Bits();
-  DType val_dtype = *member_field_dtype;
-  RUDF_DEBUG("access field dtype:{}", *member_field_dtype);
-  codegen.GetCodeGen().add(rcx, member_field_offset);
-  if (member_field_dtype->IsNumber()) {
-    // return number value
-    codegen.GetCodeGen().mov(rax.changeBit(bits), ptr[rcx]);
-    return codegen.NewValueByRegister(val_dtype, rax);
-  } else if (member_field_dtype->IsPtr()) {
-    // return ptr value
-    codegen.GetCodeGen().mov(rax, ptr[rcx]);
-    return codegen.NewValueByRegister(val_dtype, rax);
-  } else if (member_field_dtype->IsAbslSpan()) {
-    codegen.GetCodeGen().mov(rax, ptr[rcx]);
-    codegen.GetCodeGen().add(rcx, 8);
-    codegen.GetCodeGen().mov(rdx, ptr[rcx]);
-    return codegen.NewValueByRegister(val_dtype, {&rax, &rdx});
-  } else if (member_field_dtype->IsStringView() || member_field_dtype->IsStdStringView() ||
-             member_field_dtype->IsSimdVector()) {
-    codegen.GetCodeGen().mov(rax, ptr[rcx]);
-    codegen.GetCodeGen().add(rcx, 8);
-    codegen.GetCodeGen().mov(rdx, ptr[rcx]);
-    return codegen.NewValueByRegister(val_dtype, {&rax, &rdx});
-    // typedef void (*string_view_data_access)(std::string_view*);
-    // typedef void (*string_view_size_access)(std::string_view*);
-    // string_view_data_access data_ptr = reinterpret_cast<string_view_data_access>(&std::string_view::data);
-    // string_view_data_access size_ptr = reinterpret_cast<string_view_data_access>(&std::string_view::size);
-    // c.mov(rax, (size_t)data_ptr);
-    // c.call(rax);
-    // c.mov(rdx, rax);
-    // c.mov(rax, (size_t)size_ptr);
-    // c.call(rax);
-  } else {
-    // return ptr for normal object
-    codegen.GetCodeGen().mov(rax, rcx);
-    val_dtype = val_dtype.ToPtr();
-    return codegen.NewValueByRegister(val_dtype, rax);
-  }
-}
-
-absl::StatusOr<ValuePtr> StructMember::BuildFuncCall(CodeGenerator& codegen, const Value& this_arg,
-                                                     const std::vector<ValuePtr>& args) {
-  if (!member_func.has_value()) {
-    RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError("member_func is null to build func call"));
-  }
-  if ((args.size() + 1) != member_func->arg_types.size()) {
-    RUDF_LOG_ERROR_STATUS(
-        absl::InvalidArgumentError(fmt::format("Can NOT invoke object func:{} with {} args, which need {} args.",
-                                               member_func->name, member_func->arg_types.size() - 1, args.size())));
-  }
-  auto func_arg_regs = GetFuncArgsRegistersByDTypes(member_func->arg_types);
-  if (func_arg_regs.size() != member_func->arg_types.size()) {
-    RUDF_LOG_ERROR_STATUS(
-        absl::InvalidArgumentError(fmt::format("Can NOT allocate registers for object func:{}'s  {} args.",
-                                               member_func->name, member_func->arg_types.size())));
-  }
-  // Value this_arg(&codegen, this_dtype, &rcx, false);
-  std::vector<const Value*> func_all_args{&this_arg};
-  for (auto p : args) {
-    func_all_args.emplace_back(p.get());
-  }
-  ValuePtr result = codegen.CallFunction(*member_func, func_all_args);
-  if (!result) {
-    RUDF_LOG_ERROR_STATUS(
-        absl::InvalidArgumentError(fmt::format("Can NOT invoke object func:{} with nil return value")));
-  }
-  return result;
 }
 
 }  // namespace rapidudf

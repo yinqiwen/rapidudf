@@ -36,9 +36,9 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/function.h"
-#include "rapidudf/codegen/optype.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/function.h"
+#include "rapidudf/meta/optype.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
@@ -56,6 +56,8 @@ struct VarTag {
 
 class ParseContext {
  public:
+  using FunctionCallMap = std::unordered_map<std::string, const FunctionDesc*>;
+  using MemberFuncCallMap = std::unordered_map<DType, std::unordered_map<std::string, FunctionDesc>>;
   void Clear();
 
   const std::string& GetAstErr() const { return ast_err_; }
@@ -73,39 +75,47 @@ class ParseContext {
 
   bool AddLocalVar(const std::string& name, DType dtype);
 
-  absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name);
-
-  void AddBuiltinFuncCall(std::string_view name) {
-    GetFunctionParseContext(current_function_cursor_).builtin_func_calls.insert(std::string(name));
+  absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name, bool implicit = false);
+  absl::StatusOr<const FunctionDesc*> CheckFuncExist(std::string_view name, bool implicit = false) {
+    return CheckFuncExist(std::string(name), implicit);
   }
-  const std::unordered_set<std::string>& GetAllBuiltinFuncCalls(uint32_t funcion_idx) const {
-    return GetFunctionParseContext(funcion_idx).builtin_func_calls;
-  }
+  void AddMemberFuncCall(DType dtype, const std::string& name, FunctionDesc desc);
 
   DType GetFuncReturnDType(uint32_t idx = 0) { return GetFunctionParseContext(idx).desc.return_type; }
   void SetFuncDesc(const FunctionDesc& d, uint32_t idx = 0) { GetFunctionParseContext(idx).desc = d; }
 
-  const std::unordered_map<std::string, const FunctionDesc*>& GetAllFuncCalls(uint32_t funcion_idx) const {
+  const FunctionCallMap& GetAllFuncCalls(uint32_t funcion_idx) const {
     return GetFunctionParseContext(funcion_idx).func_calls;
+  }
+  const FunctionCallMap& GetAllImplicitFuncCalls(uint32_t funcion_idx) const {
+    return GetFunctionParseContext(funcion_idx).implicit_func_calls;
+  }
+  const MemberFuncCallMap& GetAllMemberFuncCalls(uint32_t funcion_idx) const {
+    return GetFunctionParseContext(funcion_idx).member_func_calls;
   }
 
   void SetFunctionCursor(uint32_t idx) { current_function_cursor_ = idx; }
 
-  // void MarkSimdVectorOperation() { GetFunctionParseContext(current_function_cursor_).has_simd_vector_op = true; }
-  // bool HasSimdVectorOperation(uint32_t idx) const { return GetFunctionParseContext(idx).has_simd_vector_op; }
-
   void ReserveFunctionParseContext(uint32_t n) { GetFunctionParseContext(n - 1); }
+
+  bool CanCastTo(DType from_dtype, DType to_dtype);
+
+  void EnterLoop();
+  bool IsInLoop();
+  void ExitLoop();
 
  private:
   using LocalVarMap = std::unordered_map<std::string, DType>;
-  using FunctionCallMap = std::unordered_map<std::string, const FunctionDesc*>;
+
   using BuiltinFuncationCallSet = std::unordered_set<std::string>;
 
   struct FunctionParseContext {
     LocalVarMap local_vars;
     FunctionCallMap func_calls;
-    BuiltinFuncationCallSet builtin_func_calls;
+    FunctionCallMap implicit_func_calls;
+    MemberFuncCallMap member_func_calls;
     FunctionDesc desc;
+    uint32_t in_loop = 0;
   };
   const FunctionParseContext& GetFunctionParseContext(uint32_t idx) const { return function_parse_ctxs_[idx]; }
   FunctionParseContext& GetFunctionParseContext(uint32_t idx) {

@@ -32,11 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/meta/function.h"
 #include "rapidudf/rapidudf.h"
-#include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
 
@@ -187,7 +183,7 @@ TEST(JitCompiler, vector_add2) {
 TEST(JitCompiler, vector_ternary) {
   std::vector<int> vec{1, 2, 3, 4, 1, 5, 6};
   simd::Vector<int> simd_vec(vec);
-  JitCompiler compiler({.use_registers = true});
+  JitCompiler compiler;
   std::string content = R"(
     simd_vector<i32> test_func(simd_vector<i32> x){
       return x>2?1:0;
@@ -208,7 +204,7 @@ TEST(JitCompiler, vector_dot) {
   std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
   simd::Vector<float> simd_left(left);
   simd::Vector<float> simd_right(right);
-  JitCompiler compiler({.use_registers = true});
+  JitCompiler compiler;
   std::string content = R"(
     f32 test_func(simd_vector<f32> x,simd_vector<f32> y){
       return dot(x,y);
@@ -227,7 +223,7 @@ TEST(JitCompiler, vector_dot) {
 
 TEST(JitCompiler, vector_iota) {
   spdlog::set_level(spdlog::level::debug);
-  JitCompiler compiler({.use_registers = true});
+  JitCompiler compiler;
   std::string content = R"(
     simd_vector<f64> test_func(){
       var t = iota(1_f64,12);
@@ -256,7 +252,7 @@ TEST(JitCompiler, vector_string_cmp) {
   auto right_views = StringView::makeVector(right);
   simd::Vector<StringView> simd_left(left_views);
   simd::Vector<StringView> simd_right(right_views);
-  JitCompiler compiler({.use_registers = true});
+  JitCompiler compiler;
   std::string content = R"(
     simd_vector<bit> test_func(simd_vector<string_view> x,simd_vector<string_view> y){
       return x > y;
@@ -272,8 +268,27 @@ TEST(JitCompiler, vector_string_cmp) {
   }
 }
 
+TEST(JitCompiler, vector_pow) {
+  std::vector<double> vec{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+  simd::Vector<double> simd_vec(vec);
+  JitCompiler compiler;
+  std::string content = R"(
+    simd_vector<f64> test_func(simd_vector<f64> x){
+      return pow(x,10);
+    }
+  )";
+  auto rc = compiler.CompileFunction<simd::Vector<f64>, simd::Vector<f64>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  for (size_t i = 0; i < result.Size(); i++) {
+    ASSERT_DOUBLE_EQ(result[i], std::pow(vec[i], 10));
+  }
+}
+
 TEST(JitCompiler, complex) {
-  JitCompiler compiler({.use_registers = true});
+  JitCompiler compiler;
   std::string source = R"(
     simd_vector<f64> test_func(simd_vector<f64> x,simd_vector<f64> y, double pi){
       return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
@@ -297,5 +312,50 @@ TEST(JitCompiler, complex) {
     double y = yy[i];
     double actual = (x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y);
     ASSERT_EQ(result[i], actual);
+  }
+}
+
+struct Feeds {
+  rapidudf::simd::Vector<double> Click;
+  rapidudf::simd::Vector<double> Like;
+  rapidudf::simd::Vector<double> Inter;
+  rapidudf::simd::Vector<double> Join;
+  rapidudf::simd::Vector<double> TimeV1;
+  rapidudf::simd::Vector<double> PostComment;
+  rapidudf::simd::Vector<double> PositiveCommentV1;
+  rapidudf::simd::Vector<double> ExpoTimeV1;
+};
+RUDF_STRUCT_FIELDS(Feeds, Click, Like, Inter, Join, TimeV1, PostComment, PositiveCommentV1, ExpoTimeV1)
+TEST(JitCompiler, test) {
+  JitCompiler compiler;
+  std::string source = R"(simd_vector<f64> boost_scores(Feeds feeds) { 
+                              var score = pow(feeds.Click, 10.0);
+                              score *= pow(feeds.Like + 0.000082, 4.7);
+                              // score *= pow(feeds.Inter, 3.5);
+                              // score *= pow(feeds.Join + 0.000024, 5.5);
+                              // score *= pow(feeds.TimeV1, 7.0);
+                              // score *= pow(feeds.PostComment + 0.000024, 3.5);
+                              // score *= pow(feeds.PositiveCommentV1 + 0.0038, 1.0);
+                              // score *= pow(feeds.ExpoTimeV1, 1.5);
+                              return score;
+                            })";
+  auto rc = compiler.CompileFunction<rapidudf::simd::Vector<double>, Feeds&>(source);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+
+  std::vector<double> clicks;
+  std::vector<double> likes;
+  for (size_t i = 0; i < 100; i++) {
+    clicks.emplace_back(i + 11);
+    likes.emplace_back(i + 12);
+  }
+  Feeds feeds;
+  feeds.Click = clicks;
+  feeds.Like = likes;
+  auto result = f(feeds);
+  for (size_t i = 0; i < result.Size(); i++) {
+    double actual_score = std::pow(clicks[i], 10.0);
+    actual_score *= std::pow(likes[i] + 0.000082, 4.7);
+    ASSERT_DOUBLE_EQ(result[i], actual_score);
   }
 }

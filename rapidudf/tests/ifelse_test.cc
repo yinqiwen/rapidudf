@@ -32,11 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-
+#include "rapidudf/rapidudf.h"
 using namespace rapidudf;
 using namespace rapidudf::ast;
 TEST(JitCompiler, ifelse0) {
@@ -54,7 +50,7 @@ TEST(JitCompiler, ifelse0) {
       }
     }
   )";
-  auto rc = compiler.CompileFunction<int, int>(content);
+  auto rc = compiler.CompileFunction<int, int>(content, true);
   ASSERT_TRUE(rc.ok());
   // auto f = compiler.GetFunc<int, int>(true);
   // ASSERT_TRUE(f != nullptr);

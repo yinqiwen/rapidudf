@@ -32,12 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
+#include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;

@@ -30,6 +30,7 @@
 */
 #include "rapidudf/ast/statement.h"
 #include <fmt/core.h>
+#include "rapidudf/builtin/builtin_symbols.h"
 namespace rapidudf {
 namespace ast {
 static absl::Status check_statements(ParseContext& ctx, std::vector<Statement>& statements) {
@@ -76,15 +77,37 @@ absl::Status ReturnStatement::Validate(ParseContext& ctx) {
     if (!expr_result.ok()) {
       return expr_result.status();
     }
-    if (expr_result->dtype.CanCastTo(ctx.GetFuncReturnDType())) {
-      return absl::OkStatus();
-    } else {
+    if (!ctx.CanCastTo(expr_result->dtype, ctx.GetFuncReturnDType())) {
       return ctx.GetErrorStatus(fmt::format("Can NOT return invalid dtype:{}, while func return dtype:{}",
                                             expr_result->dtype, ctx.GetFuncReturnDType()));
     }
+    return absl::OkStatus();
   }
   return status;
 }
 
+absl::Status WhileStatement::Validate(ParseContext& ctx) {
+  ctx.EnterLoop();
+  auto status = body.Validate(ctx);
+  ctx.ExitLoop();
+  return status;
+}
+
+absl::Status ContinueStatement::Validate(ParseContext& ctx) {
+  ctx.SetPosition(position);
+  if (ctx.IsInLoop()) {
+    return absl::OkStatus();
+  } else {
+    return ctx.GetErrorStatus(fmt::format("Can NOT continue in non loop block"));
+  }
+}
+absl::Status BreakStatement::Validate(ParseContext& ctx) {
+  ctx.SetPosition(position);
+  if (ctx.IsInLoop()) {
+    return absl::OkStatus();
+  } else {
+    return ctx.GetErrorStatus(fmt::format("Can NOT break in non loop block"));
+  }
+}
 }  // namespace ast
 }  // namespace rapidudf

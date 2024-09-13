@@ -30,10 +30,8 @@
 */
 
 #include <gtest/gtest.h>
-#include "rapidudf/jit/jit.h"
 
-#include "rapidudf/reflect/macros.h"
-#include "rapidudf/reflect/protobuf.h"
+#include "rapidudf/rapidudf.h"
 #include "rapidudf/tests/test_pb.pb.h"
 
 using namespace rapidudf;

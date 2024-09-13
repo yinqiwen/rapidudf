@@ -32,11 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
-#include "rapidudf/ast/context.h"
-#include "rapidudf/ast/grammar.h"
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/jit/jit.h"
-#include "rapidudf/log/log.h"
+#include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
@@ -45,7 +41,6 @@ TEST(JitCompiler, expression) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  ParseContext ctx;
   std::string content = R"(
     x >= 1 && y < 10
   )";

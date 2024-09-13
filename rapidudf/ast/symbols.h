@@ -31,8 +31,8 @@
 
 #pragma once
 #include <boost/parser/parser.hpp>
-#include "rapidudf/codegen/dtype.h"
-#include "rapidudf/codegen/optype.h"
+#include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace ast {
 
@@ -45,7 +45,8 @@ struct Symbols {
   static boost::parser::symbols<OpToken> kAdditiveOpSymbols;
   static boost::parser::symbols<OpToken> kMultiplicativeOpSymbols;
   static boost::parser::symbols<OpToken> kUnaryOpSymbols;
-
+  static boost::parser::symbols<uint32_t> kContinueSymbols;
+  static boost::parser::symbols<uint32_t> kBreakSymbols;
   static void Init();
   Symbols();
 };
