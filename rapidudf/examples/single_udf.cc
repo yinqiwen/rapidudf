@@ -48,7 +48,7 @@ int main() {
   )";
 
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
-  rapidudf::JitCompiler compiler({.use_registers = false});
+  rapidudf::JitCompiler compiler;
   // CompileExpression的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
   auto result = compiler.CompileFunction<int, int>(source, true);
   if (!result.ok()) {

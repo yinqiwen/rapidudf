@@ -45,6 +45,9 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
 
   auto* absl_span_type = ::llvm::StructType::create(ctx, "absl_span");
   absl_span_type->setBody(pointer_type, size_type);
+
+  auto* simd_vector_type = ::llvm::StructType::create(ctx, "simd_vector");
+  simd_vector_type->setBody(size_type, pointer_type);
 }
 ::llvm::Type* get_type(::llvm::LLVMContext& ctx, DType dtype) {
   if (dtype.IsPtr()) {
@@ -56,6 +59,9 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
   }
   if (dtype.IsAbslSpan()) {
     return ::llvm::StructType::getTypeByName(ctx, "absl_span");
+  }
+  if (dtype.IsSimdVector()) {
+    return ::llvm::StructType::getTypeByName(ctx, "simd_vector");
   }
 
   switch (dtype.GetFundamentalType()) {

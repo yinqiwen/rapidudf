@@ -28,9 +28,10 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include <llvm/IR/GlobalValue.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Use.h>
-#include "llvm/Support/MathExtras.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/optype.h"
@@ -39,6 +40,7 @@ namespace llvm {
 
 ValuePtr Value::UnaryOp(OpToken op) {
   ::llvm::Value* result_val = nullptr;
+  ::llvm::Intrinsic::ID builtin_intrinsic = 0;
   switch (op) {
     case OP_NEGATIVE: {
       if (!dtype_.IsNumber()) {
@@ -46,9 +48,9 @@ ValuePtr Value::UnaryOp(OpToken op) {
         return {};
       }
       if (dtype_.IsFloat()) {
-        result_val = ir_builder_->CreateFNeg(val_);
+        result_val = ir_builder_->CreateFNeg(GetValue());
       } else {
-        result_val = ir_builder_->CreateNeg(val_);
+        result_val = ir_builder_->CreateNeg(GetValue());
       }
       break;
     }
@@ -57,14 +59,55 @@ ValuePtr Value::UnaryOp(OpToken op) {
         RUDF_ERROR("Can NOT do negative op on non u8 value:{}", dtype_);
         return {};
       }
-      result_val = ir_builder_->CreateNot(val_);
+      result_val = ir_builder_->CreateNot(GetValue());
+      break;
+    }
+    case OP_SIN: {
+      builtin_intrinsic = ::llvm::Intrinsic::sin;
+      break;
+    }
+    case OP_COS: {
+      builtin_intrinsic = ::llvm::Intrinsic::cos;
+      break;
+    }
+    case OP_FLOOR: {
+      builtin_intrinsic = ::llvm::Intrinsic::floor;
+      break;
+    }
+    case OP_ABS: {
+      if (dtype_.IsFloat()) {
+        builtin_intrinsic = ::llvm::Intrinsic::fabs;
+      } else {
+        builtin_intrinsic = ::llvm::Intrinsic::abs;
+      }
       break;
     }
     case OP_SQRT: {
-      ::llvm::Function* sqrt_func =
-          ::llvm::Intrinsic::getDeclaration(ir_builder_->GetInsertBlock()->getModule(), ::llvm::Intrinsic::sqrt,
-                                            {::llvm::Type::getDoubleTy(ir_builder_->getContext())});
-      result_val = ir_builder_->CreateCall(sqrt_func, val_, "sqrt");
+      builtin_intrinsic = ::llvm::Intrinsic::sqrt;
+      break;
+    }
+    case OP_CEIL: {
+      builtin_intrinsic = ::llvm::Intrinsic::ceil;
+      break;
+    }
+    case OP_EXP: {
+      builtin_intrinsic = ::llvm::Intrinsic::exp;
+      break;
+    }
+    case OP_EXP2: {
+      builtin_intrinsic = ::llvm::Intrinsic::exp2;
+      break;
+    }
+    case OP_LOG: {
+      builtin_intrinsic = ::llvm::Intrinsic::log;
+      break;
+    }
+    case OP_LOG2: {
+      builtin_intrinsic = ::llvm::Intrinsic::log2;
+      break;
+    }
+    case OP_LOG10: {
+      builtin_intrinsic = ::llvm::Intrinsic::log10;
       break;
     }
     default: {
@@ -72,6 +115,21 @@ ValuePtr Value::UnaryOp(OpToken op) {
       break;
     }
   }
+
+  if (builtin_intrinsic != 0) {
+    ::llvm::Type* arg_type = nullptr;
+    if (dtype_.IsF32()) {
+      arg_type = ::llvm::Type::getFloatTy(ir_builder_->getContext());
+    } else if (dtype_.IsF64()) {
+      arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
+    }
+    if (nullptr != arg_type) {
+      ::llvm::Function* intrinsic_func =
+          ::llvm::Intrinsic::getDeclaration(ir_builder_->GetInsertBlock()->getModule(), builtin_intrinsic, {arg_type});
+      result_val = ir_builder_->CreateCall(intrinsic_func, GetValue());
+    }
+  }
+
   if (!result_val) {
     RUDF_ERROR("Can NOT do {} for val:{}", op, dtype_);
   }

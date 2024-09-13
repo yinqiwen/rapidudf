@@ -69,14 +69,16 @@ constexpr uint64_t fnv1a_hash(const char* str) {
 }
 constexpr uint64_t fnv1a_hash(std::string_view str) { return fnv1a_hash(str.data()); }
 
-enum FuncAttrs : uint8_t {
+enum FuncAttrs : uint64_t {
   kFuncNoAttrs = 0,
-  kFuncUseArenaAllocator = 1,
+  kBuiltinFunc = 1,
+  kFuncUseArenaAllocator = 2,
+  kFuncWithCtx = 4,
 };
 class FunctionAttrs {
  public:
   FunctionAttrs(FuncAttrs attrs = kFuncNoAttrs) { attrs_ = attrs; }
-  FunctionAttrs(uint8_t attrs) { attrs_ = static_cast<FuncAttrs>(attrs); }
+  FunctionAttrs(uint64_t attrs) { attrs_ = static_cast<FuncAttrs>(attrs); }
   bool UseArenaAllocator() const { return (attrs_ & kFuncUseArenaAllocator) > 0; }
 
  private:

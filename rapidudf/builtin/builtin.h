@@ -33,6 +33,7 @@
 
 #include <string_view>
 #include "flatbuffers/flatbuffers.h"
+#include "rapidudf/meta/optype.h"
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/string_view.h"
 
@@ -54,5 +55,7 @@ bool json_cmp_json(uint32_t op, const JsonObject& left, const JsonObject& right)
 void init_builtin();
 bool is_builtin_function(std::string_view name);
 bool register_builtin_function(std::string_view name);
+
+OpToken get_buitin_func_op(const std::string& name);
 
 }  // namespace rapidudf

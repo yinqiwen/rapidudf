@@ -34,40 +34,10 @@
 #include "exprtk.hpp"
 #include "rapidudf/rapidudf.h"
 
-static rapidudf::JitFunction<double, double, double, double> g_expr_func;
-static std::vector<rapidudf::JitFunction<rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>,
-                                         rapidudf::simd::Vector<double>, double>>
-    g_vector_expr_funcs;
-static const double pi = 3.14159265358979323846264338327950288419716939937510;
-static void DoRapidUDFExprSetup(const benchmark::State& state) {
-  std::string source = R"(
-    double test_func(double x,double y, double pi){
-      return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
-    }
-  )";
-  rapidudf::JitCompiler compiler;
-  auto result = compiler.CompileFunction<double, double, double, double>(source, false);
-  g_expr_func = std::move(result.value());
-}
-
-static void DoRapidUDFExprTeardown(const benchmark::State& state) {}
-
-static void BM_rapidudf_expr_func(benchmark::State& state) {
-  double result = 0;
-  size_t n = 0;
-  for (auto _ : state) {
-    result += g_expr_func(100, 102, pi);
-    n++;
-  }
-  double x = 100;
-  double y = 102;
-  double actual = x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
-  RUDF_INFO("Result:{} for loop:{}, actual:{}", result, n, actual);
-}
-BENCHMARK(BM_rapidudf_expr_func)->Setup(DoRapidUDFExprSetup)->Teardown(DoRapidUDFExprTeardown);
-
 static size_t test_n = 1024;
+static const double pi = 3.14159265358979323846264338327950288419716939937510;
 static std::vector<double> xx, yy, actuals, final_results;
+
 static void init_test_numbers() {
   xx.clear();
   yy.clear();
@@ -83,6 +53,50 @@ static void init_test_numbers() {
     actuals.emplace_back(actual);
   }
 }
+
+static rapidudf::JitFunction<double, double, double, double> g_expr_func;
+static std::vector<rapidudf::JitFunction<rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>,
+                                         rapidudf::simd::Vector<double>, double>>
+    g_vector_expr_funcs;
+
+static void DoRapidUDFExprSetup(const benchmark::State& state) {
+  std::string source = R"(
+    double test_func(double x,double y, double pi){
+      return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
+    }
+  )";
+  rapidudf::JitCompiler compiler;
+  auto result = compiler.CompileFunction<double, double, double, double>(source, false);
+  g_expr_func = std::move(result.value());
+  init_test_numbers();
+}
+
+static void DoRapidUDFExprTeardown(const benchmark::State& state) {}
+
+static void BM_rapidudf_expr_func(benchmark::State& state) {
+  double results = 0;
+  for (auto _ : state) {
+    for (size_t i = 0; i < test_n; i++) {
+      double x = xx[i];
+      double y = yy[i];
+      double result = g_expr_func(x, y, pi);
+      results += result;
+    }
+  }
+  RUDF_INFO("Native result:{}", results);
+  // double result = 0;
+  // size_t n = 0;
+  // for (auto _ : state) {
+  //   result += g_expr_func(100, 102, pi);
+  //   n++;
+  // }
+  // double x = 100;
+  // double y = 102;
+  // double actual = x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
+  // RUDF_INFO("Result:{} for loop:{}, actual:{}", result, n, actual);
+}
+BENCHMARK(BM_rapidudf_expr_func)->Setup(DoRapidUDFExprSetup)->Teardown(DoRapidUDFExprTeardown);
+
 static void DoRapidUDFVectorExprSetup(const benchmark::State& state) {
   std::string source = R"(
     simd_vector<f64> test_func(simd_vector<f64> x,simd_vector<f64> y, double pi){

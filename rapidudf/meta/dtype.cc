@@ -92,7 +92,9 @@ bool DType::IsSigned() const {
     case DATA_F64: {
       return true;
     }
+    default: {
       return false;
+    }
   }
 }
 

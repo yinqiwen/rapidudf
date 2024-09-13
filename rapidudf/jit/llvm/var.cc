@@ -32,16 +32,19 @@
 #include <fmt/core.h>
 #include <variant>
 #include <vector>
+#include "rapidudf/builtin/builtin.h"
+#include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace llvm {
 
 absl::StatusOr<ValuePtr> JitCompiler::GetLocalVar(const std::string& name) {
-  auto found = current_compile_functon_ctx_->named_values.find(name);
-  if (found != current_compile_functon_ctx_->named_values.end()) {
+  auto found = GetCompileContext().named_values.find(name);
+  if (found != GetCompileContext().named_values.end()) {
     return found->second;
   }
   return absl::NotFoundError(fmt::format("No var '{}' found", name));
@@ -60,6 +63,8 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
           fmt::format("Can NOT get reflect accessor with dtype:{} & member func:{}", var->GetDType(), field.field)));
     }
     std::vector<ValuePtr> arg_values;
+    arg_values.emplace_back(var);
+
     if (field.func_args->args.has_value()) {
       for (auto func_arg_expr : *(field.func_args->args)) {
         auto arg_val = BuildIR(ctx, func_arg_expr);
@@ -69,17 +74,8 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
         arg_values.emplace_back(arg_val.value());
       }
     }
-
-    // auto result = BuildStructFuncCall(GetCodeGenerator(), accessor, *var, arg_values);
-    // if (!result.ok()) {
-    //   return result.status();
-    // }
-    // auto result_value = result.value();
-    // RUDF_DEBUG("func:{} call result dtype:{} {}/{}/{}", field.field, result_value->GetDType(),
-    //            result_value->IsRegister(), result_value->IsStack(), result_value->IsConst());
-
-    // return result_value;
-    return absl::UnimplementedError("VarAccessor json access func");
+    std::string member_func_name = GetMemberFuncName(var->GetDType().PtrTo(), field.field);
+    return CallFunction(member_func_name, arg_values);
   } else {
     if (!var->GetDType().IsPtr()) {
       RUDF_LOG_ERROR_STATUS(
@@ -94,17 +90,16 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
     auto field_ptr = ir_builder_->CreateInBoundsGEP(::llvm::Type::getInt8Ty(ir_builder_->getContext()), var->GetValue(),
                                                     std::vector<::llvm::Value*>{offset});
 
-    if (accessor.member_field_dtype->IsNumber()) {
-      auto dst_type_result = GetType(*accessor.member_field_dtype);
+    auto member_field_dtype = *accessor.member_field_dtype;
+    if (member_field_dtype.IsNumber() || member_field_dtype.IsStringView() || member_field_dtype.IsStdStringView() ||
+        member_field_dtype.IsSimdVector() || member_field_dtype.IsAbslSpan() || member_field_dtype.IsPtr()) {
+      auto dst_type_result = GetType(member_field_dtype);
       if (!dst_type_result.ok()) {
         return dst_type_result.status();
       }
-
       auto field_val = ir_builder_->CreateAlignedLoad(dst_type_result.value(), field_ptr,
-                                                      ::llvm::MaybeAlign(accessor.member_field_dtype->ByteSize()));
-      return NewValue(*accessor.member_field_dtype, field_val);
-    } else if (accessor.member_field_dtype->IsStringView() || accessor.member_field_dtype->IsStdStringView() ||
-               accessor.member_field_dtype->IsSimdVector()) {
+                                                      ::llvm::MaybeAlign(member_field_dtype.ByteSize()));
+      return NewValue(member_field_dtype, field_val);
     } else {
       return NewValue(accessor.member_field_dtype->ToPtr(), field_ptr);
     }
@@ -113,10 +108,25 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
 }
 
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, uint32_t idx) {
-  return absl::UnimplementedError("VarAccessor json access func");
+  if (!var->GetDType().IsJsonPtr()) {
+    RUDF_LOG_ERROR_STATUS(
+        ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
+  }
+  auto key_arg = NewValue(DATA_U64, ir_builder_->getInt64(idx));
+  std::vector<ValuePtr> args{var, key_arg};
+  return CallFunction(std::string(kBuiltinJsonArrayGet), args);
 }
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const std::string& key) {
-  return absl::UnimplementedError("VarAccessor json access func");
+  if (!var->GetDType().IsJsonPtr()) {
+    RUDF_LOG_ERROR_STATUS(
+        ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
+  }
+  auto member_result = BuildIR(ctx, key);
+  if (!member_result.ok()) {
+    return member_result.status();
+  }
+  std::vector<ValuePtr> args{var, member_result.value()};
+  return CallFunction(std::string(kBuiltinJsonMemberGet), args);
 }
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const ast::VarRef& key) {
   auto result = GetLocalVar(key.name);
@@ -139,9 +149,11 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
 
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::VarAccessor& expr) {
   ast_ctx_.SetPosition(expr.position);
-  ValuePtr var;
+
   if (expr.func_args.has_value()) {
     // name is func name
+    OpToken builtin_op = get_buitin_func_op(expr.name);
+
     std::vector<ValuePtr> arg_values;
     if (expr.func_args->args.has_value()) {
       for (auto func_arg_expr : *(expr.func_args->args)) {
@@ -152,9 +164,20 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
         arg_values.emplace_back(arg_val.value());
       }
     }
+    if (builtin_op != OP_INVALID) {
+      if (arg_values.size() == 1) {
+        auto result = arg_values[0]->UnaryOp(builtin_op);
+        if (!result) {
+          RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+              fmt::format("Can NOT do builtin op:{} with dtype:{}", builtin_op, arg_values[0]->GetDType())));
+        }
+        return result;
+      }
+    }
     return CallFunction(expr.name, arg_values);
   } else if (expr.access_args.has_value()) {
     // name is var name
+    ValuePtr var;
     auto var_result = GetLocalVar(expr.name);
     if (!var_result.ok()) {
       return var_result.status();

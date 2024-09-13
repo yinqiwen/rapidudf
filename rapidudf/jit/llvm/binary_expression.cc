@@ -32,6 +32,7 @@
 #include <fmt/core.h>
 #include <vector>
 #include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 namespace rapidudf {
@@ -75,17 +76,21 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
       case OP_GREATER_EQUAL:
       case OP_LOGIC_AND:
       case OP_LOGIC_OR: {
+        ValuePtr result;
         if (left->GetDType().IsSimdVector() || right->GetDType().IsSimdVector()) {
           auto func_name = GetFunctionName(op, left->GetDType(), right->GetDType());
           std::vector<ValuePtr> args{left, right};
-          RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
-              fmt::format("Can NOT do op:{} with left:{}, right:{}", op, left->GetDType(), right->GetDType())));
-          break;
-        }
-        auto result = left->BinaryOp(op, right);
-        if (!result) {
-          RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
-              fmt::format("Can NOT do op:{} with left:{}, right:{}", op, left->GetDType(), right->GetDType())));
+          auto call_result = CallFunction(func_name, args);
+          if (!call_result.ok()) {
+            return call_result.status();
+          }
+          result = call_result.value();
+        } else {
+          result = left->BinaryOp(op, right);
+          if (!result) {
+            RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+                fmt::format("Can NOT do op:{} with left:{}, right:{}", op, left->GetDType(), right->GetDType())));
+          }
         }
         if (op >= OP_PLUS_ASSIGN && op <= OP_MOD_ASSIGN) {
           auto status = left->CopyFrom(result);

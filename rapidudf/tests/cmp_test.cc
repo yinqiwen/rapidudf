@@ -47,7 +47,7 @@ TEST(JitCompiler, cmp_greater) {
       return x>y;
     }
   )";
-  auto rc = compiler.CompileFunction<int, int, int>(content);
+  auto rc = compiler.CompileFunction<int, int, int>(content, true);
 
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());

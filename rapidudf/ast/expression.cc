@@ -38,6 +38,7 @@
 #include "rapidudf/ast/context.h"
 #include "rapidudf/builtin/builtin.h"
 #include "rapidudf/builtin/builtin_symbols.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
@@ -96,7 +97,12 @@ absl::StatusOr<VarTag> Array::Validate(ParseContext& ctx) {
 
 absl::StatusOr<VarTag> VarRef::Validate(ParseContext& ctx) {
   ctx.SetPosition(position);
-  return ctx.IsVarExist(name, false);
+  auto result = ctx.IsVarExist(name, false);
+  if (!result.ok()) {
+    return result;
+  }
+
+  return VarTag(result.value(), name);
 }
 absl::StatusOr<VarTag> VarDefine::Validate(ParseContext& ctx) {
   ctx.SetPosition(position);
@@ -131,7 +137,8 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, DType src_dtype)
       return ctx.GetErrorStatus(fmt::format("Can NOT get field:{} accessor for dtype:{}", field, src_dtype));
     }
     DType field_dtype = *struct_member.member_field_dtype;
-    if (!field_dtype.IsPrimitive() && !field_dtype.IsPtr() && !field_dtype.IsSimdVector()) {
+    if (!field_dtype.IsPrimitive() && !field_dtype.IsPtr() && !field_dtype.IsSimdVector() &&
+        !field_dtype.IsStdStringView() && !field_dtype.IsStringView() && !field_dtype.IsAbslSpan()) {
       field_dtype = field_dtype.ToPtr();
     }
     return field_dtype;
@@ -143,6 +150,7 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, DType src_dtype)
     if (!func_arg_dtypes.ok()) {
       return func_arg_dtypes.status();
     }
+
     ctx.AddMemberFuncCall(src_dtype.PtrTo(), field, *struct_member.member_func);
     return struct_member.member_func->return_type;
   }
@@ -270,14 +278,13 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       case OP_DIVIDE_ASSIGN:
       case OP_MOD_ASSIGN: {
         if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
-          if (!left_var.dtype.IsSimdVector()) {
-            left_var.dtype = right_result->dtype;
-          }
           auto result = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype, right_result->dtype), true);
           if (!result.ok()) {
             return result.status();
           }
-
+          if (!left_var.dtype.IsSimdVector()) {
+            left_var.dtype = right_result->dtype;
+          }
           break;
         }
         if (!left_var.dtype.IsNumber() || !right_result->dtype.IsNumber()) {
@@ -287,8 +294,10 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         break;
       }
       case OP_ASSIGN: {
-        if (!left_result->name.empty()) {
-          ctx.AddLocalVar(left_result->name, right_result->dtype);
+        if (!left_var.name.empty()) {
+          ctx.AddLocalVar(left_var.name, right_result->dtype);
+        } else {
+          return ctx.GetErrorStatus(fmt::format("can NOT do {} on non var.", op));
         }
         left_var = right_result.value();
         break;
@@ -557,7 +566,11 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
 
     return desc->return_type;
   } else {
-    return ctx.IsVarExist(name, false);
+    auto result = ctx.IsVarExist(name, false);
+    if (!result.ok()) {
+      return result;
+    }
+    return VarTag(result.value(), name);
   }
 }
 

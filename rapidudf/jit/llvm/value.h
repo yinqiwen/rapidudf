@@ -69,6 +69,7 @@ class Value : public std::enable_shared_from_this<Value> {
 
  private:
   ValuePtr SelfPtr() { return shared_from_this(); }
+  ValuePtr JsonCmp(OpToken op, ValuePtr right, bool reverse);
 
   DType dtype_;
   JitCompiler* compiler_ = nullptr;

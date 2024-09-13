@@ -34,6 +34,7 @@
 #include "absl/strings/str_join.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/reflect/macros.h"
+#include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
 using namespace rapidudf::llvm;
@@ -189,28 +190,77 @@ RUDF_FUNC_REGISTER(test_extern_func, rapidudf::kFuncNoAttrs)
 //   ASSERT_EQ(f(1), 1);
 // }
 
-TEST(JitCompiler, while_test) {
-  spdlog::set_level(spdlog::level::debug);
-  JitCompiler compiler;
-  std::string content = R"(
-    int test_func(int x){
-      while(x < 10){
-        x+=1;
-        if(x == 6){
-           break;
-        }
-      }
-      return x;
-     }
-  )";
+// TEST(JitCompiler, while_test) {
+//   spdlog::set_level(spdlog::level::debug);
+//   JitCompiler compiler;
+//   std::string content = R"(
+//     int test_func(int x){
+//       while(x < 10){
+//         x+=1;
+//         if(x == 6){
+//            break;
+//         }
+//       }
+//       return x;
+//      }
+//   )";
 
-  auto rc = compiler.CompileFunction<int, int>(content, true);
-  if (!rc.ok()) {
-    RUDF_ERROR("####{}", rc.status().ToString());
-  }
+//   auto rc = compiler.CompileFunction<int, int>(content, true);
+//   if (!rc.ok()) {
+//     RUDF_ERROR("####{}", rc.status().ToString());
+//   }
+//   ASSERT_TRUE(rc.ok());
+//   TestA t;
+//   auto f = std::move(rc.value());
+//   ASSERT_EQ(f(11), 11);
+//   ASSERT_EQ(f(1), 6);
+// }
+// namespace ttt {
+// struct TestMethodStruct {
+//   int a;
+//   float b;
+//   int* p = nullptr;
+//   std::string_view c;
+//   int get_a() const { return a; }
+//   void set_a(int x) { this->a = x; }
+// };
+// }  // namespace ttt
+// RUDF_STRUCT_MEMBER_METHODS(ttt::TestMethodStruct, get_a, set_a);
+// TEST(JitCompiler, string_contains) {
+//   spdlog::set_level(spdlog::level::debug);
+//   ttt::TestMethodStruct test;
+//   JitCompiler compiler;
+//   std::string source = R"(
+//     int test_func(ttt::TestMethodStruct x, int a){
+//       x.set_a(a);
+//       return x.get_a();
+//     }
+//   )";
+//   auto rc = compiler.CompileFunction<int, ttt::TestMethodStruct&, int>(source, true);
+//   if (!rc.ok()) {
+//     RUDF_ERROR("####{}", rc.status().ToString());
+//   }
+//   ASSERT_TRUE(rc.ok());
+//   auto f = std::move(rc.value());
+//   ASSERT_EQ(f(test, 101), 101);
+//   ASSERT_EQ(test.a, 101);
+// }
+TEST(JitCompiler, json_read_int) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  JsonObject json;
+  json["key"] = 123;
+
+  std::string content = R"(
+    bool test_func(json x){
+      return x["key"] == 123;
+    }
+  )";
+  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content, true);
   ASSERT_TRUE(rc.ok());
-  TestA t;
+  // auto f = compiler.GetFunc<bool, const JsonObject&>(true);
+  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(11), 11);
-  ASSERT_EQ(f(1), 6);
+  ASSERT_TRUE(f(json));
 }

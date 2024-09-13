@@ -72,7 +72,7 @@ ValuePtr Value::CastTo(DType dtype) {
       } else {
         if (dtype.Bits() > dtype_.Bits()) {
           if (dtype.IsSigned()) {
-            new_val = ir_builder_->CreateSExt(val_, dst_type);
+            new_val = ir_builder_->CreateZExt(val_, dst_type);
           } else {
             new_val = ir_builder_->CreateZExt(val_, dst_type);
           }

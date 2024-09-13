@@ -31,7 +31,6 @@
 
 #include <fmt/core.h>
 #include <variant>
-#include <vector>
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"

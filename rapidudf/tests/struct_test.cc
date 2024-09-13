@@ -110,8 +110,6 @@ TEST(JitCompiler, struct_access_ptr) {
   )";
   auto rc = compiler.CompileFunction<int, const TestB*>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, const TestB*>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
   ASSERT_EQ(f(&t), t.base->a);
 }
@@ -129,6 +127,6 @@ TEST(JitCompiler, struct_write) {
       return x.internal.a;
     }
   )";
-  auto rc = compiler.CompileFunction<int, TestStruct&>(content);
+  auto rc = compiler.CompileFunction<int, TestStruct&>(content, true);
   ASSERT_FALSE(rc.ok());
 }

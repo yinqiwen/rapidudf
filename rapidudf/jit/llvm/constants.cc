@@ -120,7 +120,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
   std::unique_ptr<std::string> str = std::make_unique<std::string>(v);
   StringView view(*str);
   uint64_t* uv = reinterpret_cast<uint64_t*>(&view);
-  ctx->const_strings.emplace_back(std::move(str));
+  GetSession().const_strings.emplace_back(std::move(str));
   ::llvm::StructType* string_view_type = static_cast<::llvm::StructType*>(GetType(DATA_STRING_VIEW).value());
   auto* str_val = ir_builder_->CreateAlloca(string_view_type);
   ::llvm::Value* zero = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder_->getContext()), 0);

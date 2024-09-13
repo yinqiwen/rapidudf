@@ -61,8 +61,27 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
                                                                   false_val_result.value()->GetDType())));
       }
       return result;
+    } else if (cond_val->GetDType().IsSimdVectorBit()) {
+      auto true_expr_result = BuildIR(ctx, true_expr);
+      if (!true_expr_result.ok()) {
+        return true_expr_result.status();
+      }
+      auto true_expr_val = true_expr_result.value();
+      auto false_expr_result = BuildIR(ctx, false_expr);
+      if (!false_expr_result.ok()) {
+        return false_expr_result.status();
+      }
+      auto false_expr_val = false_expr_result.value();
+      auto func_name =
+          GetFunctionName(OP_CONDITIONAL, cond_val->GetDType(), true_expr_val->GetDType(), false_expr_val->GetDType());
+      std::vector<ValuePtr> args{cond_val, true_expr_val, false_expr_val};
+      auto result = CallFunction(func_name, args);
+      if (!result.ok()) {
+        return result.status();
+      }
+      return result.value();
     }
-    return absl::UnimplementedError("TernaryExprPtr");
+    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("ternary op with cond:{}", cond_val->GetDType())));
   } else {
     return cond_result;
   }

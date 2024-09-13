@@ -30,6 +30,8 @@
 */
 
 #include <llvm/IR/Use.h>
+#include <string_view>
+#include <vector>
 #include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/llvm/value.h"
@@ -40,7 +42,6 @@ namespace rapidudf {
 namespace llvm {
 ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
   ValuePtr left = SelfPtr();
-
   DType dst_dtype = dtype_;
   DType right_dtype = right->dtype_;
   if (right->dtype_ != dtype_) {
@@ -49,39 +50,48 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       left = left->CastTo(dst_dtype);
     } else if (right->dtype_.CanCastTo(dtype_)) {
       right = right->CastTo(dst_dtype);
+    } else {
+      if ((left->GetDType().IsJsonPtr() || right->GetDType().IsJsonPtr()) &&
+          (op >= OP_EQUAL && op <= OP_GREATER_EQUAL)) {
+        // continue cmp json
+      } else {
+        RUDF_ERROR("Can NOT do {} for left:{}, right:{}", op, dtype_, right_dtype);
+        return {};
+      }
     }
     if (!left || !right) {
       RUDF_ERROR("Can NOT do {} for left:{}, right:{}", op, dtype_, right_dtype);
       return {};
     }
   }
+
   DType ret_dtype = dst_dtype;
   ::llvm::Value* result_val = nullptr;
   switch (op) {
     case OP_PLUS:
     case OP_PLUS_ASSIGN: {
       if (dst_dtype.IsInteger()) {
-        result_val = ir_builder_->CreateAdd(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateAdd(left->GetValue(), right->GetValue());
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFAdd(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFAdd(left->GetValue(), right->GetValue());
       }
       break;
     }
     case OP_MINUS:
     case OP_MINUS_ASSIGN: {
       if (dst_dtype.IsInteger()) {
-        result_val = ir_builder_->CreateSub(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateSub(left->GetValue(), right->GetValue());
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFSub(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFSub(left->GetValue(), right->GetValue());
       }
       break;
     }
     case OP_MULTIPLY:
     case OP_MULTIPLY_ASSIGN: {
       if (dst_dtype.IsInteger()) {
-        result_val = ir_builder_->CreateMul(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateMul(left->GetValue(), right->GetValue());
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFMul(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFMul(left->GetValue(), right->GetValue());
       }
       break;
     }
@@ -89,12 +99,12 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
     case OP_DIVIDE_ASSIGN: {
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
-          result_val = ir_builder_->CreateSDiv(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateSDiv(left->GetValue(), right->GetValue());
         } else {
-          result_val = ir_builder_->CreateUDiv(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateUDiv(left->GetValue(), right->GetValue());
         }
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFDiv(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFDiv(left->GetValue(), right->GetValue());
       }
       break;
     }
@@ -102,25 +112,25 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
     case OP_MOD_ASSIGN: {
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
-          result_val = ir_builder_->CreateSRem(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateSRem(left->GetValue(), right->GetValue());
         } else {
-          result_val = ir_builder_->CreateURem(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateURem(left->GetValue(), right->GetValue());
         }
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFRem(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFRem(left->GetValue(), right->GetValue());
       }
       break;
     }
     case OP_LOGIC_OR: {
       if (dst_dtype.IsBool()) {
-        result_val = ir_builder_->CreateLogicalOr(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateLogicalOr(left->GetValue(), right->GetValue());
         ret_dtype = DATA_U8;
       }
       break;
     }
     case OP_LOGIC_AND: {
       if (dst_dtype.IsBool()) {
-        result_val = ir_builder_->CreateLogicalAnd(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateLogicalAnd(left->GetValue(), right->GetValue());
         ret_dtype = DATA_U8;
       }
       break;
@@ -128,18 +138,18 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
     case OP_EQUAL: {
       ret_dtype = DATA_U8;
       if (dst_dtype.IsInteger()) {
-        result_val = ir_builder_->CreateICmpEQ(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateICmpEQ(left->GetValue(), right->GetValue());
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFCmpOEQ(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFCmpOEQ(left->GetValue(), right->GetValue());
       }
       break;
     }
     case OP_NOT_EQUAL: {
       ret_dtype = DATA_U8;
       if (dst_dtype.IsInteger()) {
-        result_val = ir_builder_->CreateICmpNE(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateICmpNE(left->GetValue(), right->GetValue());
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFCmpONE(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFCmpONE(left->GetValue(), right->GetValue());
       }
       break;
     }
@@ -147,12 +157,12 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       ret_dtype = DATA_U8;
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
-          result_val = ir_builder_->CreateICmpSGT(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateICmpSGT(left->GetValue(), right->GetValue());
         } else {
-          result_val = ir_builder_->CreateICmpUGT(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateICmpUGT(left->GetValue(), right->GetValue());
         }
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFCmpOGT(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFCmpOGT(left->GetValue(), right->GetValue());
       }
       break;
     }
@@ -160,12 +170,12 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       ret_dtype = DATA_U8;
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
-          result_val = ir_builder_->CreateICmpSGE(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateICmpSGE(left->GetValue(), right->GetValue());
         } else {
-          result_val = ir_builder_->CreateICmpUGE(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateICmpUGE(left->GetValue(), right->GetValue());
         }
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFCmpOGE(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFCmpOGE(left->GetValue(), right->GetValue());
       }
       break;
     }
@@ -173,12 +183,12 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       ret_dtype = DATA_U8;
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
-          result_val = ir_builder_->CreateICmpSLT(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateICmpSLT(left->GetValue(), right->GetValue());
         } else {
-          result_val = ir_builder_->CreateICmpULT(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateICmpULT(left->GetValue(), right->GetValue());
         }
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFCmpOLT(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFCmpOLT(left->GetValue(), right->GetValue());
       }
       break;
     }
@@ -186,12 +196,12 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       ret_dtype = DATA_U8;
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
-          result_val = ir_builder_->CreateICmpSLE(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateICmpSLE(left->GetValue(), right->GetValue());
         } else {
-          result_val = ir_builder_->CreateICmpULE(left->GetValue(), right->val_);
+          result_val = ir_builder_->CreateICmpULE(left->GetValue(), right->GetValue());
         }
       } else if (dst_dtype.IsFloat()) {
-        result_val = ir_builder_->CreateFCmpOLE(left->GetValue(), right->val_);
+        result_val = ir_builder_->CreateFCmpOLE(left->GetValue(), right->GetValue());
       }
       break;
     }
@@ -212,11 +222,85 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       return {};
     }
   }
+  if ((left->GetDType().IsJsonPtr() || right->GetDType().IsJsonPtr()) && (op >= OP_EQUAL && op <= OP_GREATER_EQUAL)) {
+    return left->JsonCmp(op, right, false);
+  }
+
   if (!result_val) {
     RUDF_ERROR("Can NOT do {} for left:{}, right:{}", op, left->GetDType(), right->GetDType());
     return {};
   }
   return New(ret_dtype, compiler_, result_val);
 }
+
+ValuePtr Value::JsonCmp(OpToken op, ValuePtr right, bool reverse) {
+  auto& other = *right;
+  std::string_view cmp_func;
+  ValuePtr other_val = other.SelfPtr();
+  std::vector<ValuePtr> cmp_args;
+  cmp_args.emplace_back(New(DATA_U32, compiler_, ir_builder_->getInt32(op)));
+
+  if (dtype_.IsJsonPtr()) {
+    if (other.GetDType().IsNumber() || other.GetDType().IsStringView()) {
+      if (other.GetDType().IsStringView() || other.GetDType().IsF64() || other.GetDType().IsBool()) {
+        // do nothing
+      } else {
+        if (other.GetDType().IsF32()) {
+          other_val = other.CastTo(DATA_F64);
+        } else {
+          other_val = other.CastTo(DATA_I64);
+        }
+      }
+      cmp_args.emplace_back(SelfPtr());
+      cmp_args.emplace_back(other_val);
+      cmp_args.emplace_back(New(DATA_U8, compiler_, ir_builder_->getInt8(reverse)));
+      switch (other_val->GetDType().GetFundamentalType()) {
+        case DATA_STRING_VIEW: {
+          cmp_func = kBuiltinJsonCmpString;
+          break;
+        }
+        case DATA_I32:
+        case DATA_I64: {
+          cmp_func = kBuiltinJsonCmpInt;
+          break;
+        }
+        case DATA_F64: {
+          cmp_func = kBuiltinJsonCmpFloat;
+          break;
+        }
+        case DATA_U8: {
+          cmp_func = kBuiltinJsonCmpBool;
+          break;
+        }
+        default: {
+          break;
+        }
+      }
+    } else if (other.GetDType().IsJsonPtr()) {
+      cmp_func = kBuiltinJsonCmpJson;
+      cmp_args.emplace_back(SelfPtr());
+      cmp_args.emplace_back(other_val);
+    } else {
+      RUDF_ERROR("Can NOT cmp json with left:{}, right:{}", dtype_, other.dtype_);
+      return {};
+    }
+  } else if (GetDType().IsNumber() || GetDType().IsStringView()) {
+    if (other.GetDType().IsJsonPtr()) {
+      return other.JsonCmp(op, SelfPtr(), true);
+    } else {
+      RUDF_ERROR("Can NOT cmp json with left:{}, right:{}", dtype_, other.dtype_);
+      return {};
+    }
+  } else {
+    RUDF_ERROR("Can NOT cmp json with left:{}, right:{}", dtype_, other.dtype_);
+    return {};
+  }
+  auto result = compiler_->CallFunction(cmp_func, cmp_args);
+  if (!result.ok()) {
+    return {};
+  }
+  return result.value();
+}
+
 }  // namespace llvm
 }  // namespace rapidudf

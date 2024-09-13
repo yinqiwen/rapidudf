@@ -32,6 +32,7 @@
 #include <cmath>
 #include <vector>
 
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 static rapidudf::JitFunction<int, int> g_expr_func;
@@ -46,8 +47,8 @@ static void DoRapidUDFFibSetup(const benchmark::State& state) {
        return fib(n - 1) + fib(n - 2); //递归调用
     } 
   )";
-  rapidudf::JitCompiler compiler({.use_registers = false});
-  auto result = compiler.CompileFunction<int, int>(source, false);
+  rapidudf::JitCompiler compiler;
+  auto result = compiler.CompileFunction<int, int>(source);
   g_expr_func = std::move(result.value());
 }
 

@@ -36,7 +36,6 @@
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
-#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace llvm {
 absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const std::vector<ast::Statement>& statements) {
@@ -55,11 +54,10 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Retu
       return val_result.status();
     }
     ValuePtr val = val_result.value();
-    auto ret_val = val->CastTo(current_compile_functon_ctx_->desc.return_type);
+    auto ret_val = val->CastTo(ctx->desc.return_type);
     if (!ret_val) {
-      RUDF_LOG_ERROR_STATUS(
-          ast_ctx_.GetErrorStatus(fmt::format("Can NOT cast to return dtype:{} from dtype:{}",
-                                              current_compile_functon_ctx_->desc.return_type, val->GetDType())));
+      RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+          fmt::format("Can NOT cast to return dtype:{} from dtype:{}", ctx->desc.return_type, val->GetDType())));
     }
     if (GetCompileContext().return_value != nullptr) {
       ir_builder_->CreateStore(ret_val->GetValue(), GetCompileContext().return_value);
@@ -133,7 +131,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfEl
     } else if (else_block != nullptr) {
       next_block = else_block;
     }
-    ir_builder_->CreateCondBr(if_cond_val->GetValue(), elif_blocks[i], next_block);
+    ir_builder_->CreateCondBr(elif_cond_val->GetValue(), elif_blocks[i], next_block);
     ir_builder_->SetInsertPoint(elif_blocks[i]);
     auto status = BuildIR(ctx, statement.elif_statements[i].statements);
     if (!status.ok()) {

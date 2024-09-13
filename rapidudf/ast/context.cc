@@ -107,7 +107,7 @@ bool ParseContext::CanCastTo(DType from_dtype, DType to_dtype) {
       if (from_dtype.IsStringPtr()) {
         implicit_func_call = kBuiltinCastStdStrToStringView;
       } else if (from_dtype.IsFlatbuffersStringPtr()) {
-        implicit_func_call = kBuiltinCastStdStrToStringView;
+        implicit_func_call = kBuiltinCastFbsStrToStringView;
       } else if (from_dtype.IsStdStringView()) {
         implicit_func_call = kBuiltinCastStdStrViewToStringView;
       }
@@ -122,9 +122,11 @@ bool ParseContext::CanCastTo(DType from_dtype, DType to_dtype) {
 
 absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::string& name, bool implicit) {
   const FunctionDesc* desc = nullptr;
+  bool local_func = false;
   for (uint32_t i = 0; i <= current_function_cursor_; i++) {
     if (GetFunctionParseContext(i).desc.name == name) {
       desc = &(GetFunctionParseContext(i).desc);
+      local_func = true;
       break;
     }
   }
@@ -134,12 +136,13 @@ absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::stri
   if (desc == nullptr) {
     return absl::NotFoundError(fmt::format("func:{} not exist at {}'", name, GetErrorLine()));
   }
-  if (implicit) {
-    GetFunctionParseContext(current_function_cursor_).implicit_func_calls.emplace(name, desc);
-  } else {
-    GetFunctionParseContext(current_function_cursor_).func_calls.emplace(name, desc);
+  if (!local_func) {
+    if (implicit) {
+      GetFunctionParseContext(current_function_cursor_).implicit_func_calls.emplace(name, desc);
+    } else {
+      GetFunctionParseContext(current_function_cursor_).func_calls.emplace(name, desc);
+    }
   }
-
   return desc;
 }
 

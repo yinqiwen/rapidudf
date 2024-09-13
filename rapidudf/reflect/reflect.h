@@ -73,23 +73,25 @@ class Reflect {
   template <typename T, typename RET, typename... Args>
   static bool AddStructMethodAccessor(const std::string& name, RET (*f)(T*, Args...)) {
     void* ff = reinterpret_cast<void*>(f);
-    return AddStructMethod<T, RET, Args...>(name, ff);
+    return AddStructMethod<T, RET, Args...>(name, ff, true);
   }
   template <typename T, typename RET, typename... Args>
   static bool AddStructMethodAccessor(const std::string& name, RET (*f)(T, Args...)) {
     void* ff = reinterpret_cast<void*>(f);
-    return AddStructMethod<T, RET, Args...>(name, ff);
+    return AddStructMethod<T, RET, Args...>(name, ff, false);
   }
 
  private:
   static bool AddStructMethodAccessor(DType dtype, const std::string& name, const FunctionDesc& f);
   template <typename T, typename RET, typename... Args>
-  static bool AddStructMethod(const std::string& name, void* f) {
+  static bool AddStructMethod(const std::string& name, void* f, bool ptr) {
     FunctionDesc desc;
     desc.name = name;
     desc.return_type = get_dtype<RET>();
     auto this_dtype = get_dtype<T>();
-    this_dtype = this_dtype.ToPtr();
+    if (ptr) {
+      this_dtype = this_dtype.ToPtr();
+    }
     desc.arg_types.emplace_back(this_dtype);
     (desc.arg_types.emplace_back(rapidudf::get_dtype<Args>()), ...);
     desc.func = reinterpret_cast<void*>(f);

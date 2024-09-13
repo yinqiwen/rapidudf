@@ -50,7 +50,7 @@ TEST(JitCompiler, ifelse0) {
       }
     }
   )";
-  auto rc = compiler.CompileFunction<int, int>(content);
+  auto rc = compiler.CompileFunction<int, int>(content, true);
   ASSERT_TRUE(rc.ok());
   // auto f = compiler.GetFunc<int, int>(true);
   // ASSERT_TRUE(f != nullptr);

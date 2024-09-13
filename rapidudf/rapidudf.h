@@ -30,11 +30,13 @@
 */
 
 #pragma once
+#include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/xbyak/jit.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/reflect/macros.h"
 
 namespace rapidudf {
 
-using JitCompiler = xbyak::JitCompiler;
+// using JitCompiler = xbyak::JitCompiler;
+using JitCompiler = llvm::JitCompiler;
 }  // namespace rapidudf

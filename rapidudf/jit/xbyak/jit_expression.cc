@@ -449,7 +449,7 @@ absl::StatusOr<ValuePtr> JitCompiler::CompileExpression(ast::TernaryExprPtr expr
       GetCodeGenerator().DropTmpValue(false_expr_val);
       return result.value();
     }
-    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("ternary op with cond:{", cond_val->GetDType())));
+    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("ternary op with cond:{}", cond_val->GetDType())));
   } else {
     return cond_result;
   }
