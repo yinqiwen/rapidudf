@@ -56,6 +56,7 @@
 #include "rapidudf/ast/grammar.h"
 #include "rapidudf/ast/symbols.h"
 #include "rapidudf/builtin/builtin.h"
+#include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/jit/llvm/macros.h"
 #include "rapidudf/jit/llvm/type.h"
 #include "rapidudf/jit/llvm/value.h"
@@ -64,6 +65,7 @@
 #include "rapidudf/meta/function.h"
 namespace rapidudf {
 namespace llvm {
+
 JitCompiler::JitCompiler() {
   init_builtin();
   ast::Symbols::Init();
@@ -76,7 +78,7 @@ absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
   if (!session_) {
     return absl::InvalidArgumentError("null compiled session");
   }
-  auto func_addr_result = GetSession().jit->lookup(name);
+  auto func_addr_result = GetSession()->jit->lookup(name);
   if (!func_addr_result) {
     RUDF_LOG_RETURN_LLVM_ERROR(func_addr_result.takeError());
   }
@@ -88,6 +90,36 @@ absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
   return func_ptr;
 }
 
+::llvm::LLVMContext* JitCompiler::GetLLVMContext() { return GetSession()->context.get(); }
+::llvm::Module* JitCompiler::GetLLVMModule() { return GetSession()->module.get(); }
+JitSession* JitCompiler::GetSession() { return session_.get(); }
+uint32_t JitCompiler::GetLabelCursor() { return session_->label_cursor++; }
+FunctionCompileContextPtr JitCompiler::GetCompileContext() { return GetSession()->current_compile_functon_ctx; }
+
+absl::StatusOr<std::string> JitCompiler::VerifyFunctionSignature(FunctionCompileContextPtr func_ctx, DType return_type,
+                                                                 const std::vector<DType>& args_types) {
+  std::string err;
+  if (!func_ctx->func_ast.CompareSignature(return_type, args_types, err)) {
+    RUDF_ERROR("{}", err);
+    return absl::InvalidArgumentError(err);
+  }
+  return func_ctx->func_ast.name;
+}
+absl::StatusOr<std::string> JitCompiler::VerifyFunctionSignature(const std::string& name, DType return_type,
+                                                                 const std::vector<DType>& args_types) {
+  auto found = GetSession()->compile_functon_ctxs.find(name);
+  if (found == GetSession()->compile_functon_ctxs.end()) {
+    return absl::NotFoundError(fmt::format("No function:{} found in compiled functions.", name));
+  }
+  auto ctx = found->second;
+  return VerifyFunctionSignature(ctx, return_type, args_types);
+}
+
+absl::StatusOr<std::string> JitCompiler::VerifyFunctionSignature(DType return_type,
+                                                                 const std::vector<DType>& args_types) {
+  return VerifyFunctionSignature(GetCompileContext(), return_type, args_types);
+}
+
 void JitCompiler::NewSession(bool print_asm) {
   ast_ctx_.Clear();
   session_ = std::make_shared<JitSession>();
@@ -95,45 +127,45 @@ void JitCompiler::NewSession(bool print_asm) {
   ::llvm::orc::LLJITBuilder jit_builder;
   auto result = jit_builder.create();
   session_->jit = std::move(*result);
-  context_ = std::make_unique<::llvm::LLVMContext>();
-  module_ = std::make_unique<::llvm::Module>("RapidUDF", *context_);
-  ir_builder_ = std::make_unique<::llvm::IRBuilder<>>(*context_);
-  module_->setDataLayout(session_->jit->getDataLayout());
+  session_->context = std::make_unique<::llvm::LLVMContext>();
+  session_->module = std::make_unique<::llvm::Module>("RapidUDF", *session_->context);
+  session_->ir_builder = std::make_unique<::llvm::IRBuilder<>>(*session_->context);
+  session_->module->setDataLayout(session_->jit->getDataLayout());
 
-  init_buitin_types(*context_);
+  init_buitin_types(*session_->context);
 
   // Create new pass and analysis managers.
 
-  loop_analysis_manager_ = std::make_unique<::llvm::LoopAnalysisManager>();
-  func_analysis_manager_ = std::make_unique<::llvm::FunctionAnalysisManager>();
-  cgscc_analysis_manager_ = std::make_unique<::llvm::CGSCCAnalysisManager>();
-  module_analysis_manager_ = std::make_unique<::llvm::ModuleAnalysisManager>();
-  pass_inst_callbacks_ = std::make_unique<::llvm::PassInstrumentationCallbacks>();
-  std_insts_ = std::make_unique<::llvm::StandardInstrumentations>(*context_,
-                                                                  /*DebugLogging*/ true);
-  std_insts_->registerCallbacks(*pass_inst_callbacks_, module_analysis_manager_.get());
+  session_->loop_analysis_manager = std::make_unique<::llvm::LoopAnalysisManager>();
+  session_->func_analysis_manager = std::make_unique<::llvm::FunctionAnalysisManager>();
+  session_->cgscc_analysis_manager = std::make_unique<::llvm::CGSCCAnalysisManager>();
+  session_->module_analysis_manager = std::make_unique<::llvm::ModuleAnalysisManager>();
+  session_->pass_inst_callbacks = std::make_unique<::llvm::PassInstrumentationCallbacks>();
+  session_->std_insts = std::make_unique<::llvm::StandardInstrumentations>(*session_->context,
+                                                                           /*DebugLogging*/ true);
+  session_->std_insts->registerCallbacks(*session_->pass_inst_callbacks, session_->module_analysis_manager.get());
 
   // Add transform passes.
 
   // Register analysis passes used in these transform passes.
   ::llvm::PassBuilder pass_builder;
 
-  pass_builder.registerModuleAnalyses(*module_analysis_manager_);
-  pass_builder.registerFunctionAnalyses(*func_analysis_manager_);
-  pass_builder.registerCGSCCAnalyses(*cgscc_analysis_manager_);
-  pass_builder.registerLoopAnalyses(*loop_analysis_manager_);
-  pass_builder.crossRegisterProxies(*loop_analysis_manager_, *func_analysis_manager_, *cgscc_analysis_manager_,
-                                    *module_analysis_manager_);
+  pass_builder.registerModuleAnalyses(*session_->module_analysis_manager);
+  pass_builder.registerFunctionAnalyses(*session_->func_analysis_manager);
+  pass_builder.registerCGSCCAnalyses(*session_->cgscc_analysis_manager);
+  pass_builder.registerLoopAnalyses(*session_->loop_analysis_manager);
+  pass_builder.crossRegisterProxies(*session_->loop_analysis_manager, *session_->func_analysis_manager,
+                                    *session_->cgscc_analysis_manager, *session_->module_analysis_manager);
 
   auto func_pass_manager = pass_builder.buildFunctionSimplificationPipeline(
       ::llvm::OptimizationLevel::O2, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
-  func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
-  func_pass_manager_->addPass(::llvm::InstCombinePass());
-  func_pass_manager_->addPass(::llvm::ReassociatePass());
-  func_pass_manager_->addPass(::llvm::GVNPass());
-  func_pass_manager_->addPass(::llvm::SimplifyCFGPass());
-  func_pass_manager_->addPass(::llvm::PartiallyInlineLibCallsPass());
-  func_pass_manager_->addPass(::llvm::MergedLoadStoreMotionPass());
+  session_->func_pass_manager = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
+  session_->func_pass_manager->addPass(::llvm::InstCombinePass());
+  session_->func_pass_manager->addPass(::llvm::ReassociatePass());
+  session_->func_pass_manager->addPass(::llvm::GVNPass());
+  session_->func_pass_manager->addPass(::llvm::SimplifyCFGPass());
+  session_->func_pass_manager->addPass(::llvm::PartiallyInlineLibCallsPass());
+  session_->func_pass_manager->addPass(::llvm::MergedLoadStoreMotionPass());
   // func_pass_manager_->addPass(::llvm::createPartiallyInlineLibCallsPass());
 }
 
@@ -190,9 +222,9 @@ absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& fun
     }
   }
 
-  auto& dylib = GetSession().jit->getMainJITDylib();
+  auto& dylib = GetSession()->jit->getMainJITDylib();
   ::llvm::orc::SymbolMap extern_func_map;
-  ::llvm::orc::MangleAndInterner mangle(GetSession().jit->getExecutionSession(), GetSession().jit->getDataLayout());
+  ::llvm::orc::MangleAndInterner mangle(GetSession()->jit->getExecutionSession(), GetSession()->jit->getDataLayout());
   for (auto [_, desc] : all_func_calls) {
     auto exec_addr = ::llvm::orc::ExecutorAddr::fromPtr(desc->func);
     extern_func_map.insert({mangle(desc->name), {exec_addr, ::llvm::JITSymbolFlags::Callable}});
@@ -204,12 +236,12 @@ absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& fun
     ExternFunctionPtr extern_func = std::make_shared<ExternFunction>();
     extern_func->desc = *desc;
     auto func_type = func_type_result.value();
-    extern_func->func =
-        ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, extern_func->desc.name, *module_);
+    extern_func->func = ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, extern_func->desc.name,
+                                                 *GetLLVMModule());
     extern_func->func_type = func_type;
-    GetSession().extern_funcs[desc->name] = extern_func;
+    GetSession()->extern_funcs[desc->name] = extern_func;
   }
-  const auto& member_func_calls = ast_ctx_.GetAllMemberFuncCalls(GetSession().compile_function_idx);
+  const auto& member_func_calls = ast_ctx_.GetAllMemberFuncCalls(GetSession()->compile_function_idx);
   for (const auto& [dtype, func_calls] : member_func_calls) {
     for (const auto& [name, desc] : func_calls) {
       auto exec_addr = ::llvm::orc::ExecutorAddr::fromPtr(desc.func);
@@ -223,9 +255,10 @@ absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& fun
       ExternFunctionPtr extern_func = std::make_shared<ExternFunction>();
       extern_func->desc = desc;
       auto func_type = func_type_result.value();
-      extern_func->func = ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, fname, *module_);
+      extern_func->func =
+          ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, fname, *GetLLVMModule());
       extern_func->func_type = func_type;
-      GetSession().extern_funcs[fname] = extern_func;
+      GetSession()->extern_funcs[fname] = extern_func;
     }
   }
 
@@ -287,14 +320,14 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
   }
 
   ::llvm::FunctionType* func_type = func_type_result.value();
-  ::llvm::Function* f =
-      ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, func_compile_ctx->func_ast.name, *module_);
+  ::llvm::Function* f = ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage,
+                                                 func_compile_ctx->func_ast.name, *GetLLVMModule());
   RUDF_DEBUG("create func:{}", func_compile_ctx->func_ast.name);
   // Add a basic block to the function. As before, it automatically inserts
   // because of the last argument.
-  ::llvm::BasicBlock* entry_block = ::llvm::BasicBlock::Create(*context_, "entry", f);
-  func_compile_ctx->exit_block = ::llvm::BasicBlock::Create(*context_, "exit");
-  ir_builder_->SetInsertPoint(entry_block);
+  ::llvm::BasicBlock* entry_block = ::llvm::BasicBlock::Create(*GetLLVMContext(), "entry", f);
+  func_compile_ctx->exit_block = ::llvm::BasicBlock::Create(*GetLLVMContext(), "exit");
+  GetSession()->GetIRBuilder()->SetInsertPoint(entry_block);
   if (!function.return_type.IsVoid()) {
     auto return_type_result = GetType(function.return_type);
     if (!return_type_result.ok()) {
@@ -302,15 +335,16 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
     }
     auto* return_type = return_type_result.value();
     func_compile_ctx->return_type = return_type;
-    ValuePtr return_value = NewValue(function.return_type, ir_builder_->CreateAlloca(return_type), return_type);
+    ValuePtr return_value =
+        NewValue(function.return_type, GetSession()->GetIRBuilder()->CreateAlloca(return_type), return_type);
     func_compile_ctx->return_value = return_value;
   }
 
   // Create a basic block builder with default parameters.  The builder will
   // automatically append instructions to the basic block `BB'.
 
-  GetSession().current_compile_functon_ctx = func_compile_ctx;
-  GetSession().compile_functon_ctxs.emplace(function.name, func_compile_ctx);
+  GetSession()->current_compile_functon_ctx = func_compile_ctx;
+  GetSession()->compile_functon_ctxs.emplace(function.name, func_compile_ctx);
 
   if (!f->arg_empty()) {
     for (size_t i = 0; i < f->arg_size(); i++) {
@@ -318,8 +352,8 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
       std::string name = (*function.args)[i].name;
       DType dtype = (*function.args)[i].dtype;
       arg->setName(name);
-      auto* arg_val = ir_builder_->CreateAlloca(arg->getType());
-      ir_builder_->CreateStore(arg, arg_val);
+      auto* arg_val = GetSession()->GetIRBuilder()->CreateAlloca(arg->getType());
+      GetSession()->GetIRBuilder()->CreateStore(arg, arg_val);
       auto val = NewValue(dtype, arg_val, arg->getType());
       func_compile_ctx->named_values[name] = val;
       if (dtype.IsContextPtr()) {
@@ -334,15 +368,15 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
     return status;
   }
 
-  if (ir_builder_->GetInsertBlock()->getTerminator() == nullptr) {
-    ir_builder_->CreateBr(func_compile_ctx->exit_block);
+  if (GetSession()->GetIRBuilder()->GetInsertBlock()->getTerminator() == nullptr) {
+    GetSession()->GetIRBuilder()->CreateBr(func_compile_ctx->exit_block);
   }
   func_compile_ctx->exit_block->insertInto(f);
-  ir_builder_->SetInsertPoint(func_compile_ctx->exit_block);
+  GetSession()->GetIRBuilder()->SetInsertPoint(func_compile_ctx->exit_block);
   if (nullptr != func_compile_ctx->return_value) {
-    ir_builder_->CreateRet(func_compile_ctx->return_value->GetValue());
+    GetSession()->GetIRBuilder()->CreateRet(func_compile_ctx->return_value->GetValue());
   } else {
-    ir_builder_->CreateRetVoid();
+    GetSession()->GetIRBuilder()->CreateRetVoid();
   }
 
   // Validate the generated code, checking for consistency.
@@ -351,12 +385,12 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
   bool r = ::llvm::verifyFunction(*f, &err_stream);
   if (r) {
     RUDF_ERROR("verify failed:{}", err_str);
-    module_->print(::llvm::errs(), nullptr);
+    GetLLVMModule()->print(::llvm::errs(), nullptr);
     return absl::InvalidArgumentError(err_str);
   }
 
   // Run the optimizer on the function.
-  func_pass_manager_->run(*f, *func_analysis_manager_);
+  GetSession()->func_pass_manager->run(*f, *GetSession()->func_analysis_manager);
   return absl::OkStatus();
 }
 
@@ -365,31 +399,31 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Bloc
 }
 
 absl::Status JitCompiler::Compile() {
-  if (GetSession().print_asm) {
-    module_->print(::llvm::errs(), nullptr);
+  if (GetSession()->print_asm) {
+    GetLLVMModule()->print(::llvm::errs(), nullptr);
   }
-  ::llvm::orc::ThreadSafeModule module(std::move(module_), std::move(context_));
-  auto err = GetSession().jit->addIRModule(std::move(module));
+  ::llvm::orc::ThreadSafeModule module(std::move(GetSession()->module), std::move(GetSession()->context));
+  auto err = GetSession()->jit->addIRModule(std::move(module));
   RUDF_LOG_RETURN_LLVM_ERROR(err);
 
   return absl::OkStatus();
 }
 
 absl::StatusOr<::llvm::Type*> JitCompiler::GetType(DType dtype) {
-  auto type = get_type(*context_, dtype);
+  auto type = get_type(*GetLLVMContext(), dtype);
   if (nullptr == type) {
     RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError(fmt::format("get type failed for:{}", dtype)));
   }
   return type;
 }
 
-typename JitCompiler::ExternFunctionPtr JitCompiler::GetFunction(const std::string& name) {
-  auto local_found = GetSession().compile_functon_ctxs.find(name);
-  if (local_found != GetSession().compile_functon_ctxs.end()) {
+ExternFunctionPtr JitCompiler::GetFunction(const std::string& name) {
+  auto local_found = GetSession()->compile_functon_ctxs.find(name);
+  if (local_found != GetSession()->compile_functon_ctxs.end()) {
     //
   }
-  auto found = GetSession().extern_funcs.find(name);
-  if (found == GetSession().extern_funcs.end()) {
+  auto found = GetSession()->extern_funcs.find(name);
+  if (found == GetSession()->extern_funcs.end()) {
     return nullptr;
   }
   return found->second;
@@ -404,8 +438,8 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name,
     found_func_desc = func->desc;
     found_func = func->func;
   } else {
-    auto found = GetSession().compile_functon_ctxs.find(name);
-    if (found != GetSession().compile_functon_ctxs.end()) {
+    auto found = GetSession()->compile_functon_ctxs.find(name);
+    if (found != GetSession()->compile_functon_ctxs.end()) {
       found_func_desc = found->second->desc;
       found_func = found->second->func;
     }
@@ -415,8 +449,8 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name,
   }
   std::vector<ValuePtr> arg_values = const_arg_values;
   if (found_func_desc.context_arg_idx >= 0 && arg_values.size() == found_func_desc.arg_types.size() - 1) {
-    if (GetCompileContext().context_arg_value) {
-      arg_values.insert(arg_values.begin() + found_func_desc.context_arg_idx, GetCompileContext().context_arg_value);
+    if (GetCompileContext()->context_arg_value) {
+      arg_values.insert(arg_values.begin() + found_func_desc.context_arg_idx, GetCompileContext()->context_arg_value);
     }
   }
 
@@ -439,7 +473,7 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name,
     arg_vals[i] = arg_val->GetValue();
   }
 
-  ::llvm::Value* result = ir_builder_->CreateCall(found_func, arg_vals);
+  ::llvm::Value* result = GetSession()->GetIRBuilder()->CreateCall(found_func, arg_vals);
   return NewValue(found_func_desc.return_type, result);
 }
 

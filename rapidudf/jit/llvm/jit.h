@@ -34,25 +34,10 @@
 #include <fmt/core.h>
 
 #include <memory>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "absl/status/statusor.h"
-
-#include "llvm/Analysis/CGSCCPassManager.h"
-#include "llvm/Analysis/LoopAnalysisManager.h"
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Use.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Passes/StandardInstrumentations.h"
 
 #include "rapidudf/ast/block.h"
 #include "rapidudf/ast/context.h"
@@ -60,12 +45,27 @@
 #include "rapidudf/ast/function.h"
 #include "rapidudf/ast/statement.h"
 #include "rapidudf/jit/function.h"
-#include "rapidudf/jit/llvm/value.h"
-#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
+
+namespace llvm {
+class Value;
+class Type;
+class Module;
+class LLVMContext;
+class FunctionType;
+
+}  // namespace llvm
+
 namespace rapidudf {
 namespace llvm {
+struct JitSession;
+struct FunctionCompileContext;
+struct ExternFunction;
+using FunctionCompileContextPtr = std::shared_ptr<FunctionCompileContext>;
+using ExternFunctionPtr = std::shared_ptr<ExternFunction>;
+class Value;
+using ValuePtr = std::shared_ptr<Value>;
 class JitCompiler {
  public:
   JitCompiler();
@@ -81,15 +81,10 @@ class JitCompiler {
     auto return_type = get_dtype<RET>();
     std::vector<DType> arg_types;
     (arg_types.emplace_back(get_dtype<Args>()), ...);
-    auto found = GetSession().compile_functon_ctxs.find(name);
-    if (found == GetSession().compile_functon_ctxs.end()) {
-      return absl::NotFoundError(fmt::format("No function:{} found in compiled functions.", name));
-    }
-    auto ctx = found->second;
-    std::string err;
-    if (!ctx->func_ast.CompareSignature(return_type, arg_types, err)) {
-      RUDF_ERROR("{}", err);
-      return absl::InvalidArgumentError(err);
+
+    auto verify_result = VerifyFunctionSignature(name, return_type, arg_types);
+    if (!verify_result.ok()) {
+      return verify_result.status();
     }
     auto func_ptr_result = GetFunctionPtr(name);
     if (!func_ptr_result.ok()) {
@@ -111,12 +106,12 @@ class JitCompiler {
     auto return_type = get_dtype<RET>();
     std::vector<DType> arg_types;
     (arg_types.emplace_back(get_dtype<Args>()), ...);
-    std::string err;
-    if (!GetCompileContext().func_ast.CompareSignature(return_type, arg_types, err)) {
-      RUDF_ERROR("{}", err);
-      return absl::InvalidArgumentError(err);
+
+    auto verify_result = VerifyFunctionSignature(return_type, arg_types);
+    if (!verify_result.ok()) {
+      return verify_result.status();
     }
-    std::string fname = GetCompileContext().func_ast.name;
+    std::string fname = verify_result.value();
     auto func_ptr_result = GetFunctionPtr(fname);
     if (!func_ptr_result.ok()) {
       return func_ptr_result.status();
@@ -170,42 +165,6 @@ class JitCompiler {
   }
 
  private:
-  struct ExternFunction {
-    FunctionDesc desc;
-    ::llvm::FunctionType* func_type = nullptr;
-    ::llvm::Function* func = nullptr;
-  };
-  using ExternFunctionPtr = std::shared_ptr<ExternFunction>;
-  using LoopBlocks = std::pair<::llvm::BasicBlock*, ::llvm::BasicBlock*>;
-  struct FunctionCompileContext {
-    FunctionDesc desc;
-    ast::Function func_ast;
-    ::llvm::Function* func = nullptr;
-    ::llvm::Type* return_type = nullptr;
-    ValuePtr return_value = nullptr;
-    ::llvm::BasicBlock* exit_block = nullptr;
-    ValuePtr context_arg_value;
-    std::unordered_map<std::string, ValuePtr> named_values;
-    std::vector<LoopBlocks> loop_blocks;
-  };
-  using FunctionCompileContextPtr = std::shared_ptr<FunctionCompileContext>;
-
-  struct JitSession {
-    std::unique_ptr<::llvm::orc::LLJIT> jit;
-    std::vector<std::unique_ptr<std::string>> const_strings;
-    std::unordered_map<std::string, ExternFunctionPtr> extern_funcs;
-    std::unordered_map<std::string, FunctionCompileContextPtr> compile_functon_ctxs;
-    FunctionCompileContextPtr current_compile_functon_ctx;
-    uint32_t compile_function_idx = 0;
-    uint32_t label_cursor = 0;
-    bool print_asm = false;
-  };
-
-  using JitTypeArray = std::vector<::llvm::Type*>;
-  using JitTypeArrayPtr = std::unique_ptr<JitTypeArray>;
-  using JitValueArray = std::vector<::llvm::Value*>;
-  using JitValueArrayPtr = std::unique_ptr<JitValueArray>;
-
   // void Init();
   void NewSession(bool print_asm);
   absl::Status Compile();
@@ -217,6 +176,12 @@ class JitCompiler {
   absl::Status CompileFunction(const ast::Function& function);
   absl::Status CompileFunctions(const std::vector<ast::Function>& functions);
   absl::Status CompileExpression(const std::string& expr, ast::Function& function);
+
+  absl::StatusOr<std::string> VerifyFunctionSignature(FunctionCompileContextPtr func_ctx, DType rtype,
+                                                      const std::vector<DType>& args_types);
+  absl::StatusOr<std::string> VerifyFunctionSignature(const std::string& name, DType rtype,
+                                                      const std::vector<DType>& args_types);
+  absl::StatusOr<std::string> VerifyFunctionSignature(DType rtype, const std::vector<DType>& args_types);
 
   absl::StatusOr<::llvm::Type*> GetType(DType dtype);
   absl::StatusOr<::llvm::FunctionType*> GetFunctionType(const FunctionDesc& desc);
@@ -258,26 +223,15 @@ class JitCompiler {
     return CallFunction(std::string(name), arg_values);
   }
 
-  ::llvm::IRBuilder<>* GetIRBuilder() { return ir_builder_.get(); }
+  ::llvm::LLVMContext* GetLLVMContext();
+  ::llvm::Module* GetLLVMModule();
 
-  FunctionCompileContext& GetCompileContext() { return *GetSession().current_compile_functon_ctx; }
-  JitSession& GetSession() { return *session_; }
+  FunctionCompileContextPtr GetCompileContext();
+  JitSession* GetSession();
 
-  uint32_t GetLabelCursor() { return session_->label_cursor++; }
+  uint32_t GetLabelCursor();
 
   ast::ParseContext ast_ctx_;
-
-  std::unique_ptr<::llvm::LLVMContext> context_;
-  std::unique_ptr<::llvm::Module> module_;
-  std::unique_ptr<::llvm::IRBuilder<>> ir_builder_;
-
-  std::unique_ptr<::llvm::FunctionPassManager> func_pass_manager_;
-  std::unique_ptr<::llvm::LoopAnalysisManager> loop_analysis_manager_;
-  std::unique_ptr<::llvm::FunctionAnalysisManager> func_analysis_manager_;
-  std::unique_ptr<::llvm::CGSCCAnalysisManager> cgscc_analysis_manager_;
-  std::unique_ptr<::llvm::ModuleAnalysisManager> module_analysis_manager_;
-  std::unique_ptr<::llvm::PassInstrumentationCallbacks> pass_inst_callbacks_;
-  std::unique_ptr<::llvm::StandardInstrumentations> std_insts_;
 
   std::mutex jit_mutex_;
 

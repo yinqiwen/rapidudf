@@ -155,7 +155,7 @@ static void register_simd_vector_dot() {
   std::string func_name = GetFunctionName(OP_DOT, dtype.ToSimdVector(), dtype.ToSimdVector());
   T (*simd_f0)(simd::Vector<T>, simd::Vector<T>) = simd::simd_vector_dot<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
-  register_builtin_function("dot");
+  // register_builtin_function("dot");
 }
 
 template <typename T>
@@ -164,7 +164,7 @@ static void register_simd_vector_iota() {
   std::string func_name = GetFunctionName(OP_IOTA, dtype);
   simd::Vector<T> (*simd_f0)(Context&, T, uint32_t) = simd::simd_vector_iota<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
-  register_builtin_function("iota");
+  // register_builtin_function("iota");
 }
 
 template <typename T>

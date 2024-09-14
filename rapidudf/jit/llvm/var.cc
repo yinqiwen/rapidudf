@@ -35,6 +35,7 @@
 #include "rapidudf/builtin/builtin.h"
 #include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
@@ -43,8 +44,8 @@ namespace rapidudf {
 namespace llvm {
 
 absl::StatusOr<ValuePtr> JitCompiler::GetLocalVar(const std::string& name) {
-  auto found = GetCompileContext().named_values.find(name);
-  if (found != GetCompileContext().named_values.end()) {
+  auto found = GetCompileContext()->named_values.find(name);
+  if (found != GetCompileContext()->named_values.end()) {
     return found->second;
   }
   return absl::NotFoundError(fmt::format("No var '{}' found", name));
@@ -85,10 +86,11 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
       RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
           fmt::format("Can NOT get reflect accessor with dtype:{} & field:{}", var->GetDType(), field.field)));
     }
-    ::llvm::Value* offset =
-        ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(ir_builder_->getContext()), accessor.member_field_offset);
-    auto field_ptr = ir_builder_->CreateInBoundsGEP(::llvm::Type::getInt8Ty(ir_builder_->getContext()), var->GetValue(),
-                                                    std::vector<::llvm::Value*>{offset});
+    ::llvm::Value* offset = ::llvm::ConstantInt::get(
+        ::llvm::Type::getInt64Ty(GetSession()->GetIRBuilder()->getContext()), accessor.member_field_offset);
+    auto field_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(
+        ::llvm::Type::getInt8Ty(GetSession()->GetIRBuilder()->getContext()), var->GetValue(),
+        std::vector<::llvm::Value*>{offset});
 
     auto member_field_dtype = *accessor.member_field_dtype;
     if (member_field_dtype.IsNumber() || member_field_dtype.IsStringView() || member_field_dtype.IsStdStringView() ||
@@ -97,8 +99,8 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
       if (!dst_type_result.ok()) {
         return dst_type_result.status();
       }
-      auto field_val = ir_builder_->CreateAlignedLoad(dst_type_result.value(), field_ptr,
-                                                      ::llvm::MaybeAlign(member_field_dtype.ByteSize()));
+      auto field_val = GetSession()->GetIRBuilder()->CreateAlignedLoad(
+          dst_type_result.value(), field_ptr, ::llvm::MaybeAlign(member_field_dtype.ByteSize()));
       return NewValue(member_field_dtype, field_val);
     } else {
       return NewValue(accessor.member_field_dtype->ToPtr(), field_ptr);
@@ -112,7 +114,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
     RUDF_LOG_ERROR_STATUS(
         ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
   }
-  auto key_arg = NewValue(DATA_U64, ir_builder_->getInt64(idx));
+  auto key_arg = NewValue(DATA_U64, GetSession()->GetIRBuilder()->getInt64(idx));
   std::vector<ValuePtr> args{var, key_arg};
   return CallFunction(std::string(kBuiltinJsonArrayGet), args);
 }
@@ -143,7 +145,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::VarDefine& expr) {
   ast_ctx_.SetPosition(expr.position);
   auto var = NewValue(DATA_VOID, nullptr);
-  GetCompileContext().named_values.emplace(expr.name, var);
+  GetCompileContext()->named_values.emplace(expr.name, var);
   return var;
 }
 

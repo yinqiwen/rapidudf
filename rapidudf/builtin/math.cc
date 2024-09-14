@@ -244,9 +244,9 @@ static void register_sinh() {
 template <typename T>
 static void register_cosh() {
   T (*f)(T) = &std::cosh;
-  std::string func_name = "cosh_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_COSH, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_function("cosh");
 }
 template <typename T>
 static void register_tanh() {

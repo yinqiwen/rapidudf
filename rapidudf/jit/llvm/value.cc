@@ -32,6 +32,7 @@
 #include <fmt/core.h>
 #include <llvm/IR/Use.h>
 #include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/jit/llvm/type.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/optype.h"
@@ -40,7 +41,7 @@ namespace rapidudf {
 namespace llvm {
 Value::Value(Private, DType dtype, JitCompiler* c, ::llvm::Value* val, ::llvm::Type* t)
     : dtype_(dtype), compiler_(c), val_(val), type_(t) {
-  ir_builder_ = compiler_->GetIRBuilder();
+  ir_builder_ = compiler_->GetSession()->GetIRBuilder();
 }
 ::llvm::Value* Value::GetValue() {
   if (type_ != nullptr) {
@@ -85,10 +86,13 @@ absl::Status Value::SetSimdVectorTemporary(bool v) {
     return absl::InvalidArgumentError(fmt::format("Can not set temprary flag on {}", dtype_));
   }
   if (type_ == nullptr) {
-    return absl::InvalidArgumentError(fmt::format("Can not set temprary flag on {} with empty type", dtype_));
+    return absl::InvalidArgumentError(
+        fmt::format("Can not set temprary flag on {} with empty type with val:{}", dtype_, v));
   }
+  DType simd_vector_dtype(DATA_U8);
+  simd_vector_dtype = simd_vector_dtype.ToSimdVector();
   ::llvm::StructType* simd_vector_type =
-      static_cast<::llvm::StructType*>(get_type(ir_builder_->getContext(), DATA_STRING_VIEW));
+      static_cast<::llvm::StructType*>(get_type(ir_builder_->getContext(), simd_vector_dtype));
   auto size_field_ptr =
       ir_builder_->CreateInBoundsGEP(simd_vector_type, val_, {ir_builder_->getInt32(0), ir_builder_->getInt32(0)});
   auto size_field_val = ir_builder_->CreateLoad(ir_builder_->getInt64Ty(), size_field_ptr);

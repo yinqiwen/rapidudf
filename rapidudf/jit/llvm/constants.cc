@@ -37,6 +37,7 @@
 #include <llvm/IR/Value.h>
 #include <vector>
 #include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
@@ -48,15 +49,15 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, dou
     uint64_t uiv = static_cast<uint64_t>(v);
     bool is_signed = dtype.IsSigned();
     ::llvm::APInt iv(dtype.Bits(), uiv, is_signed);
-    auto val = ::llvm::ConstantInt::get(ir_builder_->getContext(), iv);
+    auto val = ::llvm::ConstantInt::get(GetSession()->GetIRBuilder()->getContext(), iv);
     return NewValue(dtype, val);
   } else if (dtype.IsF32()) {
     ::llvm::APFloat fv(static_cast<float>(v));
-    auto val = ::llvm::ConstantFP::get(ir_builder_->getContext(), fv);
+    auto val = ::llvm::ConstantFP::get(GetSession()->GetIRBuilder()->getContext(), fv);
     return NewValue(dtype, val);
   } else {
     ::llvm::APFloat fv(v);
-    auto val = ::llvm::ConstantFP::get(ir_builder_->getContext(), fv);
+    auto val = ::llvm::ConstantFP::get(GetSession()->GetIRBuilder()->getContext(), fv);
     return NewValue(dtype, val);
   }
 }
@@ -68,7 +69,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, dou
     return NewValue(int_dtype, val);
   }
   ::llvm::APFloat fv(v);
-  auto val = ::llvm::ConstantFP::get(ir_builder_->getContext(), fv);
+  auto val = ::llvm::ConstantFP::get(GetSession()->GetIRBuilder()->getContext(), fv);
   return NewValue(DATA_F64, val);
 }
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, bool v) {
@@ -84,7 +85,8 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
     return element_type_result.status();
   }
   auto* element_type = element_type_result.value();
-  auto* stack_val = ir_builder_->CreateAlloca(element_type, ir_builder_->getInt64(expr.elements.size()));
+  auto* stack_val = GetSession()->GetIRBuilder()->CreateAlloca(
+      element_type, GetSession()->GetIRBuilder()->getInt64(expr.elements.size()));
 
   for (size_t i = 0; i < expr.elements.size(); i++) {
     auto result = BuildIR(ctx, expr.elements[i]);
@@ -100,43 +102,49 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
             fmt::format("Cast array:{} element from {} to {} failed.", i, orig_element_dtype, element_dtype)));
       }
     }
-    auto element_ptr =
-        ir_builder_->CreateInBoundsGEP(element_type, stack_val, std::vector<::llvm::Value*>{ir_builder_->getInt64(i)});
-    ir_builder_->CreateStore(element_val->GetValue(), element_ptr);
+    auto element_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(
+        element_type, stack_val, std::vector<::llvm::Value*>{GetSession()->GetIRBuilder()->getInt64(i)});
+    GetSession()->GetIRBuilder()->CreateStore(element_val->GetValue(), element_ptr);
   }
-  auto* span_type = ::llvm::StructType::getTypeByName(ir_builder_->getContext(), "absl_span");
-  auto* span_val = ir_builder_->CreateAlloca(span_type);
-  auto size_val = ir_builder_->getInt64(expr.elements.size());
-  ::llvm::Value* zero = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder_->getContext()), 0);
-  ::llvm::Value* offset = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder_->getContext()), 1);
-  auto size_field_ptr = ir_builder_->CreateInBoundsGEP(span_type, span_val, std::vector<::llvm::Value*>{zero, offset});
-  ir_builder_->CreateStore(size_val, size_field_ptr);
-  offset = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder_->getContext()), 0);
-  auto ptr_field_ptr = ir_builder_->CreateInBoundsGEP(span_type, span_val, std::vector<::llvm::Value*>{zero, offset});
-  ir_builder_->CreateStore(stack_val, ptr_field_ptr);
-  return NewValue(expr.dtype, ir_builder_->CreateLoad(span_type, span_val));
+  auto* span_type = ::llvm::StructType::getTypeByName(GetSession()->GetIRBuilder()->getContext(), "absl_span");
+  auto* span_val = GetSession()->GetIRBuilder()->CreateAlloca(span_type);
+  auto size_val = GetSession()->GetIRBuilder()->getInt64(expr.elements.size());
+  ::llvm::Value* zero =
+      ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
+  ::llvm::Value* offset =
+      ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 1);
+  auto size_field_ptr =
+      GetSession()->GetIRBuilder()->CreateInBoundsGEP(span_type, span_val, std::vector<::llvm::Value*>{zero, offset});
+  GetSession()->GetIRBuilder()->CreateStore(size_val, size_field_ptr);
+  offset = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
+  auto ptr_field_ptr =
+      GetSession()->GetIRBuilder()->CreateInBoundsGEP(span_type, span_val, std::vector<::llvm::Value*>{zero, offset});
+  GetSession()->GetIRBuilder()->CreateStore(stack_val, ptr_field_ptr);
+  return NewValue(expr.dtype, GetSession()->GetIRBuilder()->CreateLoad(span_type, span_val));
 }
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const std::string& v) {
   std::unique_ptr<std::string> str = std::make_unique<std::string>(v);
   StringView view(*str);
   uint64_t* uv = reinterpret_cast<uint64_t*>(&view);
-  GetSession().const_strings.emplace_back(std::move(str));
+  GetSession()->const_strings.emplace_back(std::move(str));
   ::llvm::StructType* string_view_type = static_cast<::llvm::StructType*>(GetType(DATA_STRING_VIEW).value());
-  auto* str_val = ir_builder_->CreateAlloca(string_view_type);
-  ::llvm::Value* zero = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder_->getContext()), 0);
-  ::llvm::Value* offset = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder_->getContext()), 0);
-  auto size_field_ptr =
-      ir_builder_->CreateInBoundsGEP(string_view_type, str_val, std::vector<::llvm::Value*>{zero, offset});
-  auto size_val = ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(ir_builder_->getContext()), uv[0]);
-  ir_builder_->CreateStore(size_val, size_field_ptr);
+  auto* str_val = GetSession()->GetIRBuilder()->CreateAlloca(string_view_type);
+  ::llvm::Value* zero =
+      ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
+  ::llvm::Value* offset =
+      ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
+  auto size_field_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(string_view_type, str_val,
+                                                                        std::vector<::llvm::Value*>{zero, offset});
+  auto size_val = ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(GetSession()->GetIRBuilder()->getContext()), uv[0]);
+  GetSession()->GetIRBuilder()->CreateStore(size_val, size_field_ptr);
 
-  offset = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(ir_builder_->getContext()), 1);
-  auto ptr_field_ptr =
-      ir_builder_->CreateInBoundsGEP(string_view_type, str_val, std::vector<::llvm::Value*>{zero, offset});
-  auto ptr_val = ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(ir_builder_->getContext()), uv[1]);
-  ir_builder_->CreateStore(ptr_val, ptr_field_ptr);
+  offset = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 1);
+  auto ptr_field_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(string_view_type, str_val,
+                                                                       std::vector<::llvm::Value*>{zero, offset});
+  auto ptr_val = ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(GetSession()->GetIRBuilder()->getContext()), uv[1]);
+  GetSession()->GetIRBuilder()->CreateStore(ptr_val, ptr_field_ptr);
 
-  return NewValue(DATA_STRING_VIEW, ir_builder_->CreateLoad(string_view_type, str_val));
+  return NewValue(DATA_STRING_VIEW, GetSession()->GetIRBuilder()->CreateLoad(string_view_type, str_val));
 }
 
 }  // namespace llvm

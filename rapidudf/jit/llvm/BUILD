@@ -44,6 +44,7 @@ cc_library(
     ],
     hdrs = [
         "jit.h",
+        "jit_session.h",
         "macros.h",
         "value.h",
     ],
