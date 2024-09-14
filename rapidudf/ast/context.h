@@ -82,7 +82,8 @@ class ParseContext {
   void AddMemberFuncCall(DType dtype, const std::string& name, FunctionDesc desc);
 
   DType GetFuncReturnDType(uint32_t idx = 0) { return GetFunctionParseContext(idx).desc.return_type; }
-  void SetFuncDesc(const FunctionDesc& d, uint32_t idx = 0) { GetFunctionParseContext(idx).desc = d; }
+  int GetFuncContextArgIdx() { return GetFunctionParseContext(current_function_cursor_).desc.context_arg_idx; }
+  void SetFuncDesc(const FunctionDesc& d, uint32_t idx = 0);
 
   const FunctionCallMap& GetAllFuncCalls(uint32_t funcion_idx) const {
     return GetFunctionParseContext(funcion_idx).func_calls;

@@ -28,60 +28,28 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-#include <gtest/gtest.h>
-#include <functional>
-#include <vector>
-#include "rapidudf/rapidudf.h"
-using namespace rapidudf;
-using namespace rapidudf::ast;
-TEST(JitCompiler, ifelse0) {
-  spdlog::set_level(spdlog::level::debug);
-  JitCompiler compiler;
-  ParseContext ctx;
-  std::string content = R"(
-    int test_func(int x){ 
-      if(x>10){
-         return 20;
-      }elif(x > 5){
-       return 10;
-      }else{
-        return 0;
-      }
-    }
-  )";
-  auto rc = compiler.CompileFunction<int, int>(content, true);
-  ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, int>(true);
-  // ASSERT_TRUE(f != nullptr);
-  auto f = std::move(rc.value());
-  ASSERT_DOUBLE_EQ(f(11), 20);
-  ASSERT_DOUBLE_EQ(f(9), 10);
-  ASSERT_DOUBLE_EQ(f(6), 10);
-  ASSERT_DOUBLE_EQ(f(4), 0);
+#include "rapidudf/context/context.h"
+#include <memory>
+namespace rapidudf {
+Context::Context(Arena* arena) : arena_(arena) {
+  if (nullptr == arena_) {
+    own_arena_ = std::make_unique<Arena>();
+    arena_ = own_arena_.get();
+  }
 }
-
-TEST(JitCompiler, ifelse1) {
-  spdlog::set_level(spdlog::level::debug);
-  JitCompiler compiler;
-  ParseContext ctx;
-  std::string content = R"(
-    int test_func(int x){ 
-      if(x>10){
-         x=20;
-      }elif(x > 5){
-       x= 10;
-      }else{
-        x= 0;
-      }
-      return x;
-    }
-  )";
-  auto rc = compiler.CompileFunction<int, int>(content, true);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_DOUBLE_EQ(f(11), 20);
-  ASSERT_DOUBLE_EQ(f(9), 10);
-  ASSERT_DOUBLE_EQ(f(6), 10);
-  ASSERT_DOUBLE_EQ(f(4), 0);
+Context::~Context() { Reset(); }
+Arena& Context::GetArena() { return *arena_; }
+uint8_t* Context::ArenaAllocate(size_t n) {
+  uint8_t* p = GetArena().Allocate(n);
+  allocated_arena_ptrs_.insert(p);
+  return p;
 }
+void Context::Reset() {
+  GetArena().Reset();
+  allocated_arena_ptrs_.clear();
+  for (auto clean : cleanups_) {
+    clean();
+  }
+  cleanups_.clear();
+}
+}  // namespace rapidudf

@@ -171,6 +171,18 @@ cc_test(
 )
 
 cc_test(
+    name = "cast_test",
+    size = "small",
+    srcs = ["cast_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "json_test",
     size = "small",
     srcs = ["json_test.cc"],

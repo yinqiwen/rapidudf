@@ -43,6 +43,12 @@ void ParseContext::Clear() {
   validate_posistion_ = 0;
 }
 
+void ParseContext::SetFuncDesc(const FunctionDesc& d, uint32_t idx) {
+  FunctionDesc desc = d;
+  desc.Init();
+  GetFunctionParseContext(idx).desc = desc;
+}
+
 void ParseContext::EnterLoop() { GetFunctionParseContext(current_function_cursor_).in_loop++; }
 bool ParseContext::IsInLoop() { return GetFunctionParseContext(current_function_cursor_).in_loop > 0; }
 void ParseContext::ExitLoop() { GetFunctionParseContext(current_function_cursor_).in_loop--; }
@@ -134,7 +140,11 @@ absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::stri
     desc = FunctionFactory::GetFunction(name);
   }
   if (desc == nullptr) {
-    return absl::NotFoundError(fmt::format("func:{} not exist at {}'", name, GetErrorLine()));
+    return absl::NotFoundError(fmt::format("func:{} not exist at `{}`", name, GetErrorLine()));
+  }
+  if (desc->context_arg_idx >= 0 && GetFuncContextArgIdx() < 0) {
+    return absl::InvalidArgumentError(fmt::format(
+        "Function:{} need `rapidudf::Context` arg, missing in expression/udf args, at `{}`", name, GetErrorLine()));
   }
   if (!local_func) {
     if (implicit) {

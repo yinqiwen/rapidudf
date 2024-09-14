@@ -29,6 +29,8 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "rapidudf/types/simd_vector.h"
+#include "rapidudf/context/context.h"
 #include "rapidudf/rapidudf.h"
 
 struct User {
@@ -50,18 +52,21 @@ int main() {
   spdlog::set_level(spdlog::level::debug);
   // 2. UDF string
   std::string source = R"(
-    void boost_scores(User user,Feeds feeds) 
+    simd_vector<f32> boost_scores(Context ctx, User user,Feeds feeds) 
     { 
       // 注意boost是个float数组
+      var scores = feeds.score;
       var boost=(feeds.city==user.city?1_f32:0);
-      feeds.score*=boost;
+      scores*=boost;
+      return scores;
     } 
   )";
 
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
   rapidudf::JitCompiler compiler;
   // CompileExpression的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
-  auto result = compiler.CompileFunction<void, const User&, Feeds&>(source);
+  auto result =
+      compiler.CompileFunction<rapidudf::simd::Vector<float>, rapidudf::Context&, const User&, Feeds&>(source, true);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;
@@ -90,8 +95,10 @@ int main() {
   column_feeds.score = scores;
 
   // 5. 执行function
-  rapidudf::JitFunction<void, const User&, Feeds&> f = std::move(result.value());
-  f(user, column_feeds);
+  rapidudf::Context ctx;
+  rapidudf::JitFunction<rapidudf::simd::Vector<float>, rapidudf::Context&, const User&, Feeds&> f =
+      std::move(result.value());
+  rapidudf::simd::Vector<float> boosted_scores = f(ctx, user, column_feeds);
 
   return 0;
 };

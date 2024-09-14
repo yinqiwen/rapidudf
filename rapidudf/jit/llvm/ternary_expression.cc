@@ -31,6 +31,7 @@
 
 #include <fmt/core.h>
 #include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 namespace rapidudf {

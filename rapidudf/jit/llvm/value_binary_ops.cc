@@ -45,26 +45,37 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
   DType dst_dtype = dtype_;
   DType right_dtype = right->dtype_;
   if (right->dtype_ != dtype_) {
-    if (dtype_.CanCastTo(right->dtype_)) {
-      dst_dtype = right->dtype_;
-      left = left->CastTo(dst_dtype);
-    } else if (right->dtype_.CanCastTo(dtype_)) {
-      right = right->CastTo(dst_dtype);
-    } else {
-      if ((left->GetDType().IsJsonPtr() || right->GetDType().IsJsonPtr()) &&
-          (op >= OP_EQUAL && op <= OP_GREATER_EQUAL)) {
-        // continue cmp json
+    if (right->dtype_.IsNumber() && dtype_.IsNumber()) {
+      if (right->dtype_ > dtype_) {
+        dst_dtype = right->dtype_;
+        left = left->CastTo(dst_dtype);
       } else {
-        RUDF_ERROR("Can NOT do {} for left:{}, right:{}", op, dtype_, right_dtype);
-        return {};
+        dst_dtype = dtype_;
+        right = right->CastTo(dst_dtype);
+      }
+    } else {
+      if (dtype_.CanCastTo(right->dtype_)) {
+        dst_dtype = right->dtype_;
+        left = left->CastTo(dst_dtype);
+      } else if (right->dtype_.CanCastTo(dtype_)) {
+        right = right->CastTo(dst_dtype);
+      } else {
+        if ((left->GetDType().IsJsonPtr() || right->GetDType().IsJsonPtr()) &&
+            (op >= OP_EQUAL && op <= OP_GREATER_EQUAL)) {
+          // continue cmp json
+        } else {
+          RUDF_ERROR("Can NOT do {} for left:{}, right:{}", op, dtype_, right_dtype);
+          return {};
+        }
       }
     }
+
     if (!left || !right) {
       RUDF_ERROR("Can NOT do {} for left:{}, right:{}", op, dtype_, right_dtype);
       return {};
     }
   }
-
+  ::llvm::Intrinsic::ID builtin_intrinsic = 0;
   DType ret_dtype = dst_dtype;
   ::llvm::Value* result_val = nullptr;
   switch (op) {
@@ -205,6 +216,10 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       }
       break;
     }
+    case OP_POW: {
+      builtin_intrinsic = ::llvm::Intrinsic::pow;
+      break;
+    }
     default: {
       break;
     }
@@ -224,6 +239,25 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
   }
   if ((left->GetDType().IsJsonPtr() || right->GetDType().IsJsonPtr()) && (op >= OP_EQUAL && op <= OP_GREATER_EQUAL)) {
     return left->JsonCmp(op, right, false);
+  }
+
+  if (builtin_intrinsic != 0) {
+    ::llvm::Type* arg_type = nullptr;
+    if (dtype_.IsF32()) {
+      arg_type = ::llvm::Type::getFloatTy(ir_builder_->getContext());
+    } else if (dtype_.IsF64()) {
+      arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
+    } else if (dtype_.IsInteger()) {
+      left = left->CastTo(DATA_F64);
+      right = right->CastTo(DATA_F64);
+      arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
+      ret_dtype = DATA_F64;
+    }
+    if (nullptr != arg_type) {
+      ::llvm::Function* intrinsic_func =
+          ::llvm::Intrinsic::getDeclaration(ir_builder_->GetInsertBlock()->getModule(), builtin_intrinsic, {arg_type});
+      result_val = ir_builder_->CreateCall(intrinsic_func, {left->GetValue(), right->GetValue()});
+    }
   }
 
   if (!result_val) {

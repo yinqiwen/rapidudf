@@ -51,33 +51,33 @@ ValuePtr Value::CastTo(DType dtype) {
     if (dtype.IsFloat()) {
       if (dtype_.IsInteger()) {
         if (dtype_.IsSigned()) {
-          new_val = ir_builder_->CreateSIToFP(val_, dst_type);
+          new_val = ir_builder_->CreateSIToFP(GetValue(), dst_type);
         } else {
-          new_val = ir_builder_->CreateUIToFP(val_, dst_type);
+          new_val = ir_builder_->CreateUIToFP(GetValue(), dst_type);
         }
       } else {
         if (dtype.Bits() > dtype_.Bits()) {
-          new_val = ir_builder_->CreateFPExt(val_, dst_type);
+          new_val = ir_builder_->CreateFPExt(GetValue(), dst_type);
         } else {
-          new_val = ir_builder_->CreateFPTrunc(val_, dst_type);
+          new_val = ir_builder_->CreateFPTrunc(GetValue(), dst_type);
         }
       }
     } else {
       if (dtype_.IsFloat()) {
         if (dtype.IsSigned()) {
-          new_val = ir_builder_->CreateFPToSI(val_, dst_type);
+          new_val = ir_builder_->CreateFPToSI(GetValue(), dst_type);
         } else {
-          new_val = ir_builder_->CreateFPToUI(val_, dst_type);
+          new_val = ir_builder_->CreateFPToUI(GetValue(), dst_type);
         }
       } else {
         if (dtype.Bits() > dtype_.Bits()) {
           if (dtype.IsSigned()) {
-            new_val = ir_builder_->CreateZExt(val_, dst_type);
+            new_val = ir_builder_->CreateZExt(GetValue(), dst_type);
           } else {
-            new_val = ir_builder_->CreateZExt(val_, dst_type);
+            new_val = ir_builder_->CreateZExt(GetValue(), dst_type);
           }
         } else {
-          new_val = ir_builder_->CreateTrunc(val_, dst_type);
+          new_val = ir_builder_->CreateTrunc(GetValue(), dst_type);
         }
       }
     }

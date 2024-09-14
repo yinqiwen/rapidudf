@@ -78,6 +78,7 @@ enum OpToken {
   OP_ATANH,
   OP_ATAN2,
   OP_SINH,
+  OP_COSH,
   OP_TANH,
   OP_ASINH,
   OP_ACOSH,
@@ -92,7 +93,7 @@ enum OpToken {
   OP_DOT,
   OP_IOTA,
   OP_CLAMP,
-  OP_MULADD,
+  OP_FMA,
   OP_MULSUB,
   OP_MULADDSUB,
   OP_NEG_MULADD,
@@ -118,13 +119,13 @@ constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
     "min",           "pow",        "sqrt",       "floor",       "ceil",
     "erf",           "erfc",       "abs",        "sin",         "cos",
     "tan",           "asin",       "acos",       "atan",        "atanh",
-    "atan2",         "sinh",       "tanh",       "asinh",       "acosh",
-    "exp",           "exp2",       "expm1",      "log",         "log2",
-    "log10",         "log1p",      "hypot",      "dot",         "iota",
-    "clamp",         "muladd",     "mulsub",     "muladdsub",   "neg_muladd",
-    "neg_mulsub",    "sort",       "select",     "topk",        "sort_kv",
-    "select_kv",     "topk_kv",    "argsort",    "argselect",   "sum",
-    "clone"};
+    "atan2",         "sinh",       "cosh",       "tanh",        "asinh",
+    "acosh",         "exp",        "exp2",       "expm1",       "log",
+    "log2",          "log10",      "log1p",      "hypot",       "dot",
+    "iota",          "clamp",      "fma",        "mulsub",      "muladdsub",
+    "neg_muladd",    "neg_mulsub", "sort",       "select",      "topk",
+    "sort_kv",       "select_kv",  "topk_kv",    "argsort",     "argselect",
+    "sum",           "clone"};
 }  // namespace rapidudf
 
 template <>

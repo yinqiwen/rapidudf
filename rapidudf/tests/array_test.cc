@@ -43,7 +43,7 @@ static void print_span(absl::Span<const StringView> x) {
     RUDF_ERROR("{}", v);
   }
 }
-RUDF_FUNC_REGISTER(print_span, kFuncNoAttrs)
+RUDF_FUNC_REGISTER(print_span)
 TEST(JitCompiler, array_simple) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};

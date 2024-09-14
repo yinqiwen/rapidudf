@@ -96,7 +96,7 @@ class Vector {
     vec_data_ = vdata;
   }
   VectorData RawData() { return vec_data_; }
-  bool IsTemporary() const { return vec_data_.IsTemporary(); }
+
   size_t Size() const { return vec_data_.Size(); }
   size_t BytesCapacity() const { return vec_data_.BytesCapacity(); }
   auto Data() const {
@@ -138,6 +138,7 @@ class Vector {
       return datas;
     }
   }
+  bool IsTemporary() const { return vec_data_.IsTemporary(); }
 
  private:
   VectorData vec_data_;

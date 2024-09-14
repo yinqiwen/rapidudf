@@ -66,6 +66,7 @@ boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID
                                                         {"double", DType(DATA_F64)},
                                                         {"json", DType(DATA_JSON).ToPtr()},
                                                         {"string", DType(DATA_STRING).ToPtr()},
+                                                        {"Context", DType(DATA_CONTEXT).ToPtr()},
                                                         {"string_view", DType(DATA_STRING_VIEW)}};
 
 boost::parser::symbols<OpToken> Symbols::kAssignOpSymbols = {{"=", OP_ASSIGN},         {"+=", OP_PLUS_ASSIGN},
@@ -77,7 +78,7 @@ boost::parser::symbols<OpToken> Symbols::kCmpOpSymbols = {{"==", OP_EQUAL},     
                                                           {">", OP_GREATER},        {"<", OP_LESS}};
 boost::parser::symbols<OpToken> Symbols::kAdditiveOpSymbols = {{"+", OP_PLUS}, {"-", OP_MINUS}};
 boost::parser::symbols<OpToken> Symbols::kMultiplicativeOpSymbols = {
-    {"*", OP_MULTIPLY}, {"/", OP_DIVIDE}, {"%", OP_MOD}};
+    {"*", OP_MULTIPLY}, {"/", OP_DIVIDE}, {"%", OP_MOD}, {"^", OP_POW}};
 boost::parser::symbols<OpToken> Symbols::kUnaryOpSymbols = {{"-", OP_NEGATIVE}, {"!", OP_NOT}};
 boost::parser::symbols<uint32_t> Symbols::kContinueSymbols = {{"continue", 0}};
 boost::parser::symbols<uint32_t> Symbols::kBreakSymbols = {{"break", 0}};
