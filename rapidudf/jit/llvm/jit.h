@@ -61,6 +61,7 @@
 #include "rapidudf/ast/statement.h"
 #include "rapidudf/jit/function.h"
 #include "rapidudf/jit/llvm/value.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 namespace rapidudf {
@@ -181,8 +182,9 @@ class JitCompiler {
     ast::Function func_ast;
     ::llvm::Function* func = nullptr;
     ::llvm::Type* return_type = nullptr;
-    ::llvm::Value* return_value = nullptr;
+    ValuePtr return_value = nullptr;
     ::llvm::BasicBlock* exit_block = nullptr;
+    ValuePtr context_arg_value;
     std::unordered_map<std::string, ValuePtr> named_values;
     std::vector<LoopBlocks> loop_blocks;
   };

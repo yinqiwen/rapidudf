@@ -75,11 +75,18 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
       case OP_GREATER:
       case OP_GREATER_EQUAL:
       case OP_LOGIC_AND:
-      case OP_LOGIC_OR: {
+      case OP_LOGIC_OR:
+      case OP_POW: {
         ValuePtr result;
         if (left->GetDType().IsSimdVector() || right->GetDType().IsSimdVector()) {
           auto func_name = GetFunctionName(op, left->GetDType(), right->GetDType());
           std::vector<ValuePtr> args{left, right};
+          // if (left->GetDType().IsSimdVector() && (op >= OP_PLUS_ASSIGN && op <= OP_MOD_ASSIGN)) {
+          //   auto status = left->SetSimdVectorTemporary(true);
+          //   if (!status.ok()) {
+          //     return status;
+          //   }
+          // }
           auto call_result = CallFunction(func_name, args);
           if (!call_result.ok()) {
             return call_result.status();
@@ -97,8 +104,15 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
           if (!status.ok()) {
             return status;
           }
+          if (left->GetDType().IsSimdVector()) {
+            auto status = left->SetSimdVectorTemporary(false);
+            if (!status.ok()) {
+              return status;
+            }
+          }
+        } else {
+          left = result;
         }
-        left = result;
         break;
       }
       case OP_ASSIGN: {

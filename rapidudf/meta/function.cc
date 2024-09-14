@@ -29,6 +29,8 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rapidudf/meta/function.h"
+#include "rapidudf/log/log.h"
+
 namespace rapidudf {
 using FuncRegMap = std::unordered_map<std::string, FunctionDesc>;
 static std::unique_ptr<FuncRegMap> g_regs = nullptr;
@@ -119,7 +121,17 @@ std::string GetFunctionName(OpToken op, DType a, DType b) { return GetFunctionNa
 std::string GetFunctionName(OpToken op, DType a, DType b, DType c) {
   return GetFunctionName(kOpTokenStrs[op], a, b, c);
 }
-
+void FunctionDesc::Init() {
+  for (size_t i = 0; i < arg_types.size(); i++) {
+    if (arg_types[i].IsContextPtr()) {
+      if (context_arg_idx != -1) {
+        RUDF_ERROR("Function:{} has more than ONE arg type is ContextPtr({}), the first is at:{}", i, context_arg_idx);
+      } else {
+        context_arg_idx = static_cast<int>(i);
+      }
+    }
+  }
+}
 bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
   if (arg_types.size() != ts.size()) {
     return false;
@@ -133,6 +145,7 @@ bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
 }
 
 bool FunctionFactory::Register(FunctionDesc&& desc) {
+  desc.Init();
   if (!g_regs) {
     g_regs = std::make_unique<FuncRegMap>();
   }

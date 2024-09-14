@@ -30,6 +30,7 @@
 */
 
 #pragma once
+#include "rapidudf/context/context.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 
@@ -37,29 +38,29 @@ namespace rapidudf {
 namespace simd {
 
 template <typename T, typename R, OpToken op>
-Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right);
+Vector<R> simd_vector_binary_op(Context& ctx, Vector<T> left, Vector<T> right);
 template <typename T, typename R, OpToken op>
-Vector<R> simd_vector_binary_vector_scalar_op(Vector<T> left, T right);
+Vector<R> simd_vector_binary_vector_scalar_op(Context& ctx, Vector<T> left, T right);
 template <typename T, typename R, OpToken op>
-Vector<R> simd_vector_binary_scalar_vector_op(T left, Vector<T> right);
+Vector<R> simd_vector_binary_scalar_vector_op(Context& ctx, T left, Vector<T> right);
 
 template <typename T, OpToken op>
-Vector<T> simd_vector_unary_op(Vector<T> left);
+Vector<T> simd_vector_unary_op(Context& ctx, Vector<T> left);
 
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_op(Vector<R> a, Vector<T> b, Vector<T> c);
+Vector<T> simd_vector_ternary_op(Context& ctx, Vector<R> a, Vector<T> b, Vector<T> c);
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_vector_vector_scalar_op(Vector<R> a, Vector<T> b, T c);
+Vector<T> simd_vector_ternary_vector_vector_scalar_op(Context& ctx, Vector<R> a, Vector<T> b, T c);
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_vector_scalar_vector_op(Vector<R> a, T b, Vector<T> c);
+Vector<T> simd_vector_ternary_vector_scalar_vector_op(Context& ctx, Vector<R> a, T b, Vector<T> c);
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Vector<R> a, T b, T c);
+Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Context& ctx, Vector<R> a, T b, T c);
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_scalar_vector_vector_op(R a, Vector<T> b, Vector<T> c);
+Vector<T> simd_vector_ternary_scalar_vector_vector_op(Context& ctx, R a, Vector<T> b, Vector<T> c);
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_scalar_scalar_vector_op(R a, T b, Vector<T> c);
+Vector<T> simd_vector_ternary_scalar_scalar_vector_op(Context& ctx, R a, T b, Vector<T> c);
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_scalar_vector_scalar_op(R a, Vector<T> b, T c);
+Vector<T> simd_vector_ternary_scalar_vector_scalar_op(Context& ctx, R a, Vector<T> b, T c);
 
 template <typename T>
 T simd_vector_sum(Vector<T> left);
@@ -71,10 +72,10 @@ template <typename T>
 T simd_vector_dot(Vector<T> left, Vector<T> right);
 
 template <typename T>
-Vector<T> simd_vector_iota(T start, uint32_t n);
+Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
 
 template <typename T>
-Vector<T> simd_vector_clone(Vector<T> data);
+Vector<T> simd_vector_clone(Context& ctx, Vector<T> data);
 
 template <typename T>
 void sort(Vector<T> data, bool descending, bool hasnan);
@@ -83,9 +84,9 @@ void select(Vector<T> data, size_t k, bool descending, bool hasnan);
 template <typename T>
 void topk(Vector<T> data, size_t k, bool descending, bool hasnan);
 template <typename T>
-Vector<size_t> argsort(Vector<T> data, bool descending, bool hasnan);
+Vector<size_t> argsort(Context& ctx, Vector<T> data, bool descending, bool hasnan);
 template <typename T>
-Vector<size_t> argselect(Vector<T> data, size_t k, bool descending, bool hasnan);
+Vector<size_t> argselect(Context& ctx, Vector<T> data, size_t k, bool descending, bool hasnan);
 
 template <typename K, typename V>
 void sort_key_value(Vector<K> key, Vector<V> value, bool descending, bool hasnan);

@@ -46,7 +46,7 @@ struct TestStruct {
   void test_funcx() { throw std::logic_error("aaa"); }
 };
 
-RUDF_FUNC_REGISTER(test_user_func, kFuncNoAttrs)
+RUDF_FUNC_REGISTER(test_user_func)
 
 RUDF_STRUCT_MEMBER_METHODS(TestStruct, test_funcx)
 

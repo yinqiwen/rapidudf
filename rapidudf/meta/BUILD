@@ -35,6 +35,7 @@ cc_library(
     ],
     deps = [
         ":meta",
+        "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/types",
         "//rapidudf/types:simd_vector",

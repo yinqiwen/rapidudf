@@ -52,6 +52,7 @@
 
 #include "xbyak/xbyak.h"
 
+#include "rapidudf/context/context.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/simd_vector.h"
@@ -93,6 +94,7 @@ enum FundamentalType {
   DATA_STRING,
   DATA_FLATBUFFERS_STRING,
   DATA_JSON,
+  DATA_CONTEXT,
 
   DATA_OBJECT_BEGIN = 64,
 };
@@ -108,10 +110,10 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double;
 
-constexpr std::array<std::string_view, DATA_JSON + 1> kFundamentalTypeStrs = {
-    "invalid",     "void",   "bit",        "u8",  "i8",  "u16", "i16",
-    "u32",         "i32",    "u64",        "i64", "f32", "f64", "std_string_view",
-    "string_view", "string", "fbs_string", "json"};
+constexpr std::array<std::string_view, DATA_CONTEXT + 1> kFundamentalTypeStrs = {
+    "invalid",     "void",   "bit",        "u8",   "i8",     "u16", "i16",
+    "u32",         "i32",    "u64",        "i64",  "f32",    "f64", "std_string_view",
+    "string_view", "string", "fbs_string", "json", "Context"};
 
 class DType {
  public:
@@ -155,7 +157,10 @@ class DType {
   bool IsFlatbuffersString() const { return IsFundamental() && t0_ == DATA_FLATBUFFERS_STRING; }
   bool IsJson() const { return IsFundamental() && t0_ == DATA_JSON; }
   bool IsJsonPtr() const { return IsPtr() && (PtrTo().IsJson()); }
+  bool IsContext() const { return IsFundamental() && t0_ == DATA_CONTEXT; }
+  bool IsContextPtr() const { return IsPtr() && (PtrTo().IsContext()); }
   bool IsStringPtr() const { return IsPtr() && (PtrTo().IsString()); }
+  bool IsInvalid() const { return Control() == 0; }
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
   bool CanCastTo(DType other) const;
 
@@ -212,7 +217,9 @@ class DType {
   bool operator==(const DType& other) const { return control_ == other.control_; }
   bool operator!=(const DType& other) const { return control_ != other.control_; }
   bool operator>(const DType& other) const { return t0_ > other.t0_; }
+  bool operator<(const DType& other) const { return t0_ < other.t0_; }
   bool operator>=(const DType& other) const { return t0_ >= other.t0_; }
+  bool operator<=(const DType& other) const { return t0_ <= other.t0_; }
 
   template <typename T>
   std::optional<T> ToPrimitiveValue(uint64_t bin);
@@ -464,6 +471,9 @@ DType get_dtype() {
   }
   if constexpr (std::is_same_v<Bit, T>) {
     return DType(DATA_BIT);
+  }
+  if constexpr (std::is_same_v<Context, T>) {
+    return DType(DATA_CONTEXT);
   }
   static uint32_t id = nextTypeId();
   DType dtype(static_cast<FundamentalType>(id));

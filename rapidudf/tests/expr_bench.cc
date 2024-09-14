@@ -37,6 +37,7 @@
 static size_t test_n = 1024;
 static const double pi = 3.14159265358979323846264338327950288419716939937510;
 static std::vector<double> xx, yy, actuals, final_results;
+static double xi, yi;
 
 static void init_test_numbers() {
   xx.clear();
@@ -83,7 +84,7 @@ static void BM_rapidudf_expr_func(benchmark::State& state) {
       results += result;
     }
   }
-  RUDF_INFO("Native result:{}", results);
+  RUDF_INFO("RapidUDF result:{}", results);
   // double result = 0;
   // size_t n = 0;
   // for (auto _ : state) {
@@ -130,9 +131,9 @@ static exprtk::expression<double> exprtk_expression;
 static exprtk::symbol_table<double> exprtk_symbol_table;
 static void DoExprtkExprSetup(const benchmark::State& state) {
   exprtk_symbol_table.add_constants();
-  exprtk_symbol_table.add_vector("x", xx);
-  exprtk_symbol_table.add_vector("y", yy);
-  exprtk_symbol_table.add_vector("results", final_results);
+  exprtk_symbol_table.add_variable("x", xi);
+  exprtk_symbol_table.add_variable("y", yi);
+  // exprtk_symbol_table.add_vector("results", final_results);
   exprtk_expression.register_symbol_table(exprtk_symbol_table);
   std::string expr = "x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y";
   // std::string expr = "cos(y - sin(2 / x * pi))";
@@ -145,14 +146,15 @@ static void DoExprtkExprSetup(const benchmark::State& state) {
 static void DooExprtkExprTeardown(const benchmark::State& state) {}
 
 static void BM_exprtk_expr_func(benchmark::State& state) {
+  double results = 0;
   for (auto _ : state) {
-    auto results = exprtk_expression.value();
     for (size_t i = 0; i < test_n; i++) {
-      if (final_results[i] != actuals[i]) {
-        // RUDF_INFO("[{}]Error result:{}, while expected:{}", i, final_results[i], actuals[i]);
-      }
+      xi = xx[i];
+      yi = yy[i];
+      results += exprtk_expression.value();
     }
   }
+  RUDF_INFO("Exprtk result:{}", results);
 }
 BENCHMARK(BM_exprtk_expr_func)->Setup(DoExprtkExprSetup)->Teardown(DooExprtkExprTeardown);
 

@@ -58,19 +58,27 @@ namespace simd {
 namespace hn = hwy::HWY_NAMESPACE;
 inline uint8_t bit_set(uint8_t number, uint8_t n) { return number | ((uint8_t)1 << n); }
 inline uint8_t bit_clear(uint8_t number, uint8_t n) { return number & ~((uint8_t)1 << n); }
+
 template <typename T>
-static inline VectorData arena_new_vector(size_t n) {
+static constexpr size_t get_lanes() {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
-  constexpr auto lanes = hn::Lanes(d);
-  size_t element_size = get_arena_element_size(n, lanes);
-  uint32_t byte_size = sizeof(number_t) * element_size;
-  uint8_t* arena_data = GetArena().Allocate(byte_size);
-  VectorData vec(arena_data, n, byte_size);
-  vec.SetTemporary(true);
-  RUDF_DEBUG("Arena allocator create vector with {}bytes", byte_size);
-  return vec;
+  return hn::Lanes(d);
 }
+
+// template <typename T>
+// static inline VectorData arena_new_vector(size_t n) {
+//   using number_t = typename InternalType<T>::internal_type;
+//   const hn::ScalableTag<number_t> d;
+//   constexpr auto lanes = hn::Lanes(d);
+//   size_t element_size = get_arena_element_size(n, lanes);
+//   uint32_t byte_size = sizeof(number_t) * element_size;
+//   uint8_t* arena_data = GetArena().Allocate(byte_size);
+//   VectorData vec(arena_data, n, byte_size);
+//   vec.SetTemporary(true);
+//   RUDF_DEBUG("Arena allocator create vector with {}bytes", byte_size);
+//   return vec;
+// }
 
 template <typename V, OpToken op>
 static inline auto do_simd_unary_op(V lv) {
@@ -206,7 +214,7 @@ static inline auto do_simd_ternary_op(R a, T b, T c) {
     return hn::Clamp(a, b, c);
   } else if constexpr (op == OP_CONDITIONAL) {
     return hn::IfThenElse(a, b, c);
-  } else if constexpr (op == OP_MULADD) {
+  } else if constexpr (op == OP_FMA) {
     return hn::MulAdd(a, b, c);
   } else if constexpr (op == OP_MULSUB) {
     return hn::MulSub(a, b, c);
@@ -316,14 +324,6 @@ class VectorDataHelper {
   hn::ScalableTag<T> d;
 };
 
-// static size_t get_bits_byte_size(size_t n) { return (n + 7) / 8 + 8; }
-// static size_t get_arena_element_size(size_t n, size_t lanes) {
-//   size_t rest = n % lanes;
-//   if (rest == 0) {
-//     return n;
-//   }
-//   return n + lanes - rest;
-// }
 template <typename T>
 static auto get_constant(T v) {
   if constexpr (std::is_same_v<Bit, T>) {
@@ -353,7 +353,7 @@ static inline bool do_string_view_cmp(StringView lv, StringView rv) {
 }
 
 template <typename T, typename R, OpToken op>
-Vector<R> simd_vector_binary_scalar_op(Vector<T> left, T right, bool reverse) {
+Vector<R> simd_vector_binary_scalar_op(Context& ctx, Vector<T> left, T right, bool reverse) {
   using number_t = typename InternalType<T>::internal_type;
   constexpr bool is_bit = std::is_same_v<T, Bit>;
   const hn::ScalableTag<number_t> d;
@@ -361,15 +361,17 @@ Vector<R> simd_vector_binary_scalar_op(Vector<T> left, T right, bool reverse) {
   using MaskType = hn::Mask<decltype(d)>;
 
   VectorData result_data;
-  if constexpr (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN ||
-                op == OP_MOD_ASSIGN) {
+  // if constexpr (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN
+  // ||
+  //               op == OP_MOD_ASSIGN) {
+  //   result_data = left.RawData();
+  // } else {
+  // }
+
+  if (ctx.IsTemporary(left)) {
     result_data = left.RawData();
   } else {
-    if (left.IsTemporary()) {
-      result_data = left.RawData();
-    } else {
-      result_data = arena_new_vector<R>(left.Size());
-    }
+    result_data = ctx.NewSimdVector<R>(get_lanes<R>(), left.Size());
   }
 
   VectorDataHelper<number_t> helper(result_data.MutableData<R>());
@@ -394,17 +396,18 @@ Vector<R> simd_vector_binary_scalar_op(Vector<T> left, T right, bool reverse) {
 }
 
 template <OpToken op>
-Vector<Bit> simd_vector_string_cmp(Vector<StringView> left, Vector<StringView> right) {
+Vector<Bit> simd_vector_string_cmp(Context& ctx, Vector<StringView> left, Vector<StringView> right) {
   if (left.Size() != right.Size()) {
     THROW_LOGIC_ERR(fmt::format("vector string_view size mismatch {}:{}", left.Size(), right.Size()));
   }
+  auto lanes = get_lanes<Bit>();
   VectorData result_data;
-  if (left.IsTemporary()) {
+  if (ctx.IsTemporary(left)) {
     result_data = left.RawData();
-  } else if (right.IsTemporary()) {
+  } else if (ctx.IsTemporary(right)) {
     result_data = right.RawData();
   } else {
-    result_data = arena_new_vector<Bit>(left.Size());
+    result_data = ctx.NewSimdVector<Bit>(lanes, left.Size());
   }
   size_t bitset_n = left.Size() / 64;
   if (left.Size() % 64 > 0) {
@@ -424,12 +427,13 @@ Vector<Bit> simd_vector_string_cmp(Vector<StringView> left, Vector<StringView> r
 }
 
 template <OpToken op>
-Vector<Bit> simd_vector_string_cmp_scalar(Vector<StringView> left, StringView right, bool reverse) {
+Vector<Bit> simd_vector_string_cmp_scalar(Context& ctx, Vector<StringView> left, StringView right, bool reverse) {
   VectorData result_data;
-  if (left.IsTemporary()) {
+  auto lanes = get_lanes<Bit>();
+  if (ctx.IsTemporary(left)) {
     result_data = left.RawData();
   } else {
-    result_data = arena_new_vector<Bit>(left.Size());
+    result_data = ctx.NewSimdVector<Bit>(lanes, left.Size());
   }
   size_t bitset_n = left.Size() / 64;
   if (left.Size() % 64 > 0) {
@@ -449,30 +453,30 @@ Vector<Bit> simd_vector_string_cmp_scalar(Vector<StringView> left, StringView ri
 }
 
 template <typename T, typename R, OpToken op>
-Vector<R> simd_vector_binary_vector_scalar_op(Vector<T> left, T right) {
+Vector<R> simd_vector_binary_vector_scalar_op(Context& ctx, Vector<T> left, T right) {
   if constexpr (std::is_same_v<StringView, T>) {
-    return simd_vector_string_cmp_scalar<op>(left, right, false);
+    return simd_vector_string_cmp_scalar<op>(ctx, left, right, false);
   } else {
-    return simd_vector_binary_scalar_op<T, R, op>(left, right, false);
+    return simd_vector_binary_scalar_op<T, R, op>(ctx, left, right, false);
   }
 }
 
 template <typename T, typename R, OpToken op>
-Vector<R> simd_vector_binary_scalar_vector_op(T left, Vector<T> right) {
+Vector<R> simd_vector_binary_scalar_vector_op(Context& ctx, T left, Vector<T> right) {
   if constexpr (std::is_same_v<StringView, T>) {
-    return simd_vector_string_cmp_scalar<op>(right, left, true);
+    return simd_vector_string_cmp_scalar<op>(ctx, right, left, true);
   } else {
-    return simd_vector_binary_scalar_op<T, R, op>(right, left, true);
+    return simd_vector_binary_scalar_op<T, R, op>(ctx, right, left, true);
   }
 }
 
 template <typename T, typename R, OpToken op>
-Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right) {
+Vector<R> simd_vector_binary_op(Context& ctx, Vector<T> left, Vector<T> right) {
   if (left.Size() != right.Size()) {
     THROW_LOGIC_ERR(fmt::format("vector binary op:{} arg vector's size mismatch {}:{}", op, left.Size(), right.Size()));
   }
   if constexpr (std::is_same_v<StringView, T>) {
-    return simd_vector_string_cmp<op>(left, right);
+    return simd_vector_string_cmp<op>(ctx, left, right);
   } else {
     using number_t = typename InternalType<T>::internal_type;
     constexpr bool is_bit = std::is_same_v<T, Bit>;
@@ -481,17 +485,18 @@ Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right) {
     using MaskType = hn::Mask<decltype(d)>;
     VectorData result_data;
     size_t i = 0;
-    if constexpr (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN ||
-                  op == OP_MOD_ASSIGN) {
+    // if constexpr (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN
+    // ||
+    //               op == OP_MOD_ASSIGN) {
+    //   result_data = left.RawData();
+    // } else {
+    // }
+    if (ctx.IsTemporary(left)) {
       result_data = left.RawData();
+    } else if (ctx.IsTemporary(right)) {
+      result_data = right.RawData();
     } else {
-      if (left.IsTemporary()) {
-        result_data = left.RawData();
-      } else if (right.IsTemporary()) {
-        result_data = right.RawData();
-      } else {
-        result_data = arena_new_vector<R>(left.Size());
-      }
+      result_data = ctx.NewSimdVector<R>(get_lanes<R>(), left.Size());
     }
 
     VectorDataHelper<number_t> helper(result_data.MutableData<R>());
@@ -510,7 +515,7 @@ Vector<R> simd_vector_binary_op(Vector<T> left, Vector<T> right) {
 }
 
 template <typename T, OpToken logic, OpToken cmp>
-Vector<Bit> simd_vector_logic_cmp(Vector<T> left, absl::Span<const T> right) {
+Vector<Bit> simd_vector_logic_cmp(Context& ctx, Vector<T> left, absl::Span<const T> right) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   using Vec = hn::Vec<decltype(d)>;
@@ -521,10 +526,11 @@ Vector<Bit> simd_vector_logic_cmp(Vector<T> left, absl::Span<const T> right) {
     right_vals.emplace_back(hn::Set(d, v));
   }
   VectorData result_data;
-  if (left.IsTemporary()) {
+  if (ctx.IsTemporary(left)) {
     result_data = left.RawData();
   } else {
-    result_data = arena_new_vector<Bit>(left.Size());
+    // result_data = arena_new_vector<Bit>(left.Size());
+    result_data = ctx.NewSimdVector<Bit>(get_lanes<Bit>(), left.Size());
   }
   VectorDataHelper<T> helper(result_data.MutableData<Bit>());
   size_t i = 0;
@@ -571,7 +577,7 @@ static inline auto select_ternary_value(Vector<Bit> cond, hn::VFromD<D> true_val
 }
 
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_op(Vector<R> a, Vector<T> b, Vector<T> c) {
+Vector<T> simd_vector_ternary_op(Context& ctx, Vector<R> a, Vector<T> b, Vector<T> c) {
   if (a.Size() != b.Size() || a.Size() != c.Size() || c.Size() != b.Size()) {
     THROW_LOGIC_ERR(
         fmt::format("vector ternary op:{} arg vector's size mismatch {}:{}:{}", op, a.Size(), b.Size(), c.Size()));
@@ -581,14 +587,15 @@ Vector<T> simd_vector_ternary_op(Vector<R> a, Vector<T> b, Vector<T> c) {
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
   VectorData result_data;
-  if (a.IsTemporary() && a.BytesCapacity() >= sizeof(T) * a.Size()) {
+  if (ctx.IsTemporary(a) && a.BytesCapacity() >= sizeof(number_t) * a.Size()) {
     result_data = a.RawData();
-  } else if (b.IsTemporary()) {
+  } else if (ctx.IsTemporary(b)) {
     result_data = b.RawData();
-  } else if (c.IsTemporary()) {
+  } else if (ctx.IsTemporary(c)) {
     result_data = c.RawData();
   } else {
-    result_data = arena_new_vector<T>(a.Size());
+    // result_data = arena_new_vector<T>(a.Size());
+    result_data = ctx.NewSimdVector<number_t>(lanes, a.Size());
   }
   VectorDataHelper<number_t> helper(result_data.MutableData<T>());
   for (; (i) < a.Size(); i += lanes) {
@@ -607,18 +614,22 @@ Vector<T> simd_vector_ternary_op(Vector<R> a, Vector<T> b, Vector<T> c) {
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_vector_vector_scalar_op(Vector<R> a, Vector<T> b, T c) {
+Vector<T> simd_vector_ternary_vector_vector_scalar_op(Context& ctx, Vector<R> a, Vector<T> b, T c) {
+  if (a.Size() != b.Size()) {
+    THROW_LOGIC_ERR(fmt::format("vector ternary op:{} arg vector's size mismatch {}:{}", op, a.Size(), b.Size()));
+  }
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
   VectorData result_data;
-  if (a.IsTemporary() && a.BytesCapacity() >= sizeof(T) * a.Size()) {
+  if (ctx.IsTemporary(a) && a.BytesCapacity() >= sizeof(number_t) * a.Size()) {
     result_data = a.RawData();
-  } else if (b.IsTemporary()) {
+  } else if (ctx.IsTemporary(b)) {
     result_data = b.RawData();
   } else {
-    result_data = arena_new_vector<T>(a.Size());
+    // result_data = arena_new_vector<T>(a.Size());
+    result_data = ctx.NewSimdVector<number_t>(lanes, a.Size());
   }
   auto cv = hn::Set(d, get_constant(c));
   VectorDataHelper<number_t> helper(result_data.MutableData<T>());
@@ -636,18 +647,22 @@ Vector<T> simd_vector_ternary_vector_vector_scalar_op(Vector<R> a, Vector<T> b, 
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_vector_scalar_vector_op(Vector<R> a, T b, Vector<T> c) {
+Vector<T> simd_vector_ternary_vector_scalar_vector_op(Context& ctx, Vector<R> a, T b, Vector<T> c) {
+  if (a.Size() != c.Size()) {
+    THROW_LOGIC_ERR(fmt::format("vector ternary op:{} arg vector's size mismatch {}:{}", op, a.Size(), c.Size()));
+  }
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
   VectorData result_data;
-  if (a.IsTemporary() && a.BytesCapacity() >= sizeof(T) * a.Size()) {
+  if (ctx.IsTemporary(a) && a.BytesCapacity() >= sizeof(T) * a.Size()) {
     result_data = a.RawData();
-  } else if (c.IsTemporary()) {
+  } else if (ctx.IsTemporary(c)) {
     result_data = c.RawData();
   } else {
-    result_data = arena_new_vector<T>(a.Size());
+    // result_data = arena_new_vector<T>(a.Size());
+    result_data = ctx.NewSimdVector<number_t>(lanes, a.Size());
   }
   auto bv = hn::Set(d, get_constant(b));
   VectorDataHelper<number_t> helper(result_data.MutableData<T>());
@@ -664,16 +679,17 @@ Vector<T> simd_vector_ternary_vector_scalar_vector_op(Vector<R> a, T b, Vector<T
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Vector<R> a, T b, T c) {
+Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Context& ctx, Vector<R> a, T b, T c) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
   VectorData result_data;
-  if (a.IsTemporary() && a.BytesCapacity() >= sizeof(T) * a.Size()) {
+  if (ctx.IsTemporary(a) && a.BytesCapacity() >= sizeof(T) * a.Size()) {
     result_data = a.RawData();
   } else {
-    result_data = arena_new_vector<T>(a.Size());
+    // result_data = arena_new_vector<T>(a.Size());
+    result_data = ctx.NewSimdVector<number_t>(lanes, a.Size());
   }
   auto bv = hn::Set(d, get_constant(b));
   auto cv = hn::Set(d, get_constant(c));
@@ -690,18 +706,22 @@ Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Vector<R> a, T b, T c) {
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_scalar_vector_vector_op(R a, Vector<T> b, Vector<T> c) {
+Vector<T> simd_vector_ternary_scalar_vector_vector_op(Context& ctx, R a, Vector<T> b, Vector<T> c) {
+  if (b.Size() != c.Size()) {
+    THROW_LOGIC_ERR(fmt::format("vector ternary op:{} arg vector's size mismatch {}:{}", op, b.Size(), c.Size()));
+  }
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
   VectorData result_data;
-  if (b.IsTemporary()) {
+  if (ctx.IsTemporary(b)) {
     result_data = b.RawData();
-  } else if (c.IsTemporary()) {
+  } else if (ctx.IsTemporary(c)) {
     result_data = c.RawData();
   } else {
-    result_data = arena_new_vector<T>(b.Size());
+    // result_data = arena_new_vector<T>(b.Size());
+    result_data = ctx.NewSimdVector<number_t>(lanes, b.Size());
   }
   auto av = hn::Set(d, get_constant(a));
   VectorDataHelper<number_t> helper(result_data.MutableData<T>());
@@ -715,16 +735,17 @@ Vector<T> simd_vector_ternary_scalar_vector_vector_op(R a, Vector<T> b, Vector<T
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_scalar_scalar_vector_op(R a, T b, Vector<T> c) {
+Vector<T> simd_vector_ternary_scalar_scalar_vector_op(Context& ctx, R a, T b, Vector<T> c) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
   VectorData result_data;
-  if (c.IsTemporary()) {
+  if (ctx.IsTemporary(c)) {
     result_data = c.RawData();
   } else {
-    result_data = arena_new_vector<T>(c.Size());
+    // result_data = arena_new_vector<T>(c.Size());
+    result_data = ctx.NewSimdVector<number_t>(lanes, c.Size());
   }
   auto av = hn::Set(d, get_constant(a));
   auto bv = hn::Set(d, get_constant(b));
@@ -737,16 +758,17 @@ Vector<T> simd_vector_ternary_scalar_scalar_vector_op(R a, T b, Vector<T> c) {
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
-Vector<T> simd_vector_ternary_scalar_vector_scalar_op(R a, Vector<T> b, T c) {
+Vector<T> simd_vector_ternary_scalar_vector_scalar_op(Context& ctx, R a, Vector<T> b, T c) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
   VectorData result_data;
-  if (b.IsTemporary()) {
+  if (ctx.IsTemporary(b)) {
     result_data = b.RawData();
   } else {
-    result_data = arena_new_vector<T>(b.Size());
+    // result_data = arena_new_vector<T>(b.Size());
+    result_data = ctx.NewSimdVector<number_t>(lanes, b.Size());
   }
   auto av = hn::Set(d, get_constant(a));
   auto cv = hn::Set(d, get_constant(c));
@@ -760,16 +782,17 @@ Vector<T> simd_vector_ternary_scalar_vector_scalar_op(R a, Vector<T> b, T c) {
 }
 
 template <typename T, OpToken op>
-Vector<T> simd_vector_unary_op(Vector<T> left) {
+Vector<T> simd_vector_unary_op(Context& ctx, Vector<T> left) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
   VectorData result_data;
-  if (left.IsTemporary()) {
+  if (ctx.IsTemporary(left)) {
     result_data = left.RawData();
   } else {
-    result_data = arena_new_vector<T>(left.Size());
+    // result_data = arena_new_vector<T>(left.Size());
+    result_data = ctx.NewSimdVector<number_t>(lanes, left.Size());
   }
   VectorDataHelper<number_t> helper(result_data.MutableData<T>());
   for (; (i) < left.Size(); i += lanes) {
@@ -813,10 +836,11 @@ T simd_vector_sum(Vector<T> left) {
 }
 
 template <typename T>
-Vector<T> simd_vector_iota(T start, uint32_t n) {
-  auto result_data = arena_new_vector<T>(n);
+Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n) {
+  // auto result_data = arena_new_vector<T>(n);
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
+  auto result_data = ctx.NewSimdVector<T>(lanes, n);
   uint8_t* arena_data = result_data.template MutableData<uint8_t>();
   size_t i = 0;
   for (; i < n; i += lanes) {
@@ -827,16 +851,19 @@ Vector<T> simd_vector_iota(T start, uint32_t n) {
 }
 
 template <typename T>
-Vector<T> simd_vector_clone(Vector<T> data) {
-  auto result_data = arena_new_vector<T>(data.Size());
+Vector<T> simd_vector_clone(Context& ctx, Vector<T> data) {
+  auto result_data = ctx.NewSimdVector<T>(get_lanes<T>(), data.Size());
+  // auto result_data = arena_new_vector<T>(data.Size());
   memcpy(result_data.template MutableData<uint8_t>(), data.Data(), result_data.BytesCapacity());
   return Vector<T>(result_data);
 }
 
-#define DEFINE_SIMD_BINARY_MATH_OP_TEMPLATE(r, op, ii, TYPE)                                                \
-  template Vector<TYPE> simd_vector_binary_op<TYPE, TYPE, op>(Vector<TYPE> left, Vector<TYPE> right);       \
-  template Vector<TYPE> simd_vector_binary_vector_scalar_op<TYPE, TYPE, op>(Vector<TYPE> left, TYPE right); \
-  template Vector<TYPE> simd_vector_binary_scalar_vector_op<TYPE, TYPE, op>(TYPE left, Vector<TYPE> right);
+#define DEFINE_SIMD_BINARY_MATH_OP_TEMPLATE(r, op, ii, TYPE)                                                         \
+  template Vector<TYPE> simd_vector_binary_op<TYPE, TYPE, op>(Context & ctx, Vector<TYPE> left, Vector<TYPE> right); \
+  template Vector<TYPE> simd_vector_binary_vector_scalar_op<TYPE, TYPE, op>(Context & ctx, Vector<TYPE> left,        \
+                                                                            TYPE right);                             \
+  template Vector<TYPE> simd_vector_binary_scalar_vector_op<TYPE, TYPE, op>(Context & ctx, TYPE left,                \
+                                                                            Vector<TYPE> right);
 
 #define DEFINE_SIMD_BINARY_MATH_OP(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_BINARY_MATH_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
@@ -867,10 +894,11 @@ DEFINE_SIMD_BINARY_MATH_OP(OP_HYPOT, float, double);
 DEFINE_SIMD_BINARY_MATH_OP(OP_ATAN2, float, double);
 DEFINE_SIMD_BINARY_MATH_OP(OP_POW, float, double);
 
-#define DEFINE_SIMD_BINARY_BOOL_OP_TEMPLATE(r, op, ii, TYPE)                                              \
-  template Vector<Bit> simd_vector_binary_op<TYPE, Bit, op>(Vector<TYPE> left, Vector<TYPE> right);       \
-  template Vector<Bit> simd_vector_binary_vector_scalar_op<TYPE, Bit, op>(Vector<TYPE> left, TYPE right); \
-  template Vector<Bit> simd_vector_binary_scalar_vector_op<TYPE, Bit, op>(TYPE left, Vector<TYPE> right);
+#define DEFINE_SIMD_BINARY_BOOL_OP_TEMPLATE(r, op, ii, TYPE)                                                       \
+  template Vector<Bit> simd_vector_binary_op<TYPE, Bit, op>(Context & ctx, Vector<TYPE> left, Vector<TYPE> right); \
+  template Vector<Bit> simd_vector_binary_vector_scalar_op<TYPE, Bit, op>(Context & ctx, Vector<TYPE> left,        \
+                                                                          TYPE right);                             \
+  template Vector<Bit> simd_vector_binary_scalar_vector_op<TYPE, Bit, op>(Context & ctx, TYPE left, Vector<TYPE> right);
 
 #define DEFINE_SIMD_BINARY_BOOL_OP(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_BINARY_BOOL_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
@@ -890,7 +918,7 @@ DEFINE_SIMD_BINARY_BOOL_OP(OP_LOGIC_AND, Bit);
 DEFINE_SIMD_BINARY_BOOL_OP(OP_LOGIC_OR, Bit);
 
 #define DEFINE_SIMD_UNARY_OP_TEMPLATE(r, op, ii, TYPE) \
-  template Vector<TYPE> simd_vector_unary_op<TYPE, op>(Vector<TYPE> left);
+  template Vector<TYPE> simd_vector_unary_op<TYPE, op>(Context & ctx, Vector<TYPE> left);
 #define DEFINE_SIMD_UNARY_OP(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_UNARY_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_UNARY_OP(OP_NOT, Bit);
@@ -915,38 +943,41 @@ DEFINE_SIMD_UNARY_OP(OP_FLOOR, float, double);
 DEFINE_SIMD_UNARY_OP(OP_CEIL, float, double);
 DEFINE_SIMD_UNARY_OP(OP_ABS, float, double, int64_t, int32_t, int16_t, int8_t);
 
-#define DEFINE_SIMD_TERNARY_COND_OP_TEMPLATE(r, op, ii, TYPE)                                                         \
-  template Vector<TYPE> simd_vector_ternary_op<Bit, TYPE, OP_CONDITIONAL>(Vector<Bit> a, Vector<TYPE> b,              \
-                                                                          Vector<TYPE> c);                            \
-  template Vector<TYPE> simd_vector_ternary_vector_vector_scalar_op<Bit, TYPE, OP_CONDITIONAL>(                       \
-      Vector<Bit> a, Vector<TYPE> b, TYPE c);                                                                         \
-  template Vector<TYPE> simd_vector_ternary_vector_scalar_vector_op<Bit, TYPE, OP_CONDITIONAL>(Vector<Bit> a, TYPE b, \
-                                                                                               Vector<TYPE> c);       \
-  template Vector<TYPE> simd_vector_ternary_vector_scalar_scalar_op<Bit, TYPE, OP_CONDITIONAL>(Vector<Bit> a, TYPE b, \
-                                                                                               TYPE c);
+#define DEFINE_SIMD_TERNARY_COND_OP_TEMPLATE(r, op, ii, TYPE)                                              \
+  template Vector<TYPE> simd_vector_ternary_op<Bit, TYPE, OP_CONDITIONAL>(Context & ctx, Vector<Bit> a,    \
+                                                                          Vector<TYPE> b, Vector<TYPE> c); \
+  template Vector<TYPE> simd_vector_ternary_vector_vector_scalar_op<Bit, TYPE, OP_CONDITIONAL>(            \
+      Context & ctx, Vector<Bit> a, Vector<TYPE> b, TYPE c);                                               \
+  template Vector<TYPE> simd_vector_ternary_vector_scalar_vector_op<Bit, TYPE, OP_CONDITIONAL>(            \
+      Context & ctx, Vector<Bit> a, TYPE b, Vector<TYPE> c);                                               \
+  template Vector<TYPE> simd_vector_ternary_vector_scalar_scalar_op<Bit, TYPE, OP_CONDITIONAL>(            \
+      Context & ctx, Vector<Bit> a, TYPE b, TYPE c);
 
 #define DEFINE_SIMD_TERNARY_COND_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_TERNARY_COND_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_TERNARY_COND_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 
 #define DEFINE_SIMD_TERNARY_OP_TEMPLATE(r, op, ii, TYPE)                                                             \
-  template Vector<TYPE> simd_vector_ternary_op<TYPE, TYPE, op>(Vector<TYPE> a, Vector<TYPE> b, Vector<TYPE> c);      \
-  template Vector<TYPE> simd_vector_ternary_vector_vector_scalar_op<TYPE, TYPE, op>(Vector<TYPE> a, Vector<TYPE> b,  \
-                                                                                    TYPE c);                         \
-  template Vector<TYPE> simd_vector_ternary_vector_scalar_vector_op<TYPE, TYPE, op>(Vector<TYPE> a, TYPE b,          \
+  template Vector<TYPE> simd_vector_ternary_op<TYPE, TYPE, op>(Context & ctx, Vector<TYPE> a, Vector<TYPE> b,        \
+                                                               Vector<TYPE> c);                                      \
+  template Vector<TYPE> simd_vector_ternary_vector_vector_scalar_op<TYPE, TYPE, op>(Context & ctx, Vector<TYPE> a,   \
+                                                                                    Vector<TYPE> b, TYPE c);         \
+  template Vector<TYPE> simd_vector_ternary_vector_scalar_vector_op<TYPE, TYPE, op>(Context & ctx, Vector<TYPE> a,   \
+                                                                                    TYPE b, Vector<TYPE> c);         \
+  template Vector<TYPE> simd_vector_ternary_vector_scalar_scalar_op<TYPE, TYPE, op>(Context & ctx, Vector<TYPE> a,   \
+                                                                                    TYPE b, TYPE c);                 \
+  template Vector<TYPE> simd_vector_ternary_scalar_vector_vector_op<TYPE, TYPE, op>(Context & ctx, TYPE a,           \
+                                                                                    Vector<TYPE> b, Vector<TYPE> c); \
+  template Vector<TYPE> simd_vector_ternary_scalar_scalar_vector_op<TYPE, TYPE, op>(Context & ctx, TYPE a, TYPE b,   \
                                                                                     Vector<TYPE> c);                 \
-  template Vector<TYPE> simd_vector_ternary_vector_scalar_scalar_op<TYPE, TYPE, op>(Vector<TYPE> a, TYPE b, TYPE c); \
-  template Vector<TYPE> simd_vector_ternary_scalar_vector_vector_op<TYPE, TYPE, op>(TYPE a, Vector<TYPE> b,          \
-                                                                                    Vector<TYPE> c);                 \
-  template Vector<TYPE> simd_vector_ternary_scalar_scalar_vector_op<TYPE, TYPE, op>(TYPE a, TYPE b, Vector<TYPE> c); \
-  template Vector<TYPE> simd_vector_ternary_scalar_vector_scalar_op<TYPE, TYPE, op>(TYPE a, Vector<TYPE> b, TYPE c);
+  template Vector<TYPE> simd_vector_ternary_scalar_vector_scalar_op<TYPE, TYPE, op>(Context & ctx, TYPE a,           \
+                                                                                    Vector<TYPE> b, TYPE c);
 
 #define DEFINE_SIMD_TERNARY_OP(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_TERNARY_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_TERNARY_OP(OP_CLAMP, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
                        int8_t);
-DEFINE_SIMD_TERNARY_OP(OP_MULADD, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
-                       int8_t);
+DEFINE_SIMD_TERNARY_OP(OP_FMA, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 DEFINE_SIMD_TERNARY_OP(OP_MULSUB, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
                        int8_t);
 DEFINE_SIMD_TERNARY_OP(OP_MULADDSUB, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
@@ -962,12 +993,14 @@ DEFINE_SIMD_TERNARY_OP(OP_NEG_MULSUB, float, double, uint64_t, int64_t, uint32_t
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_DOT_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_DOT_OP(float, double);
 
-#define DEFINE_SIMD_IOTA_OP_TEMPLATE(r, op, ii, TYPE) template Vector<TYPE> simd_vector_iota(TYPE start, uint32_t n);
+#define DEFINE_SIMD_IOTA_OP_TEMPLATE(r, op, ii, TYPE) \
+  template Vector<TYPE> simd_vector_iota(Context&, TYPE start, uint32_t n);
 #define DEFINE_SIMD_IOTA_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_IOTA_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 
-#define DEFINE_SIMD_CLONE_OP_TEMPLATE(r, op, ii, TYPE) template Vector<TYPE> simd_vector_clone(Vector<TYPE> data);
+#define DEFINE_SIMD_CLONE_OP_TEMPLATE(r, op, ii, TYPE) \
+  template Vector<TYPE> simd_vector_clone(Context& ctx, Vector<TYPE> data);
 #define DEFINE_SIMD_CLONE_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_CLONE_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_CLONE_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
@@ -977,7 +1010,7 @@ DEFINE_SIMD_CLONE_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_SUM_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_SUM_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 
-template Vector<Bit> simd_vector_logic_cmp<float, OP_LOGIC_OR, OP_EQUAL>(Vector<float> left,
+template Vector<Bit> simd_vector_logic_cmp<float, OP_LOGIC_OR, OP_EQUAL>(Context& ctx, Vector<float> left,
                                                                          absl::Span<const float> right);
 }  // namespace simd
 }  // namespace rapidudf

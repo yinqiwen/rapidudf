@@ -42,7 +42,11 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/BDCE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/MergedLoadStoreMotion.h"
+#include "llvm/Transforms/Scalar/PartiallyInlineLibCalls.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 
@@ -121,14 +125,16 @@ void JitCompiler::NewSession(bool print_asm) {
   pass_builder.crossRegisterProxies(*loop_analysis_manager_, *func_analysis_manager_, *cgscc_analysis_manager_,
                                     *module_analysis_manager_);
 
-  // pass_builder.buildModuleOptimizationPipeline(::llvm::OptimizationLevel::O2, ::llvm::ThinOrFullLTOPhase::None).
-  auto func_pass_manager =
-      pass_builder.buildFunctionSimplificationPipeline(::llvm::OptimizationLevel::O2, ::llvm::ThinOrFullLTOPhase::None);
+  auto func_pass_manager = pass_builder.buildFunctionSimplificationPipeline(
+      ::llvm::OptimizationLevel::O2, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
   func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
   func_pass_manager_->addPass(::llvm::InstCombinePass());
   func_pass_manager_->addPass(::llvm::ReassociatePass());
   func_pass_manager_->addPass(::llvm::GVNPass());
   func_pass_manager_->addPass(::llvm::SimplifyCFGPass());
+  func_pass_manager_->addPass(::llvm::PartiallyInlineLibCallsPass());
+  func_pass_manager_->addPass(::llvm::MergedLoadStoreMotionPass());
+  // func_pass_manager_->addPass(::llvm::createPartiallyInlineLibCallsPass());
 }
 
 ValuePtr JitCompiler::NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type) {
@@ -294,8 +300,10 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
     if (!return_type_result.ok()) {
       return return_type_result.status();
     }
-    func_compile_ctx->return_type = return_type_result.value();
-    func_compile_ctx->return_value = ir_builder_->CreateAlloca(return_type_result.value());
+    auto* return_type = return_type_result.value();
+    func_compile_ctx->return_type = return_type;
+    ValuePtr return_value = NewValue(function.return_type, ir_builder_->CreateAlloca(return_type), return_type);
+    func_compile_ctx->return_value = return_value;
   }
 
   // Create a basic block builder with default parameters.  The builder will
@@ -310,10 +318,13 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
       std::string name = (*function.args)[i].name;
       DType dtype = (*function.args)[i].dtype;
       arg->setName(name);
-      // func_compile_ctx->named_values[name] = NewValue(dtype, arg, arg->getType());
       auto* arg_val = ir_builder_->CreateAlloca(arg->getType());
       ir_builder_->CreateStore(arg, arg_val);
-      func_compile_ctx->named_values[name] = NewValue(dtype, arg_val, arg->getType());
+      auto val = NewValue(dtype, arg_val, arg->getType());
+      func_compile_ctx->named_values[name] = val;
+      if (dtype.IsContextPtr()) {
+        func_compile_ctx->context_arg_value = val;
+      }
     }
   }
   func_compile_ctx->func = f;
@@ -329,7 +340,7 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
   func_compile_ctx->exit_block->insertInto(f);
   ir_builder_->SetInsertPoint(func_compile_ctx->exit_block);
   if (nullptr != func_compile_ctx->return_value) {
-    ir_builder_->CreateRet(ir_builder_->CreateLoad(func_compile_ctx->return_type, func_compile_ctx->return_value));
+    ir_builder_->CreateRet(func_compile_ctx->return_value->GetValue());
   } else {
     ir_builder_->CreateRetVoid();
   }
@@ -384,7 +395,8 @@ typename JitCompiler::ExternFunctionPtr JitCompiler::GetFunction(const std::stri
   return found->second;
 }
 
-absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name, const std::vector<ValuePtr>& arg_values) {
+absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name,
+                                                   const std::vector<ValuePtr>& const_arg_values) {
   ::llvm::Function* found_func = nullptr;
   FunctionDesc found_func_desc;
   ExternFunctionPtr func = GetFunction(name);
@@ -401,9 +413,16 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name, cons
   if (!found_func) {
     RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("No func:{} found", name)));
   }
+  std::vector<ValuePtr> arg_values = const_arg_values;
+  if (found_func_desc.context_arg_idx >= 0 && arg_values.size() == found_func_desc.arg_types.size() - 1) {
+    if (GetCompileContext().context_arg_value) {
+      arg_values.insert(arg_values.begin() + found_func_desc.context_arg_idx, GetCompileContext().context_arg_value);
+    }
+  }
+
   if (arg_values.size() != found_func_desc.arg_types.size()) {
-    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
-        fmt::format("Expect {} args, while {} given", found_func_desc.arg_types.size(), arg_values.size())));
+    return ast_ctx_.GetErrorStatus(
+        fmt::format("Expect {} args, while {} given", found_func_desc.arg_types.size(), arg_values.size()));
   }
 
   std::vector<::llvm::Value*> arg_vals(arg_values.size());
@@ -411,11 +430,10 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name, cons
     ValuePtr arg_val = arg_values[i];
     if (arg_val->GetDType() != found_func_desc.arg_types[i]) {
       DType src_dtype = arg_val->GetDType();
-      RUDF_INFO("[{}]name:{}, var dtype:{} {}", i, name, src_dtype, found_func_desc.arg_types[i]);
       arg_val = arg_val->CastTo(found_func_desc.arg_types[i]);
       if (!arg_val) {
-        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Func:{} cast arg:{} from {} to {} failed.", name, i,
-                                                                  src_dtype, found_func_desc.arg_types[i])));
+        return ast_ctx_.GetErrorStatus(
+            fmt::format("Func:{} cast arg:{} from {} to {} failed.", name, i, src_dtype, found_func_desc.arg_types[i]));
       }
     }
     arg_vals[i] = arg_val->GetValue();

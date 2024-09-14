@@ -32,6 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
+#include "rapidudf/context/context.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -41,28 +42,30 @@ TEST(JitCompiler, vector_cos) {
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f32> test_func(simd_vector<f32> x){
+    simd_vector<f32> test_func(Context ctx, simd_vector<f32> x){
       return cos(x);
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  // ASSERT_EQ(f(simd_vec), vec.size());
+  Context ctx;
+  ASSERT_EQ(f(ctx, simd_vec).Size(), vec.size());
 }
 TEST(JitCompiler, vector_add) {
   std::vector<float> vec{1, 2, 3};
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f32> test_func(simd_vector<f32> x){
+    simd_vector<f32> test_func(Context ctx, simd_vector<f32> x){
       return x+5;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
+  Context ctx;
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_FLOAT_EQ(result[i], vec[i] + 5);
@@ -73,14 +76,15 @@ TEST(JitCompiler, vector_sub) {
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f32> test_func(simd_vector<f32> x){
+    simd_vector<f32> test_func(Context ctx,simd_vector<f32> x){
       return x-5;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  Context ctx;
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_FLOAT_EQ(result[i], vec[i] - 5);
@@ -91,14 +95,15 @@ TEST(JitCompiler, vector_mul) {
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f32> test_func(simd_vector<f32> x){
+    simd_vector<f32> test_func(Context ctx,simd_vector<f32> x){
       return 5*x;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  Context ctx;
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_FLOAT_EQ(result[i], vec[i] * 5);
@@ -109,14 +114,15 @@ TEST(JitCompiler, vector_div) {
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f32> test_func(simd_vector<f32> x){
+    simd_vector<f32> test_func(Context ctx,simd_vector<f32> x){
       return 5/x;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  Context ctx;
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_FLOAT_EQ(result[i], 5 / vec[i]);
@@ -127,14 +133,15 @@ TEST(JitCompiler, vector_mod) {
   simd::Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<i32> test_func(simd_vector<i32> x){
+    simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
       return x%5;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<int>, simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  Context ctx;
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_FLOAT_EQ(result[i], vec[i] % 5);
@@ -146,15 +153,16 @@ TEST(JitCompiler, vector_cmp) {
   simd::Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<i32> test_func(simd_vector<i32> x){
+    simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
       x>5&&x<5;
       return 5+x;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<int>, simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  Context ctx;
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_FLOAT_EQ(result[i], vec[i] + 5);
@@ -166,14 +174,15 @@ TEST(JitCompiler, vector_add2) {
   simd::Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f32> test_func(simd_vector<f32> x){
+    simd_vector<f32> test_func(Context ctx,simd_vector<f32> x){
       return x+5+10;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  Context ctx;
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_FLOAT_EQ(result[i], vec[i] + 5 + 10);
@@ -185,14 +194,15 @@ TEST(JitCompiler, vector_ternary) {
   simd::Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<i32> test_func(simd_vector<i32> x){
+    simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
       return x>2?1:0;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<int>, simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  Context ctx;
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     RUDF_DEBUG("{}", result[i]);
@@ -225,43 +235,41 @@ TEST(JitCompiler, vector_iota) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f64> test_func(){
+    simd_vector<f64> test_func(Context ctx){
       var t = iota(1_f64,12);
       return t;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>>(content, true);
+  auto rc = compiler.CompileFunction<simd::Vector<double>, Context&>(content, true);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f();
+  Context ctx;
+  auto result = f(ctx);
   RUDF_INFO("IsTemporary:{}", result.IsTemporary());
   ASSERT_EQ(result.Size(), 12);
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_DOUBLE_EQ(result[i], i + 1);
   }
-
-  DType d(DATA_VOID);
-  DType d1(DATA_U8);
-  RUDF_INFO("can cast to:{}", d.CanCastTo(d1));
 }
 
 TEST(JitCompiler, vector_string_cmp) {
   std::vector<std::string> left{"hello0", "hello1", "hello2"};
   std::vector<std::string> right{"afasf", "rwrewe", "qw1231241"};
-  auto left_views = StringView::makeVector(left);
-  auto right_views = StringView::makeVector(right);
-  simd::Vector<StringView> simd_left(left_views);
-  simd::Vector<StringView> simd_right(right_views);
+
+  Context ctx;
+  auto simd_left = ctx.NewSimdVector(left);
+  auto simd_right = ctx.NewSimdVector(right);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<bit> test_func(simd_vector<string_view> x,simd_vector<string_view> y){
+    simd_vector<bit> test_func(Context ctx,simd_vector<string_view> x,simd_vector<string_view> y){
       return x > y;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<Bit>, simd::Vector<StringView>, simd::Vector<StringView>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<Bit>, Context&, simd::Vector<StringView>, simd::Vector<StringView>>(
+      content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_left, simd_right);
+  auto result = f(ctx, simd_left, simd_right);
   ASSERT_EQ(result.Size(), left.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_EQ(result[i], left[i] > right[i]);
@@ -273,14 +281,15 @@ TEST(JitCompiler, vector_pow) {
   simd::Vector<double> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f64> test_func(simd_vector<f64> x){
+    simd_vector<f64> test_func(Context ctx, simd_vector<f64> x){
       return pow(x,10);
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<f64>, simd::Vector<f64>>(content);
+  auto rc = compiler.CompileFunction<simd::Vector<f64>, Context&, simd::Vector<f64>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(simd_vec);
+  Context ctx;
+  auto result = f(ctx, simd_vec);
   ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_DOUBLE_EQ(result[i], std::pow(vec[i], 10));
@@ -290,11 +299,13 @@ TEST(JitCompiler, vector_pow) {
 TEST(JitCompiler, complex) {
   JitCompiler compiler;
   std::string source = R"(
-    simd_vector<f64> test_func(simd_vector<f64> x,simd_vector<f64> y, double pi){
+    simd_vector<f64> test_func(Context ctx, simd_vector<f64> x,simd_vector<f64> y, double pi){
       return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>, simd::Vector<double>, simd::Vector<double>, double>(source);
+  auto rc =
+      compiler.CompileFunction<simd::Vector<double>, Context&, simd::Vector<double>, simd::Vector<double>, double>(
+          source);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
 
@@ -305,7 +316,8 @@ TEST(JitCompiler, complex) {
     xx.emplace_back(i + 1);
     yy.emplace_back(i + 101);
   }
-  auto result = f(xx, yy, pi);
+  Context ctx;
+  auto result = f(ctx, xx, yy, pi);
   ASSERT_EQ(result.Size(), xx.size());
   for (size_t i = 0; i < result.Size(); i++) {
     double x = xx[i];
@@ -328,7 +340,7 @@ struct Feeds {
 RUDF_STRUCT_FIELDS(Feeds, Click, Like, Inter, Join, TimeV1, PostComment, PositiveCommentV1, ExpoTimeV1)
 TEST(JitCompiler, test) {
   JitCompiler compiler;
-  std::string source = R"(simd_vector<f64> boost_scores(Feeds feeds) { 
+  std::string source = R"(simd_vector<f64> boost_scores(Context ctx,Feeds feeds) {
                               var score = pow(feeds.Click, 10.0);
                               score *= pow(feeds.Like + 0.000082, 4.7);
                               // score *= pow(feeds.Inter, 3.5);
@@ -339,7 +351,7 @@ TEST(JitCompiler, test) {
                               // score *= pow(feeds.ExpoTimeV1, 1.5);
                               return score;
                             })";
-  auto rc = compiler.CompileFunction<rapidudf::simd::Vector<double>, Feeds&>(source);
+  auto rc = compiler.CompileFunction<rapidudf::simd::Vector<double>, Context&, Feeds&>(source);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
 
@@ -352,7 +364,8 @@ TEST(JitCompiler, test) {
   Feeds feeds;
   feeds.Click = clicks;
   feeds.Like = likes;
-  auto result = f(feeds);
+  Context ctx;
+  auto result = f(ctx, feeds);
   for (size_t i = 0; i < result.Size(); i++) {
     double actual_score = std::pow(clicks[i], 10.0);
     actual_score *= std::pow(likes[i] + 0.000082, 4.7);

@@ -40,7 +40,6 @@ using namespace rapidudf::ast;
 TEST(JitCompiler, add) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
   std::string content = R"(
     int test_func(int x, int y){
       return x+y;
@@ -57,7 +56,6 @@ TEST(JitCompiler, add) {
 TEST(JitCompiler, sub) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
   std::string content = R"(
     float test_func(float x, float y){
       return x-y;
@@ -74,7 +72,7 @@ TEST(JitCompiler, sub) {
 TEST(JitCompiler, multiply) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
+
   std::string content = R"(
     u64 test_func(u64 x, u64 y){
       return x*y;
@@ -91,7 +89,7 @@ TEST(JitCompiler, multiply) {
 TEST(JitCompiler, divid) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
+
   std::string content = R"(
     u64 test_func(u64 x, u64 y){
       return x/y;
@@ -108,7 +106,7 @@ TEST(JitCompiler, divid) {
 TEST(JitCompiler, mod) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
+
   std::string content = R"(
     u64 test_func(u64 x, u64 y){
       return x%y;
@@ -120,4 +118,38 @@ TEST(JitCompiler, mod) {
   auto f = std::move(rc.value());
   ASSERT_FLOAT_EQ(f(100, 20), 0);
   ASSERT_FLOAT_EQ(f(7, 5), 2);
+}
+
+TEST(JitCompiler, pow) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  std::string content = R"(
+    x^y
+  )";
+  auto rc = compiler.CompileExpression<uint64_t, uint64_t, uint64_t>(content, {"x", "y"}, true);
+  ASSERT_TRUE(rc.ok());
+
+  auto f = std::move(rc.value());
+  ASSERT_FLOAT_EQ(f(3, 2), std::pow(3, 2));
+  ASSERT_FLOAT_EQ(f(7, 5), std::pow(7, 5));
+
+  auto rc1 = compiler.CompileExpression<float, float, float>(content, {"x", "y"}, true);
+  ASSERT_TRUE(rc1.ok());
+
+  auto f1 = std::move(rc1.value());
+  ASSERT_FLOAT_EQ(f(3, 2), std::pow(3, 2));
+  ASSERT_FLOAT_EQ(f(7, 5), std::pow(7, 5));
+}
+
+TEST(JitCompiler, fma) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  std::string content = R"(
+    fma(x,y,z)
+  )";
+  auto rc = compiler.CompileExpression<float, float, float, float>(content, {"x", "y", "z"}, true);
+  ASSERT_TRUE(rc.ok());
+
+  auto f = std::move(rc.value());
+  ASSERT_FLOAT_EQ(f(3, 2, 7), std::fma(3, 2, 7));
 }

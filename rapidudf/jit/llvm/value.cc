@@ -55,11 +55,13 @@ absl::Status Value::CopyFrom(ValuePtr other) {
           fmt::format("Can not copy from dtype:{} while current dtype:{}", other->dtype_, dtype_));
     }
   } else {
-    type_ = get_type(ir_builder_->getContext(), other->GetDType());
     if (type_ == nullptr) {
-      return absl::InvalidArgumentError(fmt::format("Can not alloca for dtype:{}", other->GetDType()));
+      type_ = get_type(ir_builder_->getContext(), other->GetDType());
+      if (type_ == nullptr) {
+        return absl::InvalidArgumentError(fmt::format("Can not alloca for dtype:{}", other->GetDType()));
+      }
+      val_ = ir_builder_->CreateAlloca(type_);
     }
-    val_ = ir_builder_->CreateAlloca(type_);
   }
   dtype_ = other->dtype_;
   if (type_ != nullptr) {
@@ -78,5 +80,31 @@ ValuePtr Value::Select(ValuePtr true_val, ValuePtr false_val) {
   auto new_val = ir_builder_->CreateSelect(val_, true_val->GetValue(), false_val->GetValue());
   return New(true_val->GetDType(), compiler_, new_val);
 }
+absl::Status Value::SetSimdVectorTemporary(bool v) {
+  if (!dtype_.IsSimdVector()) {
+    return absl::InvalidArgumentError(fmt::format("Can not set temprary flag on {}", dtype_));
+  }
+  if (type_ == nullptr) {
+    return absl::InvalidArgumentError(fmt::format("Can not set temprary flag on {} with empty type", dtype_));
+  }
+  ::llvm::StructType* simd_vector_type =
+      static_cast<::llvm::StructType*>(get_type(ir_builder_->getContext(), DATA_STRING_VIEW));
+  auto size_field_ptr =
+      ir_builder_->CreateInBoundsGEP(simd_vector_type, val_, {ir_builder_->getInt32(0), ir_builder_->getInt32(0)});
+  auto size_field_val = ir_builder_->CreateLoad(ir_builder_->getInt64Ty(), size_field_ptr);
+  ::llvm::Value* result = nullptr;
+  if (v) {
+    uint64_t mask_v = 1ULL;
+    auto mask = ir_builder_->getInt64(mask_v);
+    result = ir_builder_->CreateOr({size_field_val, mask});
+  } else {
+    uint64_t mask_v = ~(1ULL << 0);
+    auto mask = ir_builder_->getInt64(mask_v);
+    result = ir_builder_->CreateAnd({size_field_val, mask});
+  }
+  ir_builder_->CreateStore(result, size_field_ptr);
+  return absl::OkStatus();
+}
+
 }  // namespace llvm
 }  // namespace rapidudf

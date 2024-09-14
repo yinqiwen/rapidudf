@@ -52,22 +52,22 @@ void topk(Vector<T> data, size_t k, bool descending, bool hasnan) {
   x86simdsort::partial_qsort(const_cast<T*>(data.Data()), k, data.Size(), hasnan, descending);
 }
 template <typename T>
-Vector<size_t> argsort(Vector<T> data, bool descending, bool hasnan) {
+Vector<size_t> argsort(Context& ctx, Vector<T> data, bool descending, bool hasnan) {
   std::vector<size_t> idxs = x86simdsort::argsort(const_cast<T*>(data.Data()), data.Size(), hasnan, descending);
   auto p = std::make_unique<std::vector<size_t>>(std::move(idxs));
   Vector<size_t> ret(*p);
-  GetArena().Own(std::move(p));
+  ctx.Own(std::move(p));
   return ret;
 }
 template <typename T>
-Vector<size_t> argselect(Vector<T> data, size_t k, bool descending, bool hasnan) {
+Vector<size_t> argselect(Context& ctx, Vector<T> data, size_t k, bool descending, bool hasnan) {
   if (descending) {
-    return argsort(data, descending, hasnan);
+    return argsort(ctx, data, descending, hasnan);
   } else {
     auto idxs = x86simdsort::argselect(const_cast<T*>(data.Data()), k, data.Size(), hasnan);
     auto p = std::make_unique<std::vector<size_t>>(std::move(idxs));
     Vector<size_t> ret(*p);
-    GetArena().Own(std::move(p));
+    ctx.Own(std::move(p));
     return ret;
   }
 }
@@ -101,13 +101,13 @@ DEFINE_SELECT_OP(select, float, double, uint64_t, int64_t, uint32_t, int32_t, ui
 DEFINE_SELECT_OP(topk, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t)
 
 #define DEFINE_ARGSORT_OP_TEMPLATE(r, func, ii, TYPE) \
-  template Vector<size_t> func<TYPE>(Vector<TYPE> data, bool descending, bool hasnan);
+  template Vector<size_t> func<TYPE>(Context & ctx, Vector<TYPE> data, bool descending, bool hasnan);
 #define DEFINE_ARGSORT_OP(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_ARGSORT_OP_TEMPLATE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_ARGSORT_OP(argsort, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t)
 
 #define DEFINE_ARGSELECT_OP_TEMPLATE(r, func, ii, TYPE) \
-  template Vector<size_t> func<TYPE>(Vector<TYPE> data, size_t, bool descending, bool hasnan);
+  template Vector<size_t> func<TYPE>(Context & ctx, Vector<TYPE> data, size_t, bool descending, bool hasnan);
 #define DEFINE_ARGSELECT_OP(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_ARGSELECT_OP_TEMPLATE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_ARGSELECT_OP(argselect, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t)

@@ -172,6 +172,22 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
               fmt::format("Can NOT do builtin op:{} with dtype:{}", builtin_op, arg_values[0]->GetDType())));
         }
         return result;
+      } else if (arg_values.size() == 2) {
+        auto result = arg_values[0]->BinaryOp(builtin_op, arg_values[1]);
+        if (!result) {
+          RUDF_LOG_ERROR_STATUS(
+              ast_ctx_.GetErrorStatus(fmt::format("Can NOT do builtin op:{} with left dtype:{}, right dtype:{}",
+                                                  builtin_op, arg_values[0]->GetDType(), arg_values[1]->GetDType())));
+        }
+        return result;
+      } else if (arg_values.size() == 3) {
+        auto result = arg_values[0]->TernaryOp(builtin_op, arg_values[1], arg_values[2]);
+        if (!result) {
+          RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+              fmt::format("Can NOT do builtin op:{} with 1st dtype:{}, 2nd dtype:{},3rd dtype:{}", builtin_op,
+                          arg_values[0]->GetDType(), arg_values[1]->GetDType(), arg_values[2]->GetDType())));
+        }
+        return result;
       }
     }
     return CallFunction(expr.name, arg_values);

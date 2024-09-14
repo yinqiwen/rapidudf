@@ -60,7 +60,12 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Retu
           fmt::format("Can NOT cast to return dtype:{} from dtype:{}", ctx->desc.return_type, val->GetDType())));
     }
     if (GetCompileContext().return_value != nullptr) {
-      ir_builder_->CreateStore(ret_val->GetValue(), GetCompileContext().return_value);
+      // auto status = GetCompileContext().return_value->CopyFrom(ret_val);
+      // if (!status.ok()) {
+      //   return status;
+      // }
+      // GetCompileContext().return_value->CopyFrom(ret_val);
+      ir_builder_->CreateStore(ret_val->GetValue(), GetCompileContext().return_value->GetRawValue());
     }
     ir_builder_->CreateBr(GetCompileContext().exit_block);
   } else {

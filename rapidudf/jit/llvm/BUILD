@@ -38,6 +38,7 @@ cc_library(
         "value.cc",
         "value_binary_ops.cc",
         "value_cast.cc",
+        "value_ternary_ops.cc",
         "value_unary_ops.cc",
         "var.cc",
     ],

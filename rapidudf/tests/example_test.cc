@@ -91,7 +91,7 @@ TEST(JitCompiler, bind_member_methods) {
 }
 
 static int test_cpp_func(int x, int y) { return x * 100 + y; }
-RUDF_FUNC_REGISTER(test_cpp_func, rapidudf::kFuncNoAttrs)
+RUDF_FUNC_REGISTER(test_cpp_func)
 
 TEST(JitCompiler, cpp_func) {
   spdlog::set_level(spdlog::level::debug);
@@ -129,7 +129,7 @@ TEST(JitCompiler, safe_member_func) {
 }
 
 static void exception_func() { throw std::logic_error("exception_func"); }
-RUDF_FUNC_REGISTER(exception_func, rapidudf::kFuncNoAttrs)
+RUDF_FUNC_REGISTER(exception_func)
 TEST(JitCompiler, safe_func) {
   spdlog::set_level(spdlog::level::debug);
   rapidudf::JitCompiler compiler;

@@ -58,14 +58,18 @@ class Value : public std::enable_shared_from_this<Value> {
   ~Value() {}
 
   ::llvm::Value* GetValue();
+  ::llvm::Value* GetRawValue() { return val_; }
   DType GetDType() { return dtype_; }
 
   ValuePtr UnaryOp(OpToken op);
   ValuePtr BinaryOp(OpToken op, ValuePtr right);
+  ValuePtr TernaryOp(OpToken op, ValuePtr second, ValuePtr third);
   ValuePtr Select(ValuePtr true_val, ValuePtr false_val);
 
   ValuePtr CastTo(DType dtype);
   absl::Status CopyFrom(ValuePtr other);
+
+  absl::Status SetSimdVectorTemporary(bool v);
 
  private:
   ValuePtr SelfPtr() { return shared_from_this(); }

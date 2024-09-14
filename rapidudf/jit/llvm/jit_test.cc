@@ -56,7 +56,7 @@ struct TestA {
 RUDF_STRUCT_FIELDS(TestA, base, str);
 
 static void test_extern_func() { RUDF_INFO("###test invoke!!!"); }
-RUDF_FUNC_REGISTER(test_extern_func, rapidudf::kFuncNoAttrs)
+RUDF_FUNC_REGISTER(test_extern_func)
 
 // TEST(JitCompiler, simple) {
 //   spdlog::set_level(spdlog::level::debug);

@@ -35,53 +35,24 @@
 #include "rapidudf/rapidudf.h"
 using namespace rapidudf;
 using namespace rapidudf::ast;
-TEST(JitCompiler, ifelse0) {
+TEST(JitCompiler, u64_f64) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
-  std::string content = R"(
-    int test_func(int x){ 
-      if(x>10){
-         return 20;
-      }elif(x > 5){
-       return 10;
-      }else{
-        return 0;
-      }
-    }
-  )";
-  auto rc = compiler.CompileFunction<int, int>(content, true);
+  std::string content = "x";
+  auto rc = compiler.CompileExpression<double, uint64_t>(content, {"x"}, true);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, int>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
-  ASSERT_DOUBLE_EQ(f(11), 20);
-  ASSERT_DOUBLE_EQ(f(9), 10);
-  ASSERT_DOUBLE_EQ(f(6), 10);
-  ASSERT_DOUBLE_EQ(f(4), 0);
+  ASSERT_DOUBLE_EQ(f(11), 11);
+  ASSERT_DOUBLE_EQ(f(12121), 12121);
 }
 
-TEST(JitCompiler, ifelse1) {
+TEST(JitCompiler, f64_u64) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
-  std::string content = R"(
-    int test_func(int x){ 
-      if(x>10){
-         x=20;
-      }elif(x > 5){
-       x= 10;
-      }else{
-        x= 0;
-      }
-      return x;
-    }
-  )";
-  auto rc = compiler.CompileFunction<int, int>(content, true);
+  std::string content = "x";
+  auto rc = compiler.CompileExpression<uint64_t, double>(content, {"x"}, true);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_DOUBLE_EQ(f(11), 20);
-  ASSERT_DOUBLE_EQ(f(9), 10);
-  ASSERT_DOUBLE_EQ(f(6), 10);
-  ASSERT_DOUBLE_EQ(f(4), 0);
+  ASSERT_EQ(f(11.1), 11);
+  ASSERT_EQ(f(12121.2), 12121);
 }

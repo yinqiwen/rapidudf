@@ -182,20 +182,20 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
   }
   return result;
 }
-static bool IsValidSimdVectorBinaryOperands(DType left, DType right) {
+static bool IsValidSimdVectorBinaryOperands(ParseContext& ctx, DType left, DType right) {
   if (left.IsSimdVector() || right.IsSimdVector()) {
     if (left.IsSimdVector() && right.IsSimdVector()) {
       if (left != right) {
         return false;
       }
-      return false;
+      return true;
     } else {
       DType left_ele_dtype = left.Elem();
-      DType right_ele_dtype = left.Elem();
+      DType right_ele_dtype = right.Elem();
       if (left_ele_dtype.IsNumber() && right_ele_dtype.IsNumber()) {
         return true;
       }
-      if (left_ele_dtype.IsStringView() && right_ele_dtype.IsStringView()) {
+      if (left_ele_dtype.CanCastTo(DATA_STRING_VIEW) && right_ele_dtype.CanCastTo(DATA_STRING_VIEW)) {
         return true;
       }
       return false;
@@ -216,6 +216,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       return right_result.status();
     }
     bool can_binary_op = true;
+    std::string_view implicit_func_call;
     do {
       if (left_var.dtype == right_result->dtype) {
         can_binary_op = true;
@@ -225,11 +226,14 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         can_binary_op = true;
         break;
       }
-      if (IsValidSimdVectorBinaryOperands(left_var.dtype, right_result->dtype)) {
-        can_binary_op = true;
+      if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
+        if (IsValidSimdVectorBinaryOperands(ctx, left_var.dtype, right_result->dtype)) {
+          can_binary_op = true;
+        } else {
+          can_binary_op = false;
+        }
         break;
       }
-
       if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsPrimitive()) {
         can_binary_op = true;
         break;
@@ -247,25 +251,22 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       } else {
         right_result->dtype = left_var.dtype;
       }
-      std::string_view implicit_func_call;
-      if (left_var.dtype.IsStringPtr() || right_result->dtype.IsStringPtr()) {
-        implicit_func_call = kBuiltinCastStdStrToStringView;
-      } else if (left_var.dtype.IsFlatbuffersStringPtr() || right_result->dtype.IsFlatbuffersStringPtr()) {
-        implicit_func_call = kBuiltinCastFbsStrToStringView;
-      }
-      if (!implicit_func_call.empty()) {
-        auto result = ctx.CheckFuncExist(implicit_func_call, true);
-        if (!result.ok()) {
-          return result.status();
-        }
-      }
-
     } while (0);
     if (!can_binary_op) {
       return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} by expression validate ",
                                             op, left_var.dtype, right_result->dtype));
     }
-
+    if (left_var.dtype.IsStringPtr() || right_result->dtype.IsStringPtr()) {
+      implicit_func_call = kBuiltinCastStdStrToStringView;
+    } else if (left_var.dtype.IsFlatbuffersStringPtr() || right_result->dtype.IsFlatbuffersStringPtr()) {
+      implicit_func_call = kBuiltinCastFbsStrToStringView;
+    }
+    if (!implicit_func_call.empty()) {
+      auto result = ctx.CheckFuncExist(implicit_func_call, true);
+      if (!result.ok()) {
+        return result.status();
+      }
+    }
     switch (op) {
       case OP_PLUS:
       case OP_MINUS:
@@ -276,7 +277,8 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       case OP_MINUS_ASSIGN:
       case OP_MULTIPLY_ASSIGN:
       case OP_DIVIDE_ASSIGN:
-      case OP_MOD_ASSIGN: {
+      case OP_MOD_ASSIGN:
+      case OP_POW: {
         if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           auto result = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype, right_result->dtype), true);
           if (!result.ok()) {
@@ -530,6 +532,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     std::vector<DType> arg_dtypes;
     DType largest_dtype;
     bool has_simd_vector = false;
+    DType first_number_dtype;
     if (func_args->args.has_value()) {
       for (auto expr : *(func_args->args)) {
         auto result = expr->Validate(ctx);
@@ -543,11 +546,14 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
         if (result->dtype.IsSimdVector()) {
           has_simd_vector = true;
         }
+        if (result->dtype.IsNumber() && first_number_dtype.IsInvalid()) {
+          first_number_dtype = result->dtype;
+        }
       }
     }
     if (is_builtin_function(name)) {
       if (name == kOpTokenStrs[OP_IOTA]) {
-        name = GetFunctionName(name, arg_dtypes[0]);
+        name = GetFunctionName(name, first_number_dtype);
       } else if (has_simd_vector) {
         name = GetFunctionName(name, arg_dtypes);
       } else {
@@ -559,9 +565,18 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
       return result.status();
     }
     auto* desc = result.value();
+    if (desc->context_arg_idx >= 0) {
+      if (ctx.GetFuncContextArgIdx() >= 0 && arg_dtypes.size() == desc->arg_types.size() - 1) {
+        DType ctx_ptr_dtype = DType(DATA_CONTEXT).ToPtr();
+        arg_dtypes.insert(arg_dtypes.begin() + desc->context_arg_idx, ctx_ptr_dtype);
+      }
+    }
     if (!desc->ValidateArgs(arg_dtypes)) {
-      return ctx.GetErrorStatus(
-          fmt::format("Invalid func call:{} args with invalid args, simd_vector_func:{}", name, has_simd_vector));
+      if (desc->context_arg_idx >= 0 && ctx.GetFuncContextArgIdx() < 0) {
+        return ctx.GetErrorStatus(
+            fmt::format("Function:{} need `rapidudf::Context` arg, missing in expression/udf args.", name));
+      }
+      return ctx.GetErrorStatus(fmt::format("Invalid func call:{} args with invalid args", name));
     }
 
     return desc->return_type;

@@ -57,10 +57,10 @@ class JitFunction {
   const std::string& GetName() const { return name_; }
 
   RET operator()(Args... args) {
-    auto& func_ctx = FunctionCallContext::Get(true);
-    if (reset_arena_) {
-      func_ctx.arena.Reset();
-    }
+    // auto& func_ctx = FunctionCallContext::Get(true);
+    // if (reset_arena_) {
+    //   func_ctx.arena.Reset();
+    // }
     if constexpr (std::is_same_v<void, RET>) {
       f_(args...);
     } else {
@@ -74,7 +74,7 @@ class JitFunction {
   std::shared_ptr<void> resource_;
   RET (*f_)(Args...) = nullptr;
 
-  bool reset_arena_ = false;
+  // bool reset_arena_ = false;
 
   void MoveFrom(JitFunction&& other) {
     name_ = std::move(other.name_);
