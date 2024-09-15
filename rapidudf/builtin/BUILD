@@ -20,7 +20,6 @@ cc_library(
         "string.cc",
     ],
     hdrs = ["builtin.h"],
-    copts = ["-ffast-math"],
     deps = [
         ":builtin_symbols",
         "//rapidudf/builtin/simd_vector:simd_ops",

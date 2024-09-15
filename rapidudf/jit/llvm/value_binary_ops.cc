@@ -34,6 +34,7 @@
 #include <vector>
 #include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/jit/llvm/type.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
@@ -78,6 +79,8 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
   ::llvm::Intrinsic::ID builtin_intrinsic = 0;
   DType ret_dtype = dst_dtype;
   ::llvm::Value* result_val = nullptr;
+  std::vector<::llvm::Value*> builtin_intrinsic_args;
+  ::llvm::Type* intrinsic_arg_type = get_type(ir_builder_->getContext(), dst_dtype);
   switch (op) {
     case OP_PLUS:
     case OP_PLUS_ASSIGN: {
@@ -135,19 +138,20 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
     case OP_LOGIC_OR: {
       if (dst_dtype.IsBool()) {
         result_val = ir_builder_->CreateLogicalOr(left->GetValue(), right->GetValue());
-        ret_dtype = DATA_U8;
+        ret_dtype = DATA_BIT;
       }
       break;
     }
     case OP_LOGIC_AND: {
+      RUDF_INFO("{} {}", left->GetDType(), right->GetDType());
       if (dst_dtype.IsBool()) {
         result_val = ir_builder_->CreateLogicalAnd(left->GetValue(), right->GetValue());
-        ret_dtype = DATA_U8;
+        ret_dtype = DATA_BIT;
       }
       break;
     }
     case OP_EQUAL: {
-      ret_dtype = DATA_U8;
+      ret_dtype = DATA_BIT;
       if (dst_dtype.IsInteger()) {
         result_val = ir_builder_->CreateICmpEQ(left->GetValue(), right->GetValue());
       } else if (dst_dtype.IsFloat()) {
@@ -156,7 +160,7 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       break;
     }
     case OP_NOT_EQUAL: {
-      ret_dtype = DATA_U8;
+      ret_dtype = DATA_BIT;
       if (dst_dtype.IsInteger()) {
         result_val = ir_builder_->CreateICmpNE(left->GetValue(), right->GetValue());
       } else if (dst_dtype.IsFloat()) {
@@ -165,7 +169,7 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       break;
     }
     case OP_GREATER: {
-      ret_dtype = DATA_U8;
+      ret_dtype = DATA_BIT;
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
           result_val = ir_builder_->CreateICmpSGT(left->GetValue(), right->GetValue());
@@ -178,7 +182,7 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       break;
     }
     case OP_GREATER_EQUAL: {
-      ret_dtype = DATA_U8;
+      ret_dtype = DATA_BIT;
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
           result_val = ir_builder_->CreateICmpSGE(left->GetValue(), right->GetValue());
@@ -191,7 +195,7 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       break;
     }
     case OP_LESS: {
-      ret_dtype = DATA_U8;
+      ret_dtype = DATA_BIT;
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
           result_val = ir_builder_->CreateICmpSLT(left->GetValue(), right->GetValue());
@@ -204,7 +208,7 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
       break;
     }
     case OP_LESS_EQUAL: {
-      ret_dtype = DATA_U8;
+      ret_dtype = DATA_BIT;
       if (dst_dtype.IsInteger()) {
         if (dst_dtype.IsSigned()) {
           result_val = ir_builder_->CreateICmpSLE(left->GetValue(), right->GetValue());
@@ -218,6 +222,46 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
     }
     case OP_POW: {
       builtin_intrinsic = ::llvm::Intrinsic::pow;
+      if (dtype_.IsF32()) {
+        intrinsic_arg_type = ::llvm::Type::getFloatTy(ir_builder_->getContext());
+      } else if (dtype_.IsF64()) {
+        intrinsic_arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
+      } else if (dtype_.IsInteger()) {
+        left = left->CastTo(DATA_F64);
+        right = right->CastTo(DATA_F64);
+        intrinsic_arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
+        ret_dtype = DATA_F64;
+      }
+      builtin_intrinsic_args.emplace_back(left->GetValue());
+      builtin_intrinsic_args.emplace_back(right->GetValue());
+      break;
+    }
+    case OP_MAX: {
+      if (dst_dtype.IsInteger()) {
+        if (dst_dtype.IsSigned()) {
+          builtin_intrinsic = ::llvm::Intrinsic::smax;
+        } else {
+          builtin_intrinsic = ::llvm::Intrinsic::umax;
+        }
+      } else if (dst_dtype.IsFloat()) {
+        builtin_intrinsic = ::llvm::Intrinsic::maximum;
+      }
+      builtin_intrinsic_args.emplace_back(left->GetValue());
+      builtin_intrinsic_args.emplace_back(right->GetValue());
+      break;
+    }
+    case OP_MIN: {
+      if (dst_dtype.IsInteger()) {
+        if (dst_dtype.IsSigned()) {
+          builtin_intrinsic = ::llvm::Intrinsic::smin;
+        } else {
+          builtin_intrinsic = ::llvm::Intrinsic::umin;
+        }
+      } else if (dst_dtype.IsFloat()) {
+        builtin_intrinsic = ::llvm::Intrinsic::minimum;
+      }
+      builtin_intrinsic_args.emplace_back(left->GetValue());
+      builtin_intrinsic_args.emplace_back(right->GetValue());
       break;
     }
     default: {
@@ -242,21 +286,10 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
   }
 
   if (builtin_intrinsic != 0) {
-    ::llvm::Type* arg_type = nullptr;
-    if (dtype_.IsF32()) {
-      arg_type = ::llvm::Type::getFloatTy(ir_builder_->getContext());
-    } else if (dtype_.IsF64()) {
-      arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
-    } else if (dtype_.IsInteger()) {
-      left = left->CastTo(DATA_F64);
-      right = right->CastTo(DATA_F64);
-      arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
-      ret_dtype = DATA_F64;
-    }
-    if (nullptr != arg_type) {
-      ::llvm::Function* intrinsic_func =
-          ::llvm::Intrinsic::getDeclaration(ir_builder_->GetInsertBlock()->getModule(), builtin_intrinsic, {arg_type});
-      result_val = ir_builder_->CreateCall(intrinsic_func, {left->GetValue(), right->GetValue()});
+    if (nullptr != intrinsic_arg_type) {
+      ::llvm::Function* intrinsic_func = ::llvm::Intrinsic::getDeclaration(ir_builder_->GetInsertBlock()->getModule(),
+                                                                           builtin_intrinsic, {intrinsic_arg_type});
+      result_val = ir_builder_->CreateCall(intrinsic_func, builtin_intrinsic_args);
     }
   }
 
@@ -287,7 +320,7 @@ ValuePtr Value::JsonCmp(OpToken op, ValuePtr right, bool reverse) {
       }
       cmp_args.emplace_back(SelfPtr());
       cmp_args.emplace_back(other_val);
-      cmp_args.emplace_back(New(DATA_U8, compiler_, ir_builder_->getInt8(reverse)));
+      cmp_args.emplace_back(New(DATA_BIT, compiler_, ir_builder_->getInt1(reverse)));
       switch (other_val->GetDType().GetFundamentalType()) {
         case DATA_STRING_VIEW: {
           cmp_func = kBuiltinJsonCmpString;
@@ -302,7 +335,7 @@ ValuePtr Value::JsonCmp(OpToken op, ValuePtr right, bool reverse) {
           cmp_func = kBuiltinJsonCmpFloat;
           break;
         }
-        case DATA_U8: {
+        case DATA_BIT: {
           cmp_func = kBuiltinJsonCmpBool;
           break;
         }

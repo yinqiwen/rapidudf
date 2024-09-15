@@ -70,6 +70,9 @@ template <typename T, OpToken op>
 static void register_unary_simd_vector_op() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(op, dtype.ToSimdVector());
+  if (op == OP_NOT) {
+    printf("func name:%s\n", func_name.c_str());
+  }
   simd::Vector<T> (*simd_f)(Context&, simd::Vector<T>) = simd::simd_vector_unary_op<T, op>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f);
 }
@@ -251,6 +254,7 @@ void init_builtin_simd_vector_funcs() {
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ASINH, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ACOSH, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ATANH, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_NOT, Bit)
 
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_PLUS, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
                                     uint16_t, uint8_t)
@@ -299,14 +303,14 @@ void init_builtin_simd_vector_funcs() {
                                      uint16_t, uint8_t)
   REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_FMA, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
                                      uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_MULSUB, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_FMS, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
                                      uint16_t, uint8_t)
   REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_MULADDSUB, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
                                      uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_NEG_MULADD, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                                     uint32_t, uint16_t, uint8_t)
-  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_NEG_MULSUB, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
-                                     uint32_t, uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_FNMA, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                     uint16_t, uint8_t)
+  REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_FNMS, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+                                     uint16_t, uint8_t)
 
   REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_dot, float, double)
   REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_iota, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,

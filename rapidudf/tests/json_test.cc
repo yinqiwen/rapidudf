@@ -35,13 +35,11 @@
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
-using namespace rapidudf::ast;
 
 TEST(JitCompiler, json_read_int) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  ParseContext ctx;
   JsonObject json;
   json["key"] = 123;
 
@@ -61,7 +59,7 @@ TEST(JitCompiler, json_read_str) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  ParseContext ctx;
+
   JsonObject json;
   json["key"] = "hello,world";
 
@@ -82,7 +80,7 @@ TEST(JitCompiler, json_read_float) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  ParseContext ctx;
+
   JsonObject json;
   json["key"] = 3.14;
 
@@ -103,7 +101,7 @@ TEST(JitCompiler, json_array_get) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  ParseContext ctx;
+
   JsonObject json;
   json["key"] = {1, 2, 3};
 

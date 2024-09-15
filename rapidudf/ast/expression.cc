@@ -164,7 +164,18 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
   if (op.has_value()) {
     switch (*op) {
       case OP_NOT: {
-        if (!result->dtype.IsBool()) {
+        bool can_not = false;
+        if (result->dtype.IsBool()) {
+          can_not = true;
+        } else if (result->dtype.IsSimdVector() && result->dtype.Elem().IsBool()) {
+          can_not = true;
+          std::string fname = GetFunctionName(*op, result->dtype);
+          auto check_result = ctx.CheckFuncExist(fname, true);
+          if (!check_result.ok()) {
+            return check_result.status();
+          }
+        }
+        if (!can_not) {
           return ctx.GetErrorStatus(fmt::format("can NOT do not op on non bool value:{}", result->dtype));
         }
         break;
@@ -246,11 +257,18 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         can_binary_op = false;
         break;
       }
-      if (left_var.dtype.CanCastTo(right_result->dtype)) {
-        left_var.dtype = right_result->dtype;
+      if (left_var.dtype.IsNumber() && right_result->dtype.IsNumber()) {
+        if (left_var.dtype < right_result->dtype) {
+          left_var.dtype = right_result->dtype;
+        }
       } else {
-        right_result->dtype = left_var.dtype;
+        if (left_var.dtype.CanCastTo(right_result->dtype)) {
+          left_var.dtype = right_result->dtype;
+        } else {
+          right_result->dtype = left_var.dtype;
+        }
       }
+
     } while (0);
     if (!can_binary_op) {
       return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} by expression validate ",
@@ -292,6 +310,12 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         if (!left_var.dtype.IsNumber() || !right_result->dtype.IsNumber()) {
           return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                 left_result->dtype, right_result->dtype));
+        }
+        if (op == OP_MOD || op == OP_MOD_ASSIGN) {
+          if (left_var.dtype.IsFloat() || right_result->dtype.IsFloat()) {
+            return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
+                                                  left_result->dtype, right_result->dtype));
+          }
         }
         break;
       }
@@ -356,7 +380,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
         } else {
-          left_var = VarTag(DType(DATA_U8));
+          left_var = VarTag(DType(DATA_BIT));
         }
         break;
       }
@@ -370,7 +394,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           }
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
         } else {
-          if (!left_var.dtype.IsBool() || !right_result->dtype.IsBool()) {
+          if (!left_var.dtype.IsBit() || !right_result->dtype.IsBit()) {
             return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                   left_var.dtype, right_result->dtype));
           }

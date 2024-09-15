@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "hwy/bit_set.h"
+#include "hwy/contrib/algo/transform-inl.h"
 #include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/contrib/math/math-inl.h"
 #include "hwy/highway.h"
@@ -66,22 +67,269 @@ static constexpr size_t get_lanes() {
   return hn::Lanes(d);
 }
 
-// template <typename T>
-// static inline VectorData arena_new_vector(size_t n) {
-//   using number_t = typename InternalType<T>::internal_type;
-//   const hn::ScalableTag<number_t> d;
-//   constexpr auto lanes = hn::Lanes(d);
-//   size_t element_size = get_arena_element_size(n, lanes);
-//   uint32_t byte_size = sizeof(number_t) * element_size;
-//   uint8_t* arena_data = GetArena().Allocate(byte_size);
-//   VectorData vec(arena_data, n, byte_size);
-//   vec.SetTemporary(true);
-//   RUDF_DEBUG("Arena allocator create vector with {}bytes", byte_size);
-//   return vec;
-// }
+template <class D, class Func, typename T = hn::TFromD<D>>
+void do_transform(D d, const T* in1, size_t count, T* out, const Func& func) {
+  const size_t N = hn::Lanes(d);
+  size_t idx = 0;
+  if (count >= N) {
+    for (; idx <= count - N; idx += N) {
+      const hn::Vec<D> v1 = hn::LoadU(d, in1 + idx);
+      hn::StoreU(func(d, v1), d, out + idx);
+    }
+  }
 
-template <typename V, OpToken op>
-static inline auto do_simd_unary_op(V lv) {
+  // `count` was a multiple of the vector length `N`: already done.
+  if (HWY_UNLIKELY(idx == count)) return;
+  const size_t remaining = count - idx;
+  HWY_DASSERT(0 != remaining && remaining < N);
+  const hn::Vec<D> v1 = hn::LoadN(d, in1 + idx, remaining);
+  hn::StoreN(func(d, v1), d, out + idx, remaining);
+}
+
+template <class D, class Func, typename T1, typename T2, typename OUT>
+void do_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func& func) {
+  constexpr size_t N = Lanes(d);
+  size_t idx = 0;
+  if (count >= N) {
+    for (; idx <= count - N; idx += N) {
+      hn::Vec<D> v1;
+      if constexpr (std::is_same_v<hn::Vec<D>, T1>) {
+        v1 = in1;
+      } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T1>) {
+        v1 = hn::LoadU(d, in1 + idx);
+      } else {
+        static_assert(sizeof(T1) == -1, "invalid T1");
+      }
+      hn::Vec<D> v2;
+      if constexpr (std::is_same_v<hn::Vec<D>, T2>) {
+        v2 = in2;
+      } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T2>) {
+        v2 = hn::LoadU(d, in2 + idx);
+      } else {
+        static_assert(sizeof(T2) == -1, "invalid T2");
+      }
+      auto result = func(d, v1, v2);
+      if constexpr (std::is_same_v<decltype(result), hn::VFromD<D>>) {
+        if constexpr (std::is_same_v<hn::TFromD<D>, OUT>) {
+          hn::StoreU(result, d, out + idx);
+        } else {
+          static_assert(sizeof(OUT) == -1, "invalid out type");
+        }
+      } else if constexpr (std::is_same_v<decltype(result), hn::Mask<D>>) {
+        if constexpr (std::is_same_v<uint8_t, OUT>) {
+          size_t bits_byte_idx = idx / 8;
+          size_t bit_cursor = idx % 8;
+          uint8_t cache_byte = 0;
+          if constexpr (N < 8) {
+            cache_byte = out[bits_byte_idx];
+          }
+          hn::StoreMaskBits(d, result, out + bits_byte_idx);
+          if (bit_cursor > 0) {
+            uint8_t current_byte = out[bits_byte_idx];
+            uint8_t restore_value = ((current_byte << bit_cursor) | cache_byte);
+            out[bits_byte_idx] = restore_value;
+          }
+        } else {
+          static_assert(sizeof(OUT) == -1, "invalid out type");
+        }
+      } else {
+        static_assert(sizeof(OUT) == -1, "invalid result type");
+      }
+    }
+  }
+
+  // `count` was a multiple of the vector length `N`: already done.
+  if (HWY_UNLIKELY(idx == count)) return;
+
+  const size_t remaining = count - idx;
+  HWY_DASSERT(0 != remaining && remaining < N);
+  hn::Vec<D> v1;
+  if constexpr (std::is_same_v<hn::Vec<D>, T1>) {
+    v1 = in1;
+  } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T1>) {
+    v1 = hn::LoadN(d, in1 + idx, remaining);
+  } else {
+    static_assert(sizeof(T1) == -1, "invalid T1");
+  }
+  hn::Vec<D> v2;
+  if constexpr (std::is_same_v<hn::Vec<D>, T2>) {
+    v2 = in2;
+  } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T2>) {
+    v2 = hn::LoadN(d, in2 + idx, remaining);
+  } else {
+    static_assert(sizeof(T2) == -1, "invalid T2");
+  }
+  auto result = func(d, v1, v2);
+  if constexpr (std::is_same_v<decltype(result), hn::VFromD<D>>) {
+    if constexpr (std::is_same_v<hn::TFromD<D>, OUT>) {
+      hn::StoreN(result, d, out + idx, remaining);
+    } else {
+      static_assert(sizeof(OUT) == -1, "invalid out type");
+    }
+  } else if constexpr (std::is_same_v<decltype(result), hn::Mask<D>>) {
+    if constexpr (std::is_same_v<uint8_t, OUT>) {
+      size_t bits_byte_idx = idx / 8;
+      size_t bit_cursor = idx % 8;
+      uint8_t cache_byte = out[bits_byte_idx];
+      hn::StoreMaskBits(d, result, out + bits_byte_idx);
+      if (bit_cursor > 0) {
+        uint8_t current_byte = out[bits_byte_idx];
+        uint8_t restore_value = ((cache_byte << bit_cursor) | current_byte);
+        out[bits_byte_idx] = restore_value;
+      }
+    } else {
+      static_assert(sizeof(OUT) == -1, "invalid out type");
+    }
+  } else {
+    static_assert(sizeof(result) == -1, "invalid result type");
+  }
+}
+
+template <class D, class Func, typename T1, typename T2, typename T3, typename OUT = hn::TFromD<D>>
+void do_transform(D d, T1 in1, T2 in2, T3 in3, size_t count, OUT* out, const Func& func) {
+  const size_t N = hn::Lanes(d);
+  size_t idx = 0;
+  if (count >= N) {
+    for (; idx <= count - N; idx += N) {
+      hn::Vec<D> v1;
+      if constexpr (std::is_same_v<hn::Vec<D>, T1>) {
+        v1 = in1;
+      } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T1>) {
+        v1 = hn::LoadU(d, in1 + idx);
+      } else {
+        static_assert(sizeof(T1) == -1, "invalid T1");
+      }
+      hn::Vec<D> v2;
+      if constexpr (std::is_same_v<hn::Vec<D>, T2>) {
+        v2 = in2;
+      } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T2>) {
+        v2 = hn::LoadU(d, in2 + idx);
+      } else {
+        static_assert(sizeof(T2) == -1, "invalid T2");
+      }
+      hn::Vec<D> v3;
+      if constexpr (std::is_same_v<hn::Vec<D>, T3>) {
+        v3 = in3;
+      } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T3>) {
+        v3 = hn::LoadU(d, in3 + idx);
+      } else {
+        static_assert(sizeof(T3) == -1, "invalid T2");
+      }
+      hn::StoreU(func(d, v1, v2, v3), d, out + idx);
+    }
+  }
+
+  // `count` was a multiple of the vector length `N`: already done.
+  if (HWY_UNLIKELY(idx == count)) return;
+
+  const size_t remaining = count - idx;
+  HWY_DASSERT(0 != remaining && remaining < N);
+  hn::Vec<D> v1;
+  if constexpr (std::is_same_v<hn::Vec<D>, T1>) {
+    v1 = in1;
+  } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T1>) {
+    v1 = hn::LoadN(d, in1 + idx, remaining);
+  } else {
+    static_assert(sizeof(T1) == -1, "invalid T1");
+  }
+  hn::Vec<D> v2;
+  if constexpr (std::is_same_v<hn::Vec<D>, T2>) {
+    v2 = in2;
+  } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T2>) {
+    v2 = LoadN(d, in2 + idx, remaining);
+  } else {
+    static_assert(sizeof(T2) == -1, "invalid T2");
+  }
+  hn::Vec<D> v3;
+  if constexpr (std::is_same_v<hn::Vec<D>, T3>) {
+    v3 = in3;
+  } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T3>) {
+    v3 = LoadN(d, in3 + idx, remaining);
+  } else {
+    static_assert(sizeof(T3) == -1, "invalid T2");
+  }
+  hn::StoreN(func(d, v1, v2, v3), d, out + idx, remaining);
+}
+
+template <class D, typename T2, typename T3, typename OUT = hn::TFromD<D>>
+void do_select(D d, Vector<Bit> cond, T2 in2, T3 in3, size_t count, OUT* out) {
+  const size_t N = hn::Lanes(d);
+  size_t idx = 0;
+  if (count >= N) {
+    for (; idx <= count - N; idx += N) {
+      hn::Vec<D> v2;
+      if constexpr (std::is_same_v<hn::Vec<D>, T2>) {
+        v2 = in2;
+      } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T2>) {
+        v2 = hn::LoadU(d, in2 + idx);
+      } else {
+        static_assert(sizeof(T2) == -1, "invalid T2");
+      }
+      hn::Vec<D> v3;
+      if constexpr (std::is_same_v<hn::Vec<D>, T3>) {
+        v3 = in3;
+      } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T3>) {
+        v3 = hn::LoadU(d, in3 + idx);
+      } else {
+        static_assert(sizeof(T3) == -1, "invalid T2");
+      }
+      size_t bits_byte_cursor = idx / 8;
+      size_t bits_cursor = idx % 8;
+      hn::Vec<D> result;
+      if (bits_cursor > 0) {
+        uint8_t tmp_bits[8];
+        tmp_bits[0] = cond.Data()[bits_byte_cursor];
+        tmp_bits[0] = (tmp_bits[0] >> bits_cursor);
+        auto mask = hn::LoadMaskBits(d, tmp_bits);
+        result = hn::IfThenElse(mask, v2, v3);
+      } else {
+        auto mask = hn::LoadMaskBits(d, cond.Data() + bits_byte_cursor);
+        result = hn::IfThenElse(mask, v2, v3);
+      }
+      hn::StoreU(result, d, out + idx);
+    }
+  }
+
+  // `count` was a multiple of the vector length `N`: already done.
+  if (HWY_UNLIKELY(idx == count)) return;
+
+  const size_t remaining = count - idx;
+  HWY_DASSERT(0 != remaining && remaining < N);
+
+  hn::Vec<D> v2;
+  if constexpr (std::is_same_v<hn::Vec<D>, T2>) {
+    v2 = in2;
+  } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T2>) {
+    v2 = LoadN(d, in2 + idx, remaining);
+  } else {
+    static_assert(sizeof(T2) == -1, "invalid T2");
+  }
+  hn::Vec<D> v3;
+  if constexpr (std::is_same_v<hn::Vec<D>, T3>) {
+    v3 = in3;
+  } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T3>) {
+    v3 = LoadN(d, in3 + idx, remaining);
+  } else {
+    static_assert(sizeof(T3) == -1, "invalid T2");
+  }
+  size_t bits_byte_cursor = idx / 8;
+  size_t bits_cursor = idx % 8;
+  hn::Vec<D> result;
+  if (bits_cursor > 0) {
+    uint8_t tmp_bits[8];
+    tmp_bits[0] = cond.Data()[bits_byte_cursor];
+    tmp_bits[0] = (tmp_bits[0] >> bits_cursor);
+    auto mask = hn::LoadMaskBits(d, tmp_bits);
+    result = hn::IfThenElse(mask, v2, v3);
+  } else {
+    auto mask = hn::LoadMaskBits(d, cond.Data() + bits_byte_cursor);
+    result = hn::IfThenElse(mask, v2, v3);
+  }
+  hn::StoreN(result, d, out + idx, remaining);
+}
+
+template <class D, OpToken op, typename V = hn::VFromD<D>>
+static inline auto HWY_ATTR do_simd_unary_op(D d, V lv) {
   if constexpr (op == OP_SQRT) {
     return hn::Sqrt(lv);
   } else if constexpr (op == OP_FLOOR) {
@@ -91,55 +339,38 @@ static inline auto do_simd_unary_op(V lv) {
   } else if constexpr (op == OP_NOT) {
     return hn::Not(lv);
   } else if constexpr (op == OP_COS) {
-    constexpr hn::DFromV<V> d;
     return hn::Cos(d, lv);
   } else if constexpr (op == OP_SIN) {
-    constexpr hn::DFromV<V> d;
     return hn::Sin(d, lv);
   } else if constexpr (op == OP_SINH) {
-    constexpr hn::DFromV<V> d;
     return hn::Sinh(d, lv);
   } else if constexpr (op == OP_ASIN) {
-    constexpr hn::DFromV<V> d;
     return hn::Asin(d, lv);
   } else if constexpr (op == OP_ACOS) {
-    constexpr hn::DFromV<V> d;
     return hn::Acos(d, lv);
   } else if constexpr (op == OP_ATANH) {
-    constexpr hn::DFromV<V> d;
     return hn::Atanh(d, lv);
   } else if constexpr (op == OP_SINH) {
-    constexpr hn::DFromV<V> d;
     return hn::Sinh(d, lv);
   } else if constexpr (op == OP_TANH) {
-    constexpr hn::DFromV<V> d;
     return hn::Tanh(d, lv);
   } else if constexpr (op == OP_ASINH) {
-    constexpr hn::DFromV<V> d;
     return hn::Asinh(d, lv);
   } else if constexpr (op == OP_ACOSH) {
-    constexpr hn::DFromV<V> d;
     return hn::Acosh(d, lv);
   } else if constexpr (op == OP_EXP) {
-    constexpr hn::DFromV<V> d;
     return hn::Exp(d, lv);
   } else if constexpr (op == OP_EXP2) {
-    constexpr hn::DFromV<V> d;
     return hn::Exp2(d, lv);
   } else if constexpr (op == OP_EXPM1) {
-    constexpr hn::DFromV<V> d;
     return hn::Expm1(d, lv);
   } else if constexpr (op == OP_LOG) {
-    constexpr hn::DFromV<V> d;
     return hn::Log(d, lv);
   } else if constexpr (op == OP_LOG2) {
-    constexpr hn::DFromV<V> d;
     return hn::Log2(d, lv);
   } else if constexpr (op == OP_LOG10) {
-    constexpr hn::DFromV<V> d;
     return hn::Log10(d, lv);
   } else if constexpr (op == OP_LOG1P) {
-    constexpr hn::DFromV<V> d;
     return hn::Log1p(d, lv);
   } else if constexpr (op == OP_CEIL) {
     return hn::Ceil(lv);
@@ -148,20 +379,22 @@ static inline auto do_simd_unary_op(V lv) {
   }
 }
 
-template <typename T, OpToken op, bool is_bit>
-static inline auto do_simd_binary_op(T lv, T rv) {
+template <class D, OpToken op, typename V = hn::VFromD<D>>
+static inline auto HWY_ATTR do_simd_binary_op(D d, V lv, V rv) {
   if constexpr (op == OP_PLUS || op == OP_PLUS_ASSIGN) {
-    if constexpr (is_bit) {
-      return hn::Or(lv, rv);
-    } else {
-      return hn::Add(lv, rv);
-    }
+    // if constexpr (is_bit) {
+    //   return hn::Or(lv, rv);
+    // } else {
+    //   return hn::Add(lv, rv);
+    // }
+    return hn::Add(lv, rv);
   } else if constexpr (op == OP_MINUS || op == OP_MINUS_ASSIGN) {
-    if constexpr (is_bit) {
-      return hn::And(lv, hn::Not(rv));
-    } else {
-      return hn::Sub(lv, rv);
-    }
+    // if constexpr (is_bit) {
+    //   return hn::And(lv, hn::Not(rv));
+    // } else {
+    //   return hn::Sub(lv, rv);
+    // }
+    return hn::Sub(lv, rv);
   } else if constexpr (op == OP_MULTIPLY || op == OP_MULTIPLY_ASSIGN) {
     return hn::Mul(lv, rv);
   } else if constexpr (op == OP_DIVIDE || op == OP_DIVIDE_ASSIGN) {
@@ -189,140 +422,52 @@ static inline auto do_simd_binary_op(T lv, T rv) {
   } else if constexpr (op == OP_MIN) {
     return hn::Min(lv, rv);
   } else if constexpr (op == OP_HYPOT) {
-    constexpr hn::DFromV<T> d;
     return hn::Hypot(d, lv, rv);
   } else if constexpr (op == OP_ATAN2) {
-    constexpr hn::DFromV<T> d;
     return hn::Atan2(d, lv, rv);
   } else if constexpr (op == OP_POW) {
-    if constexpr (std::is_same_v<hn::TFromV<T>, float>) {
+    if constexpr (std::is_same_v<hn::TFromV<V>, float>) {
+#ifdef __AVX2__
+      auto val = Sleef_powf8_u10(lv.raw, rv.raw);
+      return V{val};
+#else
       auto val = Sleef_powf4_u10(lv.raw, rv.raw);
-      return T{val};
+      return V{val};
+#endif
     } else {
+#ifdef __AVX2__
+      auto val = Sleef_powd4_u10(lv.raw, rv.raw);
+      return V{val};
+#else
       auto val = Sleef_powd2_u10(lv.raw, rv.raw);
-      return T{val};
+      return V{val};
+#endif
     }
-
   } else {
-    static_assert(sizeof(T) == -1, "unsupported op");
+    static_assert(sizeof(V) == -1, "unsupported op");
   }
 }
 
-template <typename R, typename T, OpToken op>
-static inline auto do_simd_ternary_op(R a, T b, T c) {
+template <class D, OpToken op, typename V = hn::VFromD<D>>
+static inline auto HWY_ATTR do_simd_ternary_op(D d, V a, V b, V c) {
   if constexpr (op == OP_CLAMP) {
     return hn::Clamp(a, b, c);
   } else if constexpr (op == OP_CONDITIONAL) {
     return hn::IfThenElse(a, b, c);
   } else if constexpr (op == OP_FMA) {
     return hn::MulAdd(a, b, c);
-  } else if constexpr (op == OP_MULSUB) {
+  } else if constexpr (op == OP_FMS) {
     return hn::MulSub(a, b, c);
   } else if constexpr (op == OP_MULADDSUB) {
     return hn::MulAddSub(a, b, c);
-  } else if constexpr (op == OP_NEG_MULADD) {
+  } else if constexpr (op == OP_FNMA) {
     return hn::NegMulAdd(a, b, c);
-  } else if constexpr (op == OP_NEG_MULSUB) {
+  } else if constexpr (op == OP_FNMS) {
     return hn::NegMulSub(a, b, c);
   } else {
-    static_assert(sizeof(T) == -1, "unsupported op");
+    static_assert(sizeof(V) == -1, "unsupported op");
   }
 }
-
-template <typename T, OpToken op>
-static inline auto do_residue_op(T lv, T rv) {
-  if constexpr (op == OP_PLUS) {
-    return lv + rv;
-  } else if constexpr (op == OP_MINUS) {
-    return lv - rv;
-  } else if constexpr (op == OP_MULTIPLY) {
-    return lv * rv;
-  } else if constexpr (op == OP_DIVIDE) {
-    return lv / rv;
-  } else if constexpr (op == OP_MOD) {
-    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
-      static_assert(sizeof(T) == -1, "can not do mod on floats");
-    } else {
-      return lv % rv;
-    }
-  } else if constexpr (op == OP_LOGIC_OR) {
-    return Bit(lv || rv);
-  } else if constexpr (op == OP_LOGIC_AND) {
-    return Bit(lv && rv);
-  } else if constexpr (op == OP_GREATER) {
-    return Bit(lv > rv);
-  } else if constexpr (op == OP_GREATER_EQUAL) {
-    return Bit(lv >= rv);
-  } else if constexpr (op == OP_LESS) {
-    return Bit(lv < rv);
-  } else if constexpr (op == OP_LESS_EQUAL) {
-    return Bit(lv <= rv);
-  } else if constexpr (op == OP_EQUAL) {
-    return Bit(lv == rv);
-  } else if constexpr (op == OP_NOT_EQUAL) {
-    return Bit(lv != rv);
-  } else {
-    static_assert(sizeof(T) == -1, "unsupported op");
-  }
-}
-
-template <typename T>
-class VectorDataHelper {
- public:
-  using D = hn::ScalableTag<T>;
-  VectorDataHelper(void* data) { data_ = reinterpret_cast<uint8_t*>(data); }
-
-  void AddMask(hn::Mask<D> mask) {
-    constexpr uint32_t lanes = hn::Lanes(D());
-    if constexpr (lanes < 8) {
-      if (bit_cursor_ > 0) {
-        uint8_t tmp[8];
-        hn::StoreMaskBits(d, mask, tmp);
-        tmp[0] = (tmp[0] << bit_cursor_);
-        data_[cursor_] = (tmp[0] | data_[cursor_]);
-      } else {
-        hn::StoreMaskBits(d, mask, data_ + cursor_);
-      }
-      bit_cursor_ += lanes;
-      if (bit_cursor_ == 8) {
-        bit_cursor_ = 0;
-        cursor_++;
-      }
-    } else {
-      size_t n = hn::StoreMaskBits(d, mask, data_ + cursor_);
-      cursor_ += n;
-    }
-  }
-  void Add(typename hn::VFromD<D> temp) {
-    hn::StoreU(temp, d, reinterpret_cast<T*>(data_ + cursor_));
-    cursor_ += (hn::Lanes(d) * sizeof(T));
-  }
-
-  void AddResidue(T v) {
-    RUDF_INFO("AddResidue:{}", v);
-    *(reinterpret_cast<T*>(data_ + cursor_)) = v;
-    cursor_ += sizeof(T);
-  }
-
-  void AddResidue(Bit v) {
-    if (v) {
-      data_[cursor_] = bit_set(data_[cursor_], bit_cursor_);
-    } else {
-      data_[cursor_] = bit_clear(data_[cursor_], bit_cursor_);
-    }
-    bit_cursor_++;
-    if (bit_cursor_ % 8 == 0) {
-      cursor_++;
-      bit_cursor_ = 0;
-    }
-  }
-
- private:
-  uint8_t* data_ = nullptr;
-  size_t cursor_ = 0;
-  uint32_t bit_cursor_ = 0;
-  hn::ScalableTag<T> d;
-};
 
 template <typename T>
 static auto get_constant(T v) {
@@ -355,43 +500,27 @@ static inline bool do_string_view_cmp(StringView lv, StringView rv) {
 template <typename T, typename R, OpToken op>
 Vector<R> simd_vector_binary_scalar_op(Context& ctx, Vector<T> left, T right, bool reverse) {
   using number_t = typename InternalType<T>::internal_type;
-  constexpr bool is_bit = std::is_same_v<T, Bit>;
+  // constexpr bool is_bit = std::is_same_v<T, Bit>;
   const hn::ScalableTag<number_t> d;
-  constexpr auto lanes = hn::Lanes(d);
-  using MaskType = hn::Mask<decltype(d)>;
+  // constexpr auto lanes = hn::Lanes(d);
+  using output_t = typename InternalType<R>::internal_type;
 
   VectorData result_data;
-  // if constexpr (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN
-  // ||
-  //               op == OP_MOD_ASSIGN) {
-  //   result_data = left.RawData();
-  // } else {
-  // }
-
   if (ctx.IsTemporary(left)) {
     result_data = left.RawData();
   } else {
     result_data = ctx.NewSimdVector<R>(get_lanes<R>(), left.Size());
   }
 
-  VectorDataHelper<number_t> helper(result_data.MutableData<R>());
   auto rv = hn::Set(d, get_constant(right));
-  size_t i = 0;
-  for (; (i) < left.Size(); i += lanes) {
-    auto lv = hn::LoadU(d, left.Data() + i);
-    auto temp = do_simd_binary_op<decltype(lv), op, is_bit>(reverse ? rv : lv, reverse ? lv : rv);
-    if constexpr (std::is_same_v<MaskType, decltype(temp)>) {
-      helper.AddMask(temp);
-    } else {
-      helper.Add(temp);
-    }
+  if (reverse) {
+    do_transform(d, rv, left.Data(), left.ElementSize(), result_data.MutableData<output_t>(),
+                 do_simd_binary_op<decltype(d), op>);
+  } else {
+    do_transform(d, left.Data(), rv, left.ElementSize(), result_data.MutableData<output_t>(),
+                 do_simd_binary_op<decltype(d), op>);
   }
-  // if (i < left.Size()) {
-  //   for (; i < left.Size(); i++) {
-  //     DO_RESIDUE_OP(op, left[i], right[i], [&]() { helper.AddResidue(temp); });
-  //   }
-  // }
-  // VectorData result_data(arena_data, result_size);
+
   return Vector<R>(result_data);
 }
 
@@ -479,18 +608,11 @@ Vector<R> simd_vector_binary_op(Context& ctx, Vector<T> left, Vector<T> right) {
     return simd_vector_string_cmp<op>(ctx, left, right);
   } else {
     using number_t = typename InternalType<T>::internal_type;
-    constexpr bool is_bit = std::is_same_v<T, Bit>;
+    using output_t = typename InternalType<R>::internal_type;
+    // constexpr bool is_bit = std::is_same_v<T, Bit>;
     const hn::ScalableTag<number_t> d;
-    constexpr auto lanes = hn::Lanes(d);
-    using MaskType = hn::Mask<decltype(d)>;
+    // constexpr auto lanes = hn::Lanes(d);
     VectorData result_data;
-    size_t i = 0;
-    // if constexpr (op == OP_PLUS_ASSIGN || op == OP_MINUS_ASSIGN || op == OP_MULTIPLY_ASSIGN || op == OP_DIVIDE_ASSIGN
-    // ||
-    //               op == OP_MOD_ASSIGN) {
-    //   result_data = left.RawData();
-    // } else {
-    // }
     if (ctx.IsTemporary(left)) {
       result_data = left.RawData();
     } else if (ctx.IsTemporary(right)) {
@@ -498,63 +620,54 @@ Vector<R> simd_vector_binary_op(Context& ctx, Vector<T> left, Vector<T> right) {
     } else {
       result_data = ctx.NewSimdVector<R>(get_lanes<R>(), left.Size());
     }
+    do_transform(d, left.Data(), right.Data(), left.ElementSize(), result_data.MutableData<output_t>(),
+                 do_simd_binary_op<decltype(d), op>);
 
-    VectorDataHelper<number_t> helper(result_data.MutableData<R>());
-    for (; (i) < left.Size(); i += lanes) {
-      auto lv = hn::LoadU(d, left.Data() + i);
-      auto rv = hn::LoadU(d, right.Data() + i);
-      auto temp = do_simd_binary_op<decltype(lv), op, is_bit>(lv, rv);
-      if constexpr (std::is_same_v<MaskType, decltype(temp)>) {
-        helper.AddMask(temp);
-      } else {
-        helper.Add(temp);
-      }
-    }
     return Vector<R>(result_data);
   }
 }
 
-template <typename T, OpToken logic, OpToken cmp>
-Vector<Bit> simd_vector_logic_cmp(Context& ctx, Vector<T> left, absl::Span<const T> right) {
-  using number_t = typename InternalType<T>::internal_type;
-  const hn::ScalableTag<number_t> d;
-  using Vec = hn::Vec<decltype(d)>;
-  using MaskType = hn::Mask<decltype(d)>;
-  constexpr auto lanes = hn::Lanes(d);
-  std::vector<Vec> right_vals;
-  for (auto v : right) {
-    right_vals.emplace_back(hn::Set(d, v));
-  }
-  VectorData result_data;
-  if (ctx.IsTemporary(left)) {
-    result_data = left.RawData();
-  } else {
-    // result_data = arena_new_vector<Bit>(left.Size());
-    result_data = ctx.NewSimdVector<Bit>(get_lanes<Bit>(), left.Size());
-  }
-  VectorDataHelper<T> helper(result_data.MutableData<Bit>());
-  size_t i = 0;
-  for (; (i) < left.Size(); i += lanes) {
-    auto lv = hn::LoadU(d, left.Data() + i);
-    MaskType mask;
-    for (size_t j = 0; j < right_vals.size(); j++) {
-      auto cmp_mask = do_simd_binary_op<decltype(lv), cmp, false>(lv, right_vals[j]);
-      if (j == 0) {
-        mask = cmp_mask;
-      } else {
-        if constexpr (logic == OP_LOGIC_AND) {
-          mask = hn::And(cmp_mask, mask);
-        } else if constexpr (logic == OP_LOGIC_OR) {
-          mask = hn::Or(cmp_mask, mask);
-        } else {
-          static_assert(sizeof(T) == -1, "unsupported logic op");
-        }
-      }
-    }
-    helper.AddMask(mask);
-  }
-  return Vector<Bit>(result_data);
-}
+// template <typename T, OpToken logic, OpToken cmp>
+// Vector<Bit> simd_vector_logic_cmp(Context& ctx, Vector<T> left, absl::Span<const T> right) {
+//   using number_t = typename InternalType<T>::internal_type;
+//   const hn::ScalableTag<number_t> d;
+//   using Vec = hn::Vec<decltype(d)>;
+//   using MaskType = hn::Mask<decltype(d)>;
+//   constexpr auto lanes = hn::Lanes(d);
+//   std::vector<Vec> right_vals;
+//   for (auto v : right) {
+//     right_vals.emplace_back(hn::Set(d, v));
+//   }
+//   VectorData result_data;
+//   if (ctx.IsTemporary(left)) {
+//     result_data = left.RawData();
+//   } else {
+//     // result_data = arena_new_vector<Bit>(left.Size());
+//     result_data = ctx.NewSimdVector<Bit>(get_lanes<Bit>(), left.Size());
+//   }
+//   VectorDataHelper<T> helper(result_data.MutableData<Bit>());
+//   size_t i = 0;
+//   for (; (i) < left.Size(); i += lanes) {
+//     auto lv = hn::LoadU(d, left.Data() + i);
+//     MaskType mask;
+//     for (size_t j = 0; j < right_vals.size(); j++) {
+//       auto cmp_mask = do_simd_binary_op<decltype(lv), cmp, false>(lv, right_vals[j]);
+//       if (j == 0) {
+//         mask = cmp_mask;
+//       } else {
+//         if constexpr (logic == OP_LOGIC_AND) {
+//           mask = hn::And(cmp_mask, mask);
+//         } else if constexpr (logic == OP_LOGIC_OR) {
+//           mask = hn::Or(cmp_mask, mask);
+//         } else {
+//           static_assert(sizeof(T) == -1, "unsupported logic op");
+//         }
+//       }
+//     }
+//     helper.AddMask(mask);
+//   }
+//   return Vector<Bit>(result_data);
+// }
 
 template <typename T, typename D>
 static inline auto select_ternary_value(Vector<Bit> cond, hn::VFromD<D> true_val, hn::VFromD<D> false_val, size_t i) {
@@ -585,7 +698,6 @@ Vector<T> simd_vector_ternary_op(Context& ctx, Vector<R> a, Vector<T> b, Vector<
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
-  size_t i = 0;
   VectorData result_data;
   if (ctx.IsTemporary(a) && a.BytesCapacity() >= sizeof(number_t) * a.Size()) {
     result_data = a.RawData();
@@ -597,20 +709,13 @@ Vector<T> simd_vector_ternary_op(Context& ctx, Vector<R> a, Vector<T> b, Vector<
     // result_data = arena_new_vector<T>(a.Size());
     result_data = ctx.NewSimdVector<number_t>(lanes, a.Size());
   }
-  VectorDataHelper<number_t> helper(result_data.MutableData<T>());
-  for (; (i) < a.Size(); i += lanes) {
-    if constexpr (op == OP_CONDITIONAL) {
-      auto true_v = hn::LoadU(d, b.Data() + i);
-      auto false_v = hn::LoadU(d, c.Data() + i);
-      helper.Add(select_ternary_value<T, decltype(d)>(a, true_v, false_v, i));
-    } else {
-      auto av = hn::LoadU(d, a.Data() + i);
-      auto bv = hn::LoadU(d, b.Data() + i);
-      auto cv = hn::LoadU(d, c.Data() + i);
-      auto temp = do_simd_ternary_op<decltype(av), decltype(bv), op>(av, bv, cv);
-      helper.Add(temp);
-    }
+  if constexpr (op == OP_CONDITIONAL) {
+    do_select(d, a, b.Data(), c.Data(), b.Size(), result_data.MutableData<number_t>());
+  } else {
+    do_transform(d, a.Data(), b.Data(), c.Data(), b.Size(), result_data.MutableData<number_t>(),
+                 do_simd_ternary_op<decltype(d), op>);
   }
+
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
@@ -621,7 +726,6 @@ Vector<T> simd_vector_ternary_vector_vector_scalar_op(Context& ctx, Vector<R> a,
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
-  size_t i = 0;
   VectorData result_data;
   if (ctx.IsTemporary(a) && a.BytesCapacity() >= sizeof(number_t) * a.Size()) {
     result_data = a.RawData();
@@ -632,18 +736,13 @@ Vector<T> simd_vector_ternary_vector_vector_scalar_op(Context& ctx, Vector<R> a,
     result_data = ctx.NewSimdVector<number_t>(lanes, a.Size());
   }
   auto cv = hn::Set(d, get_constant(c));
-  VectorDataHelper<number_t> helper(result_data.MutableData<T>());
-  for (; (i) < a.Size(); i += lanes) {
-    if constexpr (op == OP_CONDITIONAL) {
-      auto true_v = hn::LoadU(d, b.Data() + i);
-      helper.Add(select_ternary_value<T, decltype(d)>(a, true_v, cv, i));
-    } else {
-      auto av = hn::LoadU(d, a.Data() + i);
-      auto bv = hn::LoadU(d, b.Data() + i);
-      auto temp = do_simd_ternary_op<decltype(av), decltype(bv), op>(av, bv, cv);
-      helper.Add(temp);
-    }
+  if constexpr (op == OP_CONDITIONAL) {
+    do_select(d, a, b.Data(), cv, b.Size(), result_data.MutableData<number_t>());
+  } else {
+    do_transform(d, a.Data(), b.Data(), cv, b.Size(), result_data.MutableData<number_t>(),
+                 do_simd_ternary_op<decltype(d), op>);
   }
+
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
@@ -654,7 +753,7 @@ Vector<T> simd_vector_ternary_vector_scalar_vector_op(Context& ctx, Vector<R> a,
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
-  size_t i = 0;
+
   VectorData result_data;
   if (ctx.IsTemporary(a) && a.BytesCapacity() >= sizeof(T) * a.Size()) {
     result_data = a.RawData();
@@ -665,17 +764,13 @@ Vector<T> simd_vector_ternary_vector_scalar_vector_op(Context& ctx, Vector<R> a,
     result_data = ctx.NewSimdVector<number_t>(lanes, a.Size());
   }
   auto bv = hn::Set(d, get_constant(b));
-  VectorDataHelper<number_t> helper(result_data.MutableData<T>());
-  for (; (i) < a.Size(); i += lanes) {
-    auto cv = hn::LoadU(d, c.Data() + i);
-    if constexpr (op == OP_CONDITIONAL) {
-      helper.Add(select_ternary_value<T, decltype(d)>(a, bv, cv, i));
-    } else {
-      auto av = hn::LoadU(d, a.Data() + i);
-      auto temp = do_simd_ternary_op<decltype(av), decltype(av), op>(av, bv, cv);
-      helper.Add(temp);
-    }
+  if constexpr (op == OP_CONDITIONAL) {
+    do_select(d, a, bv, c.Data(), a.Size(), result_data.MutableData<number_t>());
+  } else {
+    do_transform(d, a.Data(), bv, c.Data(), a.Size(), result_data.MutableData<number_t>(),
+                 do_simd_ternary_op<decltype(d), op>);
   }
+
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
@@ -683,7 +778,7 @@ Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Context& ctx, Vector<R> a,
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
-  size_t i = 0;
+
   VectorData result_data;
   if (ctx.IsTemporary(a) && a.BytesCapacity() >= sizeof(T) * a.Size()) {
     result_data = a.RawData();
@@ -693,16 +788,13 @@ Vector<T> simd_vector_ternary_vector_scalar_scalar_op(Context& ctx, Vector<R> a,
   }
   auto bv = hn::Set(d, get_constant(b));
   auto cv = hn::Set(d, get_constant(c));
-  VectorDataHelper<number_t> helper(result_data.MutableData<T>());
-  for (; (i) < a.Size(); i += lanes) {
-    if constexpr (op == OP_CONDITIONAL) {
-      helper.Add(select_ternary_value<T, decltype(d)>(a, bv, cv, i));
-    } else {
-      auto av = hn::LoadU(d, a.Data() + i);
-      auto temp = do_simd_ternary_op<decltype(av), decltype(bv), op>(av, bv, cv);
-      helper.Add(temp);
-    }
+  if constexpr (op == OP_CONDITIONAL) {
+    do_select(d, a, bv, cv, a.Size(), result_data.MutableData<number_t>());
+  } else {
+    do_transform(d, a.Data(), bv, cv, a.Size(), result_data.MutableData<number_t>(),
+                 do_simd_ternary_op<decltype(d), op>);
   }
+
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
@@ -713,7 +805,6 @@ Vector<T> simd_vector_ternary_scalar_vector_vector_op(Context& ctx, R a, Vector<
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
-  size_t i = 0;
   VectorData result_data;
   if (ctx.IsTemporary(b)) {
     result_data = b.RawData();
@@ -724,13 +815,8 @@ Vector<T> simd_vector_ternary_scalar_vector_vector_op(Context& ctx, R a, Vector<
     result_data = ctx.NewSimdVector<number_t>(lanes, b.Size());
   }
   auto av = hn::Set(d, get_constant(a));
-  VectorDataHelper<number_t> helper(result_data.MutableData<T>());
-  for (; (i) < b.Size(); i += lanes) {
-    auto cv = hn::LoadU(d, c.Data() + i);
-    auto bv = hn::LoadU(d, b.Data() + i);
-    auto temp = do_simd_ternary_op<decltype(av), decltype(av), op>(av, bv, cv);
-    helper.Add(temp);
-  }
+  do_transform(d, av, b.Data(), c.Data(), b.Size(), result_data.MutableData<number_t>(),
+               do_simd_ternary_op<decltype(d), op>);
 
   return Vector<T>(result_data);
 }
@@ -739,7 +825,6 @@ Vector<T> simd_vector_ternary_scalar_scalar_vector_op(Context& ctx, R a, T b, Ve
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
-  size_t i = 0;
   VectorData result_data;
   if (ctx.IsTemporary(c)) {
     result_data = c.RawData();
@@ -749,12 +834,8 @@ Vector<T> simd_vector_ternary_scalar_scalar_vector_op(Context& ctx, R a, T b, Ve
   }
   auto av = hn::Set(d, get_constant(a));
   auto bv = hn::Set(d, get_constant(b));
-  VectorDataHelper<number_t> helper(result_data.MutableData<T>());
-  for (; (i) < c.Size(); i += lanes) {
-    auto cv = hn::LoadU(d, c.Data() + i);
-    auto temp = do_simd_ternary_op<decltype(av), decltype(av), op>(av, bv, cv);
-    helper.Add(temp);
-  }
+  do_transform(d, av, bv, c.Data(), c.Size(), result_data.MutableData<number_t>(), do_simd_ternary_op<decltype(d), op>);
+
   return Vector<T>(result_data);
 }
 template <typename R, typename T, OpToken op>
@@ -762,7 +843,6 @@ Vector<T> simd_vector_ternary_scalar_vector_scalar_op(Context& ctx, R a, Vector<
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
-  size_t i = 0;
   VectorData result_data;
   if (ctx.IsTemporary(b)) {
     result_data = b.RawData();
@@ -772,12 +852,8 @@ Vector<T> simd_vector_ternary_scalar_vector_scalar_op(Context& ctx, R a, Vector<
   }
   auto av = hn::Set(d, get_constant(a));
   auto cv = hn::Set(d, get_constant(c));
-  VectorDataHelper<number_t> helper(result_data.MutableData<T>());
-  for (; (i) < b.Size(); i += lanes) {
-    auto bv = hn::LoadU(d, b.Data() + i);
-    auto temp = do_simd_ternary_op<decltype(av), decltype(av), op>(av, bv, cv);
-    helper.Add(temp);
-  }
+  do_transform(d, av, b.Data(), cv, b.Size(), result_data.MutableData<number_t>(), do_simd_ternary_op<decltype(d), op>);
+
   return Vector<T>(result_data);
 }
 
@@ -786,20 +862,14 @@ Vector<T> simd_vector_unary_op(Context& ctx, Vector<T> left) {
   using number_t = typename InternalType<T>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);
-  size_t i = 0;
   VectorData result_data;
   if (ctx.IsTemporary(left)) {
     result_data = left.RawData();
   } else {
-    // result_data = arena_new_vector<T>(left.Size());
     result_data = ctx.NewSimdVector<number_t>(lanes, left.Size());
   }
-  VectorDataHelper<number_t> helper(result_data.MutableData<T>());
-  for (; (i) < left.Size(); i += lanes) {
-    auto lv = hn::LoadU(d, left.Data() + i);
-    auto temp = do_simd_unary_op<decltype(lv), op>(lv);
-    helper.Add(temp);
-  }
+  do_transform(d, left.Data(), left.ElementSize(), result_data.MutableData<number_t>(),
+               do_simd_unary_op<decltype(d), op>);
   return Vector<T>(result_data);
 }
 
@@ -978,13 +1048,12 @@ DEFINE_SIMD_TERNARY_COND_OP(float, double, uint64_t, int64_t, uint32_t, int32_t,
 DEFINE_SIMD_TERNARY_OP(OP_CLAMP, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
                        int8_t);
 DEFINE_SIMD_TERNARY_OP(OP_FMA, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
-DEFINE_SIMD_TERNARY_OP(OP_MULSUB, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
-                       int8_t);
+DEFINE_SIMD_TERNARY_OP(OP_FMS, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 DEFINE_SIMD_TERNARY_OP(OP_MULADDSUB, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
                        int8_t);
-DEFINE_SIMD_TERNARY_OP(OP_NEG_MULADD, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
+DEFINE_SIMD_TERNARY_OP(OP_FNMA, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
                        int8_t);
-DEFINE_SIMD_TERNARY_OP(OP_NEG_MULSUB, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
+DEFINE_SIMD_TERNARY_OP(OP_FNMS, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
                        int8_t);
 
 #define DEFINE_SIMD_DOT_OP_TEMPLATE(r, op, ii, TYPE) \
@@ -1010,7 +1079,7 @@ DEFINE_SIMD_CLONE_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_SUM_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_SUM_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 
-template Vector<Bit> simd_vector_logic_cmp<float, OP_LOGIC_OR, OP_EQUAL>(Context& ctx, Vector<float> left,
-                                                                         absl::Span<const float> right);
+// template Vector<Bit> simd_vector_logic_cmp<float, OP_LOGIC_OR, OP_EQUAL>(Context& ctx, Vector<float> left,
+//                                                                          absl::Span<const float> right);
 }  // namespace simd
 }  // namespace rapidudf

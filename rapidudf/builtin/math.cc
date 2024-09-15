@@ -67,6 +67,7 @@ static void register_abs() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_ABS, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
+  register_builtin_function_op(func_name, OP_ABS);
 }
 
 template <typename T>
@@ -164,6 +165,7 @@ template <typename T>
 static void register_log1p() {
   T (*abs_f)(T) = &std::log1p;
   DType dtype = get_dtype<T>();
+
   std::string func_name = GetFunctionName(OP_LOG1P, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
 }
@@ -286,6 +288,7 @@ static void register_max() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_MAX, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
+  register_builtin_function_op(func_name, OP_MAX);
 }
 template <typename T>
 static T scalar_min(T left, T right) {
@@ -297,6 +300,7 @@ static void register_min() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_MIN, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
+  register_builtin_function_op(func_name, OP_MIN);
 }
 
 template <typename T>
@@ -337,6 +341,8 @@ void init_builtin_math_funcs() {
 
   REGISTER_MATH_FUNCS(register_abs, float, double, int64_t, int32_t)
   REGISTER_MATH_FUNCS(register_max, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t,
+                      uint8_t)
+  REGISTER_MATH_FUNCS(register_min, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t,
                       uint8_t)
   REGISTER_MATH_FUNCS(register_pow, float, double)
   REGISTER_MATH_FUNCS(register_ceil, float, double)

@@ -35,13 +35,10 @@
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
-using namespace rapidudf::ast;
 
 TEST(JitCompiler, vector_size) {
-  spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  ParseContext ctx;
   std::string content = R"(
     int test_f(int x){
        return x+1;

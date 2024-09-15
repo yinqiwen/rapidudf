@@ -47,7 +47,7 @@ absl::Status ChoiceStatement::Validate(ParseContext& ctx) {
   if (!result.ok()) {
     return result.status();
   }
-  if (!result->dtype.IsBool()) {
+  if (!result->dtype.IsBit()) {
     return ctx.GetErrorStatus(fmt::format("Can NOT do if/elif/while on non bool expression:{}", result.value().dtype));
   }
   return check_statements(ctx, statements);

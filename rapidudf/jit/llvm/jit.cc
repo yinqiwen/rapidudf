@@ -159,6 +159,7 @@ void JitCompiler::NewSession(bool print_asm) {
 
   auto func_pass_manager = pass_builder.buildFunctionSimplificationPipeline(
       ::llvm::OptimizationLevel::O2, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
+
   session_->func_pass_manager = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
   session_->func_pass_manager->addPass(::llvm::InstCombinePass());
   session_->func_pass_manager->addPass(::llvm::ReassociatePass());
@@ -275,7 +276,7 @@ absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& fun
 }
 
 absl::Status JitCompiler::CompileExpression(const std::string& expr, ast::Function& function) {
-  auto f = ast::parse_expression_ast(ast_ctx_, expr);
+  auto f = ast::parse_expression_ast(ast_ctx_, expr, function.ToFuncDesc());
   if (!f.ok()) {
     RUDF_LOG_ERROR_STATUS(f.status());
   }

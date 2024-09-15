@@ -81,12 +81,12 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
         if (left->GetDType().IsSimdVector() || right->GetDType().IsSimdVector()) {
           auto func_name = GetFunctionName(op, left->GetDType(), right->GetDType());
           std::vector<ValuePtr> args{left, right};
-          // if (left->GetDType().IsSimdVector() && (op >= OP_PLUS_ASSIGN && op <= OP_MOD_ASSIGN)) {
-          //   auto status = left->SetSimdVectorTemporary(true);
-          //   if (!status.ok()) {
-          //     return status;
-          //   }
-          // }
+          if (left->GetDType().IsSimdVector() && (op >= OP_PLUS_ASSIGN && op <= OP_MOD_ASSIGN)) {
+            auto status = left->SetSimdVectorTemporary(true);
+            if (!status.ok()) {
+              return status;
+            }
+          }
           auto call_result = CallFunction(func_name, args);
           if (!call_result.ok()) {
             return call_result.status();

@@ -30,11 +30,14 @@
 */
 #include "rapidudf/ast/context.h"
 #include <fmt/format.h>
+#include <array>
 #include <vector>
 #include "rapidudf/builtin/builtin_symbols.h"
+#include "rapidudf/meta/constants.h"
 
 namespace rapidudf {
 namespace ast {
+
 void ParseContext::Clear() {
   source_.clear();
   source_lines_.clear();
@@ -77,6 +80,11 @@ absl::StatusOr<DType> ParseContext::IsVarExist(const std::string& name, bool err
       return absl::AlreadyExistsError(fmt::format("var:{} already exist at {}", name, GetErrorLine()));
     }
     return found->second;
+  }
+  for (size_t i = 0; i < kConstantCount; i++) {
+    if (kConstantNames[i] == name) {
+      return DType(DATA_F64);
+    }
   }
   if (!error_on_exist) {
     return absl::NotFoundError(fmt::format("var:{} is not exist at {}", name, GetErrorLine()));

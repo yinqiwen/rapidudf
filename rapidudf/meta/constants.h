@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -29,29 +29,12 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <gtest/gtest.h>
-#include <functional>
-#include <vector>
-#include "rapidudf/rapidudf.h"
-
-using namespace rapidudf;
-using namespace rapidudf::ast;
-
-TEST(JitCompiler, expression) {
-  spdlog::set_level(spdlog::level::debug);
-  std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
-  std::string content = R"(
-    x >= 1 && y < 10
-  )";
-  auto rc = compiler.CompileExpression<bool, int, int>(content, {"x", "y"}, true);
-  if (!rc.ok()) {
-    RUDF_ERROR("{}", rc.status().ToString());
-  }
-  ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, std::vector<int>&>(true);
-  // ASSERT_TRUE(f != nullptr);
-  auto f = std::move(rc.value());
-  ASSERT_TRUE(f(2, 5));
-  ASSERT_FALSE(f(2, 10));
-}
+#pragma once
+#include <array>
+#include <string_view>
+namespace rapidudf {
+static constexpr size_t kConstantCount = 2;
+static constexpr std::array<std::string_view, kConstantCount> kConstantNames = {"pi", "e"};
+static constexpr std::array<double, kConstantCount> kConstantValues = {3.141592653589793238462643,
+                                                                       2.718281828459045235360287};
+}  // namespace rapidudf

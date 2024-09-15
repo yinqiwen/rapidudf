@@ -83,6 +83,7 @@ bp::rule<struct logic_expr, BinaryExprPtr> logic_expr = "logic_expr";
 bp::rule<struct cmp_expr, BinaryExprPtr> cmp_expr = "cmp_expr";
 bp::rule<struct additive_expr, BinaryExprPtr> additive_expr = "additive_expr";
 bp::rule<struct multiplicative_expr, BinaryExprPtr> multiplicative_expr = "multiplicative_expr";
+bp::rule<struct power_expr, BinaryExprPtr> power_expr = "power_expr";
 bp::rule<struct unary_expr, UnaryExprPtr> unary_expr = "unary_expr";
 bp::rule<struct ternary_expr, TernaryExprPtr> ternary_expr = "ternary_expr";
 bp::rule<struct expression, BinaryExprPtr> expression = "expression";
@@ -197,7 +198,8 @@ auto const cmp_expr_def = (additive_expr >> *(Symbols::kCmpOpSymbols >> additive
 auto const additive_expr_def =
     (multiplicative_expr >> *(Symbols::kAdditiveOpSymbols >> multiplicative_expr))[binary_expr_func];
 auto const multiplicative_expr_def =
-    (unary_expr >> *(Symbols::kMultiplicativeOpSymbols >> unary_expr))[binary_expr_func];
+    (power_expr >> *(Symbols::kMultiplicativeOpSymbols >> power_expr))[binary_expr_func];
+auto const power_expr_def = (unary_expr >> *(Symbols::kPowerOpSymbols >> unary_expr))[binary_expr_func];
 auto const unary_expr_def = (-Symbols::kUnaryOpSymbols >> operand)[unary_expr_func];
 
 auto const filed_access_def = (('.' > identifier > -func_invoke_args))[field_access_func];
@@ -207,7 +209,7 @@ auto const var_accessor_def = (identifier > -(member_access | func_invoke_args))
 
 BOOST_PARSER_DEFINE_RULES(constant_number, var_declare, var_ref, var_accessor, filed_access, dynamic_param_access,
                           operand, func_invoke_args, member_access, unary_expr, assign, logic_expr, cmp_expr,
-                          additive_expr, multiplicative_expr, expression, ternary_expr, array);
+                          additive_expr, multiplicative_expr, power_expr, expression, ternary_expr, array);
 
 bp::rule<struct statements, std::vector<Statement>> statements = "statements";
 bp::rule<struct return_statement, ReturnStatement> return_statement = "return_statement";
@@ -287,12 +289,14 @@ absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, con
   return *result;
 }
 
-absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::string& source) {
+absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::string& source,
+                                                const FunctionDesc& desc) {
   ctx.SetSource(source, false);
   bp::callback_error_handler error_handler([&](std::string const& msg) { ctx.SetAstErr(msg); });
   auto const parser = bp::with_error_handler(expression, error_handler);
   std::optional<Expression> result = bp::parse(source, parser, bp::ws | comment);
   if (result) {
+    ctx.SetFuncDesc(desc);
     auto rc = (*result)->Validate(ctx);
     if (!rc.ok()) {
       return rc.status();

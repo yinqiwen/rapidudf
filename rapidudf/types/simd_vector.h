@@ -92,12 +92,28 @@ class Vector {
   }
   Vector(VectorData vdata) { vec_data_ = vdata; }
   Vector(const std::vector<T>& vec) {
-    VectorData vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
-    vec_data_ = vdata;
+    if constexpr (std::is_same_v<T, Bit>) {
+      static_assert(sizeof(T) == -1, "unsupported constructor");
+    } else {
+      VectorData vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
+      vec_data_ = vdata;
+    }
   }
   VectorData RawData() { return vec_data_; }
 
   size_t Size() const { return vec_data_.Size(); }
+  size_t ElementSize() const {
+    if constexpr (std::is_same_v<Bit, T>) {
+      size_t n = Size();
+      size_t byte_n = n / 8;
+      if (n % 8 > 0) {
+        byte_n++;
+      }
+      return byte_n;
+    } else {
+      return Size();
+    }
+  }
   size_t BytesCapacity() const { return vec_data_.BytesCapacity(); }
   auto Data() const {
     if constexpr (std::is_same_v<Bit, T>) {

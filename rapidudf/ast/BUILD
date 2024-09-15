@@ -17,6 +17,7 @@ cc_library(
     deps = [
         "//rapidudf/builtin:builtin_symbols",
         "//rapidudf/log",
+        "//rapidudf/meta:constants",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",
         "//rapidudf/meta:optype",

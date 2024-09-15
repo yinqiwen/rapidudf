@@ -39,7 +39,7 @@ namespace ast {
 
 absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, const std::string& source);
 absl::StatusOr<Function> parse_function_ast(ParseContext& ctx, const std::string& source);
-absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::string& source);
+absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::string& source, const FunctionDesc& desc);
 
 }  // namespace ast
 }  // namespace rapidudf

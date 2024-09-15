@@ -38,6 +38,7 @@
 #include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/constants.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
@@ -47,6 +48,13 @@ absl::StatusOr<ValuePtr> JitCompiler::GetLocalVar(const std::string& name) {
   auto found = GetCompileContext()->named_values.find(name);
   if (found != GetCompileContext()->named_values.end()) {
     return found->second;
+  }
+  for (size_t i = 0; i < kConstantCount; i++) {
+    if (name == kConstantNames[i]) {
+      ::llvm::APFloat fv(kConstantValues[i]);
+      auto val = ::llvm::ConstantFP::get(GetSession()->GetIRBuilder()->getContext(), fv);
+      return NewValue(DATA_F64, val);
+    }
   }
   return absl::NotFoundError(fmt::format("No var '{}' found", name));
 }

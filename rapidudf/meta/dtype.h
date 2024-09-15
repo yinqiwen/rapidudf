@@ -150,7 +150,8 @@ class DType {
   bool IsInteger() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_I64); }
   bool IsSigned() const;
   bool IsVoid() const { return t0_ == DATA_VOID; }
-  bool IsBool() const { return IsFundamental() && t0_ == DATA_U8; }
+  bool IsBit() const { return IsFundamental() && t0_ == DATA_BIT; }
+  bool IsBool() const { return IsBit(); }
   bool IsStringView() const { return IsFundamental() && t0_ == DATA_STRING_VIEW; }
   bool IsStdStringView() const { return IsFundamental() && t0_ == DATA_STD_STRING_VIEW; }
   bool IsString() const { return IsFundamental() && t0_ == DATA_STRING; }
@@ -416,7 +417,7 @@ DType get_dtype() {
   }
 
   if constexpr (std::is_same_v<bool, T>) {
-    return DType(DATA_U8);
+    return DType(DATA_BIT);
   }
   if constexpr (std::is_same_v<char, T>) {
     return DType(DATA_I8);

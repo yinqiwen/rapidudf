@@ -32,6 +32,8 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Use.h>
+#include <vector>
+#include "rapidudf/jit/llvm/type.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/optype.h"
@@ -41,6 +43,8 @@ namespace llvm {
 ValuePtr Value::UnaryOp(OpToken op) {
   ::llvm::Value* result_val = nullptr;
   ::llvm::Intrinsic::ID builtin_intrinsic = 0;
+  std::vector<::llvm::Value*> builtin_intrinsic_args;
+  ::llvm::Type* arg_type = get_type(ir_builder_->getContext(), dtype_);
   switch (op) {
     case OP_NEGATIVE: {
       if (!dtype_.IsNumber()) {
@@ -64,50 +68,63 @@ ValuePtr Value::UnaryOp(OpToken op) {
     }
     case OP_SIN: {
       builtin_intrinsic = ::llvm::Intrinsic::sin;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_COS: {
       builtin_intrinsic = ::llvm::Intrinsic::cos;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_FLOOR: {
       builtin_intrinsic = ::llvm::Intrinsic::floor;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_ABS: {
+      builtin_intrinsic_args.emplace_back(GetValue());
       if (dtype_.IsFloat()) {
         builtin_intrinsic = ::llvm::Intrinsic::fabs;
       } else {
         builtin_intrinsic = ::llvm::Intrinsic::abs;
+        builtin_intrinsic_args.emplace_back(ir_builder_->getInt1(0));
       }
+
       break;
     }
     case OP_SQRT: {
       builtin_intrinsic = ::llvm::Intrinsic::sqrt;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_CEIL: {
       builtin_intrinsic = ::llvm::Intrinsic::ceil;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_EXP: {
       builtin_intrinsic = ::llvm::Intrinsic::exp;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_EXP2: {
       builtin_intrinsic = ::llvm::Intrinsic::exp2;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_LOG: {
       builtin_intrinsic = ::llvm::Intrinsic::log;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_LOG2: {
       builtin_intrinsic = ::llvm::Intrinsic::log2;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     case OP_LOG10: {
       builtin_intrinsic = ::llvm::Intrinsic::log10;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
     default: {
@@ -117,19 +134,19 @@ ValuePtr Value::UnaryOp(OpToken op) {
   }
 
   if (builtin_intrinsic != 0) {
-    ::llvm::Type* arg_type = nullptr;
-    if (dtype_.IsF32()) {
-      arg_type = ::llvm::Type::getFloatTy(ir_builder_->getContext());
-    } else if (dtype_.IsF64()) {
-      arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
-    }
+    // if (dtype_.IsF32()) {
+    //   arg_type = ::llvm::Type::getFloatTy(ir_builder_->getContext());
+    // } else if (dtype_.IsF64()) {
+    //   arg_type = ::llvm::Type::getDoubleTy(ir_builder_->getContext());
+    // } else if (dtype_.IsInteger()) {
+    // }
     if (nullptr != arg_type) {
       ::llvm::Function* intrinsic_func =
           ::llvm::Intrinsic::getDeclaration(ir_builder_->GetInsertBlock()->getModule(), builtin_intrinsic, {arg_type});
-      result_val = ir_builder_->CreateCall(intrinsic_func, GetValue());
+
+      result_val = ir_builder_->CreateCall(intrinsic_func, builtin_intrinsic_args);
     }
   }
-
   if (!result_val) {
     RUDF_ERROR("Can NOT do {} for val:{}", op, dtype_);
   }

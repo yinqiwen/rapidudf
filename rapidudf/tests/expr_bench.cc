@@ -32,6 +32,7 @@
 #include <cmath>
 #include <vector>
 #include "exprtk.hpp"
+#include "rapidudf/context/context.h"
 #include "rapidudf/rapidudf.h"
 
 static size_t test_n = 1024;
@@ -56,9 +57,9 @@ static void init_test_numbers() {
 }
 
 static rapidudf::JitFunction<double, double, double, double> g_expr_func;
-static std::vector<rapidudf::JitFunction<rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>,
-                                         rapidudf::simd::Vector<double>, double>>
-    g_vector_expr_funcs;
+static rapidudf::JitFunction<rapidudf::simd::Vector<double>, rapidudf::Context&, rapidudf::simd::Vector<double>,
+                             rapidudf::simd::Vector<double>>
+    g_vector_expr_func;
 
 static void DoRapidUDFExprSetup(const benchmark::State& state) {
   std::string source = R"(
@@ -100,14 +101,15 @@ BENCHMARK(BM_rapidudf_expr_func)->Setup(DoRapidUDFExprSetup)->Teardown(DoRapidUD
 
 static void DoRapidUDFVectorExprSetup(const benchmark::State& state) {
   std::string source = R"(
-    simd_vector<f64> test_func(simd_vector<f64> x,simd_vector<f64> y, double pi){
+    simd_vector<f64> test_func(Context ctx, simd_vector<f64> x,simd_vector<f64> y){
       return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
     }
   )";
   rapidudf::JitCompiler compiler;
-  auto result = compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>,
-                                         rapidudf::simd::Vector<double>, double>(source, false);
-  g_vector_expr_funcs.emplace_back(std::move(result.value()));
+  auto result = compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&,
+                                         rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source, false);
+
+  g_vector_expr_func = std::move(result.value());
 
   init_test_numbers();
 }
@@ -115,8 +117,10 @@ static void DoRapidUDFVectorExprSetup(const benchmark::State& state) {
 static void DoRapidUDFVectorExprTeardown(const benchmark::State& state) {}
 
 static void BM_rapidudf_vector_expr_func(benchmark::State& state) {
+  rapidudf::Context ctx;
   for (auto _ : state) {
-    auto results = g_vector_expr_funcs[0](xx, yy, pi);
+    ctx.Reset();
+    auto results = g_vector_expr_func(ctx, xx, yy);
     for (size_t i = 0; i < results.Size(); i++) {
       // if (results[i] != actuals[i]) {
       //   RUDF_INFO("[{}]Error result:{}, while expected:{}", i, results[i], actuals[i]);

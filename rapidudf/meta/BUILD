@@ -28,6 +28,13 @@ cc_library(
 )
 
 cc_library(
+    name = "constants",
+    hdrs = [
+        "constants.h",
+    ],
+)
+
+cc_library(
     name = "dtype",
     srcs = ["dtype.cc"],
     hdrs = [

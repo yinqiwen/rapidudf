@@ -33,7 +33,9 @@
 
 #include <fmt/core.h>
 
+#include <chrono>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -96,6 +98,7 @@ class JitCompiler {
 
   template <typename RET, typename... Args>
   absl::StatusOr<JitFunction<RET, Args...>> CompileFunction(const std::string& source, bool dump_asm = false) {
+    // auto start_time = std::chrono::high_resolution_clock::now();
     std::lock_guard<std::mutex> guard(jit_mutex_);
     NewSession(dump_asm);
     auto status = CompileFunction(source);
@@ -118,6 +121,9 @@ class JitCompiler {
     }
     auto func_ptr = func_ptr_result.value();
     auto resource = std::move(session_);
+    // auto end_time = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    // printf("###Cost %lldus to compile %s\n", duration.count(), fname.c_str());
     return JitFunction<RET, Args...>(fname, func_ptr, resource, false);
   }
 
@@ -150,6 +156,7 @@ class JitCompiler {
       ast_arg.name = arg_names[i];
       gen_func_ast.args->emplace_back(ast_arg);
     }
+
     auto status = CompileExpression(source, gen_func_ast);
     if (!status.ok()) {
       return status;
