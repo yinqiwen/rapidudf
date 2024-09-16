@@ -11,16 +11,12 @@ package(
 cc_library(
     name = "simd_ops",
     srcs = [
-        "simd_ops.cc",
+        # "simd_ops.cc",
+        "simd_ops2.cc",
         "simd_sort.cc",
     ],
     hdrs = [
         "simd_ops.h",
-    ],
-    copts = [
-        "-march=haswell",
-        "-maes",
-        "-ftree-vectorize",
     ],
     deps = [
         "//rapidudf/log",
@@ -36,6 +32,16 @@ cc_library(
         "@com_google_highway//:math",
         "@sleef",
         "@x86_simd_sort",
+    ],
+)
+
+cc_library(
+    name = "dynamic_test",
+    srcs = ["dynamic_test.cc"],
+    deps = [
+        "//rapidudf/context",
+        "//rapidudf/types:simd_vector",
+        "@com_google_highway//:hwy",
     ],
 )
 

@@ -627,48 +627,6 @@ Vector<R> simd_vector_binary_op(Context& ctx, Vector<T> left, Vector<T> right) {
   }
 }
 
-// template <typename T, OpToken logic, OpToken cmp>
-// Vector<Bit> simd_vector_logic_cmp(Context& ctx, Vector<T> left, absl::Span<const T> right) {
-//   using number_t = typename InternalType<T>::internal_type;
-//   const hn::ScalableTag<number_t> d;
-//   using Vec = hn::Vec<decltype(d)>;
-//   using MaskType = hn::Mask<decltype(d)>;
-//   constexpr auto lanes = hn::Lanes(d);
-//   std::vector<Vec> right_vals;
-//   for (auto v : right) {
-//     right_vals.emplace_back(hn::Set(d, v));
-//   }
-//   VectorData result_data;
-//   if (ctx.IsTemporary(left)) {
-//     result_data = left.RawData();
-//   } else {
-//     // result_data = arena_new_vector<Bit>(left.Size());
-//     result_data = ctx.NewSimdVector<Bit>(get_lanes<Bit>(), left.Size());
-//   }
-//   VectorDataHelper<T> helper(result_data.MutableData<Bit>());
-//   size_t i = 0;
-//   for (; (i) < left.Size(); i += lanes) {
-//     auto lv = hn::LoadU(d, left.Data() + i);
-//     MaskType mask;
-//     for (size_t j = 0; j < right_vals.size(); j++) {
-//       auto cmp_mask = do_simd_binary_op<decltype(lv), cmp, false>(lv, right_vals[j]);
-//       if (j == 0) {
-//         mask = cmp_mask;
-//       } else {
-//         if constexpr (logic == OP_LOGIC_AND) {
-//           mask = hn::And(cmp_mask, mask);
-//         } else if constexpr (logic == OP_LOGIC_OR) {
-//           mask = hn::Or(cmp_mask, mask);
-//         } else {
-//           static_assert(sizeof(T) == -1, "unsupported logic op");
-//         }
-//       }
-//     }
-//     helper.AddMask(mask);
-//   }
-//   return Vector<Bit>(result_data);
-// }
-
 template <typename T, typename D>
 static inline auto select_ternary_value(Vector<Bit> cond, hn::VFromD<D> true_val, hn::VFromD<D> false_val, size_t i) {
   const D d;

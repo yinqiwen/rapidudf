@@ -70,9 +70,6 @@ template <typename T, OpToken op>
 static void register_unary_simd_vector_op() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(op, dtype.ToSimdVector());
-  if (op == OP_NOT) {
-    printf("func name:%s\n", func_name.c_str());
-  }
   simd::Vector<T> (*simd_f)(Context&, simd::Vector<T>) = simd::simd_vector_unary_op<T, op>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f);
 }
@@ -247,9 +244,12 @@ void init_builtin_simd_vector_funcs() {
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_LOG1P, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_SIN, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_COS, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_TAN, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ASIN, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ACOS, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ATAN, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_SINH, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_COSH, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_TANH, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ASINH, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ACOSH, float, double)

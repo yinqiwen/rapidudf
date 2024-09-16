@@ -283,8 +283,8 @@ int main(int argc, char* argv[]) {
   //   return 1;
   // }
   {
-    std::cout << "--- RapidUDF Parse---" << std::endl;
-    run_parse_benchmark<double>();
+    // std::cout << "--- RapidUDF Parse---" << std::endl;
+    // run_parse_benchmark<double>();
   }
   {
     std::cout << "--- RapidUDF ---" << std::endl;
