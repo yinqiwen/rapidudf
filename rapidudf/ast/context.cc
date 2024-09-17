@@ -52,6 +52,14 @@ void ParseContext::SetFuncDesc(const FunctionDesc& d, uint32_t idx) {
   GetFunctionParseContext(idx).desc = desc;
 }
 
+std::vector<FunctionDesc> ParseContext::GetAllFunctionDescs() const {
+  std::vector<FunctionDesc> fs;
+  for (auto& ctx : function_parse_ctxs_) {
+    fs.emplace_back(ctx.desc);
+  }
+  return fs;
+}
+
 void ParseContext::EnterLoop() { GetFunctionParseContext(current_function_cursor_).in_loop++; }
 bool ParseContext::IsInLoop() { return GetFunctionParseContext(current_function_cursor_).in_loop > 0; }
 void ParseContext::ExitLoop() { GetFunctionParseContext(current_function_cursor_).in_loop--; }

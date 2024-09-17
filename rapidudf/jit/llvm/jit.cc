@@ -76,7 +76,7 @@ JitCompiler::JitCompiler() {
 
 absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
   if (!session_) {
-    return absl::InvalidArgumentError("null compiled session");
+    return absl::InvalidArgumentError("null compiled session to get function ptr");
   }
 
   auto func_addr_result = GetSession()->jit->lookup(name);
@@ -96,6 +96,7 @@ absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
 JitSession* JitCompiler::GetSession() { return session_.get(); }
 uint32_t JitCompiler::GetLabelCursor() { return session_->label_cursor++; }
 FunctionCompileContextPtr JitCompiler::GetCompileContext() { return GetSession()->current_compile_functon_ctx; }
+std::vector<FunctionDesc> JitCompiler::GetAllFunctionDescs() { return ast_ctx_.GetAllFunctionDescs(); }
 
 absl::StatusOr<std::string> JitCompiler::VerifyFunctionSignature(FunctionCompileContextPtr func_ctx, DType return_type,
                                                                  const std::vector<DType>& args_types) {
@@ -210,10 +211,10 @@ absl::Status JitCompiler::CompileFunction(const std::string& source) {
   return status;
 }
 
-std::string JitCompiler::GetMemberFuncName(DType dtype, const std::string& member) {
-  std::string fname = fmt::format("{}_{}", dtype.GetTypeString(), member);
-  return fname;
-}
+// std::string JitCompiler::GetMemberFuncName(DType dtype, const std::string& member) {
+//   std::string fname = fmt::format("{}_{}", dtype.GetTypeString(), member);
+//   return fname;
+// }
 
 absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& functions) {
   ast::ParseContext::FunctionCallMap all_func_calls;
@@ -301,6 +302,8 @@ absl::Status JitCompiler::CompileFunction(const ast::Function& function) {
 }
 
 absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::string& source, bool dump_asm) {
+  std::lock_guard<std::mutex> guard(jit_mutex_);
+  NewSession(dump_asm);
   auto funcs = ast::parse_functions_ast(ast_ctx_, source);
   if (!funcs.ok()) {
     RUDF_LOG_ERROR_STATUS(funcs.status());
@@ -310,8 +313,6 @@ absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::s
     fnames.emplace_back(func.name);
   }
 
-  std::lock_guard<std::mutex> guard(jit_mutex_);
-  NewSession(dump_asm);
   auto status = CompileFunctions(funcs.value());
   if (!status.ok()) {
     return status;

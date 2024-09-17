@@ -68,8 +68,10 @@ using FunctionCompileContextPtr = std::shared_ptr<FunctionCompileContext>;
 using ExternFunctionPtr = std::shared_ptr<ExternFunction>;
 class Value;
 using ValuePtr = std::shared_ptr<Value>;
+class JitFunctionCache;
 class JitCompiler {
  public:
+  static constexpr std::string_view kExpressionFuncName = "rapidudf_expresion";
   JitCompiler();
 
   absl::StatusOr<std::vector<std::string>> CompileSource(const std::string& source, bool dump_asm = false);
@@ -78,7 +80,7 @@ class JitCompiler {
   absl::StatusOr<JitFunction<RET, Args...>> LoadFunction(const std::string& name) {
     std::lock_guard<std::mutex> guard(jit_mutex_);
     if (!session_) {
-      return absl::InvalidArgumentError("null compiled session");
+      return absl::InvalidArgumentError("null compiled session to load function");
     }
     auto return_type = get_dtype<RET>();
     std::vector<DType> arg_types;
@@ -119,8 +121,8 @@ class JitCompiler {
       return func_ptr_result.status();
     }
     auto func_ptr = func_ptr_result.value();
-    auto resource = std::move(session_);
-    return JitFunction<RET, Args...>(fname, func_ptr, resource, false);
+
+    return JitFunction<RET, Args...>(fname, func_ptr, session_, false);
   }
 
   template <typename RET, typename... Args>
@@ -141,7 +143,7 @@ class JitCompiler {
     if (!arg_names.empty()) {
       gen_func_ast.args = std::vector<ast::FunctionArg>{};
     }
-    gen_func_ast.name = "rapidudf_expresion";
+    gen_func_ast.name = std::string(kExpressionFuncName);
     ast_ctx_.ReserveFunctionParseContext(1);
     for (size_t i = 0; i < arg_names.size(); i++) {
       if (!ast_ctx_.AddLocalVar(arg_names[i], arg_types[i])) {
@@ -163,8 +165,8 @@ class JitCompiler {
       return func_ptr_result.status();
     }
     auto func_ptr = func_ptr_result.value();
-    auto resource = std::move(session_);
-    return JitFunction<RET, Args...>(gen_func_ast.name, func_ptr, resource, false);
+
+    return JitFunction<RET, Args...>(gen_func_ast.name, func_ptr, session_, false);
   }
 
  private:
@@ -211,16 +213,17 @@ class JitCompiler {
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, double v, DType dtype);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, double v);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, bool v);
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, uint32_t v);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const std::string& v);
 
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const ast::FieldAccess& field);
-  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, uint32_t idx);
-  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const std::string& key);
-  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const ast::VarRef& key);
+  // absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, uint32_t idx);
+  // absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const std::string& key);
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::VarRef& key);
 
   absl::StatusOr<ValuePtr> GetLocalVar(const std::string& name);
   ExternFunctionPtr GetFunction(const std::string& name);
-  std::string GetMemberFuncName(DType dtype, const std::string& member);
+  // std::string GetMemberFuncName(DType dtype, const std::string& member);
   absl::StatusOr<ValuePtr> CallFunction(const std::string& name, const std::vector<ValuePtr>& arg_values);
   absl::StatusOr<ValuePtr> CallFunction(std::string_view name, const std::vector<ValuePtr>& arg_values) {
     return CallFunction(std::string(name), arg_values);
@@ -231,6 +234,7 @@ class JitCompiler {
 
   FunctionCompileContextPtr GetCompileContext();
   JitSession* GetSession();
+  std::vector<FunctionDesc> GetAllFunctionDescs();
 
   uint32_t GetLabelCursor();
 
@@ -241,6 +245,7 @@ class JitCompiler {
   std::shared_ptr<JitSession> session_;
 
   friend class Value;
+  friend class JitCompilerCache;
 };
 }  // namespace llvm
 }  // namespace rapidudf

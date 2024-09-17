@@ -61,6 +61,10 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, dou
     return NewValue(dtype, val);
   }
 }
+absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, uint32_t v) {
+  auto val = GetSession()->GetIRBuilder()->getInt32(v);
+  return NewValue(DATA_U32, val);
+}
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, double v) {
   int64_t iv = static_cast<int64_t>(v);
   if (static_cast<double>(iv) == v) {

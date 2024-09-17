@@ -190,5 +190,5 @@ TEST(JitCompiler, pb_read_map_item) {
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(&pb_header, "k0"), 1001);
-  ASSERT_EQ(f(&pb_header, "k1"), 0);
+  ASSERT_ANY_THROW(f(&pb_header, "k1"));
 }

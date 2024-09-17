@@ -1049,6 +1049,49 @@ TEST(JitCompiler, vector_fma) {
   }
 }
 
+TEST(JitCompiler, clamp) {
+  JitCompiler compiler;
+  std::string content = "clamp(x,y,z)";
+  float fx = 3.1, fy = 3.2, fz = 1.3;
+  auto rc = compiler.CompileExpression<float, float, float, float>(content, {"x", "y", "z"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_FLOAT_EQ(f(fx, fy, fz), std::clamp(fx, fy, fz));
+}
+
+TEST(JitCompiler, vector_clamp) {
+  Context ctx;
+  JitCompiler compiler;
+  std::string content = "clamp(x,y,z)";
+  std::vector<float> fx{-1.1};
+  std::vector<float> fy{-1.13};
+  float fz = {3.5};
+
+  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
+      content, {"_", "x", "y", "z"}, true);
+  ASSERT_TRUE(rc1.ok());
+  auto f1 = std::move(rc1.value());
+  auto result1 = f1(ctx, fx, fy, fz);
+  ASSERT_EQ(result1.Size(), fx.size());
+  for (size_t i = 0; i < fx.size(); i++) {
+    ASSERT_FLOAT_EQ(result1[i], std::clamp(fx[i], fy[i], fz));
+  }
+
+  std::vector<int32_t> ix{-1, 1, 2, 3, 4, 5, 6};
+  std::vector<int32_t> iy{-1, -1, -2, -3, -4, -5, -6};
+  int32_t iz = 11;
+
+  auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
+      content, {"_", "x", "y", "z"}, true);
+  ASSERT_TRUE(rc2.ok());
+  auto f2 = std::move(rc2.value());
+  auto result2 = f2(ctx, ix, iy, iz);
+  ASSERT_EQ(result2.Size(), ix.size());
+  for (size_t i = 0; i < fx.size(); i++) {
+    ASSERT_EQ(result2[i], std::clamp(ix[i], iy[i], iz));
+  }
+}
+
 TEST(JitCompiler, vector_fms) {
   Context ctx;
   JitCompiler compiler;

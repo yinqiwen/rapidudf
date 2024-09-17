@@ -95,6 +95,8 @@ class ParseContext {
     return GetFunctionParseContext(funcion_idx).member_func_calls;
   }
 
+  std::vector<FunctionDesc> GetAllFunctionDescs() const;
+
   void SetFunctionCursor(uint32_t idx) { current_function_cursor_ = idx; }
 
   void ReserveFunctionParseContext(uint32_t n) { GetFunctionParseContext(n - 1); }

@@ -100,7 +100,10 @@ struct VarAccessor {
   std::string name;
   std::optional<std::vector<MemberAccess>> access_args;
   std::optional<FuncInvokeArgs> func_args;
+
+  std::vector<std::string> access_func_names;
   uint32_t position = 0;
+
   absl::StatusOr<VarTag> Validate(ParseContext& ctx);
 };
 

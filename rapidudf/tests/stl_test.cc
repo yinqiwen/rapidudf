@@ -46,11 +46,29 @@ TEST(JitCompiler, vector_access) {
   auto f = std::move(result.value());
   ASSERT_EQ(f(vec), vec.size());
 
+  auto result1 = compiler.CompileExpression<int, std::vector<int>&>("x.find(2)", {"x"});
+  ASSERT_TRUE(result1.ok());
+  auto f1 = std::move(result1.value());
+  ASSERT_EQ(f1(vec), 1);
+
+  auto result2 = compiler.CompileExpression<bool, std::vector<int>&>("x.contains(4)", {"x"});
+  ASSERT_TRUE(result2.ok());
+  auto f2 = std::move(result2.value());
+  ASSERT_EQ(f2(vec), false);
+
   std::vector<std::string> str_vec{"hello", "world"};
   auto str_f_result = compiler.CompileExpression<StringView, std::vector<std::string>&>("x.get(1)", {"x"});
   ASSERT_TRUE(str_f_result.ok());
   auto str_f = std::move(str_f_result.value());
   ASSERT_EQ(str_f(str_vec), "world");
+
+  str_f_result = compiler.CompileExpression<StringView, std::vector<std::string>&>("x[1]", {"x"});
+  ASSERT_TRUE(str_f_result.ok());
+  str_f = std::move(str_f_result.value());
+  ASSERT_EQ(str_f(str_vec), "world");
+
+  str_f_result = compiler.CompileExpression<StringView, std::vector<std::string>&>(R"(x["t1"])", {"x"});
+  ASSERT_FALSE(str_f_result.ok());
 }
 
 TEST(JitCompiler, map_access) {
@@ -66,5 +84,37 @@ TEST(JitCompiler, map_access) {
       compiler.CompileExpression<StringView, std::map<std::string, std::string>&>(R"(x.get("t1"))", {"x"});
   ASSERT_TRUE(get_f_result.ok());
   auto str_f = std::move(get_f_result.value());
+  ASSERT_EQ(str_f(map), "v1");
+
+  auto result2 = compiler.CompileExpression<bool, std::map<std::string, std::string>&>(R"(x.contains("t1"))", {"x"});
+  ASSERT_TRUE(result2.ok());
+  auto f2 = std::move(result2.value());
+  ASSERT_EQ(f2(map), true);
+
+  get_f_result = compiler.CompileExpression<StringView, std::map<std::string, std::string>&>(R"(x["t1"])", {"x"});
+  ASSERT_TRUE(get_f_result.ok());
+  str_f = std::move(get_f_result.value());
+  ASSERT_EQ(str_f(map), "v1");
+}
+
+TEST(JitCompiler, unordered_map_access) {
+  spdlog::set_level(spdlog::level::debug);
+  std::unordered_map<std::string, std::string> map{{"t0", "v0"}, {"t1", "v1"}};
+  JitCompiler compiler;
+  auto result = compiler.CompileExpression<int, std::unordered_map<std::string, std::string>&>("x.size()", {"x"});
+  ASSERT_TRUE(result.ok());
+  auto f = std::move(result.value());
+  ASSERT_EQ(f(map), map.size());
+
+  auto get_f_result =
+      compiler.CompileExpression<StringView, std::unordered_map<std::string, std::string>&>(R"(x.get("t1"))", {"x"});
+  ASSERT_TRUE(get_f_result.ok());
+  auto str_f = std::move(get_f_result.value());
+  ASSERT_EQ(str_f(map), "v1");
+
+  get_f_result =
+      compiler.CompileExpression<StringView, std::unordered_map<std::string, std::string>&>(R"(x["t1"])", {"x"});
+  ASSERT_TRUE(get_f_result.ok());
+  str_f = std::move(get_f_result.value());
   ASSERT_EQ(str_f(map), "v1");
 }

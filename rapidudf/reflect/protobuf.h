@@ -45,25 +45,52 @@
 namespace rapidudf {
 
 template <typename T, typename Enable = void>
-struct PBGetterReturnType {
-  using return_type = T;
-  static return_type value(const T& v) { return v; }
-  static return_type default_value() { return {}; }
-};
-template <typename T>
-struct PBGetterReturnType<T, typename std::enable_if<std::is_base_of<google::protobuf::Message, T>::value>::type> {
-  using return_type = const T*;
-  static return_type value(const T& v) { return &v; }
-  static return_type default_value() {
+struct PBArgType {
+  using arg_type = const T*;
+  static arg_type value(const T& v) { return &v; }
+  static arg_type default_value() {
     static T empty;
     return &empty;
   }
 };
-template <>
-struct PBGetterReturnType<std::string> {
-  using return_type = const std::string*;
-  static return_type value(const std::string& v) { return &v; }
+template <typename T>
+struct PBArgType<T,
+                 typename std::enable_if<std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_pointer_v<T> ||
+                                         std::is_same_v<std::string_view, T> || std::is_same_v<StringView, T> ||
+                                         std::is_same_v<std::string_view, T>>::type> {
+  using arg_type = T;
+  static arg_type value(const T& v) { return v; }
+  static arg_type default_value() { return {}; }
+  static T from(arg_type v) { return v; }
 };
+template <>
+struct PBArgType<std::string> {
+  using arg_type = StringView;
+  static arg_type value(const std::string& v) { return StringView(v); }
+  static std::string from(arg_type v) { return v.str(); }
+  static arg_type default_value() { return ""; }
+};
+
+// template <typename T, typename Enable = void>
+// struct PBGetterReturnType {
+//   using return_type = T;
+//   static return_type value(const T& v) { return v; }
+//   static return_type default_value() { return {}; }
+// };
+// template <typename T>
+// struct PBGetterReturnType<T, typename std::enable_if<std::is_base_of<google::protobuf::Message, T>::value>::type> {
+//   using return_type = const T*;
+//   static return_type value(const T& v) { return &v; }
+//   static return_type default_value() {
+//     static T empty;
+//     return &empty;
+//   }
+// };
+// template <>
+// struct PBGetterReturnType<std::string> {
+//   using return_type = const std::string*;
+//   static return_type value(const std::string& v) { return &v; }
+// };
 
 template <typename T, typename Enable = void>
 struct PBSetterArgType {
@@ -76,16 +103,20 @@ struct PBSetterArgType<const std::string&> {
 
 template <typename K, typename V>
 struct PBMapHelper {
-  using return_type_t = typename PBGetterReturnType<V>::return_type;
-  static return_type_t Get(const ::google::protobuf::Map<K, V>* pb_map, K k) {
+  using key_type = K;
+  using value_type = V;
+  using arg_key_type_t = typename PBArgType<key_type>::arg_type;
+  using arg_value_type_t = typename PBArgType<value_type>::arg_type;
+  static arg_value_type_t Get(const ::google::protobuf::Map<K, V>* pb_map, arg_key_type_t k) {
     if (nullptr == pb_map) {
-      return PBGetterReturnType<V>::default_value();
+      throw std::logic_error("NULL protobuf map poniter");
     }
-    auto found = pb_map->find(k);
+    auto found = pb_map->find(PBArgType<key_type>::from(k));
+
     if (found == pb_map->end()) {
-      return PBGetterReturnType<V>::default_value();
+      return {};
     }
-    return PBGetterReturnType<V>::value(found->second);
+    return PBArgType<value_type>::value(found->second);
   }
   static size_t Size(const ::google::protobuf::Map<K, V>* pb_map) {
     if (nullptr == pb_map) {
@@ -93,17 +124,24 @@ struct PBMapHelper {
     }
     return pb_map->size();
   }
+  static bool Contains(const ::google::protobuf::Map<K, V>* pb_map, arg_key_type_t key) {
+    if (nullptr == pb_map) {
+      return false;
+    }
+    auto found = pb_map->find(PBArgType<key_type>::from(key));
+    return found != pb_map->end();
+  }
 };
 
 template <typename T>
 struct PBRepeatedPtrFieldHelper {
-  using return_type_t = typename PBGetterReturnType<T>::return_type;
-  static return_type_t Get(const ::google::protobuf::RepeatedPtrField<T>* pb_vec, int i) {
+  using arg_type_t = typename PBArgType<T>::arg_type;
+  static arg_type_t Get(const ::google::protobuf::RepeatedPtrField<T>* pb_vec, int i) {
     if (nullptr == pb_vec) {
-      return PBGetterReturnType<T>::default_value();
+      throw std::logic_error("NULL protobuf RepeatedPtrField poniter");
     }
     const auto& val = pb_vec->Get(i);
-    return PBGetterReturnType<T>::value(val);
+    return PBArgType<T>::value(val);
   }
   static size_t Size(const ::google::protobuf::RepeatedPtrField<T>* pb_vec) {
     if (nullptr == pb_vec) {
@@ -115,13 +153,13 @@ struct PBRepeatedPtrFieldHelper {
 
 template <typename T>
 struct PBRepeatedFieldHelper {
-  using return_type_t = typename PBGetterReturnType<T>::return_type;
-  static return_type_t Get(const ::google::protobuf::RepeatedField<T>* pb_vec, int i) {
+  using arg_type_t = typename PBArgType<T>::arg_type;
+  static arg_type_t Get(const ::google::protobuf::RepeatedField<T>* pb_vec, int i) {
     if (nullptr == pb_vec) {
-      return PBGetterReturnType<T>::default_value();
+      throw std::logic_error("NULL protobuf RepeatedField poniter");
     }
     const auto& val = pb_vec->Get(i);
-    return PBGetterReturnType<T>::value(val);
+    return PBArgType<T>::value(val);
   }
   static size_t Size(const ::google::protobuf::RepeatedField<T>* pb_vec) {
     if (nullptr == pb_vec) {
@@ -129,26 +167,21 @@ struct PBRepeatedFieldHelper {
     }
     return pb_vec->size();
   }
-};
-
-template <typename V>
-struct PBMapHelper<std::string, V> {
-  using return_type_t = typename PBGetterReturnType<V>::return_type;
-  static return_type_t Get(const ::google::protobuf::Map<std::string, V>* pb_map, StringView k) {
-    if (nullptr == pb_map) {
-      return PBGetterReturnType<V>::default_value();
+  static int find(const ::google::protobuf::RepeatedField<T>* pb_vec, arg_type_t val) {
+    if (nullptr == pb_vec) {
+      return -1;
     }
-    auto found = pb_map->find(k);
-    if (found == pb_map->end()) {
-      return PBGetterReturnType<V>::default_value();
+    for (size_t i = 0; i < pb_vec->size(); i++) {
+      auto element_v = PBArgType<T>::value(pb_vec->Get(i));
+      if (element_v == val) {
+        return static_cast<int>(i);
+      }
     }
-    return PBGetterReturnType<V>::value(found->second);
+    return -1;
   }
-  static size_t Size(const ::google::protobuf::Map<std::string, V>* pb_map) {
-    if (nullptr == pb_map) {
-      return 0;
-    }
-    return pb_map->size();
+  static bool contains(const ::google::protobuf::RepeatedField<T>* pb_vec, arg_type_t val) {
+    int idx = find(pb_vec, val);
+    return idx > -1;
   }
 };
 
@@ -182,6 +215,7 @@ void try_register_pb_container_member_funcs(std::string_view member) {
     using mapped_type = typename remove_cv_t::mapped_type;
     Reflect::AddStructMethodAccessor("get", &PBMapHelper<key_type, mapped_type>::Get);
     Reflect::AddStructMethodAccessor("size", &PBMapHelper<key_type, mapped_type>::Size);
+    Reflect::AddStructMethodAccessor("contains", &PBMapHelper<key_type, mapped_type>::Contains);
   } else if constexpr (is_specialization<remove_cv_t, google::protobuf::RepeatedPtrField>::value) {
     using value_type = typename remove_cv_t::value_type;
     Reflect::AddStructMethodAccessor("get", &PBRepeatedPtrFieldHelper<value_type>::Get);
@@ -190,6 +224,8 @@ void try_register_pb_container_member_funcs(std::string_view member) {
     using value_type = typename remove_cv_t::value_type;
     Reflect::AddStructMethodAccessor("get", &PBRepeatedFieldHelper<value_type>::Get);
     Reflect::AddStructMethodAccessor("size", &PBRepeatedFieldHelper<value_type>::Size);
+    Reflect::AddStructMethodAccessor("contains", &PBRepeatedFieldHelper<value_type>::Contains);
+    Reflect::AddStructMethodAccessor("find", &PBRepeatedFieldHelper<value_type>::Find);
   }
 }
 

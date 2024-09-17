@@ -59,6 +59,21 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "jit_cache",
+    srcs = [
+        "jit_cache.cc",
+    ],
+    hdrs = [
+        "jit_cache.h",
+    ],
+    copts = RUDF_DEFAULT_COPTS,
+    deps = [
+        ":jit",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
 cc_test(
     name = "jit_test",
     size = "small",
@@ -67,6 +82,18 @@ cc_test(
     linkstatic = True,
     deps = [
         ":jit",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "jit_cache_test",
+    size = "small",
+    srcs = ["jit_cache_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS + ["-lLLVM"],
+    linkstatic = True,
+    deps = [
+        ":jit_cache",
         "@com_google_googletest//:gtest_main",
     ],
 )

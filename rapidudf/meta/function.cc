@@ -58,6 +58,12 @@ std::string GetFunctionName(std::string_view op, DType dtype) {
     return fname;
   }
 }
+
+std::string GetMemberFuncName(DType dtype, const std::string& member) {
+  std::string fname = fmt::format("{}_{}", dtype.GetTypeString(), member);
+  return fname;
+}
+
 std::string GetFunctionName(std::string_view op, DType a, DType b) {
   std::string fname(op);
   std::string arg_types;
@@ -138,6 +144,21 @@ bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
   }
   for (size_t i = 0; i < ts.size(); i++) {
     if (!ts[i].CanCastTo(arg_types[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool FunctionDesc::CompareSignature(DType rtype, const std::vector<DType>& validate_args_types) const {
+  if (return_type != rtype) {
+    return false;
+  }
+  if (arg_types.size() != validate_args_types.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < arg_types.size(); i++) {
+    if (arg_types[i] != validate_args_types[i]) {
       return false;
     }
   }

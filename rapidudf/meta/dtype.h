@@ -158,6 +158,9 @@ class DType {
   bool IsFlatbuffersString() const { return IsFundamental() && t0_ == DATA_FLATBUFFERS_STRING; }
   bool IsJson() const { return IsFundamental() && t0_ == DATA_JSON; }
   bool IsJsonPtr() const { return IsPtr() && (PtrTo().IsJson()); }
+  bool IsVectorPtr() const { return IsPtr() && (PtrTo().IsVector()); }
+  bool IsMapPtr() const { return IsPtr() && (PtrTo().IsMap()); }
+  bool IsUnorderedMapPtr() const { return IsPtr() && (PtrTo().IsUnorderedMap()); }
   bool IsContext() const { return IsFundamental() && t0_ == DATA_CONTEXT; }
   bool IsContextPtr() const { return IsPtr() && (PtrTo().IsContext()); }
   bool IsStringPtr() const { return IsPtr() && (PtrTo().IsString()); }

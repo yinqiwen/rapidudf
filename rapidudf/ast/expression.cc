@@ -504,43 +504,75 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
             } else {
               return std::visit(
                   [&](auto&& dynamic_arg) {
-                    if (!var_dtype.dtype.IsPtr() || !var_dtype.dtype.PtrTo().IsJson()) {
+                    bool can_brackets_op = false;
+                    if (!var_dtype.dtype.IsPtr()) {
+                      can_brackets_op = false;
+                    } else if (var_dtype.dtype.IsJsonPtr()) {
+                      can_brackets_op = true;
+                    } else if (var_dtype.dtype.IsVectorPtr()) {
+                      can_brackets_op = true;
+                    } else if (var_dtype.dtype.IsMapPtr() || var_dtype.dtype.IsUnorderedMapPtr()) {
+                      can_brackets_op = true;
+                    }
+                    if (!can_brackets_op) {
                       return absl::StatusOr<VarTag>(absl::InvalidArgumentError(
                           fmt::format("invalid dtype:{} to do json dynamic access", var_dtype.dtype)));
                     }
+
+                    std::string_view implicit_func_call;
+                    DType ret_dtype;
                     using T = std::decay_t<decltype(dynamic_arg)>;
-                    bool get_by_member = true;
-                    if constexpr (std::is_same_v<uint32_t, T>) {
-                      get_by_member = false;
-                    } else if constexpr (std::is_same_v<std::string, T>) {
-                    } else {
-                      auto result = dynamic_arg.Validate(ctx);
+                    if (var_dtype.dtype.IsJsonPtr()) {
+                      bool get_by_member = true;
+                      if constexpr (std::is_same_v<uint32_t, T>) {
+                        get_by_member = false;
+                      } else if constexpr (std::is_same_v<std::string, T>) {
+                      } else {
+                        auto result = dynamic_arg.Validate(ctx);
+                        if (!result.ok()) {
+                          return absl::StatusOr<VarTag>(result.status());
+                        }
+                        auto var_ref_dtype = result.value().dtype;
+                        if (var_ref_dtype.IsInteger()) {
+                          get_by_member = false;
+                        } else if (var_ref_dtype.IsStringView() || var_ref_dtype.IsStdStringView()) {
+                          get_by_member = true;
+                        } else {
+                          return absl::StatusOr<VarTag>(absl::InvalidArgumentError(
+                              fmt::format("Can NOT do json get by dtype:{}", var_ref_dtype)));
+                        }
+                      }
+                      if (get_by_member) {
+                        implicit_func_call = kBuiltinJsonMemberGet;
+                      } else {
+                        implicit_func_call = kBuiltinJsonArrayGet;
+                      }
+                      DType json_dtype(DATA_JSON);
+                      ret_dtype = json_dtype.ToPtr();
+                    } else if (var_dtype.dtype.IsVectorPtr() || var_dtype.dtype.IsMapPtr() ||
+                               var_dtype.dtype.IsUnorderedMapPtr()) {
+                      std::string member_func = "get";
+                      auto field_accessor = Reflect::GetStructMember(var_dtype.dtype.PtrTo(), member_func);
+                      if (!field_accessor) {
+                        return absl::StatusOr<VarTag>(ctx.GetErrorStatus(fmt::format(
+                            "Can NOT get member:{} accessor for dtype:{}", member_func, var_dtype.dtype.PtrTo())));
+                      }
+                      if (!field_accessor->member_func.has_value()) {
+                        return absl::StatusOr<VarTag>(ctx.GetErrorStatus(fmt::format(
+                            "Can NOT get member func:{} accessor for dtype:{}", member_func, var_dtype.dtype.PtrTo())));
+                      }
+                      ctx.AddMemberFuncCall(var_dtype.dtype.PtrTo(), member_func, *field_accessor->member_func);
+                      ret_dtype = field_accessor->member_func->return_type;
+                      access_func_names.emplace_back(GetMemberFuncName(var_dtype.dtype.PtrTo(), member_func));
+                    }
+                    if (!implicit_func_call.empty()) {
+                      auto result = ctx.CheckFuncExist(implicit_func_call, true);
                       if (!result.ok()) {
                         return absl::StatusOr<VarTag>(result.status());
                       }
-                      auto var_ref_dtype = result.value().dtype;
-                      if (var_ref_dtype.IsInteger()) {
-                        get_by_member = false;
-                      } else if (var_ref_dtype.IsStringView() || var_ref_dtype.IsStdStringView()) {
-                        get_by_member = true;
-                      } else {
-                        return absl::StatusOr<VarTag>(
-                            absl::InvalidArgumentError(fmt::format("Can NOT do json get by dtype:{}", var_ref_dtype)));
-                      }
+                      access_func_names.emplace_back(std::string(implicit_func_call));
                     }
-                    std::string_view implicit_func_call;
-                    if (get_by_member) {
-                      implicit_func_call = kBuiltinJsonMemberGet;
-                    } else {
-                      implicit_func_call = kBuiltinJsonArrayGet;
-                    }
-                    auto result = ctx.CheckFuncExist(implicit_func_call, true);
-                    if (!result.ok()) {
-                      return absl::StatusOr<VarTag>(result.status());
-                    }
-                    DType json_dtype(DATA_JSON);
-                    DType json_ptr_dtype = json_dtype.ToPtr();
-                    return absl::StatusOr<VarTag>(json_ptr_dtype);
+                    return absl::StatusOr<VarTag>(ret_dtype);
                   },
                   arg);
             }
