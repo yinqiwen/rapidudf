@@ -131,6 +131,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
   auto* str_val = GetSession()->GetIRBuilder()->CreateAlloca(string_view_type);
   ::llvm::Value* zero =
       ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
+
   ::llvm::Value* offset =
       ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
   auto size_field_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(string_view_type, str_val,

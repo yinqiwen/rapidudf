@@ -130,7 +130,7 @@ static void register_exp2() {
 
 template <typename T>
 static void register_floor() {
-  T (*abs_f)(T) = &std::expm1;
+  T (*abs_f)(T) = &std::floor;
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_FLOOR, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);

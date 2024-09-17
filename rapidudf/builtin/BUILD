@@ -22,7 +22,7 @@ cc_library(
     hdrs = ["builtin.h"],
     deps = [
         ":builtin_symbols",
-        "//rapidudf/builtin/simd_vector:simd_ops",
+        "//rapidudf/builtin/simd_vector:simd_vector_ops",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",

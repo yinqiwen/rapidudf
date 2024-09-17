@@ -9,14 +9,16 @@ package(
 )
 
 cc_library(
-    name = "simd_ops",
+    name = "simd_vector_ops",
     srcs = [
         # "simd_ops.cc",
-        "simd_ops2.cc",
-        "simd_sort.cc",
+        "unary_ops.cc",
+        "binary_ops.cc",
+        "ternary_ops.cc",
+        "sort_ops.cc",
     ],
     hdrs = [
-        "simd_ops.h",
+        "ops.h",
     ],
     deps = [
         "//rapidudf/log",
@@ -35,20 +37,10 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "dynamic_test",
-    srcs = ["dynamic_test.cc"],
-    deps = [
-        "//rapidudf/context",
-        "//rapidudf/types:simd_vector",
-        "@com_google_highway//:hwy",
-    ],
-)
-
 cc_test(
-    name = "simd_ops_test",
+    name = "ops_test",
     size = "small",
-    srcs = ["simd_ops_test.cc"],
+    srcs = ["ops_test.cc"],
     copts = [
         # "-march=haswell",
         "-march=haswell",
@@ -57,7 +49,7 @@ cc_test(
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
-        ":simd_ops",
+        ":simd_vector_ops",
         "@com_google_googletest//:gtest_main",
         "@com_google_highway//:hwy",
     ],

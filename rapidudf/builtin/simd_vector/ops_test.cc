@@ -28,7 +28,7 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/builtin/simd_vector/simd_ops.h"
+#include "rapidudf/builtin/simd_vector/ops.h"
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>

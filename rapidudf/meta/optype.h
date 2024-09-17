@@ -95,7 +95,6 @@ enum OpToken {
   OP_CLAMP,
   OP_FMA,
   OP_FMS,
-  OP_MULADDSUB,
   OP_FNMA,
   OP_FNMS,
   OP_SORT,
@@ -122,10 +121,10 @@ constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
     "atan2",         "sinh",       "cosh",       "tanh",        "asinh",
     "acosh",         "exp",        "exp2",       "expm1",       "log",
     "log2",          "log10",      "log1p",      "hypot",       "dot",
-    "iota",          "clamp",      "fma",        "fms",         "muladdsub",
-    "fnma",          "fnms",       "sort",       "select",      "topk",
-    "sort_kv",       "select_kv",  "topk_kv",    "argsort",     "argselect",
-    "sum",           "clone"};
+    "iota",          "clamp",      "fma",        "fms",         "fnma",
+    "fnms",          "sort",       "select",     "topk",        "sort_kv",
+    "select_kv",     "topk_kv",    "argsort",    "argselect",   "sum",
+    "clone"};
 }  // namespace rapidudf
 
 template <>

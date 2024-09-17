@@ -360,12 +360,7 @@ TEST(JitCompiler, vector_pow) {
   auto rc0 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>>(
       expr, {"_", "x", "y"});
   ASSERT_FALSE(rc0.ok());
-  // auto f0 = std::move(rc0.value());
-  // auto result0 = f0(ctx, i_left, i_right);
-  // ASSERT_EQ(result0.Size(), i_left.size());
-  // for (size_t i = 0; i < result0.Size(); i++) {
-  //   ASSERT_EQ(result0[i], std::pow(i_left[i], i_right[i]));
-  // }
+
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
       expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());

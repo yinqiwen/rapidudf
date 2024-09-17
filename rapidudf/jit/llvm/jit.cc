@@ -78,6 +78,7 @@ absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
   if (!session_) {
     return absl::InvalidArgumentError("null compiled session");
   }
+
   auto func_addr_result = GetSession()->jit->lookup(name);
   if (!func_addr_result) {
     RUDF_LOG_RETURN_LLVM_ERROR(func_addr_result.takeError());
@@ -194,12 +195,19 @@ absl::StatusOr<::llvm::FunctionType*> JitCompiler::GetFunctionType(const Functio
 }
 
 absl::Status JitCompiler::CompileFunction(const std::string& source) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   auto f = ast::parse_function_ast(ast_ctx_, source);
   if (!f.ok()) {
     RUDF_LOG_ERROR_STATUS(f.status());
   }
-
-  return CompileFunction(f.value());
+  auto duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  RUDF_INFO("Parse cost {}us", duration.count());
+  auto status = CompileFunction(f.value());
+  auto compile_duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  RUDF_INFO("Total cost {}us", compile_duration.count());
+  return status;
 }
 
 std::string JitCompiler::GetMemberFuncName(DType dtype, const std::string& member) {

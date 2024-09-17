@@ -54,7 +54,7 @@ class Context {
   uint8_t* ArenaAllocate(size_t n);
 
   template <typename T>
-  simd::VectorData NewSimdVector(size_t lanes, size_t n, bool temporary = true) {
+  simd::VectorData NewSimdVector(size_t lanes, size_t n, bool temporary = false) {
     using number_t = typename simd::InternalType<T>::internal_type;
     size_t element_size = get_arena_element_size(n, lanes);
     uint32_t byte_size = sizeof(number_t) * element_size;
