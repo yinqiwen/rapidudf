@@ -31,7 +31,8 @@
 
 #pragma once
 
-#include "absl/container/flat_hash_map.h"
+#include "rapidudf/common/lru_cache.h"
+#include "rapidudf/jit/function.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/log/log.h"
 
@@ -50,14 +51,15 @@ class JitCompilerCache {
     (arg_types.emplace_back(get_dtype<Args>()), ...);
     {
       std::lock_guard<std::mutex> guard(cache_mutex);
-      auto found = cache_map.find(source);
-      if (found != cache_map.end()) {
-        auto& cache_item = found->second;
+      auto found = cache_map.get(source);
+      if (found) {
+        auto& cache_item = *found;
         cache_item.latest_visit_time = std::chrono::high_resolution_clock::now();
         for (auto& cache_func : cache_item.funcs) {
           if (cache_func.desc.CompareSignature(return_type, arg_types)) {
             RUDF_DEBUG("Cache hit for key:{}", source);
-            return JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_item.session, false);
+            return JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_item.session,
+                                             cache_func.stat);
           }
         }
       }
@@ -78,18 +80,19 @@ class JitCompilerCache {
     cache_func.desc.name = std::string(JitCompiler::kExpressionFuncName);
     cache_func.desc.arg_types = arg_types;
     cache_func.desc.return_type = return_type;
+    cache_func.stat = compiler.GetStat();
     {
       std::lock_guard<std::mutex> guard(cache_mutex);
-      auto found = cache_map.find(source);
-      if (found != cache_map.end()) {
-        auto& cache_item = found->second;
+      auto found = cache_map.get(source);
+      if (found) {
+        auto& cache_item = *found;
         cache_item.latest_visit_time = std::chrono::high_resolution_clock::now();
         cache_item.funcs.emplace_back(cache_func);
       } else {
         CacheItem cache_item;
         cache_item.latest_visit_time = std::chrono::high_resolution_clock::now();
         cache_item.funcs.emplace_back(cache_func);
-        cache_map[source] = cache_item;
+        cache_map.insert(source, cache_item);
       }
     }
     return ret_func;
@@ -103,14 +106,15 @@ class JitCompilerCache {
     (arg_types.emplace_back(get_dtype<Args>()), ...);
     {
       std::lock_guard<std::mutex> guard(cache_mutex);
-      auto found = cache_map.find(source);
-      if (found != cache_map.end()) {
-        auto& cache_item = found->second;
+      auto found = cache_map.get(source);
+      if (found) {
+        auto& cache_item = *found;
         cache_item.latest_visit_time = std::chrono::high_resolution_clock::now();
         for (auto& cache_func : cache_item.funcs) {
           if (cache_func.desc.CompareSignature(return_type, arg_types)) {
             RUDF_DEBUG("Cache hit for key:{}", source);
-            return JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_item.session, false);
+            return JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_item.session,
+                                             cache_func.stat);
           }
         }
         return absl::NotFoundError("No func found in cache.");
@@ -136,14 +140,16 @@ class JitCompilerCache {
       CacheFunction cache_func;
       cache_func.desc = desc;
       cache_func.func = func_ptr;
+      cache_func.stat = compiler.GetStat();
       cache_item.funcs.emplace_back(cache_func);
       if (cache_func.desc.CompareSignature(return_type, arg_types)) {
-        found_func = JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_item.session, false);
+        found_func =
+            JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_item.session, cache_func.stat);
       }
     }
     {
       std::lock_guard<std::mutex> guard(cache_mutex);
-      cache_map[source] = cache_item;
+      cache_map.insert(source, cache_item);
     }
     if (found_func.has_value()) {
       return std::move(*found_func);
@@ -151,13 +157,16 @@ class JitCompilerCache {
     return absl::NotFoundError("No func found in compiled source.");
   }
 
-  // slow function
-  static size_t RemoveExpiredCache(std::chrono::seconds ttl_secs);
+  static void ResetLRUCacheSize(size_t n);
+  static size_t GetLRUCacheCapacity() { return GetCache().capacity(); }
+  static size_t GetLRUCacheSize() { return GetCache().size(); }
 
  private:
+  static const int kDefaultLRUCacheSize = 10000;
   struct CacheFunction {
     FunctionDesc desc;
     void* func = nullptr;
+    JitFunctionStat stat;
     std::shared_ptr<JitSession> expr_session;
   };
   struct CacheItem {
@@ -166,9 +175,9 @@ class JitCompilerCache {
     std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> latest_visit_time;
     void Merge(CacheItem& other) {}
   };
-  using CacheMap = absl::flat_hash_map<std::string, CacheItem>;
+  using CacheMap = lru_cache<std::string, CacheItem>;
   static CacheMap& GetCache() {
-    static CacheMap cache;
+    static CacheMap cache(kDefaultLRUCacheSize);
     return cache;
   }
   static std::mutex& GetCacheMutex() {

@@ -172,6 +172,14 @@ void JitCompiler::NewSession(bool print_asm) {
   // func_pass_manager_->addPass(::llvm::createPartiallyInlineLibCallsPass());
 }
 
+JitFunctionStat JitCompiler::GetStat() {
+  JitFunctionStat ret;
+  if (session_) {
+    ret = session_->stat;
+  }
+  return ret;
+}
+
 ValuePtr JitCompiler::NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type) {
   return Value::New(dtype, this, val, type);
 }
@@ -203,18 +211,14 @@ absl::Status JitCompiler::CompileFunction(const std::string& source) {
   }
   auto duration =
       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
-  RUDF_INFO("Parse cost {}us", duration.count());
+  GetSession()->stat.parse_cost = duration;
+  start_time = std::chrono::high_resolution_clock::now();
   auto status = CompileFunction(f.value());
   auto compile_duration =
       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
-  RUDF_INFO("Total cost {}us", compile_duration.count());
+  GetSession()->stat.parse_cost = compile_duration;
   return status;
 }
-
-// std::string JitCompiler::GetMemberFuncName(DType dtype, const std::string& member) {
-//   std::string fname = fmt::format("{}_{}", dtype.GetTypeString(), member);
-//   return fname;
-// }
 
 absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& functions) {
   ast::ParseContext::FunctionCallMap all_func_calls;
@@ -285,16 +289,23 @@ absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& fun
 }
 
 absl::Status JitCompiler::CompileExpression(const std::string& expr, ast::Function& function) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   auto f = ast::parse_expression_ast(ast_ctx_, expr, function.ToFuncDesc());
   if (!f.ok()) {
     RUDF_LOG_ERROR_STATUS(f.status());
   }
-  // RUDF_INFO("after ast parse, {}", ast_ctx_.)
+  auto duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  GetSession()->stat.parse_cost = duration;
+  start_time = std::chrono::high_resolution_clock::now();
   ast::ReturnStatement return_statement;
   return_statement.expr = *f;
   function.body.statements.emplace_back(return_statement);
-
-  return CompileFunctions(std::vector<ast::Function>{function});
+  auto compile_duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  auto status = CompileFunctions(std::vector<ast::Function>{function});
+  GetSession()->stat.parse_cost = compile_duration;
+  return status;
 }
 
 absl::Status JitCompiler::CompileFunction(const ast::Function& function) {
@@ -302,21 +313,28 @@ absl::Status JitCompiler::CompileFunction(const ast::Function& function) {
 }
 
 absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::string& source, bool dump_asm) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   std::lock_guard<std::mutex> guard(jit_mutex_);
   NewSession(dump_asm);
   auto funcs = ast::parse_functions_ast(ast_ctx_, source);
   if (!funcs.ok()) {
     RUDF_LOG_ERROR_STATUS(funcs.status());
   }
+  auto duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  GetSession()->stat.parse_cost = duration;
+  start_time = std::chrono::high_resolution_clock::now();
   std::vector<std::string> fnames;
   for (auto& func : funcs.value()) {
     fnames.emplace_back(func.name);
   }
-
   auto status = CompileFunctions(funcs.value());
   if (!status.ok()) {
     return status;
   }
+  auto compile_duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  GetSession()->stat.parse_cost = compile_duration;
   return fnames;
 }
 

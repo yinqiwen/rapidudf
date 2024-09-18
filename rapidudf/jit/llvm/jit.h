@@ -95,7 +95,7 @@ class JitCompiler {
       return func_ptr_result.status();
     }
     auto func_ptr = func_ptr_result.value();
-    return JitFunction<RET, Args...>(name, func_ptr, session_, false);
+    return JitFunction<RET, Args...>(name, func_ptr, session_, GetStat());
   }
 
   template <typename RET, typename... Args>
@@ -122,7 +122,7 @@ class JitCompiler {
     }
     auto func_ptr = func_ptr_result.value();
 
-    return JitFunction<RET, Args...>(fname, func_ptr, session_, false);
+    return JitFunction<RET, Args...>(fname, func_ptr, session_, GetStat());
   }
 
   template <typename RET, typename... Args>
@@ -166,7 +166,7 @@ class JitCompiler {
     }
     auto func_ptr = func_ptr_result.value();
 
-    return JitFunction<RET, Args...>(gen_func_ast.name, func_ptr, session_, false);
+    return JitFunction<RET, Args...>(gen_func_ast.name, func_ptr, session_, GetStat());
   }
 
  private:
@@ -174,6 +174,7 @@ class JitCompiler {
   void NewSession(bool print_asm);
   absl::Status Compile();
   absl::StatusOr<void*> GetFunctionPtr(const std::string& name);
+  JitFunctionStat GetStat();
 
   ValuePtr NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type = nullptr);
 

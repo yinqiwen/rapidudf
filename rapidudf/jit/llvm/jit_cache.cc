@@ -32,28 +32,6 @@
 #include "rapidudf/jit/llvm/jit_session.h"
 namespace rapidudf {
 namespace llvm {
-size_t JitCompilerCache::RemoveExpiredCache(std::chrono::seconds ttl_secs) {
-  auto& cache_map = GetCache();
-  auto& cache_mutex = GetCacheMutex();
-  std::vector<std::string> expired_keys;
-  {
-    std::lock_guard<std::mutex> guard(cache_mutex);
-    for (auto& [key, item] : cache_map) {
-      auto duration = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() -
-                                                                       item.latest_visit_time);
-      if (duration > ttl_secs) {
-        expired_keys.emplace_back(key);
-      }
-    }
-  }
-  if (!expired_keys.empty()) {
-    std::lock_guard<std::mutex> guard(cache_mutex);
-    for (auto& key : expired_keys) {
-      cache_map.erase(key);
-      RUDF_INFO("Remove expired compiled source:{}", key);
-    }
-  }
-  return expired_keys.size();
-}
+void JitCompilerCache::ResetLRUCacheSize(size_t n) { GetCache().reset_capacity(n); }
 }  // namespace llvm
 }  // namespace rapidudf

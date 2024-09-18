@@ -70,6 +70,7 @@ cc_library(
     copts = RUDF_DEFAULT_COPTS,
     deps = [
         ":jit",
+        "//rapidudf/common:lru_cache",
         "@com_google_absl//absl/container:flat_hash_map",
     ],
 )

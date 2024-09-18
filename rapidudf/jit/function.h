@@ -30,19 +30,26 @@
 */
 
 #pragma once
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
 #include "rapidudf/meta/function.h"
 
 namespace rapidudf {
+
+struct JitFunctionStat {
+  std::chrono::microseconds parse_cost;
+  std::chrono::microseconds compile_cost;
+};
+
 template <typename RET, typename... Args>
 class JitFunction {
  public:
   JitFunction() = default;
   template <typename T>
-  explicit JitFunction(const std::string& name, const void* f, std::shared_ptr<T> resource, bool reset_arena)
-      : name_(name), resource_(resource) {
+  explicit JitFunction(const std::string& name, const void* f, std::shared_ptr<T> resource, const JitFunctionStat& stat)
+      : name_(name), resource_(resource), stat_(stat) {
     f_ = reinterpret_cast<RET (*)(Args...)>(const_cast<void*>(f));
   }
   JitFunction(JitFunction&& other) { MoveFrom(std::move(other)); }
@@ -53,7 +60,7 @@ class JitFunction {
     MoveFrom(std::move(other));
     return *this;
   }
-
+  const JitFunctionStat& Stats() const { return stat_; }
   const std::string& GetName() const { return name_; }
 
   RET operator()(Args... args) {
@@ -73,13 +80,13 @@ class JitFunction {
   std::string name_;
   std::shared_ptr<void> resource_;
   RET (*f_)(Args...) = nullptr;
-
-  // bool reset_arena_ = false;
+  JitFunctionStat stat_;
 
   void MoveFrom(JitFunction&& other) {
     name_ = std::move(other.name_);
     resource_ = std::move(other.resource_);
     f_ = other.f_;
+    stat_ = other.stat_;
   }
 };
 
