@@ -51,6 +51,7 @@ TEST(JitCompiler, member_methods) {
   TestMethodStruct test;
   rapidudf::JitCompiler compiler;
   std::string source = R"(
+    // "TestMethodStruct x" is  a pointer/reference of 'TestMethodStruct'  
     int test_func(TestMethodStruct x, int a){
       x.set_a(a);
       return x.get_a();

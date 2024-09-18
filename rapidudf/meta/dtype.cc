@@ -30,6 +30,7 @@
 */
 #include "rapidudf/meta/dtype.h"
 #include <cxxabi.h>
+#include <memory>
 #include "rapidudf/log/log.h"
 namespace rapidudf {
 
@@ -37,8 +38,8 @@ static std::unordered_map<std::string, DType>& getNameDTypeMap() {
   static std::unordered_map<std::string, DType> name_to_dtype;
   return name_to_dtype;
 }
-static std::unordered_map<uint64_t, std::string>& getDTypeNameMap() {
-  static std::unordered_map<uint64_t, std::string> dtype_to_name;
+static std::unordered_map<DType, std::string>& getDTypeNameMap() {
+  static std::unordered_map<DType, std::string> dtype_to_name;
   return dtype_to_name;
 }
 
@@ -59,7 +60,7 @@ std::string_view DTypeFactory::GetNameByDType(DType dtype) {
   if (base_type >= DATA_VOID && base_type <= DATA_JSON) {
     return kFundamentalTypeStrs[base_type];
   }
-  auto found = getDTypeNameMap().find(dtype.Control());
+  auto found = getDTypeNameMap().find(dtype);
   if (found != getDTypeNameMap().end()) {
     return found->second;
   }
@@ -77,10 +78,49 @@ DType DTypeFactory::GetDTypeByName(const std::string& name) {
 bool DTypeFactory::AddNameDType(const std::string& name, DType dtype) {
   bool r = getNameDTypeMap().emplace(name, dtype).second;
   if (r) {
-    getDTypeNameMap().emplace(dtype.Control(), name);
+    getDTypeNameMap().emplace(dtype, name);
   }
   return r;
 }
+DType::DType(const DType& other) : control_(other.Control()), element_types_(other.element_types_) {}
+DType& DType::operator=(const DType& other) {
+  control_ = other.Control();
+  element_types_ = other.element_types_;
+  return *this;
+}
+
+bool DType::IsComplexObj() const { return t0_ == DATA_COMPLEX_OBJECT; }
+
+uint64_t DType::Control() const { return control_; }
+int DType::Compare(const DType& other) const {
+  int64_t ret = static_cast<int64_t>(Control()) - static_cast<int64_t>(other.Control());
+  if (ret != 0) {
+    return ret;
+  }
+  if (element_types_.size() != other.element_types_.size()) {
+    return static_cast<int64_t>(element_types_.size()) - static_cast<int64_t>(other.element_types_.size());
+  }
+  for (size_t i = 0; i < other.element_types_.size(); i++) {
+    int cmp_ret = 0;
+    if (element_types_[i] && other.element_types_[i]) {
+      cmp_ret = element_types_[i]->Compare(*other.element_types_[i]);
+    } else {
+      int left = element_types_[i] ? 1 : 0;
+      int right = other.element_types_[i] ? 1 : 0;
+      cmp_ret = left - right;
+    }
+    if (cmp_ret != 0) {
+      return cmp_ret;
+    }
+  }
+  return 0;
+}
+bool DType::operator==(const DType& other) const { return Compare(other) == 0; }
+bool DType::operator!=(const DType& other) const { return Compare(other) != 0; }
+bool DType::operator>(const DType& other) const { return Compare(other) > 0; }
+bool DType::operator<(const DType& other) const { return Compare(other) < 0; }
+bool DType::operator>=(const DType& other) const { return Compare(other) >= 0; }
+bool DType::operator<=(const DType& other) const { return Compare(other) <= 0; }
 
 bool DType::IsSigned() const {
   switch (t0_) {
@@ -98,14 +138,79 @@ bool DType::IsSigned() const {
   }
 }
 
+void DType::SetElement(size_t idx, DType&& dtype) {
+  if (element_types_.size() <= idx) {
+    element_types_.resize(idx + 1);
+  }
+  element_types_[idx] = std::make_shared<DType>(std::move(dtype));
+}
+DType DType::PtrTo() const {
+  if (IsComplexObj() && element_types_.size() > 0) {
+    return *element_types_[0];
+  }
+  DType result;
+  result.control_ = control_;
+  result.ptr_bit_ = 0;
+  result.element_types_ = element_types_;
+  return result;
+}
+DType DType::ToSimdVector() const {
+  DType result;
+  result.control_ = control_;
+  result.container_type_ = COLLECTION_SIMD_VECTOR;
+  result.element_types_ = element_types_;
+  return result;
+}
+DType DType::ToPtr() const {
+  DType ret(this->control_);
+  ret.ptr_bit_ = 1;
+  ret.element_types_ = element_types_;
+  return ret;
+}
+DType DType::ToVector() const {
+  DType result;
+  result.control_ = control_;
+  result.container_type_ = COLLECTION_VECTOR;
+  result.element_types_ = element_types_;
+  return result;
+}
+DType DType::ToAbslSpan() const {
+  DType result;
+  result.control_ = control_;
+  result.container_type_ = COLLECTION_ABSL_SPAN;
+  result.element_types_ = element_types_;
+  return result;
+}
+DType DType::ToCollection(CollectionType t) const {
+  DType result;
+  result.control_ = control_;
+  result.container_type_ = t;
+  result.element_types_ = element_types_;
+  return result;
+}
+
 DType DType::Key() const {
   DType result;
   if (container_type_ == COLLECTION_MAP || container_type_ == COLLECTION_UNORDERED_MAP) {
+    if (element_types_.size() > 0 && element_types_[0]) {
+      return *element_types_[0];
+    }
     result.t0_ = t0_;
   }
   return result;
 }
 DType DType::Elem() const {
+  if (element_types_.size() > 0) {
+    if (IsMap() || IsUnorderedMap()) {
+      if (element_types_.size() == 2 && element_types_[1]) {
+        return *element_types_[1];
+      }
+    } else {
+      if (element_types_[0]) {
+        return *element_types_[0];
+      }
+    }
+  }
   DType result;
   result.control_ = control_;
   if (result.container_type_ == COLLECTION_MAP || result.container_type_ == COLLECTION_UNORDERED_MAP) {
@@ -194,9 +299,6 @@ bool DType::CanCastTo(DType other) const {
 }
 
 std::vector<DType> DType::ExtractTupleDtypes() const {
-  // if (!IsTuple()) {
-  //   return {};
-  // }
   if (!IsTuple()) {
     return {*this};
   }

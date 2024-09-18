@@ -43,10 +43,11 @@ RUDF_STRUCT_FIELDS(TestInternal, a)
 struct TestStruct {
   int a = 0;
   TestInternal internal;
+  TestInternal* internal_ptr = nullptr;
   std::vector<int> vec;
 };
 
-RUDF_STRUCT_FIELDS(TestStruct, internal, a, vec)
+RUDF_STRUCT_FIELDS(TestStruct, internal, internal_ptr, a, vec)
 
 TEST(JitCompiler, struct_access) {
   spdlog::set_level(spdlog::level::debug);
@@ -54,17 +55,23 @@ TEST(JitCompiler, struct_access) {
   t.a = 101;
   t.internal.a = 102;
   JitCompiler compiler;
-  std::string source = R"(
-    int test_func(TestStruct x){
-      return x.internal.a;
-    }
-  )";
-  auto rc = compiler.CompileFunction<int, const TestStruct&>(source);
+  std::string source = "x.internal.a";
+  auto rc = compiler.CompileExpression<int, const TestStruct&>(source, {"x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(t), t.internal.a);
   t.a = 1200;
   ASSERT_EQ(f(t), t.internal.a);
+
+  TestInternal tmp;
+  t.internal_ptr = &tmp;
+  std::string ptr_source = "x.internal_ptr.a";
+  rc = compiler.CompileExpression<int, const TestStruct&>(ptr_source, {"x"});
+  ASSERT_TRUE(rc.ok());
+  f = std::move(rc.value());
+  ASSERT_EQ(f(t), t.internal_ptr->a);
+  tmp.a = 1200;
+  ASSERT_EQ(f(t), t.internal_ptr->a);
 }
 
 TEST(JitCompiler, return_cast) {

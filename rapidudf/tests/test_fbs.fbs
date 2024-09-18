@@ -4,13 +4,12 @@ table Item {
   id:uint;
 }
 
-table Header {
+table FBSStruct {
   id:uint;
-  scene:string;
-  tags:[string];
+  str:string;
+  item:Item;
+  strs:[string];
   items:[Item];
   ints:[uint];
-  strs:[string];
-  item:Item;
 }
-root_type Header;
+root_type FBSStruct;

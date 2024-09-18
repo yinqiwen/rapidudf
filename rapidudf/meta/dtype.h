@@ -36,6 +36,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -97,6 +98,7 @@ enum FundamentalType {
   DATA_CONTEXT,
 
   DATA_OBJECT_BEGIN = 64,
+  DATA_COMPLEX_OBJECT = (1 << 14) - 1,
 };
 
 using u8 = uint8_t;
@@ -126,10 +128,9 @@ class DType {
     t2_ = t2;
     t3_ = t3;
   }
-  DType(const DType& other) : control_(other.Control()) {}
-  uint64_t Control() const { return control_; }
-  void SetPtr(bool v) { ptr_bit_ = (v ? 1 : 0); }
-  void SetCollectionType(CollectionType t) { container_type_ = t; }
+  DType(const DType& other);
+  void SetElement(size_t idx, DType&& dtype);
+  uint64_t Control() const;
   FundamentalType GetFundamentalType() const { return static_cast<FundamentalType>(t0_); }
   bool IsSimdVector() const { return container_type_ == COLLECTION_SIMD_VECTOR; }
   bool IsVector() const { return container_type_ == COLLECTION_VECTOR; }
@@ -140,6 +141,7 @@ class DType {
   bool IsSet() const { return container_type_ == COLLECTION_SET; }
   bool IsCollection() const { return container_type_ != 0; }
   bool IsPtr() const { return ptr_bit_ == 1; }
+  bool IsIntegerPtr() const { return IsPtr() && (PtrTo().IsInteger()); }
   bool IsSimdVectorBit() const { return container_type_ == COLLECTION_SIMD_VECTOR && t0_ == DATA_BIT; }
   bool IsPrimitive() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_STRING_VIEW); }
   bool IsFundamental() const { return ptr_bit_ == 0 && container_type_ == 0; }
@@ -165,41 +167,18 @@ class DType {
   bool IsContextPtr() const { return IsPtr() && (PtrTo().IsContext()); }
   bool IsStringPtr() const { return IsPtr() && (PtrTo().IsString()); }
   bool IsInvalid() const { return Control() == 0; }
+  bool IsComplexObj() const;
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
   bool CanCastTo(DType other) const;
 
   DType Key() const;
   DType Elem() const;
-  DType PtrTo() const {
-    DType result;
-    result.control_ = control_;
-    result.ptr_bit_ = 0;
-    return result;
-  }
-  DType ToSimdVector() const {
-    DType result;
-    result.control_ = control_;
-    result.container_type_ = COLLECTION_SIMD_VECTOR;
-    return result;
-  }
-
-  DType ToPtr() const {
-    DType ret(this->control_);
-    ret.ptr_bit_ = 1;
-    return ret;
-  }
-  DType ToVector() const {
-    DType result;
-    result.control_ = control_;
-    result.container_type_ = COLLECTION_VECTOR;
-    return result;
-  }
-  DType ToAbslSpan() const {
-    DType result;
-    result.control_ = control_;
-    result.container_type_ = COLLECTION_ABSL_SPAN;
-    return result;
-  }
+  DType PtrTo() const;
+  DType ToSimdVector() const;
+  DType ToPtr() const;
+  DType ToVector() const;
+  DType ToAbslSpan() const;
+  DType ToCollection(CollectionType t) const;
   uint32_t TupleSize() const;
   std::vector<DType> ExtractTupleDtypes() const;
 
@@ -214,16 +193,14 @@ class DType {
     return n;
   }
 
-  DType& operator=(const DType& other) {
-    control_ = other.Control();
-    return *this;
-  }
-  bool operator==(const DType& other) const { return control_ == other.control_; }
-  bool operator!=(const DType& other) const { return control_ != other.control_; }
-  bool operator>(const DType& other) const { return t0_ > other.t0_; }
-  bool operator<(const DType& other) const { return t0_ < other.t0_; }
-  bool operator>=(const DType& other) const { return t0_ >= other.t0_; }
-  bool operator<=(const DType& other) const { return t0_ <= other.t0_; }
+  DType& operator=(const DType& other);
+  bool operator==(const DType& other) const;
+  bool operator!=(const DType& other) const;
+  bool operator>(const DType& other) const;
+  bool operator<(const DType& other) const;
+  bool operator>=(const DType& other) const;
+  bool operator<=(const DType& other) const;
+  int Compare(const DType& other) const;
 
   template <typename T>
   std::optional<T> ToPrimitiveValue(uint64_t bin);
@@ -250,8 +227,9 @@ class DType {
     };
     uint64_t control_;
   };
+  std::vector<std::shared_ptr<DType>> element_types_;
 };
-static_assert(sizeof(DType) == 8, "sizeof(DType) != 8");
+// static_assert(sizeof(DType) == 8, "sizeof(DType) != 8");
 
 template <typename T>
 DType get_dtype();
@@ -321,82 +299,130 @@ DType get_dtype() {
 
   if constexpr (std::is_pointer<T>::value) {
     using Origin = std::remove_pointer_t<T>;
-    if constexpr (std::is_pointer<Origin>::value) {
-      static_assert(sizeof(Origin) == -1, "Can NOT get dtype for ptr of ptr");
-      return {};
-    }
+    // if constexpr (std::is_pointer<Origin>::value) {
+    //   static_assert(sizeof(Origin) == -1, "Can NOT get dtype for ptr of ptr");
+    //   return {};
+    // }
     auto v = get_dtype<Origin>();
-    v.SetPtr(true);
-    return v;
+    if (v.IsPtr()) {
+      DType complex(DATA_COMPLEX_OBJECT);
+      complex = complex.ToPtr();
+      complex.SetElement(0, std::move(v));
+      return complex;
+    } else {
+      return v.ToPtr();
+    }
   }
   if constexpr (std::is_reference_v<T>) {
     using Origin = std::remove_reference_t<T>;
-    if constexpr (std::is_pointer<Origin>::value) {
-      static_assert(sizeof(Origin) == -1, "Can NOT get dtype");
-      return {};
-    }
+    // if constexpr (std::is_pointer<Origin>::value) {
+    //   static_assert(sizeof(Origin) == -1, "Can NOT get dtype");
+    //   return {};
+    // }
     auto v = get_dtype<Origin>();
-    v.SetPtr(true);
-    return v;
+    if (v.IsPtr()) {
+      DType complex(DATA_COMPLEX_OBJECT);
+      complex = complex.ToPtr();
+      complex.SetElement(0, std::move(v));
+      return complex;
+    } else {
+      return v.ToPtr();
+    }
   }
   if constexpr (is_specialization<T, simd::Vector>::value) {
     using val_type = typename T::value_type;
     RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
     auto v = get_dtype<typename T::value_type>();
-    v.SetCollectionType(COLLECTION_SIMD_VECTOR);
-    return v;
+    return v.ToCollection(COLLECTION_SIMD_VECTOR);
   }
   if constexpr (is_specialization<T, std::vector>::value) {
     using val_type = typename T::value_type;
-    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
-    auto v = get_dtype<typename T::value_type>();
-    v.SetCollectionType(COLLECTION_VECTOR);
-    return v;
+    // RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
+    auto v = get_dtype<val_type>();
+    if (v.IsPtr() || v.IsCollection()) {
+      DType complex(DATA_COMPLEX_OBJECT);
+      complex = complex.ToVector();
+      complex.SetElement(0, std::move(v));
+      return complex;
+    } else {
+      return v.ToCollection(COLLECTION_VECTOR);
+    }
   }
   if constexpr (is_specialization<T, std::set>::value || is_specialization<T, std::unordered_set>::value) {
     using val_type = typename T::value_type;
-    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
-    auto v = get_dtype<typename T::value_type>();
+    // RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
+    auto v = get_dtype<val_type>();
+    CollectionType t;
     if constexpr (is_specialization<T, std::set>::value) {
-      v.SetCollectionType(COLLECTION_SET);
+      t = COLLECTION_SET;
     } else {
-      v.SetCollectionType(COLLECTION_UNORDERED_SET);
+      t = COLLECTION_UNORDERED_SET;
     }
-    return v;
+    if (v.IsPtr() || v.IsCollection()) {
+      DType complex(DATA_COMPLEX_OBJECT);
+      complex = complex.ToCollection(t);
+      complex.SetElement(0, std::move(v));
+      return complex;
+    } else {
+      return v.ToCollection(t);
+    }
   }
   if constexpr (is_specialization<T, absl::Span>::value) {
     using val_type = typename T::value_type;
-    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
-    auto v = get_dtype<typename T::value_type>();
-    v.SetCollectionType(COLLECTION_ABSL_SPAN);
-    return v;
-  }
-  if constexpr (is_specialization<T, std::map>::value || is_specialization<T, std::unordered_map>::value) {
-    using key_type = typename T::key_type;
-    using val_type = typename T::mapped_type;
-    RETURN_IF_NOT_FUNDAMENTAL_TYPE(key_type)
-    RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
-    auto key_v = get_dtype<key_type>();
-    auto value_v = get_dtype<val_type>();
-    DType v(key_v.GetFundamentalType(), value_v.GetFundamentalType());
-    if constexpr (is_specialization<T, std::map>::value) {
-      v.SetCollectionType(COLLECTION_MAP);
+    // RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
+    auto v = get_dtype<val_type>();
+    if (v.IsPtr() || v.IsCollection()) {
+      DType complex(DATA_COMPLEX_OBJECT);
+      complex = complex.ToCollection(COLLECTION_ABSL_SPAN);
+      complex.SetElement(0, std ::move(v));
+      return complex;
     } else {
-      v.SetCollectionType(COLLECTION_UNORDERED_MAP);
+      return v.ToCollection(COLLECTION_ABSL_SPAN);
     }
-    return v;
   }
+  if constexpr (is_specialization<T, std::map>::value || is_specialization<T, std::unordered_map>::value ||
+                is_specialization<T, std::pair>::value) {
+    DType key_v, value_v;
+    if constexpr (is_specialization<T, std::map>::value || is_specialization<T, std::unordered_map>::value) {
+      using key_type = typename T::key_type;
+      using val_type = typename T::mapped_type;
+      key_v = get_dtype<key_type>();
+      value_v = get_dtype<val_type>();
+    } else {
+      using first_type = typename T::first_type;
+      using second_type = typename T::second_type;
+      key_v = get_dtype<first_type>();
+      value_v = get_dtype<second_type>();
+    }
 
-  if constexpr (is_specialization<T, std::pair>::value) {
-    using first_type = typename T::first_type;
-    using second_type = typename T::second_type;
-    RETURN_IF_NOT_FUNDAMENTAL_TYPE(first_type)
-    RETURN_IF_NOT_FUNDAMENTAL_TYPE(second_type)
-    auto key_v = get_dtype<first_type>();
-    auto value_v = get_dtype<second_type>();
-    DType v(key_v.GetFundamentalType(), value_v.GetFundamentalType());
-    v.SetCollectionType(COLLECTION_TUPLE);
-    return v;
+    CollectionType t;
+    if constexpr (is_specialization<T, std::map>::value) {
+      t = COLLECTION_MAP;
+    } else if constexpr (is_specialization<T, std::unordered_map>::value) {
+      t = COLLECTION_UNORDERED_MAP;
+    } else {
+      t = COLLECTION_TUPLE;
+    }
+
+    FundamentalType key_t, value_t;
+    if (key_v.IsPtr() || key_v.IsCollection()) {
+      key_t = DATA_COMPLEX_OBJECT;
+    } else {
+      key_t = key_v.GetFundamentalType();
+    }
+    if (value_v.IsPtr() || value_v.IsCollection()) {
+      value_t = DATA_COMPLEX_OBJECT;
+    } else {
+      value_t = value_v.GetFundamentalType();
+    }
+    DType v(key_t, value_t);
+    if (key_t == DATA_COMPLEX_OBJECT) {
+      v.SetElement(0, std::move(key_v));
+    }
+    if (value_t == DATA_COMPLEX_OBJECT) {
+      v.SetElement(1, std::move(value_v));
+    }
+    return v.ToCollection(t);
   }
 
   if constexpr (is_specialization<T, std::tuple>::value) {
@@ -414,9 +440,42 @@ DType get_dtype() {
     if constexpr (std::tuple_size_v<T> > 3) {
       d3 = get_dtype<typename std::tuple_element<3, T>::type>();
     }
-    DType v(d0.GetFundamentalType(), d1.GetFundamentalType(), d2.GetFundamentalType(), d3.GetFundamentalType());
-    v.SetCollectionType(COLLECTION_TUPLE);
-    return v;
+
+    FundamentalType t0, t1, t2, t3;
+    if (d0.IsPtr() || d0.IsCollection()) {
+      t0 = DATA_COMPLEX_OBJECT;
+    } else {
+      t0 = d0.GetFundamentalType();
+    }
+    if (d1.IsPtr() || d1.IsCollection()) {
+      t1 = DATA_COMPLEX_OBJECT;
+    } else {
+      t1 = d1.GetFundamentalType();
+    }
+    if (d2.IsPtr() || d2.IsCollection()) {
+      t2 = DATA_COMPLEX_OBJECT;
+    } else {
+      t2 = d2.GetFundamentalType();
+    }
+    if (d3.IsPtr() || d3.IsCollection()) {
+      t3 = DATA_COMPLEX_OBJECT;
+    } else {
+      t3 = d3.GetFundamentalType();
+    }
+    DType v(t0, t1, t2, t3);
+    if (t0 == DATA_COMPLEX_OBJECT) {
+      v.SetElement(0, std::move(d0));
+    }
+    if (t1 == DATA_COMPLEX_OBJECT) {
+      v.SetElement(1, std::move(d1));
+    }
+    if (t2 == DATA_COMPLEX_OBJECT) {
+      v.SetElement(1, std::move(d2));
+    }
+    if (t3 == DATA_COMPLEX_OBJECT) {
+      v.SetElement(1, std::move(d3));
+    }
+    return v.ToCollection(COLLECTION_TUPLE);
   }
 
   if constexpr (std::is_same_v<bool, T>) {

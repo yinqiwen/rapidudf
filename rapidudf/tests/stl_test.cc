@@ -97,6 +97,23 @@ TEST(JitCompiler, map_access) {
   ASSERT_EQ(str_f(map), "v1");
 }
 
+TEST(JitCompiler, map_vector_access) {
+  spdlog::set_level(spdlog::level::debug);
+  std::map<std::string, std::vector<std::string>> map{{"t0", {"v00", "v01"}}, {"t1", {"v10", "v11"}}};
+  JitCompiler compiler;
+  reflect::register_stl_collection_member_funcs<std::map<std::string, std::vector<std::string>>>();
+  auto result = compiler.CompileExpression<int, std::map<std::string, std::vector<std::string>>&>("x.size()", {"x"});
+  ASSERT_TRUE(result.ok());
+  auto f = std::move(result.value());
+  ASSERT_EQ(f(map), map.size());
+
+  auto get_f_result =
+      compiler.CompileExpression<StringView, std::map<std::string, std::vector<std::string>>&>(R"(x["t1"][1])", {"x"});
+  ASSERT_TRUE(get_f_result.ok());
+  auto str_f = std::move(get_f_result.value());
+  ASSERT_EQ(str_f(map), "v11");
+}
+
 TEST(JitCompiler, unordered_map_access) {
   spdlog::set_level(spdlog::level::debug);
   std::unordered_map<std::string, std::string> map{{"t0", "v0"}, {"t1", "v1"}};

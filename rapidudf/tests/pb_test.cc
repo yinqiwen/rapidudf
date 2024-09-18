@@ -38,157 +38,143 @@ using namespace rapidudf;
 using namespace rapidudf::ast;
 
 // RUDF_STRUCT_MEMBER_METHODS(::test::Item, id)
-RUDF_PB_FIELDS(::test::Header, id, scene, items, item_map, mapping, items_size)
 RUDF_PB_FIELDS(::test::Item, id)
+RUDF_PB_FIELDS(::test::PBStruct, id, str, ids_array, strs_array, item_array, item_map, item_map, str_int_map)
 
-RUDF_PB_SET_FIELDS(::test::Header, id, scene)
+RUDF_PB_SET_FIELDS(::test::PBStruct, id, str)
 
 TEST(JitCompiler, pb_access_read_int) {
   spdlog::set_level(spdlog::level::debug);
 
-  ::test::Header pb_header;
-  pb_header.set_scene("");
-  pb_header.set_id(101);
-  pb_header.set_scene("hello,world");
+  ::test::PBStruct pb;
+  pb.set_id(101);
+  pb.set_str("hello,world");
 
   JitCompiler compiler;
-  std::string source = R"(
-    int test_func(test::Header x){
-      return x.id();
-    }
-   )";
-  auto rc = compiler.CompileFunction<int, const test::Header&>(source);
+  std::string source = "x.id()";
+  auto rc = compiler.CompileExpression<int, const test::PBStruct&>(source, {"x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(pb_header), pb_header.id());
-  pb_header.set_id(2000);
-  ASSERT_EQ(f(pb_header), pb_header.id());
+  ASSERT_EQ(f(pb), pb.id());
+  pb.set_id(2000);
+  ASSERT_EQ(f(pb), pb.id());
 }
 TEST(JitCompiler, pb_access_read_str) {
   spdlog::set_level(spdlog::level::debug);
-  ::test::Header pb_header;
-  pb_header.set_id(101);
-  pb_header.set_scene("hello,world");
+  ::test::PBStruct pb;
+  pb.set_id(101);
+  pb.set_str("hello,world");
 
   JitCompiler compiler;
   std::string content = R"(
-    string_view test_func(test::Header x){
-      return x.scene();
+    string_view test_func(test::PBStruct x){
+      return x.str();
     }
    )";
-  auto rc = compiler.CompileFunction<StringView, const test::Header*>(content);
+  auto rc = compiler.CompileFunction<StringView, const test::PBStruct*>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(&pb_header), "hello,world");
+  ASSERT_EQ(f(&pb), "hello,world");
 }
 TEST(JitCompiler, pb_access_write_int) {
   spdlog::set_level(spdlog::level::debug);
-  ::test::Header pb_header;
-  pb_header.set_scene("");
-  pb_header.set_id(101);
-  pb_header.set_scene("hello,world");
+  ::test::PBStruct pb;
+  pb.set_id(101);
+  pb.set_str("hello,world");
 
   JitCompiler compiler;
   std::string content = R"(
-    int test_func(test::Header x, int y){
+    int test_func(test::PBStruct x, int y){
       x.set_id(y);
       return x.id();
     }
    )";
-  auto rc = compiler.CompileFunction<int, test::Header*, int>(content);
+  auto rc = compiler.CompileFunction<int, test::PBStruct&, int>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(&pb_header, 1024), 1024);
-  ASSERT_EQ(pb_header.id(), 1024);
+  ASSERT_EQ(f(pb, 1024), 1024);
+  ASSERT_EQ(pb.id(), 1024);
 }
-
-struct A {
-  template <typename T = int>
-  A(T n = {}) {}
-};
 
 TEST(JitCompiler, pb_read_repetead) {
   spdlog::set_level(spdlog::level::debug);
-  ::test::Header pb_header;
-  pb_header.set_scene("");
-  pb_header.set_id(101);
-  pb_header.set_scene("hello,world");
-  pb_header.add_items()->set_id(10001);
+  ::test::PBStruct pb;
+  pb.set_id(101);
+  pb.set_str("hello,world");
+  pb.add_item_array()->set_id(10001);
 
   JitCompiler compiler;
   std::string content = R"(
-    int test_func(test::Header x){
-      return x.items().get(0).id();
+    int test_func(test::PBStruct x){
+      return x.item_array().get(0).id();
     }
    )";
-  auto rc = compiler.CompileFunction<int, test::Header*>(content);
+  auto rc = compiler.CompileFunction<int, const test::PBStruct&>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(&pb_header), 10001);
+  ASSERT_EQ(f(pb), 10001);
 }
 
 TEST(JitCompiler, pb_write_string) {
   spdlog::set_level(spdlog::level::debug);
-  ::test::Header pb_header;
-  pb_header.set_scene("");
-  pb_header.set_id(101);
-  pb_header.set_scene("hello,world");
-  pb_header.add_items()->set_id(10001);
+  ::test::PBStruct pb;
+
+  pb.set_id(101);
+  pb.set_str("hello,world");
+  pb.add_item_array()->set_id(10001);
 
   JitCompiler compiler;
   std::string content = R"(
-    string_view test_func(test::Header x){
-      x.set_scene("123456");
-      return x.scene();
+    string_view test_func(test::PBStruct x){
+      x.set_str("123456");
+      return x.str();
     }
    )";
-  auto rc = compiler.CompileFunction<StringView, test::Header*>(content);
+  auto rc = compiler.CompileFunction<StringView, test::PBStruct&>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(&pb_header), "123456");
-  ASSERT_EQ(pb_header.scene(), "123456");
+  ASSERT_EQ(f(pb), "123456");
+  ASSERT_EQ(pb.str(), "123456");
 }
 
 TEST(JitCompiler, pb_read_map) {
   spdlog::set_level(spdlog::level::debug);
-  ::test::Header pb_header;
-  pb_header.set_scene("");
-  pb_header.set_id(101);
-  pb_header.set_scene("hello,world");
-  pb_header.mutable_mapping()->insert({"k0", 100});
-  pb_header.mutable_mapping()->insert({"k1", 101});
+  ::test::PBStruct pb;
+  pb.set_id(101);
+  pb.set_str("hello,world");
+  pb.mutable_str_int_map()->insert({"k0", 100});
+  pb.mutable_str_int_map()->insert({"k1", 101});
 
   JitCompiler compiler;
   std::string content = R"(
-    int test_func(test::Header x){
-      return x.mapping().get("k1");
+    int test_func(test::PBStruct x){
+      return x.str_int_map().get("k1");
     }
    )";
-  auto rc = compiler.CompileFunction<int, test::Header*>(content);
+  auto rc = compiler.CompileFunction<int, const test::PBStruct&>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(&pb_header), 101);
+  ASSERT_EQ(f(pb), 101);
 }
 
 TEST(JitCompiler, pb_read_map_item) {
   spdlog::set_level(spdlog::level::debug);
-  ::test::Header pb_header;
-  pb_header.set_scene("");
-  pb_header.set_id(101);
-  pb_header.set_scene("hello,world");
+  ::test::PBStruct pb;
+  pb.set_id(101);
+  pb.set_str("hello,world");
   ::test::Item item0;
   item0.set_id(1001);
-  pb_header.mutable_item_map()->insert({"k0", item0});
+  pb.mutable_item_map()->insert({"k0", item0});
 
   JitCompiler compiler;
   std::string content = R"(
-    int test_func(test::Header x, string_view key){
+    int test_func(test::PBStruct x, string_view key){
       return x.item_map().get(key).id();
     }
    )";
-  auto rc = compiler.CompileFunction<int, test::Header*, StringView>(content);
+  auto rc = compiler.CompileFunction<int, const test::PBStruct&, StringView>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_EQ(f(&pb_header, "k0"), 1001);
-  ASSERT_ANY_THROW(f(&pb_header, "k1"));
+  ASSERT_EQ(f(pb, "k0"), 1001);
+  ASSERT_ANY_THROW(f(pb, "k1"));
 }

@@ -167,7 +167,7 @@ struct PBRepeatedFieldHelper {
     }
     return pb_vec->size();
   }
-  static int find(const ::google::protobuf::RepeatedField<T>* pb_vec, arg_type_t val) {
+  static int Find(const ::google::protobuf::RepeatedField<T>* pb_vec, arg_type_t val) {
     if (nullptr == pb_vec) {
       return -1;
     }
@@ -179,8 +179,8 @@ struct PBRepeatedFieldHelper {
     }
     return -1;
   }
-  static bool contains(const ::google::protobuf::RepeatedField<T>* pb_vec, arg_type_t val) {
-    int idx = find(pb_vec, val);
+  static bool Contains(const ::google::protobuf::RepeatedField<T>* pb_vec, arg_type_t val) {
+    int idx = Find(pb_vec, val);
     return idx > -1;
   }
 };
