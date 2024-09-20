@@ -51,8 +51,6 @@
 #include "absl/types/span.h"
 #include "flatbuffers/flatbuffers.h"
 
-#include "xbyak/xbyak.h"
-
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/json_object.h"
@@ -709,14 +707,6 @@ struct fmt::formatter<rapidudf::FundamentalType> : formatter<std::string> {
     } else {
       view = fmt::format("object/{}", static_cast<int>(c));
     }
-    return formatter<std::string>::format(view, ctx);
-  }
-};
-
-template <>
-struct fmt::formatter<Xbyak::Reg64> : formatter<std::string> {
-  auto format(Xbyak::Reg64 c, format_context& ctx) const -> format_context::iterator {
-    std::string view = "todo";
     return formatter<std::string>::format(view, ctx);
   }
 };

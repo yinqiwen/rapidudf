@@ -107,9 +107,9 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
       if (!dst_type_result.ok()) {
         return dst_type_result.status();
       }
-      auto field_val = GetSession()->GetIRBuilder()->CreateAlignedLoad(
-          dst_type_result.value(), field_ptr, ::llvm::MaybeAlign(member_field_dtype.ByteSize()));
-      return NewValue(member_field_dtype, field_val);
+      // auto field_val = GetSession()->GetIRBuilder()->CreateAlignedLoad(
+      //     dst_type_result.value(), field_ptr, ::llvm::MaybeAlign(member_field_dtype.ByteSize()));
+      return NewValue(member_field_dtype, field_ptr, dst_type_result.value());
     } else {
       return NewValue(accessor.member_field_dtype->ToPtr(), field_ptr);
     }
@@ -117,31 +117,6 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
   }
 }
 
-// absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, uint32_t idx) {
-//   if (var->GetDType().IsJsonPtr()) {
-//     auto key_arg = NewValue(DATA_U64, GetSession()->GetIRBuilder()->getInt64(idx));
-//     std::vector<ValuePtr> args{var, key_arg};
-//     return CallFunction(std::string(kBuiltinJsonArrayGet), args);
-//   } else if (var->GetDType().IsVectorPtr()) {
-//     RUDF_LOG_ERROR_STATUS(
-//         ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
-//   } else {
-//     RUDF_LOG_ERROR_STATUS(
-//         ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
-//   }
-// }
-// absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const std::string& key) {
-//   if (!var->GetDType().IsJsonPtr()) {
-//     RUDF_LOG_ERROR_STATUS(
-//         ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
-//   }
-//   auto member_result = BuildIR(ctx, key);
-//   if (!member_result.ok()) {
-//     return member_result.status();
-//   }
-//   std::vector<ValuePtr> args{var, member_result.value()};
-//   return CallFunction(std::string(kBuiltinJsonMemberGet), args);
-// }
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::VarRef& key) {
   auto result = GetLocalVar(key.name);
   if (!result.ok()) {

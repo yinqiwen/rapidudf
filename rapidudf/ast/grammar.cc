@@ -31,8 +31,8 @@
 
 #include "rapidudf/ast/grammar.h"
 #include <fmt/core.h>
-
 #include <boost/parser/parser.hpp>
+#include <chrono>
 #include <unordered_set>
 
 #include "rapidudf/ast/block.h"
@@ -246,16 +246,23 @@ BOOST_PARSER_DEFINE_RULES(comment, block, func_arg, func_args, func, funcs, retu
                           continue_statement);
 
 absl::StatusOr<Function> parse_function_ast(ParseContext& ctx, const std::string& source) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   ctx.SetSource(source);
   bp::callback_error_handler error_handler([&](std::string const& msg) { ctx.SetAstErr(msg); });
   auto const parser = bp::with_error_handler(func, error_handler);
   std::optional<Function> result = bp::parse(source, parser, bp::ws | comment);
+  auto parse_duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  start_time = std::chrono::high_resolution_clock::now();
+  ctx.SetParseCost(parse_duration);
   if (result) {
     ctx.SetFuncDesc(result->ToFuncDesc());
     auto rc = result->Validate(ctx);
     if (!rc.ok()) {
       return rc;
     }
+    ctx.SetParseValidateCost(
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
   }
   if (!result) {
     return absl::InvalidArgumentError(fmt::format("parse {} failed with ast_error:{}", source, ctx.GetAstErr()));
@@ -264,10 +271,14 @@ absl::StatusOr<Function> parse_function_ast(ParseContext& ctx, const std::string
 }
 
 absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, const std::string& source) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   ctx.SetSource(source);
   bp::callback_error_handler error_handler([&](std::string const& msg) { ctx.SetAstErr(msg); });
   auto const parser = bp::with_error_handler(funcs, error_handler);
   std::optional<std::vector<Function>> result = bp::parse(source, parser, bp::ws | comment);
+  ctx.SetParseCost(
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
+  start_time = std::chrono::high_resolution_clock::now();
   if (result) {
     std::set<std::string> func_names;
     for (size_t i = 0; i < result->size(); i++) {
@@ -283,6 +294,8 @@ absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, con
       }
     }
   }
+  ctx.SetParseValidateCost(
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
   if (!result) {
     return absl::InvalidArgumentError(fmt::format("parse {} failed with ast_error:{}", source, ctx.GetAstErr()));
   }
@@ -291,17 +304,24 @@ absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, con
 
 absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::string& source,
                                                 const FunctionDesc& desc) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   ctx.SetSource(source, false);
   bp::callback_error_handler error_handler([&](std::string const& msg) { ctx.SetAstErr(msg); });
   auto const parser = bp::with_error_handler(expression, error_handler);
   std::optional<Expression> result = bp::parse(source, parser, bp::ws | comment);
+  ctx.SetParseCost(
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
+  start_time = std::chrono::high_resolution_clock::now();
   if (result) {
     ctx.SetFuncDesc(desc);
     auto rc = (*result)->Validate(ctx);
     if (!rc.ok()) {
       return rc.status();
     }
+    ctx.SetParseValidateCost(
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
   }
+
   if (!result) {
     return absl::InvalidArgumentError(fmt::format("parse {} failed with ast_error:{}", source, ctx.GetAstErr()));
   }

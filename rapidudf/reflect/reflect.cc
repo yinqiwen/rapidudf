@@ -35,7 +35,6 @@
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
-using namespace Xbyak::util;
 
 static GlobalStructMemberIndex& get_global_reflect_index() {
   static GlobalStructMemberIndex index;

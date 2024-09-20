@@ -33,6 +33,7 @@
 #include <functional>
 #include <vector>
 #include "rapidudf/context/context.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -312,6 +313,10 @@ TEST(JitCompiler, test) {
   auto rc = compiler.CompileFunction<rapidudf::simd::Vector<double>, Context&, Feeds&>(source);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
+  auto& stat = f.Stats();
+  RUDF_INFO("parse cost:{}us, parse_validate cost:{}us, IR_build cost:{}us, jit compile cost:{}us",
+            stat.parse_cost.count(), stat.parse_validate_cost.count(), stat.ir_build_cost.count(),
+            stat.compile_cost.count());
 
   std::vector<double> clicks;
   std::vector<double> likes;

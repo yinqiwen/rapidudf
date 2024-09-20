@@ -100,6 +100,10 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
           }
         }
         if (op >= OP_PLUS_ASSIGN && op <= OP_MOD_ASSIGN) {
+          if (!left->IsWritable()) {
+            RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+                fmt::format("Can NOT do op:{} with non writable value:{}", op, left->GetDType())));
+          }
           auto status = left->CopyFrom(result);
           if (!status.ok()) {
             return status;
@@ -116,6 +120,10 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
         break;
       }
       case OP_ASSIGN: {
+        if (!left->IsWritable()) {
+          RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+              fmt::format("Can NOT do op:{} with non writable value:{}", op, left->GetDType())));
+        }
         auto status = left->CopyFrom(right);
         if (!status.ok()) {
           return status;

@@ -44,7 +44,6 @@
 #include "hwy/foreach_target.h"  // must come before highway.h
 #include "hwy/highway.h"
 
-#include "hwy/bit_set.h"
 #include "hwy/contrib/algo/transform-inl.h"
 #include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/contrib/math/math-inl.h"
@@ -106,7 +105,7 @@ static constexpr size_t get_lanes() {
   return hn::Lanes(d);
 }
 
-template <class D, class Func, typename T = hn::TFromD<D>>
+template <class D, typename T, class Func>
 void do_unary_transform(D d, const T* in1, size_t count, T* out, const Func& func) {
   const size_t N = hn::Lanes(d);
   size_t idx = 0;
@@ -339,8 +338,8 @@ Vector<typename OPT::operand_t> simd_vector_unary_op_impl(Context& ctx, Vector<t
   } else {
     result_data = ctx.NewSimdVector<number_t>(lanes, left.Size(), true);
   }
-  do_unary_transform(d, left.Data(), left.ElementSize(), result_data.MutableData<number_t>(),
-                     do_simd_unary_op<decltype(d), OPT::op>);
+  auto transform_func = do_simd_unary_op<decltype(d), OPT::op>;
+  do_unary_transform(d, left.Data(), left.ElementSize(), result_data.MutableData<number_t>(), transform_func);
   return Vector<typename OPT::operand_t>(result_data);
 }
 

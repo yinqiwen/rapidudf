@@ -43,6 +43,7 @@ Value::Value(Private, DType dtype, JitCompiler* c, ::llvm::Value* val, ::llvm::T
     : dtype_(dtype), compiler_(c), val_(val), type_(t) {
   ir_builder_ = compiler_->GetSession()->GetIRBuilder();
 }
+bool Value::IsWritable() const { return dtype_.IsVoid() || type_ != nullptr; }
 ::llvm::Value* Value::GetValue() {
   if (type_ != nullptr) {
     return ir_builder_->CreateLoad(type_, val_);

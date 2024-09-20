@@ -323,7 +323,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         if (!left_var.name.empty()) {
           ctx.AddLocalVar(left_var.name, right_result->dtype);
         } else {
-          return ctx.GetErrorStatus(fmt::format("can NOT do {} on non var.", op));
+          // return ctx.GetErrorStatus(fmt::format("can NOT do {} on non var.", op));
         }
         left_var = right_result.value();
         break;

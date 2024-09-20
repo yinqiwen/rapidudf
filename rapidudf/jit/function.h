@@ -40,6 +40,8 @@ namespace rapidudf {
 
 struct JitFunctionStat {
   std::chrono::microseconds parse_cost;
+  std::chrono::microseconds parse_validate_cost;
+  std::chrono::microseconds ir_build_cost;
   std::chrono::microseconds compile_cost;
 };
 

@@ -42,9 +42,11 @@ ValuePtr Value::CastTo(DType dtype) {
     RUDF_ERROR("Can NOT cast from {} to {}", dtype_, dtype);
     return {};
   }
+
   if (dtype == dtype_) {
     return SelfPtr();
   }
+
   auto* dst_type = get_type(ir_builder_->getContext(), dtype);
   if (dtype.IsNumber()) {
     ::llvm::Value* new_val = nullptr;

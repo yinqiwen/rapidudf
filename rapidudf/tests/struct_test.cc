@@ -135,5 +135,8 @@ TEST(JitCompiler, struct_write) {
     }
   )";
   auto rc = compiler.CompileFunction<int, TestStruct&>(content, true);
-  ASSERT_FALSE(rc.ok());
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(t), t.internal.a);
+  ASSERT_EQ(105, t.internal.a);
 }

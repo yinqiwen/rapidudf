@@ -36,7 +36,6 @@
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <cstring>
 #include <type_traits>
-#include <vector>
 
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "rapidudf/builtin/simd_vector/binary_ops.cc"  // this file
@@ -44,7 +43,7 @@
 #include "hwy/foreach_target.h"  // must come before highway.h
 #include "hwy/highway.h"
 
-#include "hwy/bit_set.h"
+// #include "hwy/bit_set.h"
 #include "hwy/contrib/algo/transform-inl.h"
 #include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/contrib/math/math-inl.h"
@@ -83,7 +82,7 @@ static constexpr size_t get_lanes() {
   return hn::Lanes(d);
 }
 
-template <class D, class Func, typename T1, typename T2, typename OUT>
+template <class D, typename T1, typename T2, typename OUT, class Func>
 void do_binary_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func& func) {
   constexpr size_t N = Lanes(d);
   size_t idx = 0;
@@ -305,12 +304,11 @@ static Vector<R> simd_vector_binary_scalar_op(Context& ctx, Vector<T> left, T ri
   }
 
   auto rv = hn::Set(d, get_constant(right));
+  auto transform_func = do_simd_binary_op<decltype(d), op>;
   if (reverse) {
-    do_binary_transform(d, rv, left.Data(), left.ElementSize(), result_data.MutableData<output_t>(),
-                        do_simd_binary_op<decltype(d), op>);
+    do_binary_transform(d, rv, left.Data(), left.ElementSize(), result_data.MutableData<output_t>(), transform_func);
   } else {
-    do_binary_transform(d, left.Data(), rv, left.ElementSize(), result_data.MutableData<output_t>(),
-                        do_simd_binary_op<decltype(d), op>);
+    do_binary_transform(d, left.Data(), rv, left.ElementSize(), result_data.MutableData<output_t>(), transform_func);
   }
 
   return Vector<R>(result_data);
@@ -334,13 +332,16 @@ Vector<Bit> simd_vector_string_cmp(Context& ctx, Vector<StringView> left, Vector
   if (left.Size() % 64 > 0) {
     bitset_n++;
   }
-  std::vector<hwy::BitSet64> bitsets(bitset_n);
+  // std::vector<hwy::BitSet64> bitsets(bitset_n);
+  std::vector<uint64_t> bitsets(bitset_n);
   for (size_t i = 0; i < left.Size(); i++) {
     bool v = do_string_view_cmp<op>(left[i], right[i]);
     if (v) {
-      bitsets[i / 64].Set(i % 64);
+      bitsets[i / 64] = bits64_set(bitsets[i / 64], i % 64);
+      // bitsets[i / 64].Set(i % 64);
     } else {
-      bitsets[i / 64].Clear(i % 64);
+      // bitsets[i / 64].Clear(i % 64);
+      bitsets[i / 64] = bits64_clear(bitsets[i / 64], i % 64);
     }
   }
   memcpy(result_data.MutableData<uint8_t*>(), bitsets.data(), sizeof(uint64_t) * bitsets.size());
@@ -360,13 +361,16 @@ Vector<Bit> simd_vector_string_cmp_scalar(Context& ctx, Vector<StringView> left,
   if (left.Size() % 64 > 0) {
     bitset_n++;
   }
-  std::vector<hwy::BitSet64> bitsets(bitset_n);
+  // std::vector<hwy::BitSet64> bitsets(bitset_n);
+  std::vector<uint64_t> bitsets(bitset_n);
   for (size_t i = 0; i < left.Size(); i++) {
     bool v = reverse ? do_string_view_cmp<op>(right, left[i]) : do_string_view_cmp<op>(left[i], right);
     if (v) {
-      bitsets[i / 64].Set(i % 64);
+      // bitsets[i / 64].Set(i % 64);
+      bitsets[i / 64] = bits64_set(bitsets[i / 64], i % 64);
     } else {
-      bitsets[i / 64].Clear(i % 64);
+      // bitsets[i / 64].Clear(i % 64);
+      bitsets[i / 64] = bits64_clear(bitsets[i / 64], i % 64);
     }
   }
   memcpy(result_data.MutableData<uint8_t*>(), bitsets.data(), sizeof(uint64_t) * bitsets.size());
@@ -421,8 +425,9 @@ Vector<typename OPT::operand_t_1> simd_vector_binary_op_impl(Context& ctx, Vecto
     } else {
       result_data = ctx.NewSimdVector<operand_t_1>(get_lanes<operand_t_1>(), left.Size(), true);
     }
+    auto transform_func = do_simd_binary_op<decltype(d), OPT::op>;
     do_binary_transform(d, left.Data(), right.Data(), left.ElementSize(), result_data.MutableData<output_t>(),
-                        do_simd_binary_op<decltype(d), OPT::op>);
+                        transform_func);
 
     return Vector<operand_t_1>(result_data);
   }

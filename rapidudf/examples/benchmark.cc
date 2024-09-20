@@ -29,6 +29,7 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// copy & modified from https://github.com/ArashPartow/exprtk/blob/master/exprtk_benchmark.cpp
 #include <chrono>
 #include <cmath>
 #include <cstdio>

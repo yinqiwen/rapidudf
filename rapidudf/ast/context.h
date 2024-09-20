@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -106,6 +107,10 @@ class ParseContext {
   void EnterLoop();
   bool IsInLoop();
   void ExitLoop();
+  std::chrono::microseconds GetParseCost() { return parse_cost_; }
+  std::chrono::microseconds GetParseValidateCost() { return parse_validate_cost_; }
+  void SetParseCost(std::chrono::microseconds cost) { parse_cost_ = cost; }
+  void SetParseValidateCost(std::chrono::microseconds cost) { parse_validate_cost_ = cost; }
 
  private:
   using LocalVarMap = std::unordered_map<std::string, DType>;
@@ -135,6 +140,9 @@ class ParseContext {
 
   std::string ast_err_;
   uint32_t validate_posistion_ = 0;
+
+  std::chrono::microseconds parse_cost_;
+  std::chrono::microseconds parse_validate_cost_;
 };
 
 }  // namespace ast

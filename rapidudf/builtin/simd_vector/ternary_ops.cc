@@ -44,7 +44,7 @@
 #include "hwy/foreach_target.h"  // must come before highway.h
 #include "hwy/highway.h"
 
-#include "hwy/bit_set.h"
+// #include "hwy/bit_set.h"
 #include "hwy/contrib/algo/transform-inl.h"
 #include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/contrib/math/math-inl.h"
@@ -71,7 +71,7 @@ static constexpr size_t get_lanes() {
   return hn::Lanes(d);
 }
 
-template <class D, class Func, typename T1, typename T2, typename T3, typename OUT = hn::TFromD<D>>
+template <class D, typename T1, typename T2, typename T3, typename OUT, class Func>
 void do_ternary_transform(D d, T1 in1, T2 in2, T3 in3, size_t count, OUT* out, const Func& func) {
   const size_t N = hn::Lanes(d);
   size_t idx = 0;
@@ -291,8 +291,9 @@ Vector<typename OPT::operand_t> simd_vector_ternary_op_impl(Context& ctx, Vector
   if constexpr (OPT::op == OP_CONDITIONAL) {
     do_select(d, a, b.Data(), c.Data(), b.Size(), result_data.MutableData<number_t>());
   } else {
+    auto transform_func = do_simd_ternary_op<decltype(d), OPT::op>;
     do_ternary_transform(d, a.Data(), b.Data(), c.Data(), b.Size(), result_data.MutableData<number_t>(),
-                         do_simd_ternary_op<decltype(d), OPT::op>);
+                         transform_func);
   }
 
   return Vector<operand_t>(result_data);
@@ -322,8 +323,8 @@ Vector<typename OPT::operand_t> simd_vector_ternary_vector_vector_scalar_op_impl
   if constexpr (OPT::op == OP_CONDITIONAL) {
     do_select(d, a, b.Data(), cv, b.Size(), result_data.MutableData<number_t>());
   } else {
-    do_ternary_transform(d, a.Data(), b.Data(), cv, b.Size(), result_data.MutableData<number_t>(),
-                         do_simd_ternary_op<decltype(d), OPT::op>);
+    auto transform_func = do_simd_ternary_op<decltype(d), OPT::op>;
+    do_ternary_transform(d, a.Data(), b.Data(), cv, b.Size(), result_data.MutableData<number_t>(), transform_func);
   }
 
   return Vector<operand_t>(result_data);
@@ -354,8 +355,8 @@ Vector<typename OPT::operand_t> simd_vector_ternary_vector_scalar_vector_op_impl
   if constexpr (OPT::op == OP_CONDITIONAL) {
     do_select(d, a, bv, c.Data(), a.Size(), result_data.MutableData<number_t>());
   } else {
-    do_ternary_transform(d, a.Data(), bv, c.Data(), a.Size(), result_data.MutableData<number_t>(),
-                         do_simd_ternary_op<decltype(d), OPT::op>);
+    auto transform_func = do_simd_ternary_op<decltype(d), OPT::op>;
+    do_ternary_transform(d, a.Data(), bv, c.Data(), a.Size(), result_data.MutableData<number_t>(), transform_func);
   }
 
   return Vector<operand_t>(result_data);
@@ -382,8 +383,8 @@ Vector<typename OPT::operand_t> simd_vector_ternary_vector_scalar_scalar_op_impl
   if constexpr (OPT::op == OP_CONDITIONAL) {
     do_select(d, a, bv, cv, a.Size(), result_data.MutableData<number_t>());
   } else {
-    do_ternary_transform(d, a.Data(), bv, cv, a.Size(), result_data.MutableData<number_t>(),
-                         do_simd_ternary_op<decltype(d), OPT::op>);
+    auto transform_func = do_simd_ternary_op<decltype(d), OPT::op>;
+    do_ternary_transform(d, a.Data(), bv, cv, a.Size(), result_data.MutableData<number_t>(), transform_func);
   }
 
   return Vector<operand_t>(result_data);
@@ -410,8 +411,8 @@ Vector<typename OPT::operand_t> simd_vector_ternary_scalar_vector_vector_op_impl
     result_data = ctx.NewSimdVector<number_t>(lanes, b.Size(), true);
   }
   auto av = hn::Set(d, get_constant(a));
-  do_ternary_transform(d, av, b.Data(), c.Data(), b.Size(), result_data.MutableData<number_t>(),
-                       do_simd_ternary_op<decltype(d), OPT::op>);
+  auto transform_func = do_simd_ternary_op<decltype(d), OPT::op>;
+  do_ternary_transform(d, av, b.Data(), c.Data(), b.Size(), result_data.MutableData<number_t>(), transform_func);
 
   return Vector<operand_t>(result_data);
 }
@@ -433,8 +434,8 @@ Vector<typename OPT::operand_t> simd_vector_ternary_scalar_scalar_vector_op_impl
   }
   auto av = hn::Set(d, get_constant(a));
   auto bv = hn::Set(d, get_constant(b));
-  do_ternary_transform(d, av, bv, c.Data(), c.Size(), result_data.MutableData<number_t>(),
-                       do_simd_ternary_op<decltype(d), OPT::op>);
+  auto transform_func = do_simd_ternary_op<decltype(d), OPT::op>;
+  do_ternary_transform(d, av, bv, c.Data(), c.Size(), result_data.MutableData<number_t>(), transform_func);
 
   return Vector<operand_t>(result_data);
 }
@@ -456,8 +457,8 @@ Vector<typename OPT::operand_t> simd_vector_ternary_scalar_vector_scalar_op_impl
   }
   auto av = hn::Set(d, get_constant(a));
   auto cv = hn::Set(d, get_constant(c));
-  do_ternary_transform(d, av, b.Data(), cv, b.Size(), result_data.MutableData<number_t>(),
-                       do_simd_ternary_op<decltype(d), OPT::op>);
+  auto transform_func = do_simd_ternary_op<decltype(d), OPT::op>;
+  do_ternary_transform(d, av, b.Data(), cv, b.Size(), result_data.MutableData<number_t>(), transform_func);
 
   return Vector<operand_t>(result_data);
 }

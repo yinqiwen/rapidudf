@@ -31,6 +31,7 @@
 
 #pragma once
 #include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/jit/llvm/jit_cache.h"
 // #include "rapidudf/jit/xbyak/jit.h"
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
@@ -40,4 +41,5 @@ namespace rapidudf {
 
 // using JitCompiler = xbyak::JitCompiler;
 using JitCompiler = llvm::JitCompiler;
+using JitCompilerCache = llvm::JitCompilerCache;
 }  // namespace rapidudf
