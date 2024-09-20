@@ -30,9 +30,11 @@
 */
 
 #include <gtest/gtest.h>
+#include <cmath>
 #include <functional>
 #include <vector>
 
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -346,6 +348,27 @@ TEST(JitCompiler, pow) {
 
   auto rc2 = compiler.CompileExpression<Bit, Bit, Bit>(expr, {"x", "y"});
   ASSERT_FALSE(rc2.ok());
+
+  std::string multiple_pow =
+      "(Click^10.0)*((Like+0.000082)^4.7)*(Inter^3.5)*((Join+0.000024)^5.5)*(TimeV1^7.0)*((PostComment+0.000024)^3.5)*("
+      "(PositiveCommentV1+0.0038)^1.0)*(ExpoTimeV1^1.5)";
+  auto rc3 = compiler.CompileExpression<double, double, double, double, double, double, double, double, double>(
+      multiple_pow, {"Click", "Like", "Inter", "Join", "TimeV1", "PostComment", "PositiveCommentV1", "ExpoTimeV1"});
+  ASSERT_TRUE(rc3.ok());
+  double Click = 10;
+  double Like = 20;
+  double Inter = 2;
+  double Join = 3;
+  double TimeV1 = 11;
+  double PostComment = 12;
+  double PositiveCommentV1 = 3;
+  double ExpoTimeV1 = 4;
+  auto f3 = std::move(rc3.value());
+  double f_result = f3(Click, Like, Inter, Join, TimeV1, PostComment, PositiveCommentV1, ExpoTimeV1);
+  double actual = std::pow(Click, 10.0) * std::pow(Like + 0.000082, 4.7) * std::pow(Inter, 3.5) *
+                  std::pow(Join + 0.000024, 5.5) * std::pow(TimeV1, 7.0) * std::pow(PostComment + 0.000024, 3.5) *
+                  std::pow(PositiveCommentV1 + 0.0038, 1.0) * std::pow(ExpoTimeV1, 1.5);
+  ASSERT_DOUBLE_EQ(f_result, actual);
 }
 
 TEST(JitCompiler, vector_pow) {
