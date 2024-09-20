@@ -34,11 +34,11 @@
 #include <vector>
 #include "rapidudf/rapidudf.h"
 using namespace rapidudf;
-using namespace rapidudf::ast;
+
 TEST(JitCompiler, ifelse0) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
+
   std::string content = R"(
     int test_func(int x){ 
       if(x>10){
@@ -64,7 +64,7 @@ TEST(JitCompiler, ifelse0) {
 TEST(JitCompiler, ifelse1) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
+
   std::string content = R"(
     int test_func(int x){ 
       if(x>10){

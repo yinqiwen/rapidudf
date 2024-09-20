@@ -28,30 +28,10 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-#include <gtest/gtest.h>
-#include <functional>
-#include <vector>
-#include "rapidudf/rapidudf.h"
-
-using namespace rapidudf;
-using namespace rapidudf::ast;
-
-TEST(JitCompiler, expression) {
-  spdlog::set_level(spdlog::level::debug);
-  std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
-  std::string content = R"(
-    x >= 1 && y < 10
-  )";
-  auto rc = compiler.CompileExpression<bool, int, int>(content, {"x", "y"}, true);
-  if (!rc.ok()) {
-    RUDF_ERROR("{}", rc.status().ToString());
-  }
-  ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, std::vector<int>&>(true);
-  // ASSERT_TRUE(f != nullptr);
-  auto f = std::move(rc.value());
-  ASSERT_TRUE(f(2, 5));
-  ASSERT_FALSE(f(2, 10));
-}
+#include "rapidudf/jit/llvm/jit_cache.h"
+#include "rapidudf/jit/llvm/jit_session.h"
+namespace rapidudf {
+namespace llvm {
+void JitCompilerCache::ResetLRUCacheSize(size_t n) { GetCache().reset_capacity(n); }
+}  // namespace llvm
+}  // namespace rapidudf

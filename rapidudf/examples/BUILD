@@ -8,6 +8,19 @@ package(
 )
 
 cc_binary(
+    name = "benchmark",
+    srcs = ["benchmark.cc"],
+    copts = [
+        "-ffast-math",
+        "-O3",
+    ],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        "//rapidudf",
+    ],
+)
+
+cc_binary(
     name = "expression",
     srcs = ["expression.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,

@@ -9,6 +9,7 @@ cc_library(
     ],
     deps = [
         "//rapidudf/jit/llvm:jit",
+        "//rapidudf/jit/llvm:jit_cache",
         # "//rapidudf/jit/xbyak:jit",
         "//rapidudf/reflect",
     ],

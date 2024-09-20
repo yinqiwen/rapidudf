@@ -21,7 +21,6 @@ cc_library(
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",
         "@com_github_google_flatbuffers//:runtime_cc",
-        "@com_github_xbyak//:xbyak",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_protobuf//:protobuf",

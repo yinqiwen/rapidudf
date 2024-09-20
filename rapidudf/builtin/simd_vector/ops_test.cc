@@ -28,11 +28,12 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/builtin/simd_vector/simd_ops.h"
+#include "rapidudf/builtin/simd_vector/ops.h"
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
 
+#include "hwy/bit_set.h"
 #include "hwy/highway.h"
 #include "rapidudf/log/log.h"
 namespace hn = hwy::HWY_NAMESPACE;
@@ -111,6 +112,25 @@ TEST(SIMD, simple_op1) {
   const hn::ScalableTag<double> d;
   using MaskType = hn::Mask<decltype(d)>;
   constexpr auto lanes = hn::Lanes(d);
-
   RUDF_INFO("lanes:{}", lanes);
+  MaskType mask;
+  hwy::BitSet64 bitset;
+  uint8_t* bits = reinterpret_cast<uint8_t*>(&bitset);
+  bitset.Set(7);
+  bitset.Set(6);
+  auto v1 = hn::Set(d, 2);
+  auto v2 = hn::Zero(d);
+  // hn::StoreMaskBits(d, v1 > v2, bits);
+  // for (size_t i = 0; i < 8; i++) {
+  //   RUDF_INFO("####{}", bitset.Get(i));
+  // }
+  mask = hn::LoadMaskBits(d, bits);
+  mask = hn::SlideMaskDownLanes(d, mask, 4);
+  auto v3 = hn::IfThenElse(mask, v1, v2);
+  double buffer[8];
+  hn::StoreU(v3, d, buffer);
+  for (size_t i = 0; i < lanes; i++) {
+    RUDF_INFO("####{}", buffer[i]);
+  }
+  RUDF_INFO("####{}", hwy::SupportedTargets());
 }

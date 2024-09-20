@@ -9,18 +9,16 @@ package(
 )
 
 cc_library(
-    name = "simd_ops",
+    name = "simd_vector_ops",
     srcs = [
-        "simd_ops.cc",
-        "simd_sort.cc",
+        # "simd_ops.cc",
+        "unary_ops.cc",
+        "binary_ops.cc",
+        "ternary_ops.cc",
+        "sort_ops.cc",
     ],
     hdrs = [
-        "simd_ops.h",
-    ],
-    copts = [
-        "-march=westmere",
-        "-maes",
-        "-ftree-vectorize",
+        "ops.h",
     ],
     deps = [
         "//rapidudf/log",
@@ -29,20 +27,20 @@ cc_library(
         "//rapidudf/meta:optype",
         "@com_github_xbyak//:xbyak",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_highway//:algo",
         "@com_google_highway//:bit_set",
         "@com_google_highway//:dot",
         "@com_google_highway//:hwy",
         "@com_google_highway//:math",
-        # "@com_google_highway//hwy/contrib/sort:vqsort",
         "@sleef",
         "@x86_simd_sort",
     ],
 )
 
 cc_test(
-    name = "simd_ops_test",
+    name = "ops_test",
     size = "small",
-    srcs = ["simd_ops_test.cc"],
+    srcs = ["ops_test.cc"],
     copts = [
         # "-march=haswell",
         "-march=haswell",
@@ -51,7 +49,7 @@ cc_test(
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
-        ":simd_ops",
+        ":simd_vector_ops",
         "@com_google_googletest//:gtest_main",
         "@com_google_highway//:hwy",
     ],

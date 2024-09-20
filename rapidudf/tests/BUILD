@@ -85,19 +85,6 @@ cc_test(
 )
 
 cc_test(
-    name = "expression_test",
-    size = "small",
-    srcs = ["expression_test.cc"],
-    linkopts = RUDF_DEFAULT_LINKOPTS,
-    linkstatic = True,
-    deps = [
-        ":test_fbs",
-        "//rapidudf",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_test(
     name = "ternary_test",
     size = "small",
     srcs = ["ternary_test.cc"],
@@ -174,6 +161,18 @@ cc_test(
     name = "cast_test",
     size = "small",
     srcs = ["cast_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "builtin_func_test",
+    size = "small",
+    srcs = ["builtin_func_test.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [

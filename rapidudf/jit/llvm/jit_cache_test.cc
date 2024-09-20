@@ -28,7 +28,59 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/builtin/simd_vector/simd_ops.h"
+#include "rapidudf/jit/llvm/jit_cache.h"
+#include <gtest/gtest.h>
+#include "absl/strings/str_join.h"
+#include "rapidudf/log/log.h"
+#include "rapidudf/reflect/macros.h"
+#include "rapidudf/types/string_view.h"
 
-#include "sleef.h"
-namespace rapidudf {}
+using namespace rapidudf;
+using namespace rapidudf::llvm;
+
+TEST(JitCompiler, func_cache) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  JsonObject json;
+  json["key"] = 123;
+
+  std::string content = R"(
+    bool test_func(json x){
+      return x["key"] == 123;
+    }
+  )";
+  auto rc = JitCompilerCache::GetFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
+
+  rc = JitCompilerCache::GetFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
+}
+
+TEST(JitCompiler, expr_cache) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  JsonObject json;
+  json["key"] = 123;
+
+  std::string content = R"(
+    x["key"] == 123
+  )";
+  auto rc = JitCompilerCache::GetExpression<bool, const JsonObject&>(content, {"x"});
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
+
+  rc = JitCompilerCache::GetExpression<bool, const JsonObject&>(content, {"x"});
+  ASSERT_TRUE(rc.ok());
+  f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
+}

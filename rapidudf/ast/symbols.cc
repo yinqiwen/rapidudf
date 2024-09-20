@@ -49,7 +49,7 @@ boost::parser::symbols<DType> Symbols::kNumberSymbols = {
     {"f32", DType(DATA_F32)}, {"f64", DType(DATA_F64)}};
 
 boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID)},
-                                                        {"bool", DType(DATA_U8)},
+                                                        {"bool", DType(DATA_BIT)},
                                                         {"u8", DType(DATA_U8)},
                                                         {"i8", DType(DATA_I8)},
                                                         {"u16", DType(DATA_U16)},
@@ -78,7 +78,8 @@ boost::parser::symbols<OpToken> Symbols::kCmpOpSymbols = {{"==", OP_EQUAL},     
                                                           {">", OP_GREATER},        {"<", OP_LESS}};
 boost::parser::symbols<OpToken> Symbols::kAdditiveOpSymbols = {{"+", OP_PLUS}, {"-", OP_MINUS}};
 boost::parser::symbols<OpToken> Symbols::kMultiplicativeOpSymbols = {
-    {"*", OP_MULTIPLY}, {"/", OP_DIVIDE}, {"%", OP_MOD}, {"^", OP_POW}};
+    {"*", OP_MULTIPLY}, {"/", OP_DIVIDE}, {"%", OP_MOD}};
+boost::parser::symbols<OpToken> Symbols::kPowerOpSymbols = {{"^", OP_POW}};
 boost::parser::symbols<OpToken> Symbols::kUnaryOpSymbols = {{"-", OP_NEGATIVE}, {"!", OP_NOT}};
 boost::parser::symbols<uint32_t> Symbols::kContinueSymbols = {{"continue", 0}};
 boost::parser::symbols<uint32_t> Symbols::kBreakSymbols = {{"break", 0}};

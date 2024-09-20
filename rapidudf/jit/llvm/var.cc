@@ -38,6 +38,7 @@
 #include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/constants.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
@@ -47,6 +48,13 @@ absl::StatusOr<ValuePtr> JitCompiler::GetLocalVar(const std::string& name) {
   auto found = GetCompileContext()->named_values.find(name);
   if (found != GetCompileContext()->named_values.end()) {
     return found->second;
+  }
+  for (size_t i = 0; i < kConstantCount; i++) {
+    if (name == kConstantNames[i]) {
+      ::llvm::APFloat fv(kConstantValues[i]);
+      auto val = ::llvm::ConstantFP::get(GetSession()->GetIRBuilder()->getContext(), fv);
+      return NewValue(DATA_F64, val);
+    }
   }
   return absl::NotFoundError(fmt::format("No var '{}' found", name));
 }
@@ -99,9 +107,9 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
       if (!dst_type_result.ok()) {
         return dst_type_result.status();
       }
-      auto field_val = GetSession()->GetIRBuilder()->CreateAlignedLoad(
-          dst_type_result.value(), field_ptr, ::llvm::MaybeAlign(member_field_dtype.ByteSize()));
-      return NewValue(member_field_dtype, field_val);
+      // auto field_val = GetSession()->GetIRBuilder()->CreateAlignedLoad(
+      //     dst_type_result.value(), field_ptr, ::llvm::MaybeAlign(member_field_dtype.ByteSize()));
+      return NewValue(member_field_dtype, field_ptr, dst_type_result.value());
     } else {
       return NewValue(accessor.member_field_dtype->ToPtr(), field_ptr);
     }
@@ -109,37 +117,12 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
   }
 }
 
-absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, uint32_t idx) {
-  if (!var->GetDType().IsJsonPtr()) {
-    RUDF_LOG_ERROR_STATUS(
-        ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
-  }
-  auto key_arg = NewValue(DATA_U64, GetSession()->GetIRBuilder()->getInt64(idx));
-  std::vector<ValuePtr> args{var, key_arg};
-  return CallFunction(std::string(kBuiltinJsonArrayGet), args);
-}
-absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const std::string& key) {
-  if (!var->GetDType().IsJsonPtr()) {
-    RUDF_LOG_ERROR_STATUS(
-        ast_ctx_.GetErrorStatus(fmt::format("Can NOT do member access on dtype:{}", var->GetDType())));
-  }
-  auto member_result = BuildIR(ctx, key);
-  if (!member_result.ok()) {
-    return member_result.status();
-  }
-  std::vector<ValuePtr> args{var, member_result.value()};
-  return CallFunction(std::string(kBuiltinJsonMemberGet), args);
-}
-absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const ast::VarRef& key) {
+absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::VarRef& key) {
   auto result = GetLocalVar(key.name);
   if (!result.ok()) {
     return result.status();
   }
-  auto val = result.value();
-  if (val->GetDType().IsInteger()) {
-  } else if (val->GetDType().IsStringView()) {
-  }
-  return absl::UnimplementedError("VarAccessor json access func");
+  return result.value();
 }
 
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::VarDefine& expr) {
@@ -202,6 +185,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
     }
 
     var = var_result.value();
+    size_t access_idx = 0;
     for (auto access_arg : *expr.access_args) {
       auto next_result = std::visit(
           [&](auto&& arg) {
@@ -209,7 +193,15 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
             if constexpr (std::is_same_v<T, ast::FieldAccess>) {
               return BuildIR(ctx, var, arg);
             } else if constexpr (std::is_same_v<T, ast::DynamicParamAccess>) {
-              return std::visit([&](auto&& json_arg) { return BuildIR(ctx, var, json_arg); }, arg);
+              auto param_result = std::visit([&](auto&& json_arg) { return BuildIR(ctx, json_arg); }, arg);
+              if (!param_result.ok()) {
+                return absl::StatusOr<ValuePtr>(param_result.status());
+              }
+              if (expr.access_func_names.size() <= access_idx) {
+                return absl::StatusOr<ValuePtr>(ast_ctx_.GetErrorStatus("Empty access func."));
+              }
+              std::vector<ValuePtr> arg_values{var, param_result.value()};
+              return CallFunction(expr.access_func_names[access_idx], arg_values);
             } else {
               static_assert(sizeof(arg) == -1, "non-exhaustive visitor!");
               return absl::StatusOr<ValuePtr>(absl::OkStatus());
@@ -220,6 +212,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
         return next_result.status();
       }
       var = next_result.value();
+      access_idx++;
     }
     return var;
   } else {

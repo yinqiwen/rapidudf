@@ -52,6 +52,7 @@ struct STLArgType {
     static T empty;
     return &empty;
   }
+  static T from(arg_type v) { return *v; }
 };
 template <typename T>
 struct STLArgType<T,
@@ -188,6 +189,21 @@ using StdMapHelper = MapHelper<std::map<K, V>>;
 
 template <typename K, typename V>
 using StdUnorderedMapHelper = MapHelper<std::unordered_map<K, V>>;
+
+template <typename T>
+void register_stl_collection_member_funcs() {
+  using remove_ptr_t = std::remove_pointer_t<T>;
+  using remove_cv_t = std::remove_cv_t<remove_ptr_t>;
+  if constexpr (is_specialization<remove_cv_t, std::vector>::value) {
+    VectorHelper<T>::Init();
+  } else if constexpr (is_specialization<remove_cv_t, std::map>::value ||
+                       is_specialization<remove_cv_t, std::unordered_map>::value) {
+    MapHelper<T>::Init();
+  } else if constexpr (is_specialization<remove_cv_t, std::set>::value ||
+                       is_specialization<remove_cv_t, std::unordered_set>::value) {
+    SetHelper<T>::Init();
+  }
+}
 
 }  // namespace reflect
 }  // namespace rapidudf

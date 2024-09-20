@@ -294,7 +294,6 @@ cmake(
     generate_args = [
         "-DCMAKE_BUILD_TYPE=Release",
         "-DSLEEF_BUILD_TESTS=OFF",
-        "-DFMT_DOC=OFF",
     ],
     lib_source = ":all_srcs",
     out_lib_dir = "lib64",

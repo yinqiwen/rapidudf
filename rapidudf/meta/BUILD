@@ -28,6 +28,13 @@ cc_library(
 )
 
 cc_library(
+    name = "constants",
+    hdrs = [
+        "constants.h",
+    ],
+)
+
+cc_library(
     name = "dtype",
     srcs = ["dtype.cc"],
     hdrs = [
@@ -40,7 +47,6 @@ cc_library(
         "//rapidudf/types",
         "//rapidudf/types:simd_vector",
         "@com_github_google_flatbuffers//:runtime_cc",
-        "@com_github_xbyak//:xbyak",
         "@com_google_absl//absl/types:span",
     ],
 )

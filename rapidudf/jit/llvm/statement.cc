@@ -55,6 +55,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Retu
       return val_result.status();
     }
     ValuePtr val = val_result.value();
+
     auto ret_val = val->CastTo(ctx->desc.return_type);
     if (!ret_val) {
       RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(

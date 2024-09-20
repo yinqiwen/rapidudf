@@ -54,7 +54,7 @@ class Context {
   uint8_t* ArenaAllocate(size_t n);
 
   template <typename T>
-  simd::VectorData NewSimdVector(size_t lanes, size_t n, bool temporary = true) {
+  simd::VectorData NewSimdVector(size_t lanes, size_t n, bool temporary = false) {
     using number_t = typename simd::InternalType<T>::internal_type;
     size_t element_size = get_arena_element_size(n, lanes);
     uint32_t byte_size = sizeof(number_t) * element_size;
@@ -68,7 +68,26 @@ class Context {
 
   template <typename T>
   auto NewSimdVector(const std::vector<T>& data) {
-    if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T>) {
+    if constexpr (std::is_same_v<bool, T>) {
+      size_t byte_size = data.size() / 8;
+      if (data.size() % 8 > 0) {
+        byte_size++;
+      }
+      byte_size = get_arena_element_size(byte_size, 32);  // at least 32bytes
+      uint8_t* arena_data = ArenaAllocate(byte_size);
+      uint64_t* bits = reinterpret_cast<uint64_t*>(arena_data);
+      for (size_t i = 0; i < data.size(); i++) {
+        size_t bits_idx = i / 64;
+        size_t bits_cursor = i % 64;
+        if (data[i]) {
+          bits[bits_idx] = bits64_set(bits[bits_idx], bits_cursor);
+        } else {
+          bits[bits_idx] = bits64_clear(bits[bits_idx], bits_cursor);
+        }
+      }
+      simd::VectorData vdata(arena_data, data.size(), byte_size);
+      return simd::Vector<Bit>(vdata);
+    } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T>) {
       return simd::Vector<T>(data);
     } else if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T>) {
       uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(StringView));

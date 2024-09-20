@@ -97,6 +97,8 @@ struct JitSession {
   std::unique_ptr<::llvm::ModuleAnalysisManager> module_analysis_manager;
   std::unique_ptr<::llvm::PassInstrumentationCallbacks> pass_inst_callbacks;
   std::unique_ptr<::llvm::StandardInstrumentations> std_insts;
+
+  JitFunctionStat stat;
   ::llvm::IRBuilder<>* GetIRBuilder() { return ir_builder.get(); }
 };
 

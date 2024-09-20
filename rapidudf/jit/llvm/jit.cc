@@ -76,8 +76,9 @@ JitCompiler::JitCompiler() {
 
 absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
   if (!session_) {
-    return absl::InvalidArgumentError("null compiled session");
+    return absl::InvalidArgumentError("null compiled session to get function ptr");
   }
+
   auto func_addr_result = GetSession()->jit->lookup(name);
   if (!func_addr_result) {
     RUDF_LOG_RETURN_LLVM_ERROR(func_addr_result.takeError());
@@ -95,6 +96,7 @@ absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
 JitSession* JitCompiler::GetSession() { return session_.get(); }
 uint32_t JitCompiler::GetLabelCursor() { return session_->label_cursor++; }
 FunctionCompileContextPtr JitCompiler::GetCompileContext() { return GetSession()->current_compile_functon_ctx; }
+std::vector<FunctionDesc> JitCompiler::GetAllFunctionDescs() { return ast_ctx_.GetAllFunctionDescs(); }
 
 absl::StatusOr<std::string> JitCompiler::VerifyFunctionSignature(FunctionCompileContextPtr func_ctx, DType return_type,
                                                                  const std::vector<DType>& args_types) {
@@ -159,6 +161,7 @@ void JitCompiler::NewSession(bool print_asm) {
 
   auto func_pass_manager = pass_builder.buildFunctionSimplificationPipeline(
       ::llvm::OptimizationLevel::O2, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
+
   session_->func_pass_manager = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
   session_->func_pass_manager->addPass(::llvm::InstCombinePass());
   session_->func_pass_manager->addPass(::llvm::ReassociatePass());
@@ -167,6 +170,14 @@ void JitCompiler::NewSession(bool print_asm) {
   session_->func_pass_manager->addPass(::llvm::PartiallyInlineLibCallsPass());
   session_->func_pass_manager->addPass(::llvm::MergedLoadStoreMotionPass());
   // func_pass_manager_->addPass(::llvm::createPartiallyInlineLibCallsPass());
+}
+
+JitFunctionStat JitCompiler::GetStat() {
+  JitFunctionStat ret;
+  if (session_) {
+    ret = session_->stat;
+  }
+  return ret;
 }
 
 ValuePtr JitCompiler::NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type) {
@@ -198,15 +209,18 @@ absl::Status JitCompiler::CompileFunction(const std::string& source) {
     RUDF_LOG_ERROR_STATUS(f.status());
   }
 
-  return CompileFunction(f.value());
-}
-
-std::string JitCompiler::GetMemberFuncName(DType dtype, const std::string& member) {
-  std::string fname = fmt::format("{}_{}", dtype.GetTypeString(), member);
-  return fname;
+  GetSession()->stat.parse_cost = ast_ctx_.GetParseCost();
+  GetSession()->stat.parse_validate_cost = ast_ctx_.GetParseValidateCost();
+  auto start_time = std::chrono::high_resolution_clock::now();
+  auto status = CompileFunction(f.value());
+  auto compile_duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  GetSession()->stat.parse_cost = compile_duration;
+  return status;
 }
 
 absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& functions) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   ast::ParseContext::FunctionCallMap all_func_calls;
   ast::ParseContext::MemberFuncCallMap all_member_func_calls;
   for (size_t i = 0; i < functions.size(); i++) {
@@ -271,20 +285,27 @@ absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& fun
     auto status = BuildIR(func);
     RUDF_LOG_RETURN_ERROR_STATUS(status);
   }
-  return Compile();
+  GetSession()->stat.ir_build_cost =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  start_time = std::chrono::high_resolution_clock::now();
+  auto status = Compile();
+  GetSession()->stat.compile_cost =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  return status;
 }
 
 absl::Status JitCompiler::CompileExpression(const std::string& expr, ast::Function& function) {
-  auto f = ast::parse_expression_ast(ast_ctx_, expr);
+  auto f = ast::parse_expression_ast(ast_ctx_, expr, function.ToFuncDesc());
   if (!f.ok()) {
     RUDF_LOG_ERROR_STATUS(f.status());
   }
-  // RUDF_INFO("after ast parse, {}", ast_ctx_.)
+  GetSession()->stat.parse_cost = ast_ctx_.GetParseCost();
+  GetSession()->stat.parse_validate_cost = ast_ctx_.GetParseValidateCost();
   ast::ReturnStatement return_statement;
   return_statement.expr = *f;
   function.body.statements.emplace_back(return_statement);
-
-  return CompileFunctions(std::vector<ast::Function>{function});
+  auto status = CompileFunctions(std::vector<ast::Function>{function});
+  return status;
 }
 
 absl::Status JitCompiler::CompileFunction(const ast::Function& function) {
@@ -292,21 +313,24 @@ absl::Status JitCompiler::CompileFunction(const ast::Function& function) {
 }
 
 absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::string& source, bool dump_asm) {
+  std::lock_guard<std::mutex> guard(jit_mutex_);
+  NewSession(dump_asm);
   auto funcs = ast::parse_functions_ast(ast_ctx_, source);
   if (!funcs.ok()) {
     RUDF_LOG_ERROR_STATUS(funcs.status());
   }
+  GetSession()->stat.parse_cost = ast_ctx_.GetParseCost();
+  GetSession()->stat.parse_validate_cost = ast_ctx_.GetParseValidateCost();
+
   std::vector<std::string> fnames;
   for (auto& func : funcs.value()) {
     fnames.emplace_back(func.name);
   }
-
-  std::lock_guard<std::mutex> guard(jit_mutex_);
-  NewSession(dump_asm);
   auto status = CompileFunctions(funcs.value());
   if (!status.ok()) {
     return status;
   }
+
   return fnames;
 }
 

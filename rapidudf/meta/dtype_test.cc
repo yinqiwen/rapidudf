@@ -40,25 +40,36 @@ struct TestStruct {
 };
 
 using namespace rapidudf;
-// TEST(DType, simple) {
-//   uint32_t dtype0 = get_dtype<int>();
-//   ASSERT_EQ(dtype0, get_dtype<int>());
-//   uint32_t dtype1 = get_dtype<int*>();
-//   uint32_t dtype2 = get_dtype<decltype(((TestStruct*)0)->a)>();
-//   ASSERT_EQ(dtype0, dtype2);
-//   ASSERT_EQ(dtype0, dtype1 - DATA_PTR_BEGIN);
+TEST(DType, ptr) {
+  auto ptr_dtype = get_dtype<int*>();
+  ASSERT_TRUE(ptr_dtype.IsIntegerPtr());
+  auto ptr_ptr_dtype = get_dtype<int**>();
+  ASSERT_TRUE(ptr_ptr_dtype.IsPtr());
+  ASSERT_FALSE(ptr_ptr_dtype.IsIntegerPtr());
+  ASSERT_TRUE(ptr_ptr_dtype.PtrTo().IsIntegerPtr());
+  auto ptr_ptr_ptr_dtype = get_dtype<int***>();
+  ASSERT_TRUE(ptr_ptr_ptr_dtype.IsPtr());
+  ASSERT_FALSE(ptr_ptr_ptr_dtype.IsIntegerPtr());
+  ASSERT_TRUE(ptr_ptr_ptr_dtype.PtrTo().PtrTo().IsIntegerPtr());
+}
 
-//   uint32_t dtype_str = get_dtype<std::string>();
-//   ASSERT_EQ(dtype_str, get_dtype<std::string>());
-//   uint32_t dtype_str_ptr = get_dtype<std::string*>();
-//   ASSERT_EQ(dtype_str, dtype_str_ptr - DATA_PTR_BEGIN);
+TEST(DType, vector) {
+  auto vector_dtype = get_dtype<std::vector<int>>();
+  ASSERT_TRUE(vector_dtype.IsVector());
+  auto vector2_dtype = get_dtype<std::vector<std::vector<int>>>();
+  ASSERT_TRUE(vector2_dtype.IsVector());
+  ASSERT_TRUE(vector2_dtype.Elem().IsVector());
+  ASSERT_TRUE(vector2_dtype.Elem().Elem().IsInteger());
+}
 
-//   uint32_t dtype_t = get_dtype<TestStruct>();
-//   ASSERT_EQ(dtype_t, get_dtype<TestStruct>());
-//   // uint32_t dtype_t_ptr = get_dtype<TestStruct*>();
-//   uint32_t dtype_t_ptr = get_dtype<decltype((TestStruct*)0)>();
-//   ASSERT_EQ(dtype_t, dtype_t_ptr - DATA_PTR_BEGIN);
-// }
+TEST(DType, map) {
+  auto map_dtype = get_dtype<std::map<int, int>>();
+  ASSERT_TRUE(map_dtype.IsMap());
+  auto map_vec_dtype = get_dtype<std::map<int, std::vector<int>>>();
+  ASSERT_TRUE(map_vec_dtype.IsMap());
+  ASSERT_TRUE(map_vec_dtype.Elem().IsVector());
+  ASSERT_TRUE(map_vec_dtype.Elem().Elem().IsInteger());
+}
 
 TEST(DType, simple1) {
   auto void_dtype = get_dtype<void>();

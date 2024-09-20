@@ -164,7 +164,18 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
   if (op.has_value()) {
     switch (*op) {
       case OP_NOT: {
-        if (!result->dtype.IsBool()) {
+        bool can_not = false;
+        if (result->dtype.IsBool()) {
+          can_not = true;
+        } else if (result->dtype.IsSimdVector() && result->dtype.Elem().IsBool()) {
+          can_not = true;
+          std::string fname = GetFunctionName(*op, result->dtype);
+          auto check_result = ctx.CheckFuncExist(fname, true);
+          if (!check_result.ok()) {
+            return check_result.status();
+          }
+        }
+        if (!can_not) {
           return ctx.GetErrorStatus(fmt::format("can NOT do not op on non bool value:{}", result->dtype));
         }
         break;
@@ -246,11 +257,18 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         can_binary_op = false;
         break;
       }
-      if (left_var.dtype.CanCastTo(right_result->dtype)) {
-        left_var.dtype = right_result->dtype;
+      if (left_var.dtype.IsNumber() && right_result->dtype.IsNumber()) {
+        if (left_var.dtype < right_result->dtype) {
+          left_var.dtype = right_result->dtype;
+        }
       } else {
-        right_result->dtype = left_var.dtype;
+        if (left_var.dtype.CanCastTo(right_result->dtype)) {
+          left_var.dtype = right_result->dtype;
+        } else {
+          right_result->dtype = left_var.dtype;
+        }
       }
+
     } while (0);
     if (!can_binary_op) {
       return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} by expression validate ",
@@ -293,13 +311,19 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                 left_result->dtype, right_result->dtype));
         }
+        if (op == OP_MOD || op == OP_MOD_ASSIGN) {
+          if (left_var.dtype.IsFloat() || right_result->dtype.IsFloat()) {
+            return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
+                                                  left_result->dtype, right_result->dtype));
+          }
+        }
         break;
       }
       case OP_ASSIGN: {
         if (!left_var.name.empty()) {
           ctx.AddLocalVar(left_var.name, right_result->dtype);
         } else {
-          return ctx.GetErrorStatus(fmt::format("can NOT do {} on non var.", op));
+          // return ctx.GetErrorStatus(fmt::format("can NOT do {} on non var.", op));
         }
         left_var = right_result.value();
         break;
@@ -356,7 +380,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
         } else {
-          left_var = VarTag(DType(DATA_U8));
+          left_var = VarTag(DType(DATA_BIT));
         }
         break;
       }
@@ -370,7 +394,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           }
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
         } else {
-          if (!left_var.dtype.IsBool() || !right_result->dtype.IsBool()) {
+          if (!left_var.dtype.IsBit() || !right_result->dtype.IsBit()) {
             return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                   left_var.dtype, right_result->dtype));
           }
@@ -480,43 +504,75 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
             } else {
               return std::visit(
                   [&](auto&& dynamic_arg) {
-                    if (!var_dtype.dtype.IsPtr() || !var_dtype.dtype.PtrTo().IsJson()) {
+                    bool can_brackets_op = false;
+                    if (!var_dtype.dtype.IsPtr()) {
+                      can_brackets_op = false;
+                    } else if (var_dtype.dtype.IsJsonPtr()) {
+                      can_brackets_op = true;
+                    } else if (var_dtype.dtype.IsVectorPtr()) {
+                      can_brackets_op = true;
+                    } else if (var_dtype.dtype.IsMapPtr() || var_dtype.dtype.IsUnorderedMapPtr()) {
+                      can_brackets_op = true;
+                    }
+                    if (!can_brackets_op) {
                       return absl::StatusOr<VarTag>(absl::InvalidArgumentError(
                           fmt::format("invalid dtype:{} to do json dynamic access", var_dtype.dtype)));
                     }
+
+                    std::string_view implicit_func_call;
+                    DType ret_dtype;
                     using T = std::decay_t<decltype(dynamic_arg)>;
-                    bool get_by_member = true;
-                    if constexpr (std::is_same_v<uint32_t, T>) {
-                      get_by_member = false;
-                    } else if constexpr (std::is_same_v<std::string, T>) {
-                    } else {
-                      auto result = dynamic_arg.Validate(ctx);
+                    if (var_dtype.dtype.IsJsonPtr()) {
+                      bool get_by_member = true;
+                      if constexpr (std::is_same_v<uint32_t, T>) {
+                        get_by_member = false;
+                      } else if constexpr (std::is_same_v<std::string, T>) {
+                      } else {
+                        auto result = dynamic_arg.Validate(ctx);
+                        if (!result.ok()) {
+                          return absl::StatusOr<VarTag>(result.status());
+                        }
+                        auto var_ref_dtype = result.value().dtype;
+                        if (var_ref_dtype.IsInteger()) {
+                          get_by_member = false;
+                        } else if (var_ref_dtype.IsStringView() || var_ref_dtype.IsStdStringView()) {
+                          get_by_member = true;
+                        } else {
+                          return absl::StatusOr<VarTag>(absl::InvalidArgumentError(
+                              fmt::format("Can NOT do json get by dtype:{}", var_ref_dtype)));
+                        }
+                      }
+                      if (get_by_member) {
+                        implicit_func_call = kBuiltinJsonMemberGet;
+                      } else {
+                        implicit_func_call = kBuiltinJsonArrayGet;
+                      }
+                      DType json_dtype(DATA_JSON);
+                      ret_dtype = json_dtype.ToPtr();
+                    } else if (var_dtype.dtype.IsVectorPtr() || var_dtype.dtype.IsMapPtr() ||
+                               var_dtype.dtype.IsUnorderedMapPtr()) {
+                      std::string member_func = "get";
+                      auto field_accessor = Reflect::GetStructMember(var_dtype.dtype.PtrTo(), member_func);
+                      if (!field_accessor) {
+                        return absl::StatusOr<VarTag>(ctx.GetErrorStatus(fmt::format(
+                            "Can NOT get member:{} accessor for dtype:{}", member_func, var_dtype.dtype.PtrTo())));
+                      }
+                      if (!field_accessor->member_func.has_value()) {
+                        return absl::StatusOr<VarTag>(ctx.GetErrorStatus(fmt::format(
+                            "Can NOT get member func:{} accessor for dtype:{}", member_func, var_dtype.dtype.PtrTo())));
+                      }
+                      ctx.AddMemberFuncCall(var_dtype.dtype.PtrTo(), member_func, *field_accessor->member_func);
+                      ret_dtype = field_accessor->member_func->return_type;
+                      access_func_names.emplace_back(GetMemberFuncName(var_dtype.dtype.PtrTo(), member_func));
+                    }
+                    if (!implicit_func_call.empty()) {
+                      auto result = ctx.CheckFuncExist(implicit_func_call, true);
                       if (!result.ok()) {
                         return absl::StatusOr<VarTag>(result.status());
                       }
-                      auto var_ref_dtype = result.value().dtype;
-                      if (var_ref_dtype.IsInteger()) {
-                        get_by_member = false;
-                      } else if (var_ref_dtype.IsStringView() || var_ref_dtype.IsStdStringView()) {
-                        get_by_member = true;
-                      } else {
-                        return absl::StatusOr<VarTag>(
-                            absl::InvalidArgumentError(fmt::format("Can NOT do json get by dtype:{}", var_ref_dtype)));
-                      }
+                      access_func_names.emplace_back(std::string(implicit_func_call));
                     }
-                    std::string_view implicit_func_call;
-                    if (get_by_member) {
-                      implicit_func_call = kBuiltinJsonMemberGet;
-                    } else {
-                      implicit_func_call = kBuiltinJsonArrayGet;
-                    }
-                    auto result = ctx.CheckFuncExist(implicit_func_call, true);
-                    if (!result.ok()) {
-                      return absl::StatusOr<VarTag>(result.status());
-                    }
-                    DType json_dtype(DATA_JSON);
-                    DType json_ptr_dtype = json_dtype.ToPtr();
-                    return absl::StatusOr<VarTag>(json_ptr_dtype);
+                    return absl::StatusOr<VarTag>(ret_dtype);
                   },
                   arg);
             }

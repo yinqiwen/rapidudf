@@ -61,6 +61,7 @@ struct FunctionDesc {
 
   void Init();
   bool ValidateArgs(const std::vector<DType>& ts) const;
+  bool CompareSignature(DType rtype, const std::vector<DType>& args_types) const;
 };
 
 class FunctionFactory {
@@ -103,6 +104,7 @@ class FuncRegister {
     FunctionFactory::Register(std::move(desc));
   }
 };
+std::string GetMemberFuncName(DType dtype, const std::string& member);
 std::string GetFunctionName(OpToken op, DType dtype);
 std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype);
 std::string GetFunctionName(OpToken op, DType a, DType b, DType c);
@@ -127,6 +129,9 @@ struct MemberFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...)> {
     return func;
   }
   static R Call(T* p, Args... args) {
+    if (nullptr == p) {
+      throw std::logic_error(fmt::format("NULL object pointer to call member func:{}", GetFuncName()));
+    }
     auto func = GetFunc();
     if constexpr (std::is_same_v<void, R>) {
       (p->*func)(std::forward<Args>(args)...);
@@ -148,6 +153,9 @@ struct MemberFunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
     return func;
   }
   static R Call(const T* p, Args... args) {
+    if (nullptr == p) {
+      throw std::logic_error(fmt::format("NULL object pointer to call member func:{}", GetFuncName()));
+    }
     auto func = GetFunc();
     if constexpr (std::is_same_v<void, R>) {
       (p->*func)(std::forward<Args>(args)...);
@@ -218,6 +226,9 @@ struct FunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...)> {
     return func;
   }
   static R SafeCall(T* p, Args... args) {
+    if (nullptr == p) {
+      throw std::logic_error(fmt::format("NULL object pointer to call member func:{}", GetFuncName()));
+    }
     auto func = GetFunc();
     if constexpr (std::is_same_v<void, R>) {
       (p->*func)(std::forward<Args>(args)...);
@@ -240,6 +251,9 @@ struct FunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
     return func;
   }
   static R SafeCall(const T* p, Args... args) {
+    if (nullptr == p) {
+      throw std::logic_error(fmt::format("NULL object pointer to call member func:{}", GetFuncName()));
+    }
     auto func = GetFunc();
     if constexpr (std::is_same_v<void, R>) {
       (p->*func)(std::forward<Args>(args)...);

@@ -30,11 +30,14 @@
 */
 #include "rapidudf/ast/context.h"
 #include <fmt/format.h>
+#include <array>
 #include <vector>
 #include "rapidudf/builtin/builtin_symbols.h"
+#include "rapidudf/meta/constants.h"
 
 namespace rapidudf {
 namespace ast {
+
 void ParseContext::Clear() {
   source_.clear();
   source_lines_.clear();
@@ -47,6 +50,14 @@ void ParseContext::SetFuncDesc(const FunctionDesc& d, uint32_t idx) {
   FunctionDesc desc = d;
   desc.Init();
   GetFunctionParseContext(idx).desc = desc;
+}
+
+std::vector<FunctionDesc> ParseContext::GetAllFunctionDescs() const {
+  std::vector<FunctionDesc> fs;
+  for (auto& ctx : function_parse_ctxs_) {
+    fs.emplace_back(ctx.desc);
+  }
+  return fs;
 }
 
 void ParseContext::EnterLoop() { GetFunctionParseContext(current_function_cursor_).in_loop++; }
@@ -77,6 +88,11 @@ absl::StatusOr<DType> ParseContext::IsVarExist(const std::string& name, bool err
       return absl::AlreadyExistsError(fmt::format("var:{} already exist at {}", name, GetErrorLine()));
     }
     return found->second;
+  }
+  for (size_t i = 0; i < kConstantCount; i++) {
+    if (kConstantNames[i] == name) {
+      return DType(DATA_F64);
+    }
   }
   if (!error_on_exist) {
     return absl::NotFoundError(fmt::format("var:{} is not exist at {}", name, GetErrorLine()));

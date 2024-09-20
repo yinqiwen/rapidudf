@@ -31,8 +31,8 @@
 
 #include "rapidudf/ast/grammar.h"
 #include <fmt/core.h>
-
 #include <boost/parser/parser.hpp>
+#include <chrono>
 #include <unordered_set>
 
 #include "rapidudf/ast/block.h"
@@ -83,6 +83,7 @@ bp::rule<struct logic_expr, BinaryExprPtr> logic_expr = "logic_expr";
 bp::rule<struct cmp_expr, BinaryExprPtr> cmp_expr = "cmp_expr";
 bp::rule<struct additive_expr, BinaryExprPtr> additive_expr = "additive_expr";
 bp::rule<struct multiplicative_expr, BinaryExprPtr> multiplicative_expr = "multiplicative_expr";
+bp::rule<struct power_expr, BinaryExprPtr> power_expr = "power_expr";
 bp::rule<struct unary_expr, UnaryExprPtr> unary_expr = "unary_expr";
 bp::rule<struct ternary_expr, TernaryExprPtr> ternary_expr = "ternary_expr";
 bp::rule<struct expression, BinaryExprPtr> expression = "expression";
@@ -197,7 +198,8 @@ auto const cmp_expr_def = (additive_expr >> *(Symbols::kCmpOpSymbols >> additive
 auto const additive_expr_def =
     (multiplicative_expr >> *(Symbols::kAdditiveOpSymbols >> multiplicative_expr))[binary_expr_func];
 auto const multiplicative_expr_def =
-    (unary_expr >> *(Symbols::kMultiplicativeOpSymbols >> unary_expr))[binary_expr_func];
+    (power_expr >> *(Symbols::kMultiplicativeOpSymbols >> power_expr))[binary_expr_func];
+auto const power_expr_def = (unary_expr >> *(Symbols::kPowerOpSymbols >> unary_expr))[binary_expr_func];
 auto const unary_expr_def = (-Symbols::kUnaryOpSymbols >> operand)[unary_expr_func];
 
 auto const filed_access_def = (('.' > identifier > -func_invoke_args))[field_access_func];
@@ -207,7 +209,7 @@ auto const var_accessor_def = (identifier > -(member_access | func_invoke_args))
 
 BOOST_PARSER_DEFINE_RULES(constant_number, var_declare, var_ref, var_accessor, filed_access, dynamic_param_access,
                           operand, func_invoke_args, member_access, unary_expr, assign, logic_expr, cmp_expr,
-                          additive_expr, multiplicative_expr, expression, ternary_expr, array);
+                          additive_expr, multiplicative_expr, power_expr, expression, ternary_expr, array);
 
 bp::rule<struct statements, std::vector<Statement>> statements = "statements";
 bp::rule<struct return_statement, ReturnStatement> return_statement = "return_statement";
@@ -244,16 +246,23 @@ BOOST_PARSER_DEFINE_RULES(comment, block, func_arg, func_args, func, funcs, retu
                           continue_statement);
 
 absl::StatusOr<Function> parse_function_ast(ParseContext& ctx, const std::string& source) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   ctx.SetSource(source);
   bp::callback_error_handler error_handler([&](std::string const& msg) { ctx.SetAstErr(msg); });
   auto const parser = bp::with_error_handler(func, error_handler);
   std::optional<Function> result = bp::parse(source, parser, bp::ws | comment);
+  auto parse_duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+  start_time = std::chrono::high_resolution_clock::now();
+  ctx.SetParseCost(parse_duration);
   if (result) {
     ctx.SetFuncDesc(result->ToFuncDesc());
     auto rc = result->Validate(ctx);
     if (!rc.ok()) {
       return rc;
     }
+    ctx.SetParseValidateCost(
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
   }
   if (!result) {
     return absl::InvalidArgumentError(fmt::format("parse {} failed with ast_error:{}", source, ctx.GetAstErr()));
@@ -262,10 +271,14 @@ absl::StatusOr<Function> parse_function_ast(ParseContext& ctx, const std::string
 }
 
 absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, const std::string& source) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   ctx.SetSource(source);
   bp::callback_error_handler error_handler([&](std::string const& msg) { ctx.SetAstErr(msg); });
   auto const parser = bp::with_error_handler(funcs, error_handler);
   std::optional<std::vector<Function>> result = bp::parse(source, parser, bp::ws | comment);
+  ctx.SetParseCost(
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
+  start_time = std::chrono::high_resolution_clock::now();
   if (result) {
     std::set<std::string> func_names;
     for (size_t i = 0; i < result->size(); i++) {
@@ -281,23 +294,34 @@ absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, con
       }
     }
   }
+  ctx.SetParseValidateCost(
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
   if (!result) {
     return absl::InvalidArgumentError(fmt::format("parse {} failed with ast_error:{}", source, ctx.GetAstErr()));
   }
   return *result;
 }
 
-absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::string& source) {
+absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::string& source,
+                                                const FunctionDesc& desc) {
+  auto start_time = std::chrono::high_resolution_clock::now();
   ctx.SetSource(source, false);
   bp::callback_error_handler error_handler([&](std::string const& msg) { ctx.SetAstErr(msg); });
   auto const parser = bp::with_error_handler(expression, error_handler);
   std::optional<Expression> result = bp::parse(source, parser, bp::ws | comment);
+  ctx.SetParseCost(
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
+  start_time = std::chrono::high_resolution_clock::now();
   if (result) {
+    ctx.SetFuncDesc(desc);
     auto rc = (*result)->Validate(ctx);
     if (!rc.ok()) {
       return rc.status();
     }
+    ctx.SetParseValidateCost(
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
   }
+
   if (!result) {
     return absl::InvalidArgumentError(fmt::format("parse {} failed with ast_error:{}", source, ctx.GetAstErr()));
   }

@@ -43,7 +43,7 @@ struct FBSVectorHelper {
       return {};
     }
     if (i >= fbs_vec->size()) {
-      return nullptr;
+      return {};
     }
     return fbs_vec->Get(i);
   }
@@ -64,4 +64,5 @@ void try_register_fbs_vector_member_funcs() {
     Reflect::AddStructMethodAccessor("size", &FBSVectorHelper<remove_cv_t>::Size);
   }
 }
+
 }  // namespace rapidudf

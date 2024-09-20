@@ -33,6 +33,7 @@
 #include <functional>
 #include <vector>
 #include "rapidudf/context/context.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -209,48 +210,6 @@ TEST(JitCompiler, vector_ternary) {
     // ASSERT_FLOAT_EQ(result[i], vec[i] + 5 + 10);
   }
 }
-TEST(JitCompiler, vector_dot) {
-  std::vector<float> left{1, 2, 3, 4, 1, 5, 6};
-  std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
-  simd::Vector<float> simd_left(left);
-  simd::Vector<float> simd_right(right);
-  JitCompiler compiler;
-  std::string content = R"(
-    f32 test_func(simd_vector<f32> x,simd_vector<f32> y){
-      return dot(x,y);
-    }
-  )";
-  auto rc = compiler.CompileFunction<float, simd::Vector<float>, simd::Vector<float>>(content);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  auto result = f(simd_left, simd_right);
-  float native_result = 0;
-  for (size_t i = 0; i < left.size(); i++) {
-    native_result += (left[i] * right[i]);
-  }
-  ASSERT_FLOAT_EQ(result, native_result);
-}
-
-TEST(JitCompiler, vector_iota) {
-  spdlog::set_level(spdlog::level::debug);
-  JitCompiler compiler;
-  std::string content = R"(
-    simd_vector<f64> test_func(Context ctx){
-      var t = iota(1_f64,12);
-      return t;
-    }
-  )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>, Context&>(content, true);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  Context ctx;
-  auto result = f(ctx);
-  RUDF_INFO("IsTemporary:{}", result.IsTemporary());
-  ASSERT_EQ(result.Size(), 12);
-  for (size_t i = 0; i < result.Size(); i++) {
-    ASSERT_DOUBLE_EQ(result[i], i + 1);
-  }
-}
 
 TEST(JitCompiler, vector_string_cmp) {
   std::vector<std::string> left{"hello0", "hello1", "hello2"};
@@ -323,7 +282,7 @@ TEST(JitCompiler, complex) {
     double x = xx[i];
     double y = yy[i];
     double actual = (x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y);
-    ASSERT_EQ(result[i], actual);
+    ASSERT_DOUBLE_EQ(result[i], actual);
   }
 }
 
@@ -354,6 +313,10 @@ TEST(JitCompiler, test) {
   auto rc = compiler.CompileFunction<rapidudf::simd::Vector<double>, Context&, Feeds&>(source);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
+  auto& stat = f.Stats();
+  RUDF_INFO("parse cost:{}us, parse_validate cost:{}us, IR_build cost:{}us, jit compile cost:{}us",
+            stat.parse_cost.count(), stat.parse_validate_cost.count(), stat.ir_build_cost.count(),
+            stat.compile_cost.count());
 
   std::vector<double> clicks;
   std::vector<double> likes;

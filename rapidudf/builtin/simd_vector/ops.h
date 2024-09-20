@@ -37,6 +37,13 @@
 namespace rapidudf {
 namespace simd {
 
+template <typename T, OpToken opt, typename T1 = void>
+struct OpTypes {
+  using operand_t = T;
+  using operand_t_1 = T1;
+  static constexpr OpToken op = opt;
+};
+
 template <typename T, typename R, OpToken op>
 Vector<R> simd_vector_binary_op(Context& ctx, Vector<T> left, Vector<T> right);
 template <typename T, typename R, OpToken op>

@@ -245,7 +245,7 @@ RUDF_FUNC_REGISTER(test_extern_func)
 //   ASSERT_EQ(f(test, 101), 101);
 //   ASSERT_EQ(test.a, 101);
 // }
-TEST(JitCompiler, json_read_int) {
+TEST(JitCompiler, function_cache) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;

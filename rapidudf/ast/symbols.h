@@ -44,6 +44,7 @@ struct Symbols {
   static boost::parser::symbols<OpToken> kCmpOpSymbols;
   static boost::parser::symbols<OpToken> kAdditiveOpSymbols;
   static boost::parser::symbols<OpToken> kMultiplicativeOpSymbols;
+  static boost::parser::symbols<OpToken> kPowerOpSymbols;
   static boost::parser::symbols<OpToken> kUnaryOpSymbols;
   static boost::parser::symbols<uint32_t> kContinueSymbols;
   static boost::parser::symbols<uint32_t> kBreakSymbols;

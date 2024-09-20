@@ -36,19 +36,30 @@
 
 using namespace rapidudf;
 
-TEST(JitCompiler, ternary0) {
-  spdlog::set_level(spdlog::level::debug);
+TEST(JitCompiler, ternary) {
   JitCompiler compiler;
-  std::string content = R"(
-    int test_func(int x){ 
-      return x>3?1:0;
-    }
-  )";
-  auto rc = compiler.CompileFunction<int, int>(content);
+  std::string content = "x>3?1:0";
+
+  auto rc = compiler.CompileExpression<int, int>(content, {"x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  ASSERT_DOUBLE_EQ(f(3), 0);
-  ASSERT_DOUBLE_EQ(f(4), 1);
-  ASSERT_DOUBLE_EQ(f(6), 1);
-  ASSERT_DOUBLE_EQ(f(2), 0);
+  ASSERT_EQ(f(3), 0);
+  ASSERT_EQ(f(4), 1);
+  ASSERT_EQ(f(6), 1);
+  ASSERT_EQ(f(2), 0);
+}
+
+TEST(JitCompiler, vector_ternary) {
+  JitCompiler compiler;
+  Context ctx;
+  std::string content = "x>3?1:0";
+  std::vector<int> cond_var = {1, 2, 1, 2, 4, 1, 4, 5, 6};
+  auto rc = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>>(content, {"_", "x"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(ctx, cond_var);
+  ASSERT_EQ(result.Size(), cond_var.size());
+  for (size_t i = 0; i < cond_var.size(); i++) {
+    ASSERT_EQ(result[i], cond_var[i] > 3 ? 1 : 0);
+  }
 }

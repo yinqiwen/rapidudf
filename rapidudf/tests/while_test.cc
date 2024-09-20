@@ -36,11 +36,9 @@
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
-using namespace rapidudf::ast;
 TEST(JitCompiler, while0) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
-  ParseContext ctx;
   std::string content = R"(
     int test_func(int x, int y){ 
       while(x > 0){
