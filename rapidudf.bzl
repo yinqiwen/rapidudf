@@ -49,32 +49,6 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
         sha256 = "241b06f3097fd186ff468832150d6cc142247dc42a32aaefb56d0099895fd229",
     )
 
-    _SPDLOG_BUILD_FILE = """
-cc_library(
-    name = "spdlog",
-    hdrs = glob([
-        "include/**/*.h",
-    ]),
-    srcs= glob([
-        "src/*.cpp",
-    ]),
-    defines = ["SPDLOG_FMT_EXTERNAL", "SPDLOG_COMPILED_LIB"],
-    includes = ["include"],
-    visibility = ["//visibility:public"],
-)
-"""
-    spdlog_ver = kwargs.get("spdlog_ver", "1.10.0")
-    spdlog_name = "spdlog-{ver}".format(ver = spdlog_ver)
-    http_archive(
-        name = "com_github_spdlog",
-        strip_prefix = spdlog_name,
-        urls = [
-            "https://mirrors.tencent.com/github.com/gabime/spdlog/archive/v{ver}.tar.gz".format(ver = spdlog_ver),
-            "https://github.com/gabime/spdlog/archive/v{ver}.tar.gz".format(ver = spdlog_ver),
-        ],
-        build_file_content = _SPDLOG_BUILD_FILE,
-    )
-
     fbs_ver = kwargs.get("fbs_ver", "2.0.0")
     fbs_name = "flatbuffers-{ver}".format(ver = fbs_ver)
     http_archive(
@@ -132,7 +106,7 @@ cc_library(
     new_git_repository(
         name = "boost_parser",
         remote = "https://github.com/tzlaine/parser.git",
-        branch = "master",
+        commit = "d774edc0e638a4e5bdfb5d4f22f8a01a6f6f7983",
         build_file_content = _BOOST_PARSER_BUILD_FILE,
     )
 
@@ -277,7 +251,7 @@ make(
     new_git_repository(
         name = "x86_simd_sort",
         remote = "https://github.com/intel/x86-simd-sort.git",
-        branch = "main",
+        commit = "c61ce8f97f495cab7077774741be7a3903e71dd4",
         build_file_content = _X86_SIMD_SORT_BUILD_FILE,
     )
 
@@ -308,7 +282,7 @@ cmake(
     new_git_repository(
         name = "sleef",
         remote = "https://github.com/shibatch/sleef.git",
-        branch = "master",
+        tag = "3.7",
         build_file_content = _SLEEF_BUILD_FILE,
     )
 

@@ -53,6 +53,14 @@ class Context {
 
   uint8_t* ArenaAllocate(size_t n);
 
+  template <typename T, typename... Args>
+  T* New(Args&&... args) {
+    auto tmp = std::make_unique<T>(std::forward<Args>(args)...);
+    T* p = tmp.get();
+    Own(std::move(tmp));
+    return p;
+  }
+
   template <typename T>
   simd::VectorData NewSimdVector(size_t lanes, size_t n, bool temporary = false) {
     using number_t = typename simd::InternalType<T>::internal_type;
@@ -117,6 +125,8 @@ class Context {
     const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data.Data());
     return allocated_arena_ptrs_.count(ptr) > 0;
   }
+  void SetHasNan(bool v = true) { has_nan_ = v; }
+  bool HasNan() const { return has_nan_; }
 
   ~Context();
 
@@ -127,5 +137,7 @@ class Context {
   Arena* arena_ = nullptr;
   absl::flat_hash_set<const uint8_t*> allocated_arena_ptrs_;
   std::vector<CleanupFunc> cleanups_;
+
+  bool has_nan_ = false;
 };
 }  // namespace rapidudf

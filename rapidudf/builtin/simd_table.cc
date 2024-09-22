@@ -28,22 +28,27 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-#pragma once
-#include <memory>
-#include "rapidudf/context/context.h"
+#include <stdexcept>
 #include "rapidudf/reflect/struct.h"
 #include "rapidudf/types/simd_vector_table.h"
-
 namespace rapidudf {
-namespace reflect {
-template <typename T>
-struct SimdVectorHelper {
-  static T get(simd::Vector<T> v, size_t i) { return v[i]; }
-  static size_t size(simd::Vector<T> v) { return v.Size(); }
-  static simd::Column* to_column(simd::Vector<T> v, Context& ctx) { return ctx.New<simd::Column>(ctx, v); }
-  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, to_column) }
+struct SimdTableHelper {
+  static simd::Column** get(simd::Table* table, StringView name) {
+    auto result = table->Get(name);
+    if (!result.ok()) {
+      throw std::logic_error(result.status().ToString());
+    }
+    return (result.value());
+  }
+  static void add(simd::Table* table, StringView name, simd::Column* column) {
+    auto status = table->Add(name.str(), column);
+    if (!status.ok()) {
+      throw std::logic_error(status.ToString());
+    }
+  }
+  static void set(simd::Table* table, StringView name, simd::Column* column) { table->Set(name.str(), column); }
+  static size_t size(simd::Table* table) { return table->Size(); }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, get, add, set, size) }
 };
-}  // namespace reflect
-
+void init_builtin_simd_table_funcs() { SimdTableHelper::Init(); }
 }  // namespace rapidudf

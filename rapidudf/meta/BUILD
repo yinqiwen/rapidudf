@@ -28,6 +28,17 @@ cc_library(
 )
 
 cc_library(
+    name = "operand",
+    hdrs = [
+        "operand.h",
+    ],
+    deps = [
+        ":optype",
+        "//rapidudf/types",
+    ],
+)
+
+cc_library(
     name = "constants",
     hdrs = [
         "constants.h",
@@ -45,7 +56,9 @@ cc_library(
         "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/types",
+        "//rapidudf/types:scalar",
         "//rapidudf/types:simd_vector",
+        "//rapidudf/types:simd_vector_table",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_google_absl//absl/types:span",
     ],

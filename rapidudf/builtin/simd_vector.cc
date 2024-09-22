@@ -191,23 +191,23 @@ template <typename T>
 static void register_simd_vector_sort() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_SORT, dtype.ToSimdVector());
-  void (*simd_f0)(simd::Vector<T>, bool, bool) = simd::sort<T>;
+  void (*simd_f0)(Context&, simd::Vector<T>, bool) = simd::sort<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 
   func_name = GetFunctionName(OP_SELECT, dtype.ToSimdVector());
-  void (*simd_f1)(simd::Vector<T>, size_t, bool, bool) = simd::select<T>;
+  void (*simd_f1)(Context&, simd::Vector<T>, size_t, bool) = simd::select<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f1);
 
   func_name = GetFunctionName(OP_TOPK, dtype.ToSimdVector());
-  void (*simd_f2)(simd::Vector<T>, size_t, bool, bool) = simd::topk<T>;
+  void (*simd_f2)(Context&, simd::Vector<T>, size_t, bool) = simd::topk<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f2);
 
   func_name = GetFunctionName(OP_ARG_SORT, dtype.ToSimdVector());
-  simd::Vector<size_t> (*simd_f3)(Context&, simd::Vector<T>, bool, bool) = simd::argsort<T>;
+  simd::Vector<size_t> (*simd_f3)(Context&, simd::Vector<T>, bool) = simd::argsort<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f3);
 
   func_name = GetFunctionName(OP_ARG_SELECT, dtype.ToSimdVector());
-  simd::Vector<size_t> (*simd_f4)(Context&, simd::Vector<T>, size_t, bool, bool) = simd::argselect<T>;
+  simd::Vector<size_t> (*simd_f4)(Context&, simd::Vector<T>, size_t, bool) = simd::argselect<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f4);
 }
 
@@ -216,15 +216,15 @@ static void register_simd_vector_key_valye_sort() {
   DType key_dtype = get_dtype<K>();
   DType value_dtype = get_dtype<V>();
   std::string func_name = GetFunctionName(OP_SORT_KV, key_dtype.ToSimdVector(), value_dtype.ToSimdVector());
-  void (*simd_f0)(simd::Vector<K>, simd::Vector<V>, bool, bool) = simd::sort_key_value<K, V>;
+  void (*simd_f0)(Context&, simd::Vector<K>, simd::Vector<V>, bool) = simd::sort_key_value<K, V>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 
   func_name = GetFunctionName(OP_SELECT_KV, key_dtype.ToSimdVector(), value_dtype.ToSimdVector());
-  void (*simd_f1)(simd::Vector<K>, simd::Vector<V>, size_t, bool, bool) = simd::select_key_value<K, V>;
+  void (*simd_f1)(Context&, simd::Vector<K>, simd::Vector<V>, size_t, bool) = simd::select_key_value<K, V>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f1);
 
   func_name = GetFunctionName(OP_TOPK_KV, key_dtype.ToSimdVector(), value_dtype.ToSimdVector());
-  void (*simd_f2)(simd::Vector<K>, simd::Vector<V>, size_t, bool, bool) = simd::topk_key_value<K, V>;
+  void (*simd_f2)(Context&, simd::Vector<K>, simd::Vector<V>, size_t, bool) = simd::topk_key_value<K, V>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f2);
 }
 #define KEY_VALUE_SORT_DTYPES (uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)
@@ -233,7 +233,11 @@ static void register_simd_vector_key_valye_sort() {
 
 void init_builtin_simd_vector_funcs() {
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ABS, float, double, int64_t, int32_t, int16_t, int8_t)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_NEGATIVE, float, double, int64_t, int32_t, int16_t, int8_t)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_CEIL, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_ROUND, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_RINT, float, double)
+  REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_TRUNC, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_EXP, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_EXPM1, float, double)
   REGISTER_SIMD_VECTOR_UNARY_FUNCS(OP_EXP2, float, double)

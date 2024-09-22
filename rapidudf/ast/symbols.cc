@@ -67,6 +67,8 @@ boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID
                                                         {"json", DType(DATA_JSON).ToPtr()},
                                                         {"string", DType(DATA_STRING).ToPtr()},
                                                         {"Context", DType(DATA_CONTEXT).ToPtr()},
+                                                        {"simd_table", DType(DATA_SIMD_TABLE).ToPtr()},
+                                                        {"simd_column", DType(DATA_SIMD_COLUMN).ToPtr()},
                                                         {"string_view", DType(DATA_STRING_VIEW)}};
 
 boost::parser::symbols<OpToken> Symbols::kAssignOpSymbols = {{"=", OP_ASSIGN},         {"+=", OP_PLUS_ASSIGN},

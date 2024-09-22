@@ -79,7 +79,7 @@ ValuePtr Value::TernaryOp(OpToken op, ValuePtr second, ValuePtr third) {
       break;
     }
     default: {
-      break;
+      return {};
     }
   }
 

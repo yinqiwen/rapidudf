@@ -47,19 +47,19 @@
   BOOST_PP_SEQ_FOR_EACH_I(REGISTER_MATH_FUNC_WITH_TYPE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 namespace rapidudf {
 
-static std::unordered_set<std::string_view>& get_builtin_math_funcs() {
-  static std::unordered_set<std::string_view> funcs;
-  return funcs;
-}
+// static std::unordered_set<std::string_view>& get_builtin_math_funcs() {
+//   static std::unordered_set<std::string_view> funcs;
+//   return funcs;
+// }
 
 static std::unordered_map<std::string, OpToken>& get_builtin_func_op_mapping() {
   static std::unordered_map<std::string, OpToken> mapping;
   return mapping;
 }
 
-void register_builtin_function_op(const std::string& name, OpToken op) { get_builtin_func_op_mapping()[name] = op; }
+// void register_builtin_function_op(const std::string& name, OpToken op) { get_builtin_func_op_mapping()[name] = op; }
 
-bool register_builtin_function(std::string_view name) { return get_builtin_math_funcs().insert(name).second; }
+// bool register_builtin_function(std::string_view name) { return get_builtin_math_funcs().insert(name).second; }
 
 template <typename T>
 static void register_abs() {
@@ -67,7 +67,7 @@ static void register_abs() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_ABS, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_function_op(func_name, OP_ABS);
+  // register_builtin_function_op(func_name, OP_ABS);
 }
 
 template <typename T>
@@ -84,6 +84,24 @@ static void register_ceil() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_CEIL, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
+}
+
+template <typename T>
+static void register_round() {
+  T (*abs_f)(T) = &std::round;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ROUND, dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
+  // register_builtin_function_op(func_name, OP_ROUND);
+}
+
+template <typename T>
+static void register_rint() {
+  T (*abs_f)(T) = &std::rint;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_RINT, dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
+  // register_builtin_function_op(func_name, OP_RINT);
 }
 
 template <typename T>
@@ -108,7 +126,7 @@ static void register_exp() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_EXP, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_function_op(func_name, OP_EXP);
+  // register_builtin_function_op(func_name, OP_EXP);
 }
 
 template <typename T>
@@ -125,7 +143,7 @@ static void register_exp2() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_EXP2, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_function_op(func_name, OP_EXP2);
+  // register_builtin_function_op(func_name, OP_EXP2);
 }
 
 template <typename T>
@@ -135,6 +153,13 @@ static void register_floor() {
   std::string func_name = GetFunctionName(OP_FLOOR, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
 }
+template <typename T>
+static void register_trunc() {
+  T (*f)(T) = &std::trunc;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_TRUNC, dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
+}
 
 template <typename T>
 static void register_sqrt() {
@@ -142,7 +167,7 @@ static void register_sqrt() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_SQRT, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_function_op(func_name, OP_SQRT);
+  // register_builtin_function_op(func_name, OP_SQRT);
 }
 
 template <typename T>
@@ -151,7 +176,7 @@ static void register_log() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_LOG, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_function_op(func_name, OP_LOG);
+  // register_builtin_function_op(func_name, OP_LOG);
 }
 template <typename T>
 static void register_log10() {
@@ -159,7 +184,7 @@ static void register_log10() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_LOG10, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_function_op(func_name, OP_LOG10);
+  // register_builtin_function_op(func_name, OP_LOG10);
 }
 template <typename T>
 static void register_log1p() {
@@ -175,7 +200,7 @@ static void register_log2() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_LOG2, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_function_op(func_name, OP_LOG2);
+  // register_builtin_function_op(func_name, OP_LOG2);
 }
 template <typename T>
 static void register_hypot() {
@@ -190,7 +215,7 @@ static void register_sin() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_SIN, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_function_op(func_name, OP_SIN);
+  // register_builtin_function_op(func_name, OP_SIN);
 }
 template <typename T>
 static void register_cos() {
@@ -198,7 +223,7 @@ static void register_cos() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_COS, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_function_op(func_name, OP_COS);
+  // register_builtin_function_op(func_name, OP_COS);
 }
 template <typename T>
 static void register_tan() {
@@ -288,7 +313,7 @@ static void register_max() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_MAX, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_function_op(func_name, OP_MAX);
+  // register_builtin_function_op(func_name, OP_MAX);
 }
 template <typename T>
 static T scalar_min(T left, T right) {
@@ -300,7 +325,7 @@ static void register_min() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_MIN, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
-  register_builtin_function_op(func_name, OP_MIN);
+  // register_builtin_function_op(func_name, OP_MIN);
 }
 
 template <typename T>
@@ -314,7 +339,7 @@ static void register_fma() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_FMA, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  register_builtin_function_op(func_name, OP_FMA);
+  // register_builtin_function_op(func_name, OP_FMA);
 }
 
 template <typename T>
@@ -324,7 +349,7 @@ static void register_clamp() {
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
 }
 
-bool is_builtin_function(std::string_view name) { return get_builtin_math_funcs().count(name) == 1; }
+// bool is_builtin_function(std::string_view name) { return get_builtin_math_funcs().count(name) == 1; }
 
 OpToken get_buitin_func_op(const std::string& name) {
   auto found = get_builtin_func_op_mapping().find(name);
@@ -336,7 +361,7 @@ OpToken get_buitin_func_op(const std::string& name) {
 
 void init_builtin_math_funcs() {
   for (uint32_t op = OP_CONDITIONAL; op < OP_END; op++) {
-    get_builtin_math_funcs().insert(kOpTokenStrs[op]);
+    get_builtin_func_op_mapping().emplace(kOpTokenStrs[op], static_cast<OpToken>(op));
   }
 
   REGISTER_MATH_FUNCS(register_abs, float, double, int64_t, int32_t)
@@ -352,6 +377,9 @@ void init_builtin_math_funcs() {
   REGISTER_MATH_FUNCS(register_expm1, float, double)
   REGISTER_MATH_FUNCS(register_exp2, float, double)
   REGISTER_MATH_FUNCS(register_floor, float, double)
+  REGISTER_MATH_FUNCS(register_round, float, double)
+  REGISTER_MATH_FUNCS(register_rint, float, double)
+  REGISTER_MATH_FUNCS(register_trunc, float, double)
   REGISTER_MATH_FUNCS(register_sqrt, float, double)
   REGISTER_MATH_FUNCS(register_log, float, double)
   REGISTER_MATH_FUNCS(register_log10, float, double)

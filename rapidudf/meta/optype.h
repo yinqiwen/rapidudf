@@ -66,6 +66,9 @@ enum OpToken {
   OP_SQRT,
   OP_FLOOR,
   OP_CEIL,
+  OP_ROUND,
+  OP_RINT,
+  OP_TRUNC,
   OP_ERF,
   OP_ERFC,
   OP_ABS,
@@ -107,6 +110,7 @@ enum OpToken {
   OP_ARG_SELECT,
   OP_SUM,
   OP_CLONE,
+  OP_SCALAR_CAST,
   OP_END,
 };
 constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
@@ -116,15 +120,15 @@ constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
     "equal",         "not_equal",  "less",       "less_equal",  "greater",
     "greater_equal", "and",        "or",         "conditional", "max",
     "min",           "pow",        "sqrt",       "floor",       "ceil",
-    "erf",           "erfc",       "abs",        "sin",         "cos",
-    "tan",           "asin",       "acos",       "atan",        "atanh",
-    "atan2",         "sinh",       "cosh",       "tanh",        "asinh",
-    "acosh",         "exp",        "exp2",       "expm1",       "log",
-    "log2",          "log10",      "log1p",      "hypot",       "dot",
-    "iota",          "clamp",      "fma",        "fms",         "fnma",
-    "fnms",          "sort",       "select",     "topk",        "sort_kv",
-    "select_kv",     "topk_kv",    "argsort",    "argselect",   "sum",
-    "clone"};
+    "round",         "rint",       "trunc",      "erf",         "erfc",
+    "abs",           "sin",        "cos",        "tan",         "asin",
+    "acos",          "atan",       "atanh",      "atan2",       "sinh",
+    "cosh",          "tanh",       "asinh",      "acosh",       "exp",
+    "exp2",          "expm1",      "log",        "log2",        "log10",
+    "log1p",         "hypot",      "dot",        "iota",        "clamp",
+    "fma",           "fms",        "fnma",       "fnms",        "sort",
+    "select",        "topk",       "sort_kv",    "select_kv",   "topk_kv",
+    "argsort",       "argselect",  "sum",        "clone",       "to_scalar"};
 }  // namespace rapidudf
 
 template <>

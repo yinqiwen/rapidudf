@@ -54,7 +54,9 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/json_object.h"
+#include "rapidudf/types/scalar.h"
 #include "rapidudf/types/simd_vector.h"
+#include "rapidudf/types/simd_vector_table.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
@@ -92,8 +94,11 @@ enum FundamentalType {
   DATA_STRING_VIEW,
   DATA_STRING,
   DATA_FLATBUFFERS_STRING,
+  DATA_SCALAR,
   DATA_JSON,
   DATA_CONTEXT,
+  DATA_SIMD_TABLE,
+  DATA_SIMD_COLUMN,
 
   DATA_OBJECT_BEGIN = 64,
   DATA_COMPLEX_OBJECT = (1 << 14) - 1,
@@ -110,10 +115,11 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double;
 
-constexpr std::array<std::string_view, DATA_CONTEXT + 1> kFundamentalTypeStrs = {
-    "invalid",     "void",   "bit",        "u8",   "i8",     "u16", "i16",
-    "u32",         "i32",    "u64",        "i64",  "f32",    "f64", "std_string_view",
-    "string_view", "string", "fbs_string", "json", "Context"};
+constexpr std::array<std::string_view, DATA_SIMD_COLUMN + 1> kFundamentalTypeStrs = {
+    "invalid",     "void",   "bit",        "u8",     "i8",   "u16",     "i16",
+    "u32",         "i32",    "u64",        "i64",    "f32",  "f64",     "std_string_view",
+    "string_view", "string", "fbs_string", "scalar", "json", "Context", "simd_table",
+    "simd_column"};
 
 class DType {
  public:
@@ -164,6 +170,12 @@ class DType {
   bool IsContext() const { return IsFundamental() && t0_ == DATA_CONTEXT; }
   bool IsContextPtr() const { return IsPtr() && (PtrTo().IsContext()); }
   bool IsStringPtr() const { return IsPtr() && (PtrTo().IsString()); }
+  bool IsSimdTable() const { return IsFundamental() && t0_ == DATA_SIMD_TABLE; }
+  bool IsSimdTablePtr() const { return IsPtr() && (PtrTo().IsSimdTable()); }
+  bool IsSimdColumn() const { return IsFundamental() && t0_ == DATA_SIMD_COLUMN; }
+  bool IsSimdColumnPtr() const { return IsPtr() && (PtrTo().IsSimdColumn()); }
+  bool IsScalar() const { return IsFundamental() && t0_ == DATA_SCALAR; }
+  bool IsScalarPtr() const { return IsPtr() && (PtrTo().IsScalar()); }
   bool IsInvalid() const { return Control() == 0; }
   bool IsComplexObj() const;
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
@@ -536,6 +548,15 @@ DType get_dtype() {
   if constexpr (std::is_same_v<Context, T>) {
     return DType(DATA_CONTEXT);
   }
+  if constexpr (std::is_same_v<simd::Table, T>) {
+    return DType(DATA_SIMD_TABLE);
+  }
+  if constexpr (std::is_same_v<simd::Column, T>) {
+    return DType(DATA_SIMD_COLUMN);
+  }
+  if constexpr (std::is_same_v<Scalar, T>) {
+    return DType(DATA_SCALAR);
+  }
   static uint32_t id = nextTypeId();
   DType dtype(static_cast<FundamentalType>(id));
   // DTypeFactory::Add<T>(dtype);
@@ -702,7 +723,7 @@ struct fmt::formatter<rapidudf::FundamentalType> : formatter<std::string> {
   // parse is inherited from formatter<string_view>.
   auto format(rapidudf::FundamentalType c, format_context& ctx) const -> format_context::iterator {
     std::string view = "object";
-    if (c <= rapidudf::DATA_JSON) {
+    if (c <= rapidudf::DATA_SIMD_COLUMN) {
       view = std::string(rapidudf::kFundamentalTypeStrs[c]);
     } else {
       view = fmt::format("object/{}", static_cast<int>(c));

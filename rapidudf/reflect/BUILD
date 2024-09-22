@@ -17,6 +17,7 @@ cc_library(
         "struct.h",
     ],
     deps = [
+        "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",

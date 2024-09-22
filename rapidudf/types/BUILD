@@ -31,6 +31,20 @@ cc_library(
 )
 
 cc_library(
+    name = "scalar",
+    srcs = ["scalar.cc"],
+    hdrs = [
+        "scalar.h",
+    ],
+    deps = [
+        ":types",
+        "//rapidudf/context",
+        "//rapidudf/meta",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
     name = "simd_vector",
     srcs = ["simd_vector.cc"],
     hdrs = [
@@ -39,5 +53,22 @@ cc_library(
     deps = [
         ":types",
         "//rapidudf/arena",
+    ],
+)
+
+cc_library(
+    name = "simd_vector_table",
+    srcs = ["simd_vector_table.cc"],
+    hdrs = [
+        "simd_vector_table.h",
+    ],
+    deps = [
+        ":scalar",
+        ":simd_vector",
+        "//rapidudf/context",
+        "//rapidudf/meta:optype",
+        "@com_github_fmtlib//:fmt",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

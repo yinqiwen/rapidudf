@@ -49,6 +49,7 @@
 #include "llvm/Transforms/Scalar/PartiallyInlineLibCalls.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/Transforms/Scalar/TailRecursionElimination.h"
 
 #include <memory>
 #include <vector>
@@ -66,7 +67,7 @@
 namespace rapidudf {
 namespace llvm {
 
-JitCompiler::JitCompiler() {
+JitCompiler::JitCompiler(const Options& opts) : opts_(opts) {
   init_builtin();
   ast::Symbols::Init();
   ::llvm::InitializeNativeTarget();
@@ -133,6 +134,9 @@ void JitCompiler::NewSession(bool print_asm) {
   session_->module = std::make_unique<::llvm::Module>("RapidUDF", *session_->context);
   session_->ir_builder = std::make_unique<::llvm::IRBuilder<>>(*session_->context);
   session_->module->setDataLayout(session_->jit->getDataLayout());
+  if (opts_.fast_math) {
+    session_->ir_builder->setFastMathFlags(::llvm::FastMathFlags::getFast());
+  }
 
   init_buitin_types(*session_->context);
 
@@ -159,8 +163,27 @@ void JitCompiler::NewSession(bool print_asm) {
   pass_builder.crossRegisterProxies(*session_->loop_analysis_manager, *session_->func_analysis_manager,
                                     *session_->cgscc_analysis_manager, *session_->module_analysis_manager);
 
-  auto func_pass_manager = pass_builder.buildFunctionSimplificationPipeline(
-      ::llvm::OptimizationLevel::O2, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
+  ::llvm::OptimizationLevel opt_level = ::llvm::OptimizationLevel::O2;
+  switch (opts_.optimize_level) {
+    case 0: {
+      opt_level = ::llvm::OptimizationLevel::O0;
+      break;
+    }
+    case 1: {
+      opt_level = ::llvm::OptimizationLevel::O1;
+      break;
+    }
+    case 3: {
+      opt_level = ::llvm::OptimizationLevel::O3;
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+
+  auto func_pass_manager =
+      pass_builder.buildFunctionSimplificationPipeline(opt_level, ::llvm::ThinOrFullLTOPhase::None);
 
   session_->func_pass_manager = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
   session_->func_pass_manager->addPass(::llvm::InstCombinePass());
@@ -169,6 +192,7 @@ void JitCompiler::NewSession(bool print_asm) {
   session_->func_pass_manager->addPass(::llvm::SimplifyCFGPass());
   session_->func_pass_manager->addPass(::llvm::PartiallyInlineLibCallsPass());
   session_->func_pass_manager->addPass(::llvm::MergedLoadStoreMotionPass());
+  session_->func_pass_manager->addPass(::llvm::TailCallElimPass());
   // func_pass_manager_->addPass(::llvm::createPartiallyInlineLibCallsPass());
 }
 
@@ -414,7 +438,10 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
   }
 
   // Run the optimizer on the function.
-  GetSession()->func_pass_manager->run(*f, *GetSession()->func_analysis_manager);
+  if (opts_.optimize_level > 0) {
+    GetSession()->func_pass_manager->run(*f, *GetSession()->func_analysis_manager);
+  }
+
   return absl::OkStatus();
 }
 
@@ -496,9 +523,21 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name,
     }
     arg_vals[i] = arg_val->GetValue();
   }
-
   ::llvm::Value* result = GetSession()->GetIRBuilder()->CreateCall(found_func, arg_vals);
-  return NewValue(found_func_desc.return_type, result);
+  ::llvm::Type* return_val_type = nullptr;
+  DType return_type = found_func_desc.return_type;
+
+  if (return_type.IsPtr()) {
+    auto ret_type_ptr_to = return_type.PtrTo();
+    if (ret_type_ptr_to.IsSimdColumnPtr()) {
+      return_val_type = GetSession()->GetIRBuilder()->getInt8PtrTy();
+      return_type = return_type.PtrTo();
+    } else if (ret_type_ptr_to.IsInteger() || ret_type_ptr_to.IsFloat()) {
+      return_val_type = GetType(ret_type_ptr_to).value();
+      return_type = return_type.PtrTo();
+    }
+  }
+  return NewValue(return_type, result, return_val_type);
 }
 
 }  // namespace llvm

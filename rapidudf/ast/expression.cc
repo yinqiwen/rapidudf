@@ -174,6 +174,14 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
           if (!check_result.ok()) {
             return check_result.status();
           }
+        } else if (result->dtype.IsSimdColumnPtr()) {
+          can_not = true;
+          // todo
+          std::string fname = GetFunctionName(*op, result->dtype);
+          auto check_result = ctx.CheckFuncExist(fname, true);
+          if (!check_result.ok()) {
+            return check_result.status();
+          }
         }
         if (!can_not) {
           return ctx.GetErrorStatus(fmt::format("can NOT do not op on non bool value:{}", result->dtype));
@@ -181,7 +189,25 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
         break;
       }
       case OP_NEGATIVE: {
-        if (!result->dtype.IsNumber()) {
+        bool can_neg = false;
+        if (result->dtype.IsNumber() && result->dtype.IsSigned()) {
+          can_neg = true;
+        } else if (result->dtype.IsSimdVector() && result->dtype.Elem().IsSigned()) {
+          can_neg = true;
+          std::string fname = GetFunctionName(*op, result->dtype);
+          auto check_result = ctx.CheckFuncExist(fname, true);
+          if (!check_result.ok()) {
+            return check_result.status();
+          }
+        } else if (result->dtype.IsSimdColumnPtr()) {
+          can_neg = true;
+          std::string fname = GetFunctionName(*op, result->dtype);
+          auto check_result = ctx.CheckFuncExist(fname, true);
+          if (!check_result.ok()) {
+            return check_result.status();
+          }
+        }
+        if (!can_neg) {
           return ctx.GetErrorStatus(fmt::format("can NOT do negative op on non number value:{}", result->dtype));
         }
         break;
@@ -227,7 +253,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       return right_result.status();
     }
     bool can_binary_op = true;
-    std::string_view implicit_func_call;
+    std::string implicit_func_call;
     do {
       if (left_var.dtype == right_result->dtype) {
         can_binary_op = true;
@@ -235,6 +261,23 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       }
       if (left_var.dtype.IsVoid() && !left_var.name.empty() && op == OP_ASSIGN) {
         can_binary_op = true;
+        break;
+      }
+      if (left_var.dtype.IsSimdColumnPtr() || right_result->dtype.IsSimdColumnPtr()) {
+        can_binary_op = true;
+        if (!left_var.dtype.IsSimdColumnPtr() && !left_var.dtype.IsPrimitive()) {
+          can_binary_op = false;
+        }
+        if (!right_result->dtype.IsSimdColumnPtr() && !right_result->dtype.IsPrimitive()) {
+          can_binary_op = false;
+        }
+        if (can_binary_op) {
+          if (left_var.dtype.IsPrimitive()) {
+            implicit_func_call = GetFunctionName(OP_SCALAR_CAST, left_var.dtype);
+          } else if (right_result->dtype.IsPrimitive()) {
+            implicit_func_call = GetFunctionName(OP_SCALAR_CAST, right_result->dtype);
+          }
+        }
         break;
       }
       if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
@@ -274,10 +317,12 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} by expression validate ",
                                             op, left_var.dtype, right_result->dtype));
     }
-    if (left_var.dtype.IsStringPtr() || right_result->dtype.IsStringPtr()) {
-      implicit_func_call = kBuiltinCastStdStrToStringView;
-    } else if (left_var.dtype.IsFlatbuffersStringPtr() || right_result->dtype.IsFlatbuffersStringPtr()) {
-      implicit_func_call = kBuiltinCastFbsStrToStringView;
+    if (implicit_func_call.empty()) {
+      if (left_var.dtype.IsStringPtr() || right_result->dtype.IsStringPtr()) {
+        implicit_func_call = kBuiltinCastStdStrToStringView;
+      } else if (left_var.dtype.IsFlatbuffersStringPtr() || right_result->dtype.IsFlatbuffersStringPtr()) {
+        implicit_func_call = kBuiltinCastFbsStrToStringView;
+      }
     }
     if (!implicit_func_call.empty()) {
       auto result = ctx.CheckFuncExist(implicit_func_call, true);
@@ -305,6 +350,14 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           if (!left_var.dtype.IsSimdVector()) {
             left_var.dtype = right_result->dtype;
           }
+          break;
+        } else if (left_var.dtype.IsSimdColumnPtr() || right_result->dtype.IsSimdColumnPtr()) {
+          auto result = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype, right_result->dtype), true);
+          if (!result.ok()) {
+            return result.status();
+          }
+          DType result_dtype(DATA_SIMD_COLUMN);
+          left_var.dtype = result_dtype.ToPtr();
           break;
         }
         if (!left_var.dtype.IsNumber() || !right_result->dtype.IsNumber()) {
@@ -365,7 +418,11 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         } else if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           can_cmp = true;
           implicit_func_call = GetFunctionName(op, left_var.dtype, right_result->dtype);
-          left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+          // left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+        } else if (left_var.dtype.IsSimdColumnPtr() || right_result->dtype.IsSimdColumnPtr()) {
+          can_cmp = true;
+          implicit_func_call = GetFunctionName(op, left_var.dtype, right_result->dtype);
+          // left_var = VarTag(DType(DATA_SIMD_COLUMN).ToPtr());
         }
         if (!can_cmp) {
           return ctx.GetErrorStatus(
@@ -379,6 +436,8 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
         }
         if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+        } else if (left_var.dtype.IsSimdColumnPtr() || right_result->dtype.IsSimdColumnPtr()) {
+          left_var = VarTag(DType(DATA_SIMD_COLUMN).ToPtr());
         } else {
           left_var = VarTag(DType(DATA_BIT));
         }
@@ -393,6 +452,13 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
             return result.status();
           }
           left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+        } else if (left_var.dtype.IsSimdColumnPtr() || right_result->dtype.IsSimdColumnPtr()) {
+          std::string implicit_func_call = GetFunctionName(op, left_var.dtype, right_result->dtype);
+          auto result = ctx.CheckFuncExist(implicit_func_call, true);
+          if (!result.ok()) {
+            return result.status();
+          }
+          left_var = VarTag(DType(DATA_SIMD_COLUMN).ToPtr());
         } else {
           if (!left_var.dtype.IsBit() || !right_result->dtype.IsBit()) {
             return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
@@ -408,7 +474,6 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       }
     }
   }
-
   return left_var;
 }
 
@@ -478,6 +543,35 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
         }
         return VarTag(ternary_result_dtype.ToSimdVector());
       }
+    } else if (cond_result->dtype.IsSimdColumnPtr()) {
+      bool valid_true_dtype = false;
+      std::vector<std::string> implicit_func_calls;
+      if (true_expr_result->dtype.IsSimdColumnPtr() || true_expr_result->dtype.IsPrimitive()) {
+        valid_true_dtype = true;
+        if (true_expr_result->dtype.IsPrimitive()) {
+          implicit_func_calls.emplace_back(GetFunctionName(OP_SCALAR_CAST, true_expr_result->dtype));
+        }
+      }
+      bool valid_false_dtype = false;
+      if (false_expr_result->dtype.IsSimdColumnPtr() || false_expr_result->dtype.IsPrimitive()) {
+        valid_false_dtype = true;
+        if (false_expr_result->dtype.IsPrimitive()) {
+          implicit_func_calls.emplace_back(GetFunctionName(OP_SCALAR_CAST, false_expr_result->dtype));
+        }
+      }
+
+      if (valid_true_dtype && valid_false_dtype) {
+        implicit_func_calls.emplace_back(
+            GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
+        for (auto implicit_func_call : implicit_func_calls) {
+          auto result = ctx.CheckFuncExist(implicit_func_call, true);
+          if (!result.ok()) {
+            return result.status();
+          }
+        }
+        DType result_dtype(DATA_SIMD_COLUMN);
+        return VarTag(result_dtype.ToPtr());
+      }
     }
     return ctx.GetErrorStatus(
         fmt::format("can NOT do ternary with cond dtype:{}, true_expr_dtype:{}, false_expr_dtype:{}",
@@ -512,6 +606,8 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
                     } else if (var_dtype.dtype.IsVectorPtr()) {
                       can_brackets_op = true;
                     } else if (var_dtype.dtype.IsMapPtr() || var_dtype.dtype.IsUnorderedMapPtr()) {
+                      can_brackets_op = true;
+                    } else if (var_dtype.dtype.IsSimdTablePtr()) {
                       can_brackets_op = true;
                     }
                     if (!can_brackets_op) {
@@ -550,7 +646,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
                       DType json_dtype(DATA_JSON);
                       ret_dtype = json_dtype.ToPtr();
                     } else if (var_dtype.dtype.IsVectorPtr() || var_dtype.dtype.IsMapPtr() ||
-                               var_dtype.dtype.IsUnorderedMapPtr()) {
+                               var_dtype.dtype.IsUnorderedMapPtr() || var_dtype.dtype.IsSimdTablePtr()) {
                       std::string member_func = "get";
                       auto field_accessor = Reflect::GetStructMember(var_dtype.dtype.PtrTo(), member_func);
                       if (!field_accessor) {
@@ -561,8 +657,14 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
                         return absl::StatusOr<VarTag>(ctx.GetErrorStatus(fmt::format(
                             "Can NOT get member func:{} accessor for dtype:{}", member_func, var_dtype.dtype.PtrTo())));
                       }
-                      ctx.AddMemberFuncCall(var_dtype.dtype.PtrTo(), member_func, *field_accessor->member_func);
                       ret_dtype = field_accessor->member_func->return_type;
+                      if (ret_dtype.IsPtr()) {
+                        auto ret_ptr_to = ret_dtype.PtrTo();
+                        if (ret_ptr_to.IsSimdColumnPtr() || ret_ptr_to.IsInteger() || ret_ptr_to.IsFloat()) {
+                          ret_dtype = ret_dtype.PtrTo();
+                        }
+                      }
+                      ctx.AddMemberFuncCall(var_dtype.dtype.PtrTo(), member_func, *field_accessor->member_func);
                       access_func_names.emplace_back(GetMemberFuncName(var_dtype.dtype.PtrTo(), member_func));
                     }
                     if (!implicit_func_call.empty()) {
@@ -588,6 +690,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     std::vector<DType> arg_dtypes;
     DType largest_dtype;
     bool has_simd_vector = false;
+    bool has_simd_column = false;
     DType first_number_dtype;
     if (func_args->args.has_value()) {
       for (auto expr : *(func_args->args)) {
@@ -602,23 +705,38 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
         if (result->dtype.IsSimdVector()) {
           has_simd_vector = true;
         }
+        if (result->dtype.IsSimdColumnPtr()) {
+          has_simd_column = true;
+        }
         if (result->dtype.IsNumber() && first_number_dtype.IsInvalid()) {
           first_number_dtype = result->dtype;
         }
       }
     }
-    if (is_builtin_function(name)) {
+    builtin_op = get_buitin_func_op(name);
+    if (builtin_op != OP_INVALID) {
       if (name == kOpTokenStrs[OP_IOTA]) {
-        name = GetFunctionName(name, first_number_dtype);
-      } else if (has_simd_vector) {
-        name = GetFunctionName(name, arg_dtypes);
+        name = GetFunctionName(OP_IOTA, first_number_dtype);
+      } else if (has_simd_vector || has_simd_column) {
+        name = GetFunctionName(builtin_op, arg_dtypes);
       } else {
-        name = GetFunctionName(name, largest_dtype);
+        name = GetFunctionName(builtin_op, largest_dtype);
       }
     }
     auto result = ctx.CheckFuncExist(name);
     if (!result.ok()) {
       return result.status();
+    }
+    if (has_simd_column) {
+      for (auto arg_dtype : arg_dtypes) {
+        if (arg_dtype.IsPrimitive()) {
+          std::string implicit_func_call = GetFunctionName(OP_SCALAR_CAST, arg_dtype);
+          result = ctx.CheckFuncExist(implicit_func_call, true);
+          if (!result.ok()) {
+            return result.status();
+          }
+        }
+      }
     }
     auto* desc = result.value();
     if (desc->context_arg_idx >= 0) {

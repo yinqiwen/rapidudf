@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,22 +28,18 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-#pragma once
-#include <memory>
-#include "rapidudf/context/context.h"
-#include "rapidudf/reflect/struct.h"
-#include "rapidudf/types/simd_vector_table.h"
-
+#include "rapidudf/types/scalar.h"
 namespace rapidudf {
-namespace reflect {
-template <typename T>
-struct SimdVectorHelper {
-  static T get(simd::Vector<T> v, size_t i) { return v[i]; }
-  static size_t size(simd::Vector<T> v) { return v.Size(); }
-  static simd::Column* to_column(simd::Vector<T> v, Context& ctx) { return ctx.New<simd::Column>(ctx, v); }
-  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, to_column) }
-};
-}  // namespace reflect
-
+double Scalar::to_f64() const { return ToPrimitive<double>(); }
+float Scalar::to_f32() const { return ToPrimitive<float>(); }
+uint64_t Scalar::to_u64() const { return ToPrimitive<uint64_t>(); }
+uint32_t Scalar::to_u32() const { return ToPrimitive<uint32_t>(); }
+uint16_t Scalar::to_u16() const { return ToPrimitive<uint16_t>(); }
+uint8_t Scalar::to_u8() const { return ToPrimitive<uint8_t>(); }
+int64_t Scalar::to_i64() const { return ToPrimitive<int64_t>(); }
+int32_t Scalar::to_i32() const { return ToPrimitive<int32_t>(); }
+int16_t Scalar::to_i16() const { return ToPrimitive<int16_t>(); }
+int8_t Scalar::to_i8() const { return ToPrimitive<int8_t>(); }
+Bit Scalar::to_bit() const { return ToPrimitive<Bit>(); }
+StringView Scalar::to_string_view() const { return ToPrimitive<StringView>(); }
 }  // namespace rapidudf

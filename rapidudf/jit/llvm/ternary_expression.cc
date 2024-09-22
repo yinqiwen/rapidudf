@@ -62,7 +62,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
                                                                   false_val_result.value()->GetDType())));
       }
       return result;
-    } else if (cond_val->GetDType().IsSimdVectorBit()) {
+    } else if (cond_val->GetDType().IsSimdVectorBit() || cond_val->GetDType().IsSimdColumnPtr()) {
       auto true_expr_result = BuildIR(ctx, true_expr);
       if (!true_expr_result.ok()) {
         return true_expr_result.status();
@@ -76,7 +76,20 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
       auto func_name =
           GetFunctionName(OP_CONDITIONAL, cond_val->GetDType(), true_expr_val->GetDType(), false_expr_val->GetDType());
       std::vector<ValuePtr> args{cond_val, true_expr_val, false_expr_val};
-      auto result = CallFunction(func_name, args);
+      if (cond_val->GetDType().IsSimdColumnPtr()) {
+        for (size_t i = 0; i < args.size(); i++) {
+          if (!args[i]->GetDType().IsSimdColumnPtr()) {
+            auto cast_func = GetFunctionName(OP_SCALAR_CAST, args[i]->GetDType());
+            auto cast_result = CallFunction(cast_func, {args[i]});
+            if (!cast_result.ok()) {
+              return cast_result.status();
+            }
+            args[i] = cast_result.value();
+          }
+        }
+      }
+
+      auto result = CallFunction(func_name, args, false);
       if (!result.ok()) {
         return result.status();
       }

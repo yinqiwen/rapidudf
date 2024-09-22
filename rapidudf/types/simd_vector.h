@@ -101,6 +101,21 @@ class Vector {
   }
   VectorData RawData() { return vec_data_; }
 
+  auto begin() const {
+    if constexpr (std::is_same_v<Bit, T>) {
+      return reinterpret_cast<const uint8_t*>(vec_data_.Data());
+    } else {
+      return reinterpret_cast<const T*>(vec_data_.Data());
+    }
+  }
+  auto end() const {
+    if constexpr (std::is_same_v<Bit, T>) {
+      return reinterpret_cast<const uint8_t*>(vec_data_.Data()) + ElementSize();
+    } else {
+      return reinterpret_cast<const T*>(vec_data_.Data()) + ElementSize();
+    }
+  }
+
   size_t Size() const { return vec_data_.Size(); }
   size_t ElementSize() const {
     if constexpr (std::is_same_v<Bit, T>) {

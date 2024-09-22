@@ -92,6 +92,24 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
             return call_result.status();
           }
           result = call_result.value();
+        } else if (left->GetDType().IsSimdColumnPtr() || right->GetDType().IsSimdColumnPtr()) {
+          auto func_name = GetFunctionName(op, left->GetDType(), right->GetDType());
+          std::vector<ValuePtr> args{left, right};
+          for (size_t i = 0; i < args.size(); i++) {
+            if (!args[i]->GetDType().IsSimdColumnPtr()) {
+              auto cast_func = GetFunctionName(OP_SCALAR_CAST, args[i]->GetDType());
+              auto cast_result = CallFunction(cast_func, {args[i]});
+              if (!cast_result.ok()) {
+                return cast_result.status();
+              }
+              args[i] = cast_result.value();
+            }
+          }
+          auto call_result = CallFunction(func_name, args);
+          if (!call_result.ok()) {
+            return call_result.status();
+          }
+          result = call_result.value();
         } else {
           result = left->BinaryOp(op, right);
           if (!result) {

@@ -13,6 +13,9 @@ cc_library(
         "builtin.cc",
         "json.cc",
         "math.cc",
+        "scalar.cc",
+        "simd_column.cc",
+        "simd_table.cc",
         "simd_vector.cc",
         "stl.cc",
         "stl_maps.cc",
@@ -28,6 +31,7 @@ cc_library(
         "//rapidudf/meta:function",
         "//rapidudf/meta:optype",
         "//rapidudf/reflect",
+        "//rapidudf/types:scalar",
         "@com_github_google_flatbuffers//:runtime_cc",
     ],
 )

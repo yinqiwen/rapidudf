@@ -9,12 +9,15 @@
 |min(x,y)  | Y     | Y      | N           | N     | Y                   | Y                     |N                  |N
 |pow(x)    | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |ceil(x)   | N     | Y      | N           | N     | N                   | Y                     |N                  |N
+|floor(x)  | N     | Y      | N           | N     | N                   | Y                     |N                  |N
+|round(x)  | N     | Y      | N           | N     | N                   | Y                     |N                  |N
+|rint(x)   | N     | Y      | N           | N     | N                   | Y                     |N                  |N
+|trunc(x)  | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |erf(x)    | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |erfc(x)   | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |exp(x)    | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |expm1(x)  | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |exp2(x)   | N     | Y      | N           | N     | N                   | Y                     |N                  |N
-|floor(x)  | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |sqrt(x)   | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |log(x)    | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |log2(x)   | N     | Y      | N           | N     | N                   | Y                     |N                  |N
@@ -34,6 +37,7 @@
 |atanh(x)  | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |atan2(x)  | N     | Y      | N           | N     | N                   | Y                     |N                  |N
 |hypot(x,y)| N     | Y      | N           | N     | N                   | Y                     |N                  |N
+|sum(x,y)  | N     | N      | N           | N     | Y                   | Y                     |N                  |N
 |dot(x,y)  | N     | N      | N           | N     | N                   | Y                     |N                  |N
 |iota(S,N) | N     | N      | N           | N     | Y                   | Y                     |N                  |N
 |clamp(x,y,z) | Y     | Y      | Y           | Y     | Y                   | Y                    |N                  |N
@@ -53,7 +57,6 @@
 - `.starts_with_ignore_case(part)` return true if part starts_with_ignore_case
 - `.ends_with_ignore_case(part)` return true if part ends_with_ignore_case
 
-
 ## std::vector
 - `.get(idx)`  get element by index
 - `.size()`    return container size
@@ -68,7 +71,6 @@
 ## std::set/std::unordered_set
 - `.size()`    return container size
 - `.contains(key)` return true if key exist
-
 
 ## google::protobuf::RepeatedField
 - `.get(idx)`  get element by index

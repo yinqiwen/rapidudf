@@ -76,6 +76,14 @@ extern __m128d Sleef_tand2_u10(__m128d);
 extern __m256d Sleef_tand4_u10(__m256d);
 extern __m512d Sleef_tand8_u10(__m512d);
 
+extern __m128 Sleef_rintf4(__m128);
+extern __m256 Sleef_rintf8(__m256);
+extern __m512 Sleef_rintf16(__m512);
+
+extern __m128d Sleef_rintd2(__m128d);
+extern __m256d Sleef_rintd4(__m256d);
+extern __m512d Sleef_rintd8(__m512d);
+
 extern __m128 Sleef_erff4_u10(__m128);
 extern __m256 Sleef_erff8_u10(__m256);
 extern __m512 Sleef_erff16_u10(__m512);
@@ -130,10 +138,16 @@ static inline auto do_simd_unary_op(D d, V lv) {
     return hn::Sqrt(lv);
   } else if constexpr (op == OP_FLOOR) {
     return hn::Floor(lv);
+  } else if constexpr (op == OP_ROUND) {
+    return hn::Round(lv);
+  } else if constexpr (op == OP_TRUNC) {
+    return hn::Trunc(lv);
   } else if constexpr (op == OP_ABS) {
     return hn::Abs(lv);
   } else if constexpr (op == OP_NOT) {
     return hn::Not(lv);
+  } else if constexpr (op == OP_NEGATIVE) {
+    return hn::Neg(lv);
   } else if constexpr (op == OP_COS) {
     return hn::Cos(d, lv);
   } else if constexpr (op == OP_SIN) {
@@ -312,6 +326,34 @@ static inline auto do_simd_unary_op(D d, V lv) {
       static_assert(sizeof(lv.raw) == -1, "unsupported target");
 #endif
     }
+  } else if constexpr (op == OP_RINT) {
+    if constexpr (std::is_same_v<hn::TFromV<V>, float>) {
+#if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
+      auto val = Sleef_rintf16(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_AVX2
+      auto val = Sleef_rintf8(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_SSE4 || HWY_TARGET == HWY_SSSE3 || HWY_TARGET == HWY_SSE2
+      auto val = Sleef_rintf4(lv.raw);
+      return V{val};
+#else
+      static_assert(sizeof(lv.raw) == -1, "unsupported type");
+#endif
+    } else {
+#if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
+      auto val = Sleef_rintd8(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_AVX2
+      auto val = Sleef_rintd4(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_SSE4 || HWY_TARGET == HWY_SSE2 || HWY_TARGET == HWY_SSSE3
+      auto val = Sleef_rintd2(lv.raw);
+      return V{val};
+#else
+      static_assert(sizeof(lv.raw) == -1, "unsupported target");
+#endif
+    }
   } else {
     static_assert(sizeof(V) == -1, "unsupported op");
   }
@@ -415,8 +457,10 @@ namespace simd {
 
 template <typename T>
 Vector<T> simd_vector_clone(Context& ctx, Vector<T> data) {
-  HWY_EXPORT_T(Table1, simd_vector_clone_impl<T>);
-  return HWY_DYNAMIC_DISPATCH_T(Table1)(ctx, data);
+  auto* p = ctx.ArenaAllocate(data.BytesCapacity());
+  memcpy(p, data.Data(), data.BytesCapacity());
+  VectorData result_data(p, data.Size(), data.BytesCapacity());
+  return Vector<T>(data);
 }
 template <typename T>
 Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n) {
@@ -447,6 +491,7 @@ Vector<T> simd_vector_unary_op(Context& ctx, Vector<T> left) {
 #define DEFINE_SIMD_UNARY_OP(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_UNARY_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_UNARY_OP(OP_NOT, Bit);
+DEFINE_SIMD_UNARY_OP(OP_NEGATIVE, float, double, int64_t, int32_t, int16_t, int8_t);
 DEFINE_SIMD_UNARY_OP(OP_COS, float, double);
 DEFINE_SIMD_UNARY_OP(OP_SIN, float, double);
 DEFINE_SIMD_UNARY_OP(OP_TAN, float, double);
@@ -469,6 +514,9 @@ DEFINE_SIMD_UNARY_OP(OP_LOG1P, float, double);
 DEFINE_SIMD_UNARY_OP(OP_SQRT, float, double);
 DEFINE_SIMD_UNARY_OP(OP_FLOOR, float, double);
 DEFINE_SIMD_UNARY_OP(OP_CEIL, float, double);
+DEFINE_SIMD_UNARY_OP(OP_ROUND, float, double);
+DEFINE_SIMD_UNARY_OP(OP_RINT, float, double);
+DEFINE_SIMD_UNARY_OP(OP_TRUNC, float, double);
 DEFINE_SIMD_UNARY_OP(OP_ERF, float, double);
 DEFINE_SIMD_UNARY_OP(OP_ERFC, float, double);
 DEFINE_SIMD_UNARY_OP(OP_ABS, float, double, int64_t, int32_t, int16_t, int8_t);
@@ -489,7 +537,8 @@ DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_
   template Vector<TYPE> simd_vector_clone(Context& ctx, Vector<TYPE> data);
 #define DEFINE_SIMD_CLONE_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_CLONE_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
-DEFINE_SIMD_CLONE_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
+DEFINE_SIMD_CLONE_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t, Bit,
+                     StringView);
 
 #define DEFINE_SIMD_SUM_OP_TEMPLATE(r, op, ii, TYPE) template TYPE simd_vector_sum(Vector<TYPE> vec);
 #define DEFINE_SIMD_SUM_OP(...) \

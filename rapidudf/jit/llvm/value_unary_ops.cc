@@ -89,7 +89,6 @@ ValuePtr Value::UnaryOp(OpToken op) {
         builtin_intrinsic = ::llvm::Intrinsic::abs;
         builtin_intrinsic_args.emplace_back(ir_builder_->getInt1(0));
       }
-
       break;
     }
     case OP_SQRT: {
@@ -99,6 +98,11 @@ ValuePtr Value::UnaryOp(OpToken op) {
     }
     case OP_CEIL: {
       builtin_intrinsic = ::llvm::Intrinsic::ceil;
+      builtin_intrinsic_args.emplace_back(GetValue());
+      break;
+    }
+    case OP_ROUND: {
+      builtin_intrinsic = ::llvm::Intrinsic::round;
       builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
@@ -127,9 +131,19 @@ ValuePtr Value::UnaryOp(OpToken op) {
       builtin_intrinsic_args.emplace_back(GetValue());
       break;
     }
-    default: {
-      RUDF_ERROR("Unsupported unary op:{}", op);
+    case OP_RINT: {
+      builtin_intrinsic = ::llvm::Intrinsic::rint;
+      builtin_intrinsic_args.emplace_back(GetValue());
       break;
+    }
+    case OP_TRUNC: {
+      builtin_intrinsic = ::llvm::Intrinsic::trunc;
+      builtin_intrinsic_args.emplace_back(GetValue());
+      break;
+    }
+    default: {
+      // RUDF_ERROR("Unsupported unary op:{}", op);
+      return {};
     }
   }
 

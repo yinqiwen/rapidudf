@@ -101,6 +101,7 @@ struct VarAccessor {
   std::optional<std::vector<MemberAccess>> access_args;
   std::optional<FuncInvokeArgs> func_args;
 
+  OpToken builtin_op = OP_INVALID;
   std::vector<std::string> access_func_names;
   uint32_t position = 0;
 

@@ -57,12 +57,19 @@ absl::Status Value::CopyFrom(ValuePtr other) {
           fmt::format("Can not copy from dtype:{} while current dtype:{}", other->dtype_, dtype_));
     }
   } else {
-    if (type_ == nullptr) {
-      type_ = get_type(ir_builder_->getContext(), other->GetDType());
+    if (other->type_ == nullptr) {
       if (type_ == nullptr) {
-        return absl::InvalidArgumentError(fmt::format("Can not alloca for dtype:{}", other->GetDType()));
+        type_ = get_type(ir_builder_->getContext(), other->GetDType());
+        if (type_ == nullptr) {
+          return absl::InvalidArgumentError(fmt::format("Can not alloca for dtype:{}", other->GetDType()));
+        }
+        val_ = ir_builder_->CreateAlloca(type_);
       }
-      val_ = ir_builder_->CreateAlloca(type_);
+    } else {
+      type_ = other->type_;
+      val_ = other->val_;
+      dtype_ = other->dtype_;
+      return absl::OkStatus();
     }
   }
   dtype_ = other->dtype_;

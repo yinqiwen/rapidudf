@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,22 +28,37 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-#pragma once
-#include <memory>
-#include "rapidudf/context/context.h"
-#include "rapidudf/reflect/struct.h"
-#include "rapidudf/types/simd_vector_table.h"
-
+#include "rapidudf/jit/llvm/jit.h"
 namespace rapidudf {
-namespace reflect {
-template <typename T>
-struct SimdVectorHelper {
-  static T get(simd::Vector<T> v, size_t i) { return v[i]; }
-  static size_t size(simd::Vector<T> v) { return v.Size(); }
-  static simd::Column* to_column(simd::Vector<T> v, Context& ctx) { return ctx.New<simd::Column>(ctx, v); }
-  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, to_column) }
-};
-}  // namespace reflect
-
+namespace llvm {
+bool JitCompiler::HasIntrinsic(OpToken op) {
+  switch (op) {
+    case OP_NEGATIVE:
+    case OP_NOT:
+    case OP_SIN:
+    case OP_COS:
+    case OP_FLOOR:
+    case OP_ABS:
+    case OP_SQRT:
+    case OP_CEIL:
+    case OP_ROUND:
+    case OP_EXP:
+    case OP_EXP2:
+    case OP_LOG:
+    case OP_LOG2:
+    case OP_LOG10:
+    case OP_RINT:
+    case OP_TRUNC:
+    case OP_FMA:
+    case OP_POW:
+    case OP_MAX:
+    case OP_MIN: {
+      return true;
+    }
+    default: {
+      return false;
+    }
+  }
+}
+}  // namespace llvm
 }  // namespace rapidudf

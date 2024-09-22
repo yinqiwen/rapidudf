@@ -53,8 +53,6 @@ bool json_cmp_float(uint32_t op, const JsonObject& json, double right, bool reve
 bool json_cmp_json(uint32_t op, const JsonObject& left, const JsonObject& right);
 
 void init_builtin();
-bool is_builtin_function(std::string_view name);
-bool register_builtin_function(std::string_view name);
 
 OpToken get_buitin_func_op(const std::string& name);
 

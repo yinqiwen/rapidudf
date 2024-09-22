@@ -411,6 +411,92 @@ TEST(JitCompiler, vector_floor) {
     ASSERT_FLOAT_EQ(result5[i], std::floor(fvs[i]));
   }
 }
+TEST(JitCompiler, round) {
+  JitCompiler compiler;
+  std::string content = "round(x)";
+  double x = 3.14;
+  auto rc1 = compiler.CompileExpression<double, double>(content, {"x"});
+  ASSERT_TRUE(rc1.ok());
+  auto f1 = std::move(rc1.value());
+  ASSERT_DOUBLE_EQ(f1(x), std::round(x));
+}
+
+TEST(JitCompiler, vector_round) {
+  Context ctx;
+  JitCompiler compiler;
+  std::string content = "round(x)";
+
+  std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
+  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  if (!rc5.ok()) {
+    RUDF_ERROR("{}", rc5.status().ToString());
+  }
+  ASSERT_TRUE(rc5.ok());
+  auto f5 = std::move(rc5.value());
+  auto result5 = f5(ctx, fvs);
+  ASSERT_EQ(result5.Size(), fvs.size());
+  for (size_t i = 0; i < fvs.size(); i++) {
+    ASSERT_FLOAT_EQ(result5[i], std::round(fvs[i]));
+  }
+}
+
+TEST(JitCompiler, rint) {
+  JitCompiler compiler;
+  std::string content = "rint(x)";
+  double x = 3.14;
+  auto rc1 = compiler.CompileExpression<double, double>(content, {"x"});
+  ASSERT_TRUE(rc1.ok());
+  auto f1 = std::move(rc1.value());
+  ASSERT_DOUBLE_EQ(f1(x), std::rint(x));
+}
+
+TEST(JitCompiler, vector_rint) {
+  Context ctx;
+  JitCompiler compiler;
+  std::string content = "rint(x)";
+
+  std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
+  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  if (!rc5.ok()) {
+    RUDF_ERROR("{}", rc5.status().ToString());
+  }
+  ASSERT_TRUE(rc5.ok());
+  auto f5 = std::move(rc5.value());
+  auto result5 = f5(ctx, fvs);
+  ASSERT_EQ(result5.Size(), fvs.size());
+  for (size_t i = 0; i < fvs.size(); i++) {
+    ASSERT_FLOAT_EQ(result5[i], std::rint(fvs[i]));
+  }
+}
+
+TEST(JitCompiler, trunc) {
+  JitCompiler compiler;
+  std::string content = "trunc(x)";
+  double x = 3.14;
+  auto rc1 = compiler.CompileExpression<double, double>(content, {"x"});
+  ASSERT_TRUE(rc1.ok());
+  auto f1 = std::move(rc1.value());
+  ASSERT_DOUBLE_EQ(f1(x), std::trunc(x));
+}
+
+TEST(JitCompiler, vector_trunc) {
+  Context ctx;
+  JitCompiler compiler;
+  std::string content = "trunc(x)";
+
+  std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
+  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  if (!rc5.ok()) {
+    RUDF_ERROR("{}", rc5.status().ToString());
+  }
+  ASSERT_TRUE(rc5.ok());
+  auto f5 = std::move(rc5.value());
+  auto result5 = f5(ctx, fvs);
+  ASSERT_EQ(result5.Size(), fvs.size());
+  for (size_t i = 0; i < fvs.size(); i++) {
+    ASSERT_FLOAT_EQ(result5[i], std::trunc(fvs[i]));
+  }
+}
 
 TEST(JitCompiler, sqrt) {
   JitCompiler compiler;
@@ -757,6 +843,28 @@ TEST(JitCompiler, vector_asin) {
   ASSERT_EQ(result5.Size(), fvs.size());
   for (size_t i = 0; i < fvs.size(); i++) {
     ASSERT_FLOAT_EQ(result5[i], std::asin(fvs[i]));
+  }
+}
+TEST(JitCompiler, column_asin) {
+  Context ctx;
+  JitCompiler compiler;
+  std::string content = "asin(x)";
+  std::vector<float> fvs{0.3, 0.5, 0.2, 0.6, 0.7, 0, 1.0};
+  auto& ctx_ = ctx;
+  simd::Column* column = ctx.New<simd::Column>(ctx_, fvs);
+  simd::Table table(ctx);
+
+  auto rc5 = compiler.CompileExpression<simd::Column*, Context&, simd::Column*>(content, {"_", "x"});
+  if (!rc5.ok()) {
+    RUDF_ERROR("{}", rc5.status().ToString());
+  }
+  ASSERT_TRUE(rc5.ok());
+  auto f5 = std::move(rc5.value());
+  auto result5 = f5(ctx, column);
+  ASSERT_EQ(result5->Size(), fvs.size());
+  auto result_vec = result5->ToVector<float>().value();
+  for (size_t i = 0; i < fvs.size(); i++) {
+    ASSERT_FLOAT_EQ(result_vec[i], std::asin(fvs[i]));
   }
 }
 

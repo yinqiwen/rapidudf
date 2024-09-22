@@ -278,6 +278,18 @@ cc_test(
 )
 
 cc_test(
+    name = "simd_table_test",
+    size = "small",
+    srcs = ["simd_table_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "simd_sort_test",
     size = "small",
     srcs = ["simd_sort_test.cc"],

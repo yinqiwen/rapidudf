@@ -79,10 +79,10 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
     ValuePtr result;
     switch (op) {
       case OP_NOT: {
-        if (val->GetDType().IsSimdVector()) {
+        if (val->GetDType().IsSimdVector() || val->GetDType().IsSimdColumnPtr()) {
           auto func_name = GetFunctionName(op, val->GetDType());
           std::vector<ValuePtr> args{val};
-          auto call_result = CallFunction(func_name, args);
+          auto call_result = CallFunction(func_name, args, false);
           if (!call_result.ok()) {
             return call_result.status();
           }
@@ -93,7 +93,17 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
         break;
       }
       case OP_NEGATIVE: {
-        result = val->UnaryOp(op);
+        if (val->GetDType().IsSimdVector() || val->GetDType().IsSimdColumnPtr()) {
+          auto func_name = GetFunctionName(op, val->GetDType());
+          std::vector<ValuePtr> args{val};
+          auto call_result = CallFunction(func_name, args);
+          if (!call_result.ok()) {
+            return call_result.status();
+          }
+          result = call_result.value();
+        } else {
+          result = val->UnaryOp(op);
+        }
         break;
       }
       default: {

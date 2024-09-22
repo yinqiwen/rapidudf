@@ -33,6 +33,7 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/scalar.h"
 
 namespace rapidudf {
 namespace simd {
@@ -44,15 +45,15 @@ struct OpTypes {
   static constexpr OpToken op = opt;
 };
 
+template <typename T, OpToken op>
+Vector<T> simd_vector_unary_op(Context& ctx, Vector<T> left);
+
 template <typename T, typename R, OpToken op>
 Vector<R> simd_vector_binary_op(Context& ctx, Vector<T> left, Vector<T> right);
 template <typename T, typename R, OpToken op>
 Vector<R> simd_vector_binary_vector_scalar_op(Context& ctx, Vector<T> left, T right);
 template <typename T, typename R, OpToken op>
 Vector<R> simd_vector_binary_scalar_vector_op(Context& ctx, T left, Vector<T> right);
-
-template <typename T, OpToken op>
-Vector<T> simd_vector_unary_op(Context& ctx, Vector<T> left);
 
 template <typename R, typename T, OpToken op>
 Vector<T> simd_vector_ternary_op(Context& ctx, Vector<R> a, Vector<T> b, Vector<T> c);
@@ -73,9 +74,6 @@ template <typename T>
 T simd_vector_sum(Vector<T> left);
 
 template <typename T>
-T simd_vector_or_equals(Vector<T> left, absl::Span<const T> right);
-
-template <typename T>
 T simd_vector_dot(Vector<T> left, Vector<T> right);
 
 template <typename T>
@@ -85,22 +83,25 @@ template <typename T>
 Vector<T> simd_vector_clone(Context& ctx, Vector<T> data);
 
 template <typename T>
-void sort(Vector<T> data, bool descending, bool hasnan);
+void sort(Context& ctx, Vector<T> data, bool descending);
 template <typename T>
-void select(Vector<T> data, size_t k, bool descending, bool hasnan);
+void select(Context& ctx, Vector<T> data, size_t k, bool descending);
 template <typename T>
-void topk(Vector<T> data, size_t k, bool descending, bool hasnan);
+void topk(Context& ctx, Vector<T> data, size_t k, bool descending);
 template <typename T>
-Vector<size_t> argsort(Context& ctx, Vector<T> data, bool descending, bool hasnan);
+Vector<size_t> argsort(Context& ctx, Vector<T> data, bool descending);
 template <typename T>
-Vector<size_t> argselect(Context& ctx, Vector<T> data, size_t k, bool descending, bool hasnan);
+Vector<size_t> argselect(Context& ctx, Vector<T> data, size_t k, bool descending);
 
 template <typename K, typename V>
-void sort_key_value(Vector<K> key, Vector<V> value, bool descending, bool hasnan);
+void sort_key_value(Context& ctx, Vector<K> key, Vector<V> value, bool descending);
 template <typename K, typename V>
-void select_key_value(Vector<K> key, Vector<V> value, size_t k, bool descending, bool hasnan);
+void select_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
 template <typename K, typename V>
-void topk_key_value(Vector<K> key, Vector<V> value, size_t k, bool descending, bool hasnan);
+void topk_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
+
+template <typename T>
+T simd_vector_or_equals(Vector<T> left, absl::Span<const T> right);
 
 }  // namespace simd
 }  // namespace rapidudf

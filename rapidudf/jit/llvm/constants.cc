@@ -77,8 +77,8 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, dou
   return NewValue(DATA_F64, val);
 }
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, bool v) {
-  auto val = ::llvm::ConstantInt::getBool(GetType(DATA_U8).value(), v);
-  return NewValue(DATA_U8, val);
+  auto val = ::llvm::ConstantInt::getBool(GetSession()->GetIRBuilder()->getInt1Ty(), v);
+  return NewValue(DATA_BIT, val);
 }
 
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Array& expr) {

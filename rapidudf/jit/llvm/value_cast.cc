@@ -92,7 +92,7 @@ ValuePtr Value::CastTo(DType dtype) {
       cast_func = kBuiltinCastFbsStrToStringView;
     }
     if (!cast_func.empty()) {
-      auto result = compiler_->CallFunction(cast_func, std::vector<ValuePtr>{SelfPtr()});
+      auto result = compiler_->CallFunction(cast_func, std::vector<ValuePtr>{SelfPtr()}, false);
       if (result.ok()) {
         return result.value();
       }

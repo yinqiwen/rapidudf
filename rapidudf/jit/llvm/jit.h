@@ -69,10 +69,16 @@ using ExternFunctionPtr = std::shared_ptr<ExternFunction>;
 class Value;
 using ValuePtr = std::shared_ptr<Value>;
 class JitFunctionCache;
+
 class JitCompiler {
  public:
+  struct Options {
+    bool fast_math = true;
+    uint8_t optimize_level = 2;
+    Options() {}
+  };
   static constexpr std::string_view kExpressionFuncName = "rapidudf_expresion";
-  JitCompiler();
+  JitCompiler(const Options& opts = Options{});
 
   absl::StatusOr<std::vector<std::string>> CompileSource(const std::string& source, bool dump_asm = false);
 
@@ -176,6 +182,8 @@ class JitCompiler {
   absl::StatusOr<void*> GetFunctionPtr(const std::string& name);
   JitFunctionStat GetStat();
 
+  bool HasIntrinsic(OpToken op);
+
   ValuePtr NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type = nullptr);
 
   absl::Status CompileFunction(const std::string& source);
@@ -226,7 +234,8 @@ class JitCompiler {
   ExternFunctionPtr GetFunction(const std::string& name);
   // std::string GetMemberFuncName(DType dtype, const std::string& member);
   absl::StatusOr<ValuePtr> CallFunction(const std::string& name, const std::vector<ValuePtr>& arg_values);
-  absl::StatusOr<ValuePtr> CallFunction(std::string_view name, const std::vector<ValuePtr>& arg_values) {
+  absl::StatusOr<ValuePtr> CallFunction(std::string_view name, const std::vector<ValuePtr>& arg_values,
+                                        bool writable_return_val) {
     return CallFunction(std::string(name), arg_values);
   }
 
@@ -238,6 +247,8 @@ class JitCompiler {
   std::vector<FunctionDesc> GetAllFunctionDescs();
 
   uint32_t GetLabelCursor();
+
+  Options opts_;
 
   ast::ParseContext ast_ctx_;
 
