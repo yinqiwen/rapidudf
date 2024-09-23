@@ -62,20 +62,6 @@ absl::Status Table::Add(const std::string& name, Column* column) {
   return absl::OkStatus();
 }
 
-// absl::Status Table::AddColumn(const std::string& name, Column column) {
-//   std::string column_name = name;
-//   if (column_name.empty()) {
-//     column_name = fmt::format("__column_{}", column_table_.size());
-//   }
-//   if (column_table_.find(column_name) != column_table_.end()) {
-//     return absl::InvalidArgumentError(fmt::format("duplicate column name:{} to add", column_name));
-//   }
-//   auto p = std::make_unique<Column>(std::move(column));
-//   column_table_.emplace(column_name, p.get());
-//   columns_.emplace_back(std::move(p));
-//   return absl::OkStatus();
-// }
-
 absl::StatusOr<Column**> Table::Get(StringView name) {
   auto found = column_table_.find(std::string_view(name));
   if (found == column_table_.end()) {

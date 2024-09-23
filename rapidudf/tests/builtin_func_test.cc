@@ -1071,6 +1071,28 @@ TEST(JitCompiler, vector_hypot) {
   }
 }
 
+TEST(JitCompiler, vector_sum) {
+  std::vector<float> left{1, 2, 3, 4, 1, 5, 6};
+  std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
+  simd::Vector<float> simd_left(left);
+  simd::Vector<float> simd_right(right);
+  JitCompiler compiler;
+  std::string content = R"(
+    f32 test_func(simd_vector<f32> x){
+      return sum(x);
+    }
+  )";
+  auto rc = compiler.CompileFunction<float, simd::Vector<float>>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(simd_left);
+  float native_result = 0;
+  for (size_t i = 0; i < left.size(); i++) {
+    native_result += (left[i]);
+  }
+  ASSERT_FLOAT_EQ(result, native_result);
+}
+
 TEST(JitCompiler, vector_dot) {
   std::vector<float> left{1, 2, 3, 4, 1, 5, 6};
   std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
@@ -1200,6 +1222,16 @@ TEST(JitCompiler, vector_clamp) {
   }
 }
 
+TEST(JitCompiler, fms) {
+  JitCompiler compiler;
+  std::string content = "fms(x,y,z)";
+  float fx = 3.1, fy = 3.2, fz = 1.3;
+  auto rc = compiler.CompileExpression<float, float, float, float>(content, {"x", "y", "z"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_FLOAT_EQ(f(fx, fy, fz), fx * fy - fz);
+}
+
 TEST(JitCompiler, vector_fms) {
   Context ctx;
   JitCompiler compiler;
@@ -1233,6 +1265,16 @@ TEST(JitCompiler, vector_fms) {
   }
 }
 
+TEST(JitCompiler, fnma) {
+  JitCompiler compiler;
+  std::string content = "fnma(x,y,z)";
+  float fx = 3.1, fy = 3.2, fz = 1.3;
+  auto rc = compiler.CompileExpression<float, float, float, float>(content, {"x", "y", "z"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_FLOAT_EQ(f(fx, fy, fz), -fx * fy + fz);
+}
+
 TEST(JitCompiler, vector_fnma) {
   Context ctx;
   JitCompiler compiler;
@@ -1264,6 +1306,16 @@ TEST(JitCompiler, vector_fnma) {
   for (size_t i = 0; i < fx.size(); i++) {
     ASSERT_EQ(result2[i], -ix[i] * iy[i] + iz);
   }
+}
+
+TEST(JitCompiler, fnms) {
+  JitCompiler compiler;
+  std::string content = "fnms(x,y,z)";
+  float fx = 3.1, fy = 3.2, fz = 1.3;
+  auto rc = compiler.CompileExpression<float, float, float, float>(content, {"x", "y", "z"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_FLOAT_EQ(f(fx, fy, fz), -fx * fy - fz);
 }
 
 TEST(JitCompiler, vector_fnms) {

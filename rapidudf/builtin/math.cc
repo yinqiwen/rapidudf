@@ -343,6 +343,43 @@ static void register_fma() {
 }
 
 template <typename T>
+static T scalar_fms(T a, T b, T c) {
+  return a * b - c;
+}
+template <typename T>
+static T scalar_fnma(T a, T b, T c) {
+  return -a * b + c;
+}
+template <typename T>
+static T scalar_fnms(T a, T b, T c) {
+  return -a * b - c;
+}
+
+template <typename T>
+static void register_fms() {
+  T (*f)(T, T, T) = &scalar_fms;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_FMS, dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
+}
+
+template <typename T>
+static void register_fnma() {
+  T (*f)(T, T, T) = &scalar_fnma;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_FNMA, dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
+}
+
+template <typename T>
+static void register_fnms() {
+  T (*f)(T, T, T) = &scalar_fnms;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_FNMS, dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
+}
+
+template <typename T>
 static void register_clamp() {
   T (*f)(T, T, T) = &scalar_clamp<T>;
   std::string func_name = "clamp_" + get_dtype<T>().GetTypeString();
@@ -402,5 +439,8 @@ void init_builtin_math_funcs() {
   REGISTER_MATH_FUNCS(register_clamp, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t, uint16_t,
                       uint8_t)
   REGISTER_MATH_FUNCS(register_fma, float, double)
+  REGISTER_MATH_FUNCS(register_fms, float, double)
+  REGISTER_MATH_FUNCS(register_fnma, float, double)
+  REGISTER_MATH_FUNCS(register_fnms, float, double)
 }
 }  // namespace rapidudf

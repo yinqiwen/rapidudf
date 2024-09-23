@@ -110,7 +110,7 @@ class Table {
   }
 
   template <template <class, class> class Map, template <class> class Vec, class V>
-  absl::Status Add(Map<std::string, Vec<V>>&& values) {
+  absl::Status AddMap(Map<std::string, Vec<V>>&& values) {
     for (auto& [name, v] : values) {
       auto status = AddColumn(name, v);
       if (!status.ok()) {

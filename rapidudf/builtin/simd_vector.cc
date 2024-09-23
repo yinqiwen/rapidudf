@@ -171,7 +171,7 @@ static void register_simd_vector_iota() {
 template <typename T>
 static void register_simd_vector_sum() {
   DType dtype = get_dtype<T>();
-  std::string func_name = GetFunctionName(OP_SUM, dtype);
+  std::string func_name = GetFunctionName(OP_SUM, dtype.ToSimdVector());
   T (*simd_f0)(simd::Vector<T>) = simd::simd_vector_sum<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
   // register_builtin_function("sum");
@@ -180,7 +180,7 @@ static void register_simd_vector_sum() {
 template <typename T>
 static void register_simd_vector_clone() {
   DType dtype = get_dtype<T>();
-  std::string func_name = GetFunctionName(OP_CLONE, dtype);
+  std::string func_name = GetFunctionName(OP_CLONE, dtype.ToSimdVector());
 
   simd::Vector<T> (*simd_f0)(Context&, simd::Vector<T>) = simd::simd_vector_clone<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);

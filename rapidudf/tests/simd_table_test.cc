@@ -31,6 +31,7 @@
 
 #include <gtest/gtest.h>
 #include <functional>
+#include <unordered_map>
 #include <vector>
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
@@ -103,4 +104,43 @@ TEST(JitCompiler, table_func) {
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   f(ctx, table);
+}
+
+TEST(JitCompiler, table_func1) {
+  Context ctx;
+  simd::Table table(ctx);
+  std::unordered_map<std::string, std::vector<double>> table_data;
+  table_data["Click"] = {1, 2, 3, 5};
+  table_data["Like"] = {1, 2, 3, 5};
+  table_data["Join"] = {1, 2, 3, 5};
+  table_data["Inter"] = {1, 2, 3, 5};
+  table_data["TimeV1"] = {1, 2, 3, 5};
+  table_data["PostComment"] = {1, 2, 3, 5};
+  table_data["PositiveCommentV1"] = {1, 2, 3, 5};
+  table_data["ExpoTimeV1"] = {1, 2, 3, 5};
+
+  std::unordered_map<std::string, std::vector<double>> table_data_clone = table_data;
+  // std::string multiple_pow =
+  //     "(Click^10.0)*((Like+0.000082)^4.7)*(Inter^3.5)*((Join+0.000024)^5.5)*(TimeV1^7.0)*((PostComment+0.000024)^3.5)*("
+  //     "(PositiveCommentV1+0.0038)^1.0)*(ExpoTimeV1^1.5)";
+  auto _ = table.AddMap(std::move(table_data));
+  std::string content = R"(
+    (table["Click"]^10.0)*((table["Like"]+0.000082)^4.7)*(table["Inter"]^3.5)*((table["Join"]+0.000024)^5.5)*(table["TimeV1"]^7.0)*((table["PostComment"]+0.000024)^3.5)*((table["PositiveCommentV1"]+0.0038)^1.0)*(table["ExpoTimeV1"]^1.5)
+  )";
+
+  JitCompiler compiler;
+  auto rc = compiler.CompileExpression<simd::Column*, Context&, simd::Table&>(content, {"_", "table"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto column = f(ctx, table);
+  simd::Vector<double> result = column->ToVector<double>().value();
+  for (size_t i = 0; i < result.Size(); i++) {
+    double actual =
+        std::pow(table_data_clone["Click"][i], 10.0) * std::pow(table_data_clone["Like"][i] + 0.000082, 4.7) *
+        std::pow(table_data_clone["Inter"][i], 3.5) * std::pow(table_data_clone["Join"][i] + 0.000024, 5.5) *
+        std::pow(table_data_clone["TimeV1"][i], 7.0) * std::pow(table_data_clone["PostComment"][i] + 0.000024, 3.5) *
+        std::pow(table_data_clone["PositiveCommentV1"][i] + 0.0038, 1.0) *
+        std::pow(table_data_clone["ExpoTimeV1"][i], 1.5);
+    ASSERT_DOUBLE_EQ(actual, result[i]);
+  }
 }
