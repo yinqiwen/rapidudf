@@ -30,8 +30,10 @@
 */
 
 #pragma once
+#include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 #include "absl/container/flat_hash_map.h"
@@ -66,7 +68,12 @@ class Column {
   explicit Column(Context& ctx, Vector<uint8_t> data) : ctx_(ctx), data_(data){};
   explicit Column(Context& ctx, Vector<int8_t> data) : ctx_(ctx), data_(data){};
   explicit Column(Context& ctx, Vector<Bit> data) : ctx_(ctx), data_(data){};
-  size_t Size() const;
+
+  template <typename T>
+  static Column* FromVector(Context& ctx, Vector<T> data) {
+    return ctx.New<simd::Column>(ctx, data);
+  }
+
   Context& GetContext() { return ctx_; }
 
   Internal& GetInternal() { return data_; }
@@ -78,6 +85,15 @@ class Column {
     return std::holds_alternative<Vector<T>>(data_);
   }
   bool IsBit() const { return Is<Bit>(); }
+
+  /**
+  ** member methods
+  */
+  size_t size() const;
+  Column* clone();
+  Column* take(size_t n);
+  Column* filter(Column* bits);
+  Column* gather(Column* indices);
 
   template <typename T>
   absl::StatusOr<Vector<T>> ToVector() const {
@@ -101,11 +117,12 @@ class Column {
 class Table {
  public:
   explicit Table(Context& ctx) : ctx_(ctx) {}
+  Context& GetContext() { return ctx_; }
   template <typename T>
   absl::Status Add(const std::string& name, std::vector<T>&& data) {
     auto vec = ctx_.NewSimdVector(data);
     auto p = ctx_.New<Column>(ctx_, vec);
-    auto _ = ctx_.New<std::vector<T>>(std::move(data));
+    std::ignore = ctx_.New<std::vector<T>>(std::move(data));
     return Add(name, p);
   }
 
@@ -117,13 +134,16 @@ class Table {
         return status;
       }
     }
-    auto _ = ctx_.New<Map<std::string, Vec<V>>>(std::move(values));
+    std::ignore = ctx_.New<Map<std::string, Vec<V>>>(std::move(values));
     return absl::OkStatus();
   }
   absl::Status Add(const std::string& name, Column* column);
   absl::StatusOr<Column**> Get(StringView name);
   void Set(const std::string& name, Column* column);
   size_t Size() const;
+  Vector<int32_t> GetIndices();
+
+  void Visit(std::function<void(const std::string&, Column*)>&& f);
 
  private:
   using ColumnTable = absl::flat_hash_map<std::string, Column*>;
@@ -137,6 +157,7 @@ class Table {
   Context& ctx_;
   // ColumnArray columns_;
   ColumnTable column_table_;
+  Vector<int32_t> indices_;
 };
 }  // namespace simd
 }  // namespace rapidudf

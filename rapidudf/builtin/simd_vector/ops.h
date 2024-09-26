@@ -83,22 +83,28 @@ template <typename T>
 Vector<T> simd_vector_clone(Context& ctx, Vector<T> data);
 
 template <typename T>
-void sort(Context& ctx, Vector<T> data, bool descending);
+Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits);
+
 template <typename T>
-void select(Context& ctx, Vector<T> data, size_t k, bool descending);
+Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indices);
+
 template <typename T>
-void topk(Context& ctx, Vector<T> data, size_t k, bool descending);
+void simd_vector_sort(Context& ctx, Vector<T> data, bool descending);
 template <typename T>
-Vector<size_t> argsort(Context& ctx, Vector<T> data, bool descending);
+void simd_vector_select(Context& ctx, Vector<T> data, size_t k, bool descending);
 template <typename T>
-Vector<size_t> argselect(Context& ctx, Vector<T> data, size_t k, bool descending);
+void simd_vector_topk(Context& ctx, Vector<T> data, size_t k, bool descending);
+template <typename T>
+Vector<size_t> simd_vector_argsort(Context& ctx, Vector<T> data, bool descending);
+template <typename T>
+Vector<size_t> simd_vector_argselect(Context& ctx, Vector<T> data, size_t k, bool descending);
 
 template <typename K, typename V>
-void sort_key_value(Context& ctx, Vector<K> key, Vector<V> value, bool descending);
+void simd_vector_sort_key_value(Context& ctx, Vector<K> key, Vector<V> value, bool descending);
 template <typename K, typename V>
-void select_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
+void simd_vector_select_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
 template <typename K, typename V>
-void topk_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
+void simd_vector_topk_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
 
 template <typename T>
 T simd_vector_or_equals(Vector<T> left, absl::Span<const T> right);

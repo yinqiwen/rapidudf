@@ -29,9 +29,9 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <llvm/IR/Use.h>
 #include <string_view>
 #include <vector>
+#include "llvm/IR/Use.h"
 #include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/llvm/type.h"

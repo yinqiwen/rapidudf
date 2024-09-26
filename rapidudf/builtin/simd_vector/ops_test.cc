@@ -109,10 +109,14 @@ using namespace rapidudf;
 // }
 
 TEST(SIMD, simple_op1) {
-  const hn::ScalableTag<double> d;
+  using D = hn::ScalableTag<float>;
+  const hn::ScalableTag<float> d;
   using MaskType = hn::Mask<decltype(d)>;
+  using Offset = hwy::MakeSigned<float>;
+  const hn::Rebind<Offset, D> d_offset;
+  // using Offset2 = hwy::MakeWide<Offset>;
   constexpr auto lanes = hn::Lanes(d);
-  RUDF_INFO("lanes:{}", lanes);
+  RUDF_INFO("lanes:{}, offset size:{}/{}", lanes, sizeof(Offset));
   MaskType mask;
   hwy::BitSet64 bitset;
   uint8_t* bits = reinterpret_cast<uint8_t*>(&bitset);
@@ -120,17 +124,40 @@ TEST(SIMD, simple_op1) {
   bitset.Set(6);
   auto v1 = hn::Set(d, 2);
   auto v2 = hn::Zero(d);
+
   // hn::StoreMaskBits(d, v1 > v2, bits);
   // for (size_t i = 0; i < 8; i++) {
   //   RUDF_INFO("####{}", bitset.Get(i));
   // }
-  mask = hn::LoadMaskBits(d, bits);
-  mask = hn::SlideMaskDownLanes(d, mask, 4);
-  auto v3 = hn::IfThenElse(mask, v1, v2);
-  double buffer[8];
-  hn::StoreU(v3, d, buffer);
-  for (size_t i = 0; i < lanes; i++) {
-    RUDF_INFO("####{}", buffer[i]);
-  }
-  RUDF_INFO("####{}", hwy::SupportedTargets());
+  // mask = hn::LoadMaskBits(d, bits);
+  // mask = hn::SlideMaskDownLanes(d, mask, 4);
+  // auto v3 = hn::IfThenElse(mask, v1, v2);
+  // float buffer[8];
+  // hn::StoreU(v3, d, buffer);
+  // for (size_t i = 0; i < lanes; i++) {
+  //   RUDF_INFO("####{}", buffer[i]);
+  // }
+  // RUDF_INFO("####{}", hwy::SupportedTargets());
+
+  // Offset* offsets = nullptr;
+  // float* base = nullptr;
+  // hn::GatherIndex(d, base, hn::LoadU(d_offset, offsets));
+
+  // using D2 = hn::ScalableTag<double>;
+  // const hn::ScalableTag<double> d2;
+  // double* base2 = nullptr;
+  // auto offset = hn::LoadU(d_offset, offsets);
+
+  // using D3 = hn::ScalableTag<uint32_t>;
+
+  // using ToD = hn::RebindToSigned<D2>;
+  // const ToD to_d;
+
+  // hn::Vec128<uint32_t> xv;
+  // hn::Half<D3> from_d;
+  // hn::CappedTag<uint32_t, 4> from_d2;
+  // auto xx = hn::Set(from_d2, 2);
+
+  // auto x = hn::PromoteTo(to_d, xx);
+  // hn::GatherIndex(d2, base2, hn::ZeroExtendVector(d2, offset));
 }

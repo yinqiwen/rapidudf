@@ -61,13 +61,14 @@ Column* simd_column_binary_op(Column* left, Column* right) {
           THROW_LOGIC_ERR(fmt::format("Can NOT do {} with simd_table ptr", op));
         } else {
           using value_type = typename T::value_type;
-          auto right_vec = right->ToVector<value_type>().value();
           if constexpr (is_valid_operand<value_type>(op)) {
             if constexpr (op >= OP_EQUAL && op <= OP_LOGIC_OR) {
+              auto right_vec = right->ToVector<value_type>().value();
               auto result = simd_vector_binary_op<value_type, Bit, op>(ctx, arg, right_vec);
               auto* c = ctx.New<Column>(ctx, result);
               return c;
             } else {
+              auto right_vec = right->ToVector<value_type>().value();
               auto result = simd_vector_binary_op<value_type, value_type, op>(ctx, arg, right_vec);
               auto* c = ctx.New<Column>(ctx, result);
               return c;
@@ -95,13 +96,14 @@ Column* simd_column_binary_column_scalar_op(Column* left, Scalar* right) {
           if (!right_result.ok()) {
             THROW_LOGIC_ERR(right_result.status().ToString());
           }
-          value_type right_val = right_result.value();
           if constexpr (is_valid_operand<value_type>(op)) {
             if constexpr (op >= OP_EQUAL && op <= OP_LOGIC_OR) {
+              value_type right_val = right_result.value();
               auto result = simd_vector_binary_vector_scalar_op<value_type, Bit, op>(ctx, arg, right_val);
               auto* c = ctx.New<Column>(ctx, result);
               return c;
             } else {
+              value_type right_val = right_result.value();
               auto result = simd_vector_binary_vector_scalar_op<value_type, value_type, op>(ctx, arg, right_val);
               auto* c = ctx.New<Column>(ctx, result);
               return c;
@@ -128,8 +130,8 @@ Column* simd_column_binary_scalar_column_op(Scalar* left, Column* right) {
           if (!left_result.ok()) {
             THROW_LOGIC_ERR(left_result.status().ToString());
           }
-          value_type left_val = left_result.value();
           if constexpr (is_valid_operand<value_type>(op)) {
+            value_type left_val = left_result.value();
             if constexpr (op >= OP_EQUAL && op <= OP_LOGIC_OR) {
               auto result = simd_vector_binary_scalar_vector_op<value_type, Bit, op>(ctx, left_val, arg);
               auto* c = ctx.New<Column>(ctx, result);

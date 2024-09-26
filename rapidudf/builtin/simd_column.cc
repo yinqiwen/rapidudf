@@ -156,6 +156,8 @@ void init_builtin_simd_column_funcs() {
   REGISTER_SIMD_COLUMN_BINARY_FUNCS(OP_HYPOT, OP_ATAN2, OP_POW, OP_GREATER, OP_GREATER_EQUAL, OP_LESS, OP_LESS_EQUAL,
                                     OP_EQUAL, OP_NOT_EQUAL, OP_LOGIC_AND, OP_LOGIC_OR)
   REGISTER_SIMD_COLUMN_TERNARY_FUNCS(OP_CONDITIONAL, OP_CLAMP, OP_FMA, OP_FMS, OP_FNMA, OP_FNMS);
+
+  RUDF_STRUCT_MEMBER_METHODS(simd::Column, size, clone, take, filter, gather)
 }
 
 }  // namespace rapidudf

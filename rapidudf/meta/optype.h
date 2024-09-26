@@ -111,6 +111,8 @@ enum OpToken {
   OP_SUM,
   OP_CLONE,
   OP_SCALAR_CAST,
+  OP_FILTER,
+  OP_GATHER,
   OP_END,
 };
 constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
@@ -128,7 +130,8 @@ constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {
     "log1p",         "hypot",      "dot",        "iota",        "clamp",
     "fma",           "fms",        "fnma",       "fnms",        "sort",
     "select",        "topk",       "sort_kv",    "select_kv",   "topk_kv",
-    "argsort",       "argselect",  "sum",        "clone",       "to_scalar"};
+    "argsort",       "argselect",  "sum",        "clone",       "to_scalar",
+    "filter",        "gather"};
 }  // namespace rapidudf
 
 template <>

@@ -309,10 +309,6 @@ DType get_dtype() {
 
   if constexpr (std::is_pointer<T>::value) {
     using Origin = std::remove_pointer_t<T>;
-    // if constexpr (std::is_pointer<Origin>::value) {
-    //   static_assert(sizeof(Origin) == -1, "Can NOT get dtype for ptr of ptr");
-    //   return {};
-    // }
     auto v = get_dtype<Origin>();
     if (v.IsPtr()) {
       DType complex(DATA_COMPLEX_OBJECT);

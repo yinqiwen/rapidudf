@@ -70,9 +70,10 @@ Column* simd_column_ternary_op(Column* a, Column* b, Column* c) {
           THROW_LOGIC_ERR(fmt::format("Can NOT do {} with simd_table ptr", op));
         } else {
           using value_type = typename T::value_type;
-          auto c_vec = c->ToVector<value_type>().value();
+
           if constexpr (op == OP_CONDITIONAL) {
             if constexpr (is_valid_operand<value_type>(op)) {
+              auto c_vec = c->ToVector<value_type>().value();
               auto a_vec = a->ToVector<Bit>().value();
               auto result = simd_vector_ternary_op<Bit, value_type, op>(ctx, a_vec, arg, c_vec);
               auto* c = ctx.New<Column>(ctx, result);
@@ -81,8 +82,9 @@ Column* simd_column_ternary_op(Column* a, Column* b, Column* c) {
               THROW_LOGIC_ERR(fmt::format("Unsupported op:{} with column dtype:{}", op, get_dtype<value_type>()));
             }
           } else {
-            auto a_vec = a->ToVector<value_type>().value();
             if constexpr (is_valid_operand<value_type>(op)) {
+              auto a_vec = a->ToVector<value_type>().value();
+              auto c_vec = c->ToVector<value_type>().value();
               auto result = simd_vector_ternary_op<value_type, value_type, op>(ctx, a_vec, arg, c_vec);
               auto* c = ctx.New<Column>(ctx, result);
               return c;
@@ -119,9 +121,10 @@ Column* simd_column_ternary_column_column_scalar_op(Column* a, Column* b, Scalar
           if (!c_result.ok()) {
             THROW_LOGIC_ERR(c_result.status().ToString());
           }
-          auto c_val = c_result.value();
+
           if constexpr (op == OP_CONDITIONAL) {
             if constexpr (is_valid_operand<value_type>(op)) {
+              auto c_val = c_result.value();
               auto a_vec = a->ToVector<Bit>().value();
               auto result = simd_vector_ternary_vector_vector_scalar_op<Bit, value_type, op>(ctx, a_vec, arg, c_val);
               auto* c = ctx.New<Column>(ctx, result);
@@ -130,8 +133,9 @@ Column* simd_column_ternary_column_column_scalar_op(Column* a, Column* b, Scalar
               THROW_LOGIC_ERR(fmt::format("Unsupported op:{} with column dtype:{}", op, get_dtype<value_type>()));
             }
           } else {
-            auto a_vec = a->ToVector<value_type>().value();
             if constexpr (is_valid_operand<value_type>(op)) {
+              auto a_vec = a->ToVector<value_type>().value();
+              auto c_val = c_result.value();
               auto result =
                   simd_vector_ternary_vector_vector_scalar_op<value_type, value_type, op>(ctx, a_vec, arg, c_val);
               auto* c = ctx.New<Column>(ctx, result);
@@ -169,9 +173,10 @@ Column* simd_column_ternary_column_scalar_column_op(Column* a, Scalar* b, Column
           if (!b_result.ok()) {
             THROW_LOGIC_ERR(b_result.status().ToString());
           }
-          auto b_val = b_result.value();
+
           if constexpr (op == OP_CONDITIONAL) {
             if constexpr (is_valid_operand<value_type>(op)) {
+              auto b_val = b_result.value();
               auto a_vec = a->ToVector<Bit>().value();
               auto result = simd_vector_ternary_vector_scalar_vector_op<Bit, value_type, op>(ctx, a_vec, b_val, arg);
               auto* c = ctx.New<Column>(ctx, result);
@@ -180,8 +185,9 @@ Column* simd_column_ternary_column_scalar_column_op(Column* a, Scalar* b, Column
               THROW_LOGIC_ERR(fmt::format("Unsupported op:{} with column dtype:{}", op, get_dtype<value_type>()));
             }
           } else {
-            auto a_vec = a->ToVector<value_type>().value();
             if constexpr (is_valid_operand<value_type>(op)) {
+              auto b_val = b_result.value();
+              auto a_vec = a->ToVector<value_type>().value();
               auto result =
                   simd_vector_ternary_vector_scalar_vector_op<value_type, value_type, op>(ctx, a_vec, b_val, arg);
               auto* c = ctx.New<Column>(ctx, result);
@@ -211,7 +217,6 @@ Column* simd_column_ternary_column_scalar_scalar_op(Column* a, Scalar* b, Scalar
           THROW_LOGIC_ERR(fmt::format("Can NOT do {} with simd_table ptr", op));
         } else {
           if constexpr (op == OP_CONDITIONAL) {
-            auto a_vec = a->ToVector<Bit>().value();
             return std::visit(
                 [&](auto&& b_arg) {
                   using value_type = std::decay_t<decltype(b_arg)>;
@@ -222,6 +227,7 @@ Column* simd_column_ternary_column_scalar_scalar_op(Column* a, Scalar* b, Scalar
                   if (!c_result.ok()) {
                     THROW_LOGIC_ERR(c_result.status().ToString());
                   }
+                  auto a_vec = a->ToVector<Bit>().value();
                   auto c_val = c_result.value();
                   auto result =
                       simd_vector_ternary_vector_scalar_scalar_op<Bit, value_type, op>(ctx, a_vec, b_arg, c_val);
@@ -235,13 +241,15 @@ Column* simd_column_ternary_column_scalar_scalar_op(Column* a, Scalar* b, Scalar
             if (!b_result.ok()) {
               THROW_LOGIC_ERR(b_result.status().ToString());
             }
-            auto b_val = b_result.value();
+
             auto c_result = c->To<value_type>();
             if (!c_result.ok()) {
               THROW_LOGIC_ERR(c_result.status().ToString());
             }
-            auto c_val = c_result.value();
+
             if constexpr (is_valid_operand<value_type>(op)) {
+              auto b_val = b_result.value();
+              auto c_val = c_result.value();
               auto result =
                   simd_vector_ternary_vector_scalar_scalar_op<value_type, value_type, op>(ctx, arg, b_val, c_val);
               auto* c = ctx.New<Column>(ctx, result);
@@ -273,9 +281,9 @@ Column* simd_column_ternary_scalar_column_column_op(Scalar* a, Column* b, Column
           if (!a_result.ok()) {
             THROW_LOGIC_ERR(a_result.status().ToString());
           }
-          auto a_val = a_result.value();
-          auto c_vec = c->ToVector<value_type>().value();
           if constexpr (is_valid_operand<value_type>(op)) {
+            auto a_val = a_result.value();
+            auto c_vec = c->ToVector<value_type>().value();
             auto result =
                 simd_vector_ternary_scalar_vector_vector_op<value_type, value_type, op>(ctx, a_val, arg, c_vec);
             auto* c = ctx.New<Column>(ctx, result);
@@ -302,13 +310,14 @@ Column* simd_column_ternary_scalar_scalar_column_op(Scalar* a, Scalar* b, Column
           if (!a_result.ok()) {
             THROW_LOGIC_ERR(a_result.status().ToString());
           }
-          auto a_val = a_result.value();
+
           auto b_result = b->To<value_type>();
           if (!b_result.ok()) {
             THROW_LOGIC_ERR(b_result.status().ToString());
           }
-          auto b_val = b_result.value();
           if constexpr (is_valid_operand<value_type>(op)) {
+            auto a_val = a_result.value();
+            auto b_val = b_result.value();
             auto result =
                 simd_vector_ternary_scalar_scalar_vector_op<value_type, value_type, op>(ctx, a_val, b_val, arg);
             auto* c = ctx.New<Column>(ctx, result);
@@ -335,13 +344,15 @@ Column* simd_column_ternary_scalar_column_scalar_op(Scalar* a, Column* b, Scalar
           if (!a_result.ok()) {
             THROW_LOGIC_ERR(a_result.status().ToString());
           }
-          auto a_val = a_result.value();
+
           auto c_result = c->To<value_type>();
           if (!c_result.ok()) {
             THROW_LOGIC_ERR(c_result.status().ToString());
           }
-          auto c_val = c_result.value();
+
           if constexpr (is_valid_operand<value_type>(op)) {
+            auto a_val = a_result.value();
+            auto c_val = c_result.value();
             auto result =
                 simd_vector_ternary_scalar_vector_scalar_op<value_type, value_type, op>(ctx, a_val, arg, c_val);
             auto* c = ctx.New<Column>(ctx, result);

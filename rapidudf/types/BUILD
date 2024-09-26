@@ -8,6 +8,7 @@ cc_library(
         "string_view.h",
     ],
     deps = [
+        "@com_github_fmtlib//:fmt",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
         "@com_google_nlohmann_json//:json",
@@ -53,6 +54,7 @@ cc_library(
     deps = [
         ":types",
         "//rapidudf/arena",
+        "//rapidudf/meta:exception",
     ],
 )
 

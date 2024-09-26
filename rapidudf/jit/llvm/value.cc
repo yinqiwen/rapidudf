@@ -29,12 +29,15 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rapidudf/jit/llvm/value.h"
-#include <fmt/core.h>
-#include <llvm/IR/Use.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Type.h>
+#include "fmt/core.h"
+#include "llvm/IR/Use.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/jit/llvm/type.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
@@ -99,22 +102,47 @@ absl::Status Value::SetSimdVectorTemporary(bool v) {
   }
   DType simd_vector_dtype(DATA_U8);
   simd_vector_dtype = simd_vector_dtype.ToSimdVector();
-  ::llvm::StructType* simd_vector_type =
-      static_cast<::llvm::StructType*>(get_type(ir_builder_->getContext(), simd_vector_dtype));
-  auto size_field_ptr =
-      ir_builder_->CreateInBoundsGEP(simd_vector_type, val_, {ir_builder_->getInt32(0), ir_builder_->getInt32(0)});
-  auto size_field_val = ir_builder_->CreateLoad(ir_builder_->getInt64Ty(), size_field_ptr);
   ::llvm::Value* result = nullptr;
+  ::llvm::ConstantInt* neg_one =
+      ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), -1, true);
+  ::llvm::ConstantInt* one = ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), 1, true);
+
+  ::llvm::ConstantInt* index = ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), 0, true);
   if (v) {
-    uint64_t mask_v = 1ULL;
-    auto mask = ir_builder_->getInt64(mask_v);
-    result = ir_builder_->CreateOr({size_field_val, mask});
+    //  %mask = shl i128 1, %index
+    //  %set_bit_value = or i128 %value, %mask
+    auto mask = ir_builder_->CreateShl(one, index);
+    result = ir_builder_->CreateOr({GetValue(), mask});
   } else {
-    uint64_t mask_v = ~(1ULL << 0);
-    auto mask = ir_builder_->getInt64(mask_v);
-    result = ir_builder_->CreateAnd({size_field_val, mask});
+    //   %mask = xor i128 -1, shl i128 1, %index
+    // %cleared_value = and i128 %value, %mask
+    auto mask = ir_builder_->CreateShl(one, index);
+    mask = ir_builder_->CreateXor(mask, neg_one);
+    result = ir_builder_->CreateAnd({GetValue(), mask});
   }
-  ir_builder_->CreateStore(result, size_field_ptr);
+  if (type_ != nullptr) {
+    ir_builder_->CreateStore(result, val_);
+  } else {
+    val_ = result;
+  }
+  // ir_builder_->CreateStore(result, size_field_ptr);
+
+  // ::llvm::StructType* simd_vector_type =
+  //     static_cast<::llvm::StructType*>(get_type(ir_builder_->getContext(), simd_vector_dtype));
+  // auto size_field_ptr =
+  //     ir_builder_->CreateInBoundsGEP(simd_vector_type, val_, {ir_builder_->getInt32(0), ir_builder_->getInt32(0)});
+  // auto size_field_val = ir_builder_->CreateLoad(ir_builder_->getInt64Ty(), size_field_ptr);
+  // ::llvm::Value* result = nullptr;
+  // if (v) {
+  //   uint64_t mask_v = 1ULL;
+  //   auto mask = ir_builder_->getInt64(mask_v);
+  //   result = ir_builder_->CreateOr({size_field_val, mask});
+  // } else {
+  //   uint64_t mask_v = ~(1ULL << 0);
+  //   auto mask = ir_builder_->getInt64(mask_v);
+  //   result = ir_builder_->CreateAnd({size_field_val, mask});
+  // }
+  // ir_builder_->CreateStore(result, size_field_ptr);
   return absl::OkStatus();
 }
 

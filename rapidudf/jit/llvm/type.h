@@ -30,8 +30,8 @@
 */
 
 #pragma once
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Type.h>
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Type.h"
 
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"

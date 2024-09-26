@@ -30,10 +30,6 @@
 */
 
 #pragma once
-#include <memory>
-#include <optional>
-#include <string>
-#include "rapidudf/ast/expression.h"
 #include "rapidudf/ast/statement.h"
 namespace rapidudf {
 namespace ast {

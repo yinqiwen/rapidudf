@@ -30,6 +30,7 @@
 */
 #include "rapidudf/meta/function.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
 using FuncRegMap = std::unordered_map<std::string, FunctionDesc>;
@@ -168,7 +169,9 @@ std::string GetFunctionName(OpToken op, const std::vector<DType>& arg_dtypes) {
     case OP_TOPK:
     case OP_IOTA:
     case OP_ARG_SORT:
-    case OP_ARG_SELECT: {
+    case OP_ARG_SELECT:
+    case OP_FILTER:
+    case OP_GATHER: {
       if (arg_dtypes.size() > 0) {
         return GetFunctionName(op, arg_dtypes[0]);
       }
@@ -198,6 +201,32 @@ void FunctionDesc::Init() {
     }
   }
 }
+bool FunctionDesc::PassArgByValue(size_t argno) const {
+  if (argno >= arg_types.size()) {
+    return false;
+  }
+  // x86-64 linux
+  uint32_t used_param_registers = 0;
+  uint32_t total_param_registers = 6;
+  for (size_t i = 0; i <= argno; i++) {
+    uint32_t request_param_registers = 0;
+    if (arg_types[i].IsPtr() || arg_types[i].IsInteger() || arg_types[i].IsBit()) {
+      request_param_registers = 1;
+    } else if (arg_types[i].IsAbslSpan() || arg_types[i].IsStringView() || arg_types[i].IsStdStringView() ||
+               arg_types[i].IsSimdVector()) {
+      request_param_registers = 2;
+    }
+    used_param_registers += request_param_registers;
+  }
+  if (arg_types[argno].IsSimdVector() || arg_types[argno].IsAbslSpan() || arg_types[argno].IsStringView() ||
+      arg_types[argno].IsStdStringView()) {
+    if (used_param_registers > total_param_registers) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
   if (arg_types.size() != ts.size()) {
     return false;

@@ -29,9 +29,9 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <fmt/core.h>
 #include <variant>
 #include <vector>
+#include "fmt/core.h"
 #include "rapidudf/builtin/builtin.h"
 #include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/jit/llvm/jit.h"
@@ -63,7 +63,8 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
                                               const ast::FieldAccess& field) {
   auto accessor = field.struct_member;
   if (field.func_args.has_value()) {
-    if (!var->GetDType().IsSimdVector() && !var->GetDType().IsPtr() && !var->GetDType().IsStringView()) {
+    if (!var->GetDType().IsSimdVector() && !var->GetDType().IsPtr() && !var->GetDType().IsStringView() &&
+        !var->GetDType().IsStdStringView()) {
       RUDF_LOG_ERROR_STATUS(
           ast_ctx_.GetErrorStatus(fmt::format("Can NOT access field:{} with dtype:{}", field.field, var->GetDType())));
     }

@@ -133,7 +133,7 @@ void do_unary_transform(D d, const T* in1, size_t count, T* out, const Func& fun
 }
 
 template <class D, OpToken op, typename V = hn::VFromD<D>>
-static inline auto do_simd_unary_op(D d, V lv) {
+static inline auto do_simd_unary_op([[maybe_unused]] D d, V lv) {
   if constexpr (op == OP_SQRT) {
     return hn::Sqrt(lv);
   } else if constexpr (op == OP_FLOOR) {

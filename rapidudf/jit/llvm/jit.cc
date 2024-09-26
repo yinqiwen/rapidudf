@@ -29,15 +29,19 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rapidudf/jit/llvm/jit.h"
-#include <fmt/core.h>
-#include <llvm/ADT/ArrayRef.h>
-#include <llvm/IR/Argument.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Use.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <memory>
+#include <vector>
+
+#include "fmt/core.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
+#include "llvm/IR/Argument.h"
 #include "llvm/IR/Mangler.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Use.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
@@ -51,8 +55,6 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Scalar/TailRecursionElimination.h"
 
-#include <memory>
-#include <vector>
 #include "rapidudf/ast/context.h"
 #include "rapidudf/ast/grammar.h"
 #include "rapidudf/ast/symbols.h"
@@ -87,7 +89,8 @@ absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
   auto func_addr = std::move(*func_addr_result);
   auto func_ptr = reinterpret_cast<void*>(func_addr.toPtr<void()>());
   if (nullptr == func_ptr) {
-    RUDF_INFO("####Null func ptr:{}", name);
+    RUDF_ERROR("No func:{} found", name);
+  } else {
   }
   return func_ptr;
 }
@@ -193,6 +196,7 @@ void JitCompiler::NewSession(bool print_asm) {
   session_->func_pass_manager->addPass(::llvm::PartiallyInlineLibCallsPass());
   session_->func_pass_manager->addPass(::llvm::MergedLoadStoreMotionPass());
   session_->func_pass_manager->addPass(::llvm::TailCallElimPass());
+
   // func_pass_manager_->addPass(::llvm::createPartiallyInlineLibCallsPass());
 }
 
@@ -215,13 +219,18 @@ absl::StatusOr<::llvm::FunctionType*> JitCompiler::GetFunctionType(const Functio
   }
   ::llvm::Type* return_type = return_type_result.value();
   std::vector<::llvm::Type*> func_arg_types;
-  for (size_t i = 0; i < desc.arg_types.size(); i++) {
-    auto arg_type = GetType(desc.arg_types[i]);
-    if (!arg_type.ok()) {
-      return arg_type.status();
-    }
 
-    func_arg_types.emplace_back(arg_type.value());
+  for (size_t i = 0; i < desc.arg_types.size(); i++) {
+    auto arg_type_result = GetType(desc.arg_types[i]);
+    if (!arg_type_result.ok()) {
+      return arg_type_result.status();
+    }
+    auto* arg_type = arg_type_result.value();
+    bool byval = desc.PassArgByValue(i);
+    if (byval) {
+      arg_type = ::llvm::PointerType::get(arg_type, 0);
+    }
+    func_arg_types.emplace_back(arg_type);
   }
   auto func_type = ::llvm::FunctionType::get(return_type, ::llvm::ArrayRef<::llvm::Type*>(func_arg_types), false);
   return func_type;
@@ -368,8 +377,10 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
   }
 
   ::llvm::FunctionType* func_type = func_type_result.value();
+
   ::llvm::Function* f = ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage,
                                                  func_compile_ctx->func_ast.name, *GetLLVMModule());
+
   RUDF_DEBUG("create func:{}", func_compile_ctx->func_ast.name);
   // Add a basic block to the function. As before, it automatically inserts
   // because of the last argument.
@@ -400,14 +411,40 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
       std::string name = (*function.args)[i].name;
       DType dtype = (*function.args)[i].dtype;
       arg->setName(name);
-      auto* arg_val = GetSession()->GetIRBuilder()->CreateAlloca(arg->getType());
-      GetSession()->GetIRBuilder()->CreateStore(arg, arg_val);
-      auto val = NewValue(dtype, arg_val, arg->getType());
-      func_compile_ctx->named_values[name] = val;
+      // RUDF_INFO("{}:{}", name, f->getParamByValType(i)->getScalarSizeInBits());
       if (dtype.IsContextPtr()) {
+        auto val = NewValue(dtype, arg);
         func_compile_ctx->context_arg_value = val;
+        func_compile_ctx->named_values[name] = val;
+      } else {
+        auto* arg_type = get_type(*GetSession()->context, dtype);
+        ValuePtr val;
+        if (arg_type != arg->getType()) {
+          auto* arg_val = GetSession()->GetIRBuilder()->CreateAlloca(arg_type);
+          auto load_val = GetSession()->GetIRBuilder()->CreateLoad(arg_type, arg);
+          GetSession()->GetIRBuilder()->CreateStore(load_val, arg_val);
+          val = NewValue(dtype, arg_val, arg_type);
+          f->addParamAttr(i, ::llvm::Attribute::getWithByValType(*GetSession()->context, arg_type));
+        } else {
+          auto* arg_val = GetSession()->GetIRBuilder()->CreateAlloca(arg->getType());
+          GetSession()->GetIRBuilder()->CreateStore(arg, arg_val);
+          val = NewValue(dtype, arg_val, arg->getType());
+        }
+        // if (dtype.IsStdStringView()) {
+        //   auto* string_view_type = get_type(*GetSession()->context, DATA_STD_STRING_VIEW);
+        //   auto* arg_val = GetSession()->GetIRBuilder()->CreateAlloca(string_view_type);
+        //   auto load_val = GetSession()->GetIRBuilder()->CreateLoad(string_view_type, arg);
+        //   GetSession()->GetIRBuilder()->CreateStore(load_val, arg_val);
+        //   val = NewValue(dtype, arg_val, string_view_type);
+        //   f->addParamAttr(i, ::llvm::Attribute::getWithByValType(*GetSession()->context, string_view_type));
+        // } else {
+
+        // }
+
+        func_compile_ctx->named_values[name] = val;
       }
     }
+    // f->setCallingConv(::llvm::CallingConv::X86_64_SysV);
   }
   func_compile_ctx->func = f;
   auto status = BuildIR(func_compile_ctx, function.body);
@@ -530,7 +567,8 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name,
   if (return_type.IsPtr()) {
     auto ret_type_ptr_to = return_type.PtrTo();
     if (ret_type_ptr_to.IsSimdColumnPtr()) {
-      return_val_type = GetSession()->GetIRBuilder()->getInt8PtrTy();
+      return_val_type = GetSession()->GetIRBuilder()->getPtrTy();
+      // return_val_type = GetSession()->GetIRBuilder()->getIntPtrTy(session_->jit->getDataLayout());
       return_type = return_type.PtrTo();
     } else if (ret_type_ptr_to.IsInteger() || ret_type_ptr_to.IsFloat()) {
       return_val_type = GetType(ret_type_ptr_to).value();

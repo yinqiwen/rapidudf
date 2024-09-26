@@ -1,5 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 def clean_dep(dep):
     return str(Label(dep))
@@ -49,20 +50,10 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
         sha256 = "241b06f3097fd186ff468832150d6cc142247dc42a32aaefb56d0099895fd229",
     )
 
-    fbs_ver = kwargs.get("fbs_ver", "2.0.0")
-    fbs_name = "flatbuffers-{ver}".format(ver = fbs_ver)
-    http_archive(
-        name = "com_github_google_flatbuffers",
-        strip_prefix = fbs_name,
-        urls = [
-            "https://mirrors.tencent.com/github.com/google/flatbuffers/archive/v{ver}.tar.gz".format(ver = fbs_ver),
-            "https://github.com/google/flatbuffers/archive/v{ver}.tar.gz".format(ver = fbs_ver),
-        ],
-    )
-
     protobuf_ver = kwargs.get("protobuf_ver", "3.19.2")
     protobuf_name = "protobuf-{ver}".format(ver = protobuf_ver)
-    http_archive(
+    maybe(
+        http_archive,
         name = "com_google_protobuf",
         strip_prefix = protobuf_name,
         urls = [
@@ -71,20 +62,10 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
         ],
     )
 
-    abseil_ver = kwargs.get("abseil_ver", "20240116.2")
-    abseil_name = "abseil-cpp-{ver}".format(ver = abseil_ver)
-    http_archive(
-        name = "com_google_absl",
-        strip_prefix = abseil_name,
-        urls = [
-            "https://mirrors.tencent.com/github.com/abseil/abseil-cpp/archive/{ver}.tar.gz".format(ver = abseil_ver),
-            "https://github.com/abseil/abseil-cpp/archive/refs/tags/{ver}.tar.gz".format(ver = abseil_ver),
-        ],
-    )
-
     gtest_ver = kwargs.get("gtest_ver", "1.14.0")
     gtest_name = "googletest-{ver}".format(ver = gtest_ver)
-    http_archive(
+    maybe(
+        http_archive,
         name = "com_google_googletest",
         strip_prefix = gtest_name,
         urls = [
@@ -112,7 +93,8 @@ cc_library(
 
     fbs_ver = kwargs.get("fbs_ver", "2.0.0")
     fbs_name = "flatbuffers-{ver}".format(ver = fbs_ver)
-    http_archive(
+    maybe(
+        http_archive,
         name = "com_github_google_flatbuffers",
         strip_prefix = fbs_name,
         urls = [
@@ -153,7 +135,9 @@ cmake(
 """
     fmtlib_ver = kwargs.get("fmtlib_ver", "11.0.2")
     fmtlib_name = "fmt-{ver}".format(ver = fmtlib_ver)
-    http_archive(
+
+    maybe(
+        http_archive,
         name = "com_github_fmtlib",
         strip_prefix = fmtlib_name,
         urls = [
@@ -179,8 +163,9 @@ cc_library(
 """
     spdlog_ver = kwargs.get("spdlog_ver", "1.14.1")
     spdlog_name = "spdlog-{ver}".format(ver = spdlog_ver)
-    http_archive(
-        name = "com_github_spdlog",
+    maybe(
+        http_archive,
+        name = "spdlog",
         strip_prefix = spdlog_name,
         urls = [
             "https://mirrors.tencent.com/github.com/gabime/spdlog/archive/v{ver}.tar.gz".format(ver = spdlog_ver),
@@ -189,31 +174,32 @@ cc_library(
         build_file_content = _SPDLOG_BUILD_FILE,
     )
 
-    _XBYAK_BUILD_FILE = """
-cc_library(
-    name = "xbyak",
-    hdrs = glob([
-        "**/*.h",
-    ]),
-    includes=["./"],
-    visibility = [ "//visibility:public" ],
-)
-"""
-    xbyak_ver = kwargs.get("xbyak_ver", "7.07")
-    xbyak_name = "xbyak-{ver}".format(ver = xbyak_ver)
-    http_archive(
-        name = "com_github_xbyak",
-        strip_prefix = xbyak_name,
-        urls = [
-            "https://mirrors.tencent.com/github.com/herumi/xbyak/archive/v{ver}.tar.gz".format(ver = xbyak_ver),
-            "https://github.com/herumi/xbyak/archive/v{ver}.tar.gz".format(ver = xbyak_ver),
-        ],
-        build_file_content = _XBYAK_BUILD_FILE,
-    )
+    #     _XBYAK_BUILD_FILE = """
+    # cc_library(
+    #     name = "xbyak",
+    #     hdrs = glob([
+    #         "**/*.h",
+    #     ]),
+    #     includes=["./"],
+    #     visibility = [ "//visibility:public" ],
+    # )
+    # """
+    #     xbyak_ver = kwargs.get("xbyak_ver", "7.07")
+    #     xbyak_name = "xbyak-{ver}".format(ver = xbyak_ver)
+    #     http_archive(
+    #         name = "com_github_xbyak",
+    #         strip_prefix = xbyak_name,
+    #         urls = [
+    #             "https://mirrors.tencent.com/github.com/herumi/xbyak/archive/v{ver}.tar.gz".format(ver = xbyak_ver),
+    #             "https://github.com/herumi/xbyak/archive/v{ver}.tar.gz".format(ver = xbyak_ver),
+    #         ],
+    #         build_file_content = _XBYAK_BUILD_FILE,
+    #     )
 
     abseil_ver = kwargs.get("abseil_ver", "20240116.2")
     abseil_name = "abseil-cpp-{ver}".format(ver = abseil_ver)
-    http_archive(
+    maybe(
+        http_archive,
         name = "com_google_absl",
         strip_prefix = abseil_name,
         urls = [
@@ -248,7 +234,9 @@ make(
     visibility = ["//visibility:public"],
 )
 """
-    new_git_repository(
+
+    maybe(
+        new_git_repository,
         name = "x86_simd_sort",
         remote = "https://github.com/intel/x86-simd-sort.git",
         commit = "c61ce8f97f495cab7077774741be7a3903e71dd4",
@@ -286,6 +274,23 @@ cmake(
         build_file_content = _SLEEF_BUILD_FILE,
     )
 
+    _LLVM_BUILD_FILE = """
+cc_library(
+    name = "libllvm",
+    srcs = glob(["lib/libLLVM*.so","lib64/libLLVM*.so"]),
+    hdrs = glob(["include/llvm/**/*","include/llvm-c/**/*"]),
+    includes = ["include"],
+    visibility = [ "//visibility:public" ],
+)
+"""
+
+    maybe(
+        native.new_local_repository,
+        name = "local_llvm",
+        path = "/usr",
+        build_file_content = _LLVM_BUILD_FILE,
+    )
+
     _EXPRTK_BUILD_FILE = """
 cc_library(
     name = "exprtk",
@@ -304,7 +309,8 @@ cc_library(
 
     bench_ver = kwargs.get("bench_ver", "1.8.3")
     bench_name = "benchmark-{ver}".format(ver = bench_ver)
-    http_archive(
+    maybe(
+        http_archive,
         name = "com_google_benchmark",
         strip_prefix = bench_name,
         urls = [

@@ -28,6 +28,7 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include "llvm/Config/llvm-config.h"
 #include "rapidudf/jit/llvm/jit.h"
 namespace rapidudf {
 namespace llvm {
@@ -55,6 +56,17 @@ bool JitCompiler::HasIntrinsic(OpToken op) {
     case OP_MIN: {
       return true;
     }
+#if LLVM_VERSION_MAJOR >= 19
+    case OP_TAN:
+    case OP_ASIN:
+    case OP_ACOS:
+    case OP_ATAN:
+    case OP_SINH:
+    case OP_COSH:
+    case OP_TANH: {
+      return true;
+    }
+#endif
     default: {
       return false;
     }

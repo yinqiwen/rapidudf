@@ -67,6 +67,9 @@ Scalar* simd_column_sum(Column* a);
 Scalar* simd_column_dot(Column* a, Column* b);
 Column* simd_column_clone(Column* data);
 
+Column* simd_column_filter(Column* data, Column* bits);
+Column* simd_column_gather(Column* data, Column* indices);
+
 void column_sort(Column* data, bool descending);
 void column_select(Column* data, size_t k, bool descending);
 void column_topk(Column* data, size_t k, bool descending);

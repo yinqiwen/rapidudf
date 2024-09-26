@@ -39,10 +39,19 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "rapidudf/arena/arena.h"
+#include "rapidudf/common/AtomicIntrusiveLinkedList.h"
 #include "rapidudf/types/simd_vector.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
+
+using CleanupFunc = std::function<void()>;
+struct CleanupFuncWrapper {
+  CleanupFunc func;
+  CleanupFuncWrapper(CleanupFunc&& f) : func(std::move(f)) {}
+  ::rapiduf::folly::AtomicIntrusiveLinkedListHook<CleanupFuncWrapper> _hook;
+  using List = ::rapiduf::folly::AtomicIntrusiveLinkedList<CleanupFuncWrapper, &CleanupFuncWrapper::_hook>;
+};
 class Context {
  public:
   static constexpr uint32_t kByteLanes = 32;  // 256bit
@@ -113,7 +122,8 @@ class Context {
   void Own(std::unique_ptr<T>&& p) {
     auto* pp = p.release();
     auto f = [pp] { delete pp; };
-    cleanups_.emplace_back(std::move(f));
+    cleanups_.insertHead(new CleanupFuncWrapper(std::move(f)));
+    // cleanups_.emplace_back(std::move(f));
   }
 
   template <typename T>
@@ -136,8 +146,8 @@ class Context {
   std::unique_ptr<Arena> own_arena_;
   Arena* arena_ = nullptr;
   absl::flat_hash_set<const uint8_t*> allocated_arena_ptrs_;
-  std::vector<CleanupFunc> cleanups_;
-
+  // std::vector<CleanupFunc> cleanups_;
+  CleanupFuncWrapper::List cleanups_;
   bool has_nan_ = false;
 };
 }  // namespace rapidudf

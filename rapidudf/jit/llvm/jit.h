@@ -31,8 +31,6 @@
 
 #pragma once
 
-#include <fmt/core.h>
-
 #include <chrono>
 #include <memory>
 #include <mutex>
@@ -40,6 +38,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "fmt/core.h"
 
 #include "rapidudf/ast/block.h"
 #include "rapidudf/ast/context.h"

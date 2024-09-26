@@ -9,14 +9,25 @@ package(
 )
 
 cc_library(
-    name = "meta",
+    name = "exception",
     hdrs = [
         "exception.h",
+    ],
+    deps = [
+        "@com_github_fmtlib//:fmt",
+    ],
+)
+
+cc_library(
+    name = "meta",
+    hdrs = [
         "type_traits.h",
     ],
     deps = [
+        ":exception",
         "//rapidudf/arena",
         "//rapidudf/log",
+        "@com_github_fmtlib//:fmt",
     ],
 )
 

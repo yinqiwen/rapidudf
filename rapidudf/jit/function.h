@@ -66,10 +66,6 @@ class JitFunction {
   const std::string& GetName() const { return name_; }
 
   RET operator()(Args... args) {
-    // auto& func_ctx = FunctionCallContext::Get(true);
-    // if (reset_arena_) {
-    //   func_ctx.arena.Reset();
-    // }
     if constexpr (std::is_same_v<void, RET>) {
       f_(args...);
     } else {

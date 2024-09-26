@@ -29,9 +29,12 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "rapidudf/types/simd_vector.h"
 #include <gtest/gtest.h>
+#include <cmath>
 #include <functional>
 #include <vector>
+#include "rapidudf/builtin/simd_vector/ops.h"
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
@@ -44,14 +47,20 @@ TEST(JitCompiler, vector_cos) {
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<f32> test_func(Context ctx, simd_vector<f32> x){
-      return cos(x);
+      var ret = cos(x);
+      return ret;
     }
   )";
   auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
-  ASSERT_EQ(f(ctx, simd_vec).Size(), vec.size());
+  auto result = f(ctx, simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
+  ASSERT_FALSE(result.IsTemporary());
+  for (size_t i = 0; i < vec.size(); i++) {
+    ASSERT_FLOAT_EQ(result[i], std::cos(vec[i]));
+  }
 }
 TEST(JitCompiler, vector_add) {
   std::vector<float> vec{1, 2, 3};
@@ -234,6 +243,101 @@ TEST(JitCompiler, vector_string_cmp) {
     ASSERT_EQ(result[i], left[i] > right[i]);
   }
 }
+
+TEST(JitCompiler, vector_filter) {
+  std::vector<int> ids{10, 11, 23, 45, 67, 88, 87, 99, 15};
+  std::vector<std::string> citys{"sz", "sh", "bj", "gz", "sh", "bj", "sz", "sh", "gz"};
+  Context ctx;
+  JitCompiler compiler;
+
+  std::string content = R"(
+    filter(ids, citys=="sz")
+  )";
+  auto rc = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<StringView>>(
+      content, {"_", "ids", "citys"});
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  auto result = f(ctx, ids, ctx.NewSimdVector(citys));
+  ASSERT_EQ(result.Size(), 2);
+  ASSERT_EQ(result[0], 10);
+  ASSERT_EQ(result[1], 87);
+}
+
+static void print_column(simd::Vector<int> c) { RUDF_INFO("print_column:{}", c.Size()); }
+
+RUDF_FUNC_REGISTER(print_column)
+
+TEST(JitCompiler, vector_gather) {
+  std::vector<int> ids{10, 11, 23, 45, 67, 88, 87, 99, 15};
+  std::vector<float> scores{15.6, 22.4, 12.4, 5.6, 333.4, 100.5, 67.8, 1.5, 45.7};
+  Context ctx;
+  JitCompiler compiler;
+
+  std::string content = R"(
+    void test_func(i32 ctx, simd_vector<i32> ids,simd_vector<i32> scores, simd_vector<i32>
+    idxs,simd_vector<i32> idxs1){
+
+      print_column(ids);
+      print_column(scores);
+       print_column(idxs);
+      print_column(idxs1);
+      // return ids;
+    }
+  )";
+
+  auto rc = compiler.CompileFunction<void, int32_t, simd::Vector<int>, simd::Vector<int>, simd::Vector<int>,
+                                     simd::Vector<int>>(content, true);
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  // RUDF_INFO("x size:{}", x.Size());
+  f(11, ids, ids, ids, ids);
+}
+
+// TEST(JitCompiler, vector_gather) {
+//   std::vector<int> ids{10, 11, 23, 45, 67, 88, 87, 99, 15};
+//   std::vector<float> scores{15.6, 22.4, 12.4, 5.6, 333.4, 100.5, 67.8, 1.5, 45.7};
+//   Context ctx;
+//   JitCompiler compiler;
+
+//   std::string content = R"(
+//     simd_vector<i32> test_func(Context ctx, simd_vector<i32> ids, simd_vector<f32> scores, simd_vector<i32> idxs){
+//       // print_column(idxs);
+//       // print_column(ids);
+//       sort_kv(scores, idxs,true);
+//       return gather(ids,idxs);
+//     }
+//   )";
+
+//   auto rc =
+//       compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<float>,
+//       simd::Vector<int>>(
+//           content, true);
+//   if (!rc.ok()) {
+//     RUDF_ERROR("{}", rc.status().ToString());
+//   }
+//   ASSERT_TRUE(rc.ok());
+//   auto f = std::move(rc.value());
+//   auto x = ctx.NewSimdVector(scores);
+//   auto idxs = simd::simd_vector_iota<int>(ctx, 0, scores.size());
+//   simd::simd_vector_sort_key_value<float, int>(ctx, scores, idxs, true);
+//   auto result = simd::simd_vector_gather<int>(ctx, ids, idxs);
+//   for (size_t i = 0; i < result.Size(); i++) {
+//     RUDF_INFO("{} {}", ids[i], scores[i]);
+//   }
+
+//   // RUDF_INFO("x size:{}", x.Size());
+//   auto result1 = f(ctx, ids, scores, idxs);
+//   RUDF_INFO("{}/{}", idxs.Size(), result1.Size());
+//   for (size_t i = 0; i < result1.Size(); i++) {
+//     RUDF_INFO("{}/{}", result1[i], scores[i]);
+//   }
+// }
 
 TEST(JitCompiler, vector_pow) {
   std::vector<double> vec{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};

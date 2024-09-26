@@ -30,7 +30,6 @@
 */
 
 #include <gtest/gtest.h>
-#include <functional>
 #include <unordered_map>
 #include <vector>
 #include "rapidudf/context/context.h"
@@ -43,7 +42,7 @@
 using namespace rapidudf;
 
 static void print_column(simd::Column* c) {
-  RUDF_INFO("print_column:{}", c->Size());
+  RUDF_INFO("print_column:{}", c->size());
   auto data = c->ToVector<double>().value();
   for (auto v : data) {
     RUDF_INFO("{}", v);
@@ -62,7 +61,7 @@ TEST(JitCompiler, table_simple) {
   )";
 
   JitCompiler compiler;
-  auto rc = compiler.CompileExpression<void, Context&, simd::Table&>(content, {"_", "x"}, true);
+  auto rc = compiler.CompileExpression<void, Context&, simd::Table&>(content, {"_", "x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
 
@@ -79,7 +78,7 @@ TEST(JitCompiler, cond_table) {
   )";
 
   JitCompiler compiler;
-  auto rc = compiler.CompileExpression<void, Context&, simd::Table&>(content, {"_", "x"}, true);
+  auto rc = compiler.CompileExpression<void, Context&, simd::Table&>(content, {"_", "x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   f(ctx, table);
@@ -100,7 +99,7 @@ TEST(JitCompiler, table_func) {
   )";
 
   JitCompiler compiler;
-  auto rc = compiler.CompileFunction<void, Context&, simd::Table&>(content, true);
+  auto rc = compiler.CompileFunction<void, Context&, simd::Table&>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   f(ctx, table);

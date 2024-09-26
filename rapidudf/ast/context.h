@@ -42,7 +42,6 @@
 #include "rapidudf/meta/optype.h"
 
 #include "absl/status/statusor.h"
-#include "absl/strings/str_split.h"
 namespace rapidudf {
 namespace ast {
 

@@ -32,8 +32,10 @@
 #pragma once
 #include <stddef.h>
 #include <cstdint>
+#include <stdexcept>
 #include <vector>
 
+#include "rapidudf/meta/exception.h"
 #include "rapidudf/types/bit.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
@@ -54,12 +56,14 @@ class Vector;
 class VectorData {
  public:
   VectorData(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
-      : temporary_(0), size_(size), reserved_(0), bytes_capacity_(bytes_capacity), data_(data) {}
+      : temporary_(0), size_(size), readonly_(0), bytes_capacity_(bytes_capacity), data_(data) {}
   inline size_t Size() const { return size_; }
   inline size_t BytesCapacity() const { return bytes_capacity_; };
   inline const void* Data() const { return data_; }
   inline void SetTemporary(bool v) { temporary_ = v ? 1 : 0; }
-  inline bool IsTemporary() const { return temporary_; };
+  inline bool IsTemporary() const { return temporary_ && !readonly_; };
+  inline void SetReadonly(bool v) { readonly_ = v ? 1 : 0; }
+  inline bool IsReadonly() const { return readonly_; };
 
   template <typename T>
   T* MutableData() {
@@ -71,7 +75,7 @@ class VectorData {
     struct {
       uint64_t temporary_ : 1;
       uint64_t size_ : 31;  // corresponds to logical address
-      uint64_t reserved_ : 1;
+      uint64_t readonly_ : 1;
       uint64_t bytes_capacity_ : 31;
     };
   };
@@ -90,8 +94,27 @@ class Vector {
     VectorData vdata(data, size, capacity * sizeof(T));
     vec_data_ = vdata;
   }
-  Vector(VectorData vdata) { vec_data_ = vdata; }
+  Vector(VectorData vdata) {
+    size_t byte_capacity = vdata.BytesCapacity();
+    if (byte_capacity == 0) {
+      if constexpr (std::is_same_v<T, Bit>) {
+        byte_capacity = (vdata.Size() + 7) / 8;
+      } else {
+        byte_capacity = vdata.Size() * sizeof(T);
+      }
+    }
+    vec_data_ = VectorData(vdata.Data(), vdata.Size(), byte_capacity);
+  }
   Vector(const std::vector<T>& vec) {
+    if constexpr (std::is_same_v<T, Bit>) {
+      static_assert(sizeof(T) == -1, "unsupported constructor");
+    } else {
+      VectorData vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
+      vdata.SetReadonly(true);
+      vec_data_ = vdata;
+    }
+  }
+  Vector(std::vector<T>& vec) {
     if constexpr (std::is_same_v<T, Bit>) {
       static_assert(sizeof(T) == -1, "unsupported constructor");
     } else {
@@ -148,6 +171,29 @@ class Vector {
       return Data()[idx];
     }
   }
+  Vector<T> SubVector(uint32_t pos, uint32_t len) {
+    if (pos + len > Size()) {
+      THROW_OUT_OF_RANGE_ERR((pos + len), Size());
+    }
+    if constexpr (std::is_same_v<T, Bit>) {
+      // static_assert(sizeof(T) == -1, "unsupported subvector for Vector<Bit>");
+      auto* data_ptr = Data();
+      if (pos % 8 == 0) {
+        auto* subvector_data_ptr = data_ptr + pos / 8;
+        VectorData subvector_data(subvector_data_ptr, len, (len + 7) / 8);
+        return Vector<T>(subvector_data);
+      } else {
+        throw std::logic_error(fmt::format("Can NOT subvector from pos:{}", pos));
+      }
+
+    } else {
+      auto* data_ptr = Data();
+      auto* subvector_data_ptr = data_ptr + pos;
+      VectorData subvector_data(subvector_data_ptr, len, sizeof(T) * len);
+      return Vector<T>(subvector_data);
+    }
+  }
+
   auto ToStdVector() const {
     if constexpr (std::is_same_v<Bit, T>) {
       std::vector<uint8_t> bits;
@@ -169,7 +215,16 @@ class Vector {
       return datas;
     }
   }
+  Vector<T> Resize(size_t n) const {
+    if (n > vec_data_.Size()) {
+      THROW_OUT_OF_RANGE_ERR(n, vec_data_.Size());
+    }
+    auto new_vec_data = VectorData(vec_data_.Data(), n, vec_data_.BytesCapacity());
+    return Vector<T>(new_vec_data);
+  }
+
   bool IsTemporary() const { return vec_data_.IsTemporary(); }
+  bool IsReadonly() const { return vec_data_.IsReadonly(); }
 
  private:
   VectorData vec_data_;

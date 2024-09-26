@@ -31,6 +31,7 @@
 
 #include <gtest/gtest.h>
 #include <functional>
+#include <stdexcept>
 #include <vector>
 #include "absl/strings/str_join.h"
 
@@ -76,6 +77,9 @@ TEST(JitCompiler, sort) {
   for (size_t i = 0; i < data_clone.size(); i++) {
     ASSERT_FLOAT_EQ(data[i], data_clone[i]);
   }
+
+  const std::vector<float>& const_ref = data;
+  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
 }
 
 TEST(JitCompiler, select) {
@@ -99,6 +103,8 @@ TEST(JitCompiler, select) {
     RUDF_INFO("{} {}", data[i], data_clone[i]);
     // ASSERT_FLOAT_EQ(data[i], data_clone[i]);
   }
+  const std::vector<double>& const_ref = data;
+  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
 }
 
 TEST(JitCompiler, topk) {
@@ -121,6 +127,8 @@ TEST(JitCompiler, topk) {
     RUDF_INFO("{}", data[i]);
     // ASSERT_FLOAT_EQ(data[i], data_clone[i]);
   }
+  const std::vector<double>& const_ref = data;
+  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
 }
 
 TEST(JitCompiler, argsort) {
@@ -191,6 +199,8 @@ TEST(JitCompiler, sort_kv) {
   for (size_t i = 0; i < ids.Size(); i++) {
     RUDF_INFO("[{}]:{}", ids[i], data[i]);
   }
+  const std::vector<double>& const_ref = data;
+  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
 }
 
 TEST(JitCompiler, select_kv) {
@@ -217,6 +227,8 @@ TEST(JitCompiler, select_kv) {
   for (size_t i = 0; i < ids.Size(); i++) {
     RUDF_INFO("[{}]:{}", ids[i], data[i]);
   }
+  const std::vector<double>& const_ref = data;
+  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
 }
 
 TEST(JitCompiler, topk_kv) {
@@ -243,4 +255,6 @@ TEST(JitCompiler, topk_kv) {
   for (size_t i = 0; i < ids.Size(); i++) {
     RUDF_INFO("[{}]:{}", ids[i], data[i]);
   }
+  const std::vector<double>& const_ref = data;
+  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
 }

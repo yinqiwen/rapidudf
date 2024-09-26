@@ -11,3 +11,10 @@ cc_library(
         "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
+
+cc_library(
+    name = "atomic_intrusive_list",
+    hdrs = [
+        "AtomicIntrusiveLinkedList.h",
+    ],
+)

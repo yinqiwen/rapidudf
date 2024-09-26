@@ -71,8 +71,8 @@ Scalar* simd_column_dot(Column* left, Column* right) {
           THROW_LOGIC_ERR(fmt::format("Can NOT do {} with simd_table ptr", OP_DOT));
         } else {
           using value_type = typename T::value_type;
-          auto right_vec = right->ToVector<value_type>().value();
           if constexpr (is_valid_operand<value_type>(OP_DOT)) {
+            auto right_vec = right->ToVector<value_type>().value();
             auto val = simd_vector_dot(arg, right_vec);
             return to_scalar(ctx, val);
           } else {
@@ -95,6 +95,67 @@ Column* simd_column_clone(Column* data) {
           auto result = simd_vector_clone(ctx, arg);
           auto* c = ctx.New<Column>(ctx, result);
           return c;
+        }
+        return (Column*)0;
+      },
+      data->GetInternal());
+}
+
+Column* simd_column_filter(Column* data, Column* bits) {
+  auto& ctx = data->GetContext();
+  return std::visit(
+      [&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, TablePtr>) {
+          THROW_LOGIC_ERR(fmt::format("Can NOT do {} with simd_table ptr", OP_FILTER));
+        } else {
+          if constexpr (std::is_same_v<T, Vector<Bit>>) {
+            THROW_LOGIC_ERR(fmt::format("Can NOT do {} with simd_vector<bit>", OP_FILTER));
+          } else {
+            return std::visit(
+                [&](auto&& bits_arg) {
+                  using R = std::decay_t<decltype(bits_arg)>;
+                  if constexpr (std::is_same_v<R, Vector<Bit>>) {
+                    auto result = simd_vector_filter(ctx, arg, bits_arg);
+                    auto* c = ctx.New<Column>(ctx, result);
+                    return c;
+                  } else {
+                    THROW_LOGIC_ERR(fmt::format("Can NOT do {} with non vector bit", OP_FILTER));
+                  }
+                  return (Column*)0;
+                },
+                bits->GetInternal());
+          }
+        }
+        return (Column*)0;
+      },
+      data->GetInternal());
+}
+Column* simd_column_gather(Column* data, Column* indices) {
+  auto& ctx = data->GetContext();
+  return std::visit(
+      [&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, TablePtr>) {
+          THROW_LOGIC_ERR(fmt::format("Can NOT do {} with simd_table ptr", OP_GATHER));
+        } else {
+          if constexpr (std::is_same_v<T, Vector<Bit>>) {
+            THROW_LOGIC_ERR(fmt::format("Can NOT do {} with simd_vector<bit>", OP_GATHER));
+          } else {
+            return std::visit(
+                [&](auto&& indices_arg) {
+                  using R = std::decay_t<decltype(indices_arg)>;
+                  if constexpr (std::is_same_v<R, Vector<int32_t>>) {
+                    auto result = simd_vector_gather(ctx, arg, indices_arg);
+                    auto* c = ctx.New<Column>(ctx, result);
+                    return c;
+                  } else {
+                    THROW_LOGIC_ERR(fmt::format("Can NOT do {} with non vector int32", OP_GATHER));
+                  }
+                  return (Column*)0;
+                },
+                indices->GetInternal());
+          }
         }
         return (Column*)0;
       },

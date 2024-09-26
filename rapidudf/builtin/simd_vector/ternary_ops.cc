@@ -270,8 +270,7 @@ Vector<typename OPT::operand_t> simd_vector_ternary_op_impl(Context& ctx, Vector
                                                             Vector<typename OPT::operand_t> b,
                                                             Vector<typename OPT::operand_t> c) {
   if (a.Size() != b.Size() || a.Size() != c.Size() || c.Size() != b.Size()) {
-    THROW_LOGIC_ERR(
-        fmt::format("vector ternary op:{} arg vector's size mismatch {}:{}:{}", OPT::op, a.Size(), b.Size(), c.Size()));
+    THROW_SIZE_MISMATCH_ERR(a.Size(), b.Size());
   }
   using operand_t = typename OPT::operand_t;
   using number_t = typename InternalType<operand_t>::internal_type;
@@ -304,7 +303,7 @@ Vector<typename OPT::operand_t> simd_vector_ternary_vector_vector_scalar_op_impl
                                                                                  Vector<typename OPT::operand_t> b,
                                                                                  typename OPT::operand_t c) {
   if (a.Size() != b.Size()) {
-    THROW_LOGIC_ERR(fmt::format("vector ternary op:{} arg vector's size mismatch {}:{}", OPT::op, a.Size(), b.Size()));
+    THROW_SIZE_MISMATCH_ERR(a.Size(), b.Size());
   }
   using operand_t = typename OPT::operand_t;
   using number_t = typename InternalType<operand_t>::internal_type;
@@ -335,7 +334,7 @@ Vector<typename OPT::operand_t> simd_vector_ternary_vector_scalar_vector_op_impl
                                                                                  typename OPT::operand_t b,
                                                                                  Vector<typename OPT::operand_t> c) {
   if (a.Size() != c.Size()) {
-    THROW_LOGIC_ERR(fmt::format("vector ternary op:{} arg vector's size mismatch {}:{}", OPT::op, a.Size(), c.Size()));
+    THROW_SIZE_MISMATCH_ERR(a.Size(), c.Size());
   }
   using operand_t = typename OPT::operand_t;
   using number_t = typename InternalType<operand_t>::internal_type;
@@ -395,7 +394,7 @@ Vector<typename OPT::operand_t> simd_vector_ternary_scalar_vector_vector_op_impl
                                                                                  Vector<typename OPT::operand_t> b,
                                                                                  Vector<typename OPT::operand_t> c) {
   if (b.Size() != c.Size()) {
-    THROW_LOGIC_ERR(fmt::format("vector ternary op:{} arg vector's size mismatch {}:{}", OPT::op, b.Size(), c.Size()));
+    THROW_SIZE_MISMATCH_ERR(b.Size(), c.Size());
   }
   using operand_t = typename OPT::operand_t;
   using number_t = typename InternalType<operand_t>::internal_type;

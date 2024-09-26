@@ -106,9 +106,14 @@ struct StringViewHelper {
   }
 };
 
+struct StdStringViewHelper {
+  static size_t size(std::string_view s) { return s.size(); }
+};
+
 void init_builtin_string_funcs() {
   RUDF_STRUCT_HELPER_METHODS_BIND(StringViewHelper, size, contains, starts_with, ends_with, contains_ignore_case,
                                   starts_with_ignore_case, ends_with_ignore_case)
+  RUDF_STRUCT_HELPER_METHODS_BIND(StdStringViewHelper, size)
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);

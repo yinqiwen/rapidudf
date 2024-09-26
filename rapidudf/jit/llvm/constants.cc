@@ -29,14 +29,16 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <fmt/core.h>
-#include <llvm/ADT/APFloat.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
-#include <vector>
 #include "rapidudf/jit/llvm/jit.h"
+
+#include <vector>
+#include "fmt/core.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Value.h"
+
 #include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
@@ -131,25 +133,31 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
   StringView view(*str);
   uint64_t* uv = reinterpret_cast<uint64_t*>(&view);
   GetSession()->const_strings.emplace_back(std::move(str));
-  ::llvm::StructType* string_view_type = static_cast<::llvm::StructType*>(GetType(DATA_STRING_VIEW).value());
+  ::llvm::IntegerType* string_view_type = static_cast<::llvm::IntegerType*>(GetType(DATA_STRING_VIEW).value());
   auto* str_val = GetSession()->GetIRBuilder()->CreateAlloca(string_view_type);
-  ::llvm::Value* zero =
-      ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
-
-  ::llvm::Value* offset =
-      ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
-  auto size_field_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(string_view_type, str_val,
-                                                                        std::vector<::llvm::Value*>{zero, offset});
-  auto size_val = ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(GetSession()->GetIRBuilder()->getContext()), uv[0]);
-  GetSession()->GetIRBuilder()->CreateStore(size_val, size_field_ptr);
-
-  offset = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 1);
-  auto ptr_field_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(string_view_type, str_val,
-                                                                       std::vector<::llvm::Value*>{zero, offset});
-  auto ptr_val = ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(GetSession()->GetIRBuilder()->getContext()), uv[1]);
-  GetSession()->GetIRBuilder()->CreateStore(ptr_val, ptr_field_ptr);
-
+  ::llvm::APInt str_ints(128, {uv[0], uv[1]});
+  GetSession()->GetIRBuilder()->CreateStore(::llvm::ConstantInt::get(string_view_type, str_ints), str_val);
   return NewValue(DATA_STRING_VIEW, GetSession()->GetIRBuilder()->CreateLoad(string_view_type, str_val));
+
+  // ::llvm::StructType* string_view_type = static_cast<::llvm::StructType*>(GetType(DATA_STRING_VIEW).value());
+  // auto* str_val = GetSession()->GetIRBuilder()->CreateAlloca(string_view_type);
+  // ::llvm::Value* zero =
+  //     ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
+
+  // ::llvm::Value* offset =
+  //     ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 0);
+  // auto size_field_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(string_view_type, str_val,
+  //                                                                       std::vector<::llvm::Value*>{zero, offset});
+  // auto size_val = ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(GetSession()->GetIRBuilder()->getContext()),
+  // uv[0]); GetSession()->GetIRBuilder()->CreateStore(size_val, size_field_ptr);
+
+  // offset = ::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(GetSession()->GetIRBuilder()->getContext()), 1);
+  // auto ptr_field_ptr = GetSession()->GetIRBuilder()->CreateInBoundsGEP(string_view_type, str_val,
+  //                                                                      std::vector<::llvm::Value*>{zero, offset});
+  // auto ptr_val = ::llvm::ConstantInt::get(::llvm::Type::getInt64Ty(GetSession()->GetIRBuilder()->getContext()),
+  // uv[1]); GetSession()->GetIRBuilder()->CreateStore(ptr_val, ptr_field_ptr);
+
+  // return NewValue(DATA_STRING_VIEW, GetSession()->GetIRBuilder()->CreateLoad(string_view_type, str_val));
 }
 
 }  // namespace llvm

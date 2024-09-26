@@ -29,11 +29,11 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <llvm/IR/Intrinsics.h>
-#include <llvm/IR/Use.h>
 #include <algorithm>
 #include <string_view>
 #include <vector>
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/Use.h"
 #include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/llvm/value.h"

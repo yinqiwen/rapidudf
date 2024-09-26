@@ -861,7 +861,7 @@ TEST(JitCompiler, column_asin) {
   ASSERT_TRUE(rc5.ok());
   auto f5 = std::move(rc5.value());
   auto result5 = f5(ctx, column);
-  ASSERT_EQ(result5->Size(), fvs.size());
+  ASSERT_EQ(result5->size(), fvs.size());
   auto result_vec = result5->ToVector<float>().value();
   for (size_t i = 0; i < fvs.size(); i++) {
     ASSERT_FLOAT_EQ(result_vec[i], std::asin(fvs[i]));

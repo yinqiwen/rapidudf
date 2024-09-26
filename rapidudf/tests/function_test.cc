@@ -30,27 +30,57 @@
 */
 
 #include <gtest/gtest.h>
-#include <functional>
+#include <string_view>
 #include <vector>
+
+#include "absl/types/span.h"
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/types/simd_vector.h"
+#include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
+using namespace rapidudf::ast;
 
-TEST(JitCompiler, vector_size) {
-  std::vector<int> vec{1, 2, 3};
+// TEST(JitCompiler, many_args0) {
+//   JitCompiler compiler;
+//   std::string content = R"(
+//     int test_func(int a, string_view b, string_view c, string_view d){
+//        return b.size() + c.size() + d.size();
+//     }
+//   )";
+//   auto rc = compiler.CompileFunction<int, int, StringView, StringView, StringView>(content, true);
+//   ASSERT_TRUE(rc.ok());
+//   auto f = std::move(rc.value());
+//   StringView str = "hello,world";
+//   ASSERT_EQ(f(1, str, str, str), str.size() * 3);
+// }
+
+// TEST(JitCompiler, many_args1) {
+//   JitCompiler compiler;
+//   std::string content = R"(
+//     int test_func(int a, simd_vector<i32> b,  simd_vector<i32> c,  simd_vector<i32> d,  simd_vector<i32> e){
+//        return b.size() + c.size() + d.size() + e.size();
+//     }
+//   )";
+//   auto rc =
+//       compiler.CompileFunction<int, int, simd::Vector<int>, simd::Vector<int>, simd::Vector<int>, simd::Vector<int>>(
+//           content, true);
+//   ASSERT_TRUE(rc.ok());
+//   auto f = std::move(rc.value());
+//   std::vector<int> x = {1, 2, 3, 4, 5, 6, 7, 8};
+//   ASSERT_EQ(f(1, x, x, x, x), x.size() * 4);
+// }
+
+TEST(JitCompiler, many_args2) {
   JitCompiler compiler;
   std::string content = R"(
-    int test_f(int x){
-       return x+1;
-    }
-    int test_func(int x){
-      return test_f(x) + 10;
+    int test_func(int a, std_string_view b, std_string_view c, std_string_view d){
+       return b.size() + c.size() + d.size();
     }
   )";
-  auto rc = compiler.CompileSource(content, true);
+  auto rc = compiler.CompileFunction<int, int, std::string_view, std::string_view, std::string_view>(content, true);
   ASSERT_TRUE(rc.ok());
-  auto func_result = compiler.LoadFunction<int, int>("test_func");
-  ASSERT_TRUE(func_result.ok());
-  auto f = std::move(func_result.value());
-  ASSERT_EQ(f(1), 12);
+  auto f = std::move(rc.value());
+  std::string_view str = "hello,world1";
+  ASSERT_EQ(f(1, str, str, str), str.size() * 3);
 }

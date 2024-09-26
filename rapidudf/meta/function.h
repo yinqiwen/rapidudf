@@ -62,7 +62,15 @@ struct FunctionDesc {
   void Init();
   bool ValidateArgs(const std::vector<DType>& ts) const;
   bool CompareSignature(DType rtype, const std::vector<DType>& args_types) const;
+
+  bool PassArgByValue(size_t i) const;
 };
+
+template <typename T>
+DType get_function_arg_dtype() {
+  DType dtype = get_dtype<T>();
+  return dtype;
+}
 
 class FunctionFactory {
  public:
@@ -79,7 +87,7 @@ class FunctionFactory {
     desc.name = std::string(name);
     desc.func = reinterpret_cast<void*>(f);
     desc.return_type = get_dtype<RET>();
-    (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
+    (desc.arg_types.emplace_back(get_function_arg_dtype<Args>()), ...);
     return Register(std::move(desc));
   }
 
@@ -103,7 +111,7 @@ class FuncRegister {
     }
     desc.return_type = get_dtype<RET>();
 
-    (desc.arg_types.emplace_back(get_dtype<Args>()), ...);
+    (desc.arg_types.emplace_back(get_function_arg_dtype<Args>()), ...);
     FunctionFactory::Register(std::move(desc));
   }
 };

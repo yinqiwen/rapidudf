@@ -9,7 +9,7 @@ RUDF_DEFAULT_COPTS = [
 RUDF_DEFAULT_LINKOPTS = [
     "-L/usr/local/lib",
     "-L/usr/local/lib64",
-    "-lLLVM",
+    # "-lLLVM",
     "-ldl",
     "-lrt",
 ]

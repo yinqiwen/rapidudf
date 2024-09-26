@@ -21,7 +21,7 @@
 #include <string_view>
 #include <vector>
 
-#include <fmt/format.h>
+#include "fmt/format.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"

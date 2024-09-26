@@ -1,10 +1,9 @@
 # RapidUDF
-
 `RapidUDF` is a C++ vectorized expression/script calculation execution engine primarily based on `vectorization` and `JIT compilation` technologies. Compared to similar implementations, it offers significant performance improvements. Users can apply it in scenarios requiring high-performance online calculations with complex and flexible needs, such as rule engines, storage UDFs, and feature computations.
 
 ## Dependencies
 
-- [LLVM](https://llvm.org/)
+- [LLVM 17/18/19](https://llvm.org/)
 - [highway](https://github.com/google/highway)
 - [x86-simd-sort](https://github.com/intel/x86-simd-sort)
 - [sleef](https://github.com/shibatch/sleef)
@@ -37,7 +36,7 @@
   - Access operators (`.`, `[]`)
 - Conditional control (`if-elif*-else`)
 - Loop control (`while`, `continue`, `break`)
-- Supported data types
+- [Supported data types](docs/dtype.md)
   - Basic types (`bit/bool`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`, `i8`, `i16`, `i32`, `i64`, `string_view`)
   - Vectorized vectors (`simd_vector<u64>`, `simd_vector<f64>`, etc.)
   - `Protobuf` (requires FFI compile-time binding)
@@ -72,6 +71,7 @@
     rapidudf_workspace()
 ```
 ### CMake
+TODO
 
 ## Usage
 
@@ -217,11 +217,21 @@ int main() {
 ```
 
 ### More Examples and Usage
-- [Using custom C++ classes in expressions/UDFs](docs/ffi.md)
-- [Calling member methods of custom C++ classes in expressions/UDFs](docs/ffi.md)
-- [Using protobuf objects in expressions/UDFs](docs/ffi.md)
-- [Using flatbuffers objects in expressions/UDFs](docs/ffi.md)
-- [Using STL objects in expressions/UDFs](docs/ffi.md)
+- Using custom C++ classes in expressions/UDFs
+  - [doc](docs/ffi.md)
+  - [example code](rapidudf/tests/struct_test.cc)
+- Calling member methods of custom C++ classes in expressions/UDFs
+  - [doc](docs/ffi.md)
+  - [example code](rapidudf/tests/example_test.cc)
+- Using protobuf objects in expressions/UDFs
+  - [doc](docs/ffi.md)
+  - [example code](rapidudf/tests/pb_test.cc)
+- Using flatbuffers objects in expressions/UDFs
+  - [doc](docs/ffi.md)
+  - [example code](rapidudf/tests/fbs_test.cc)
+- Using STL objects in expressions/UDFs
+  - [doc](docs/ffi.md)
+  - [example code](rapidudf/tests/stl_test.cc)
 
 ## Performance
 ### Comparison with Native C++
@@ -254,11 +264,4 @@ BM_exprtk_expr_func               65001 ns        65001 ns        10869
 BM_native_func                    50161 ns        50160 ns        13953
 ```
 
-### Comparison with Lua/WASM/...
-Compared to third-party language implementations like Lua/WASM, the biggest performance advantage of RapidUDF lies in the lack of overhead for data transfer/function calls.     
-The compiled UDF can access objects defined in C++ according to the C++ memory model, including but not limited to:   
-- Protobuf
-- Flatbufers
-- Json
-- STL containers
-- Custom C++ classes
+

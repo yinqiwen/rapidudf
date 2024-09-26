@@ -71,27 +71,6 @@ struct PBArgType<std::string> {
   static arg_type default_value() { return ""; }
 };
 
-// template <typename T, typename Enable = void>
-// struct PBGetterReturnType {
-//   using return_type = T;
-//   static return_type value(const T& v) { return v; }
-//   static return_type default_value() { return {}; }
-// };
-// template <typename T>
-// struct PBGetterReturnType<T, typename std::enable_if<std::is_base_of<google::protobuf::Message, T>::value>::type> {
-//   using return_type = const T*;
-//   static return_type value(const T& v) { return &v; }
-//   static return_type default_value() {
-//     static T empty;
-//     return &empty;
-//   }
-// };
-// template <>
-// struct PBGetterReturnType<std::string> {
-//   using return_type = const std::string*;
-//   static return_type value(const std::string& v) { return &v; }
-// };
-
 template <typename T, typename Enable = void>
 struct PBSetterArgType {
   using arg_type = T;
@@ -109,7 +88,7 @@ struct PBMapHelper {
   using arg_value_type_t = typename PBArgType<value_type>::arg_type;
   static arg_value_type_t Get(const ::google::protobuf::Map<K, V>* pb_map, arg_key_type_t k) {
     if (nullptr == pb_map) {
-      throw std::logic_error("NULL protobuf map poniter");
+      THROW_NULL_POINTER_ERR("null pb map");
     }
     auto found = pb_map->find(PBArgType<key_type>::from(k));
 
@@ -138,7 +117,7 @@ struct PBRepeatedPtrFieldHelper {
   using arg_type_t = typename PBArgType<T>::arg_type;
   static arg_type_t Get(const ::google::protobuf::RepeatedPtrField<T>* pb_vec, int i) {
     if (nullptr == pb_vec) {
-      throw std::logic_error("NULL protobuf RepeatedPtrField poniter");
+      THROW_NULL_POINTER_ERR("null pb RepeatedPtrField");
     }
     const auto& val = pb_vec->Get(i);
     return PBArgType<T>::value(val);
@@ -156,7 +135,7 @@ struct PBRepeatedFieldHelper {
   using arg_type_t = typename PBArgType<T>::arg_type;
   static arg_type_t Get(const ::google::protobuf::RepeatedField<T>* pb_vec, int i) {
     if (nullptr == pb_vec) {
-      throw std::logic_error("NULL protobuf RepeatedField poniter");
+      THROW_NULL_POINTER_ERR("null pb RepeatedField");
     }
     const auto& val = pb_vec->Get(i);
     return PBArgType<T>::value(val);

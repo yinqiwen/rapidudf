@@ -29,7 +29,7 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rapidudf/ast/statement.h"
-#include <fmt/core.h>
+#include "fmt/core.h"
 #include "rapidudf/builtin/builtin_symbols.h"
 namespace rapidudf {
 namespace ast {

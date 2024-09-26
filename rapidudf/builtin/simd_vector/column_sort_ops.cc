@@ -49,7 +49,7 @@ void column_sort(Column* data, bool descending) {
         } else {
           using value_type = typename T::value_type;
           if constexpr (is_valid_operand<value_type>(OP_SORT)) {
-            sort(ctx, arg, descending);
+            simd_vector_sort(ctx, arg, descending);
           } else {
             THROW_LOGIC_ERR(fmt::format("Unsupported op:{} with column dtype:{}", OP_SUM, get_dtype<value_type>()));
           }
@@ -67,7 +67,7 @@ void column_select(Column* data, size_t k, bool descending) {
         } else {
           using value_type = typename T::value_type;
           if constexpr (is_valid_operand<value_type>(OP_SORT)) {
-            select(ctx, arg, k, descending);
+            simd_vector_select(ctx, arg, k, descending);
           } else {
             THROW_LOGIC_ERR(fmt::format("Unsupported op:{} with column dtype:{}", OP_SUM, get_dtype<value_type>()));
           }
@@ -85,7 +85,7 @@ void column_topk(Column* data, size_t k, bool descending) {
         } else {
           using value_type = typename T::value_type;
           if constexpr (is_valid_operand<value_type>(OP_SORT)) {
-            topk(ctx, arg, k, descending);
+            simd_vector_topk(ctx, arg, k, descending);
           } else {
             THROW_LOGIC_ERR(fmt::format("Unsupported op:{} with column dtype:{}", OP_SUM, get_dtype<value_type>()));
           }
@@ -103,7 +103,7 @@ Column* column_argsort(Column* data, bool descending) {
         } else {
           using value_type = typename T::value_type;
           if constexpr (is_valid_operand<value_type>(OP_ARG_SORT)) {
-            auto v = argsort(ctx, arg, descending);
+            auto v = simd_vector_argsort(ctx, arg, descending);
             return ctx.New<Column>(ctx, v);
           } else {
             THROW_LOGIC_ERR(fmt::format("Unsupported op:{} with column dtype:{}", OP_SUM, get_dtype<value_type>()));
@@ -123,7 +123,7 @@ Column* column_argselect(Column* data, size_t k, bool descending) {
         } else {
           using value_type = typename T::value_type;
           if constexpr (is_valid_operand<value_type>(OP_ARG_SORT)) {
-            auto v = argselect(ctx, arg, k, descending);
+            auto v = simd_vector_argselect(ctx, arg, k, descending);
             return ctx.New<Column>(ctx, v);
           } else {
             THROW_LOGIC_ERR(fmt::format("Unsupported op:{} with column dtype:{}", OP_SUM, get_dtype<value_type>()));
@@ -151,7 +151,7 @@ void column_sort_key_value(Column* key, Column* value, bool descending) {
                   } else {
                     using value_type = typename R::value_type;
                     if constexpr (is_valid_operand<value_type>(OP_SORT_KV)) {
-                      sort_key_value(ctx, arg, val_arg, descending);
+                      simd_vector_sort_key_value(ctx, arg, val_arg, descending);
                     } else {
                       THROW_LOGIC_ERR(
                           fmt::format("Unsupported op:{} with column dtype:{}", OP_SORT_KV, get_dtype<value_type>()));
@@ -184,7 +184,7 @@ void column_select_key_value(Column* key, Column* value, size_t k, bool descendi
                   } else {
                     using value_type = typename R::value_type;
                     if constexpr (is_valid_operand<value_type>(OP_SELECT_KV)) {
-                      select_key_value(ctx, arg, val_arg, k, descending);
+                      simd_vector_select_key_value(ctx, arg, val_arg, k, descending);
                     } else {
                       THROW_LOGIC_ERR(
                           fmt::format("Unsupported op:{} with column dtype:{}", OP_SELECT_KV, get_dtype<value_type>()));
@@ -217,7 +217,7 @@ void column_topk_key_value(Column* key, Column* value, size_t k, bool descending
                   } else {
                     using value_type = typename R::value_type;
                     if constexpr (is_valid_operand<value_type>(OP_TOPK_KV)) {
-                      topk_key_value(ctx, arg, val_arg, k, descending);
+                      simd_vector_topk_key_value(ctx, arg, val_arg, k, descending);
                     } else {
                       THROW_LOGIC_ERR(
                           fmt::format("Unsupported op:{} with column dtype:{}", OP_TOPK_KV, get_dtype<value_type>()));

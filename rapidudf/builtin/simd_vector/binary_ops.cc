@@ -182,7 +182,7 @@ void do_binary_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func
 }
 
 template <class D, OpToken op, typename V = hn::VFromD<D>>
-static inline auto do_simd_binary_op(D d, V lv, V rv) {
+static inline auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
   if constexpr (op == OP_PLUS || op == OP_PLUS_ASSIGN) {
     // if constexpr (is_bit) {
     //   return hn::Or(lv, rv);
@@ -317,7 +317,7 @@ static Vector<R> simd_vector_binary_scalar_op(Context& ctx, Vector<T> left, T ri
 template <OpToken op>
 Vector<Bit> simd_vector_string_cmp(Context& ctx, Vector<StringView> left, Vector<StringView> right) {
   if (left.Size() != right.Size()) {
-    THROW_LOGIC_ERR(fmt::format("vector string_view size mismatch {}:{}", left.Size(), right.Size()));
+    THROW_SIZE_MISMATCH_ERR(left.Size(), right.Size());
   }
   auto lanes = get_lanes<Bit>();
   VectorData result_data;
@@ -404,8 +404,7 @@ template <typename OPT>
 Vector<typename OPT::operand_t_1> simd_vector_binary_op_impl(Context& ctx, Vector<typename OPT::operand_t> left,
                                                              Vector<typename OPT::operand_t> right) {
   if (left.Size() != right.Size()) {
-    THROW_LOGIC_ERR(
-        fmt::format("vector binary op:{} arg vector's size mismatch {}:{}", OPT::op, left.Size(), right.Size()));
+    THROW_SIZE_MISMATCH_ERR(left.Size(), right.Size());
   }
   using operand_t = typename OPT::operand_t;
   using operand_t_1 = typename OPT::operand_t_1;

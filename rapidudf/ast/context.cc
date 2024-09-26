@@ -29,9 +29,11 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rapidudf/ast/context.h"
-#include <fmt/format.h>
 #include <array>
 #include <vector>
+#include "absl/strings/str_split.h"
+#include "fmt/format.h"
+
 #include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/meta/constants.h"
 

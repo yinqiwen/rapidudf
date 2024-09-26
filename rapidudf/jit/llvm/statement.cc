@@ -29,10 +29,10 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <fmt/core.h>
 #include <utility>
 #include <variant>
 #include <vector>
+#include "fmt/core.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/llvm/jit_session.h"
 #include "rapidudf/log/log.h"
@@ -62,11 +62,6 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Retu
           fmt::format("Can NOT cast to return dtype:{} from dtype:{}", ctx->desc.return_type, val->GetDType())));
     }
     if (GetCompileContext()->return_value != nullptr) {
-      // auto status = GetCompileContext()->return_value->CopyFrom(ret_val);
-      // if (!status.ok()) {
-      //   return status;
-      // }
-      // GetCompileContext()->return_value->CopyFrom(ret_val);
       GetSession()->GetIRBuilder()->CreateStore(ret_val->GetValue(), GetCompileContext()->return_value->GetRawValue());
     }
     GetSession()->GetIRBuilder()->CreateBr(GetCompileContext()->exit_block);

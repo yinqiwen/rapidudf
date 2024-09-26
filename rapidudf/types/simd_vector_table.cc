@@ -29,13 +29,24 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rapidudf/types/simd_vector_table.h"
-#include <fmt/format.h>
 #include <memory>
 #include <variant>
+#include "fmt/format.h"
+#include "rapidudf/types/simd_vector.h"
 namespace rapidudf {
 namespace simd {
 
-size_t Column::Size() const {
+/**
+ ** defined in rapidudf/builtin/simd_vector/ops.h
+ */
+template <typename T>
+Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
+template <typename T>
+Vector<T> simd_vector_clone(Context& ctx, Vector<T> data);
+Column* simd_column_filter(Column* data, Column* bits);
+Column* simd_column_gather(Column* data, Column* indices);
+
+size_t Column::size() const {
   return std::visit(
       [](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
@@ -47,6 +58,36 @@ size_t Column::Size() const {
       },
       data_);
 }
+
+Column* Column::take(size_t n) {
+  return std::visit(
+      [&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, TablePtr>) {
+          return (Column*)0;
+        } else {
+          auto new_vec = arg.Resize(n);
+          return ctx_.New<Column>(ctx_, new_vec);
+        }
+      },
+      data_);
+}
+
+Column* Column::clone() {
+  return std::visit(
+      [&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, TablePtr>) {
+          return (Column*)0;
+        } else {
+          auto new_vec = simd_vector_clone(ctx_, arg);
+          return ctx_.New<Column>(ctx_, new_vec);
+        }
+      },
+      data_);
+}
+Column* Column::filter(Column* bits) { return simd_column_filter(this, bits); }
+Column* Column::gather(Column* indices) { return simd_column_gather(this, indices); }
 
 void Table::Set(const std::string& name, Column* column) { column_table_[name] = column; }
 
@@ -69,6 +110,24 @@ absl::StatusOr<Column**> Table::Get(StringView name) {
   }
   return &found->second;
 }
+
+void Table::Visit(std::function<void(const std::string&, Column*)>&& f) {
+  for (auto& [name, column] : column_table_) {
+    f(name, column);
+  }
+}
+
 size_t Table::Size() const { return column_table_.size(); }
+
+Vector<int32_t> Table::GetIndices() {
+  if (indices_.Size() == 0) {
+    indices_ = simd_vector_iota<int32_t>(ctx_, 0, indices_.Size());
+  }
+  auto* p = ctx_.ArenaAllocate(sizeof(int32_t) * indices_.Size());
+  memcpy(p, indices_.Data(), sizeof(int32_t) * indices_.Size());
+  VectorData vdata(p, indices_.Size(), sizeof(int32_t) * indices_.Size());
+  vdata.SetTemporary(true);
+  return Vector<int32_t>(vdata);
+}
 }  // namespace simd
 }  // namespace rapidudf

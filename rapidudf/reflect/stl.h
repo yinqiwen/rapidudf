@@ -78,7 +78,7 @@ struct VectorHelper {
   using arg_type_t = typename STLArgType<value_type>::arg_type;
   static arg_type_t get(VEC* v, size_t i) {
     if (nullptr == v) {
-      return STLArgType<value_type>::default_value();
+      THROW_NULL_POINTER_ERR("null vector");
     }
     return STLArgType<value_type>::value(v->at(i));
   }
@@ -100,6 +100,9 @@ struct VectorHelper {
   }
   static void add(VEC* vec, arg_type_t val) { vec->emplace_back(STLArgType<value_type>::from(val)); }
   static void set(VEC* vec, size_t i, arg_type_t val) {
+    if (nullptr == vec) {
+      THROW_NULL_POINTER_ERR("null vector");
+    }
     if (vec->size() > i) {
       vec->at(i) = STLArgType<value_type>::from(val);
     }
@@ -161,7 +164,7 @@ struct MapHelper {
   }
   static arg_value_type_t get(Map* v, arg_key_type_t key) {
     if (nullptr == v) {
-      return {};
+      THROW_NULL_POINTER_ERR("null map");
     }
     auto found = v->find(STLArgType<key_type>::from(key));
     if (found == v->end()) {

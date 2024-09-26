@@ -167,6 +167,14 @@ constexpr bool is_valid_operand(OpToken op) {
         return false;
       }
     }
+    case OP_FILTER:
+    case OP_GATHER: {
+      if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<T, StringView>) {
+        return true;
+      } else {
+        return false;
+      }
+    }
     default: {
       return false;
     }

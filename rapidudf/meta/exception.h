@@ -30,10 +30,53 @@
 */
 
 #pragma once
-#include <exception>
+
+#include <stdexcept>
+#include <string>
 #include "fmt/format.h"
+
+namespace rapidudf {
+class NullPointerException : public std::logic_error {
+ public:
+  explicit NullPointerException(const std::string& msg) : std::logic_error(msg) {}
+};
+class ReadonlyException : public std::logic_error {
+ public:
+  explicit ReadonlyException(const std::string& msg) : std::logic_error(msg) {}
+};
+class SizeMismatchException : public std::logic_error {
+ public:
+  explicit SizeMismatchException(size_t current, size_t expect, const std::string& msg)
+      : std::logic_error(fmt::format("expect size:{}, but got size:{} at {}", expect, current, msg)) {}
+};
+class OutOfRangeException : public std::logic_error {
+ public:
+  explicit OutOfRangeException(size_t requested, size_t limit, const std::string& msg)
+      : std::logic_error(fmt::format("limit size:{}, but requested:{} at {}", limit, requested, msg)) {}
+};
+}  // namespace rapidudf
 
 #define THROW_LOGIC_ERR(msg)                                                        \
   do {                                                                              \
     throw std::logic_error(fmt::format("{}:{} error:{}", __FILE__, __LINE__, msg)); \
+  } while (0)
+
+#define THROW_NULL_POINTER_ERR(msg)                                                               \
+  do {                                                                                            \
+    throw rapidudf::NullPointerException(fmt::format("{}:{} error:{}", __FILE__, __LINE__, msg)); \
+  } while (0)
+
+#define THROW_READONLY_ERR(msg)                                                                \
+  do {                                                                                         \
+    throw rapidudf::ReadonlyException(fmt::format("{}:{} error:{}", __FILE__, __LINE__, msg)); \
+  } while (0)
+
+#define THROW_SIZE_MISMATCH_ERR(current, expect)                                                      \
+  do {                                                                                                \
+    throw rapidudf::SizeMismatchException(current, expect, fmt::format("{}:{}", __FILE__, __LINE__)); \
+  } while (0)
+
+#define THROW_OUT_OF_RANGE_ERR(requested, limit)                                                     \
+  do {                                                                                               \
+    throw rapidudf::OutOfRangeException(requested, limit, fmt::format("{}:{}", __FILE__, __LINE__)); \
   } while (0)

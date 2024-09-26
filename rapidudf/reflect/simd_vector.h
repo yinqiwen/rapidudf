@@ -30,9 +30,10 @@
 */
 
 #pragma once
-#include <memory>
+#include <type_traits>
 #include "rapidudf/context/context.h"
 #include "rapidudf/reflect/struct.h"
+#include "rapidudf/types/simd_vector.h"
 #include "rapidudf/types/simd_vector_table.h"
 
 namespace rapidudf {
@@ -41,8 +42,9 @@ template <typename T>
 struct SimdVectorHelper {
   static T get(simd::Vector<T> v, size_t i) { return v[i]; }
   static size_t size(simd::Vector<T> v) { return v.Size(); }
-  static simd::Column* to_column(simd::Vector<T> v, Context& ctx) { return ctx.New<simd::Column>(ctx, v); }
-  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, to_column) }
+  static simd::Vector<T> subvector(simd::Vector<T> v, uint32_t pos, uint32_t len) { return v.SubVector(pos, len); }
+  static simd::Column* to_column(simd::Vector<T> v, Context& ctx) { return simd::Column::FromVector(ctx, v); }
+  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, subvector, to_column) }
 };
 }  // namespace reflect
 

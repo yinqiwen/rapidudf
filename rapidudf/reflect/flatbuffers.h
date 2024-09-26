@@ -32,6 +32,7 @@
 #pragma once
 #include <type_traits>
 #include "flatbuffers/flatbuffers.h"
+#include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/reflect/reflect.h"
 namespace rapidudf {
@@ -40,7 +41,7 @@ template <typename T>
 struct FBSVectorHelper {
   static typename T::value_type Get(const T* fbs_vec, uint32_t i) {
     if (nullptr == fbs_vec) {
-      return {};
+      THROW_NULL_POINTER_ERR("null fbs vector");
     }
     if (i >= fbs_vec->size()) {
       return {};

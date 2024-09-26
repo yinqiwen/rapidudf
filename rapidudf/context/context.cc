@@ -47,9 +47,12 @@ uint8_t* Context::ArenaAllocate(size_t n) {
 void Context::Reset() {
   GetArena().Reset();
   allocated_arena_ptrs_.clear();
-  for (auto clean : cleanups_) {
-    clean();
-  }
-  cleanups_.clear();
+  // for (auto clean : cleanups_) {
+  //   clean();
+  // }
+  cleanups_.sweep([](CleanupFuncWrapper* wrapper) {
+    wrapper->func();
+    delete wrapper;
+  });
 }
 }  // namespace rapidudf

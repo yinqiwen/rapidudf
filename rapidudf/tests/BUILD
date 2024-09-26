@@ -47,6 +47,18 @@ cc_binary(
 )
 
 cc_test(
+    name = "function_test",
+    size = "small",
+    srcs = ["function_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "pb_test",
     size = "small",
     srcs = ["pb_test.cc"],

@@ -29,8 +29,8 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <fmt/core.h>
 #include <vector>
+#include "fmt/core.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
@@ -145,6 +145,12 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
         auto status = left->CopyFrom(right);
         if (!status.ok()) {
           return status;
+        }
+        if (left->GetDType().IsSimdVector()) {
+          auto status = left->SetSimdVectorTemporary(false);
+          if (!status.ok()) {
+            return status;
+          }
         }
         break;
       }

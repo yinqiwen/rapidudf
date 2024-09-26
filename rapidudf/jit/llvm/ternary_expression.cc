@@ -29,7 +29,7 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <fmt/core.h>
+#include "fmt/core.h"
 #include "rapidudf/jit/llvm/jit.h"
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"

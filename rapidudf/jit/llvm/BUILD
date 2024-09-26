@@ -22,6 +22,7 @@ cc_library(
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "@com_google_absl//absl/status:statusor",
+        "@local_llvm//:libllvm",
     ],
 )
 
@@ -57,6 +58,7 @@ cc_library(
         "//rapidudf/log",
         "//rapidudf/reflect",
         "@com_google_absl//absl/status:statusor",
+        "@local_llvm//:libllvm",
     ],
 )
 
