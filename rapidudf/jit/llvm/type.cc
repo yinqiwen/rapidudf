@@ -98,6 +98,9 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
     case DATA_F64: {
       return ::llvm::Type::getDoubleTy(ctx);
     }
+    case DATA_F128: {
+      return ::llvm::Type::getFP128Ty(ctx);
+    }
     case DATA_STD_STRING_VIEW: {
       return ::llvm::StructType::getTypeByName(ctx, "std_string_view");
       // return ::llvm::IntegerType::get(ctx, 128);

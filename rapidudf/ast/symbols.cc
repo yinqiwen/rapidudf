@@ -60,6 +60,7 @@ boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID
                                                         {"i64", DType(DATA_I64)},
                                                         {"f32", DType(DATA_F32)},
                                                         {"f64", DType(DATA_F64)},
+                                                        {"f128", DType(DATA_F128)},
                                                         {"int", DType(DATA_I32)},
                                                         {"long", DType(DATA_I64)},
                                                         {"float", DType(DATA_F32)},

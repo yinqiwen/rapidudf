@@ -90,6 +90,7 @@ enum FundamentalType {
   DATA_I64,
   DATA_F32,
   DATA_F64,
+  DATA_F128,
   DATA_STD_STRING_VIEW,
   DATA_STRING_VIEW,
   DATA_STRING,
@@ -116,10 +117,11 @@ using f32 = float;
 using f64 = double;
 
 constexpr std::array<std::string_view, DATA_SIMD_COLUMN + 1> kFundamentalTypeStrs = {
-    "invalid",     "void",   "bit",        "u8",     "i8",   "u16",     "i16",
-    "u32",         "i32",    "u64",        "i64",    "f32",  "f64",     "std_string_view",
-    "string_view", "string", "fbs_string", "scalar", "json", "Context", "simd_table",
-    "simd_column"};
+    "invalid",     "void",       "bit",        "u8",     "i8",
+    "u16",         "i16",        "u32",        "i32",    "u64",
+    "i64",         "f32",        "f64",        "f128",   "std_string_view",
+    "string_view", "string",     "fbs_string", "scalar", "json",
+    "Context",     "simd_table", "simd_column"};
 
 class DType {
  public:
@@ -149,10 +151,11 @@ class DType {
   bool IsSimdVectorBit() const { return container_type_ == COLLECTION_SIMD_VECTOR && t0_ == DATA_BIT; }
   bool IsPrimitive() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_STRING_VIEW); }
   bool IsFundamental() const { return ptr_bit_ == 0 && container_type_ == 0; }
-  bool IsNumber() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_F64); }
+  bool IsNumber() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_F128); }
   bool IsF32() const { return IsFundamental() && t0_ == DATA_F32; }
   bool IsF64() const { return IsFundamental() && t0_ == DATA_F64; }
-  bool IsFloat() const { return IsF32() || IsF64(); }
+  bool IsF128() const { return IsFundamental() && t0_ == DATA_F128; }
+  bool IsFloat() const { return IsF32() || IsF64() || IsF128(); }
   bool IsInteger() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_I64); }
   bool IsSigned() const;
   bool IsVoid() const { return t0_ == DATA_VOID; }
@@ -522,6 +525,9 @@ DType get_dtype() {
   }
   if constexpr (std::is_same_v<double, T>) {
     return DType(DATA_F64);
+  }
+  if constexpr (std::is_same_v<long double, T>) {
+    return DType(DATA_F128);
   }
   if constexpr (std::is_same_v<std::string_view, T>) {
     return DType(DATA_STD_STRING_VIEW);

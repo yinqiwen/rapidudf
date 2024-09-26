@@ -675,8 +675,8 @@ TEST(JitCompiler, vector_sin) {
 TEST(JitCompiler, cos) {
   JitCompiler compiler;
   std::string content = "cos(x)";
-  double x = 3.14;
-  auto rc1 = compiler.CompileExpression<double, double>(content, {"x"});
+  long double x = 3.14;
+  auto rc1 = compiler.CompileExpression<long double, long double>(content, {"x"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   ASSERT_DOUBLE_EQ(f1(x), std::cos(x));
@@ -929,8 +929,8 @@ TEST(JitCompiler, vector_atan) {
 TEST(JitCompiler, asinh) {
   JitCompiler compiler;
   std::string content = "asinh(x)";
-  double x = 3.14;
-  auto rc1 = compiler.CompileExpression<double, double>(content, {"x"});
+  long double x = 3.14;
+  auto rc1 = compiler.CompileExpression<long double, long double>(content, {"x"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   ASSERT_DOUBLE_EQ(f1(x), std::asinh(x));
