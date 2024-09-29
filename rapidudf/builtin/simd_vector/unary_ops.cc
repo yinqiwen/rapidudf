@@ -538,7 +538,7 @@ DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_
 #define DEFINE_SIMD_CLONE_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_CLONE_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_CLONE_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t, Bit,
-                     StringView);
+                     StringView, Pointer);
 
 #define DEFINE_SIMD_SUM_OP_TEMPLATE(r, op, ii, TYPE) template TYPE simd_vector_sum(Vector<TYPE> vec);
 #define DEFINE_SIMD_SUM_OP(...) \

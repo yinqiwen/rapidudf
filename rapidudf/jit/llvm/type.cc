@@ -92,14 +92,17 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
     case DATA_I64: {
       return ::llvm::IntegerType::get(ctx, dtype.Bits());
     }
+    case DATA_F16: {
+      return ::llvm::Type::getHalfTy(ctx);
+    }
     case DATA_F32: {
       return ::llvm::Type::getFloatTy(ctx);
     }
     case DATA_F64: {
       return ::llvm::Type::getDoubleTy(ctx);
     }
-    case DATA_F128: {
-      return ::llvm::Type::getFP128Ty(ctx);
+    case DATA_F80: {
+      return ::llvm::Type::getX86_FP80Ty(ctx);
     }
     case DATA_STD_STRING_VIEW: {
       return ::llvm::StructType::getTypeByName(ctx, "std_string_view");

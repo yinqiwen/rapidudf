@@ -39,6 +39,7 @@
 #include "rapidudf/types/bit.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
+
 namespace simd {
 
 template <typename T>
@@ -222,6 +223,7 @@ class Vector {
     auto new_vec_data = VectorData(vec_data_.Data(), n, vec_data_.BytesCapacity());
     return Vector<T>(new_vec_data);
   }
+  VectorData& GetVectorData() { return vec_data_; }
 
   bool IsTemporary() const { return vec_data_.IsTemporary(); }
   bool IsReadonly() const { return vec_data_.IsReadonly(); }

@@ -281,6 +281,7 @@ cc_test(
     name = "simd_vector_test",
     size = "small",
     srcs = ["simd_vector_test.cc"],
+    # copts = ["-O2"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [

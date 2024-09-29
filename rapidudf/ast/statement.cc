@@ -42,6 +42,18 @@ static absl::Status check_statements(ParseContext& ctx, std::vector<Statement>& 
   }
   return absl::OkStatus();
 }
+
+absl::Status ExpressionStatement::Validate(ParseContext& ctx) {
+  is_vector_expr = false;
+  ctx.SetVectorExressionFlag(false);
+  auto result = expr->Validate(ctx);
+  if (!result.ok()) {
+    return result.status();
+  }
+  is_vector_expr = ctx.IsVectorExpression();
+  return absl::OkStatus();
+}
+
 absl::Status ChoiceStatement::Validate(ParseContext& ctx) {
   auto result = expr->Validate(ctx);
   if (!result.ok()) {
@@ -73,6 +85,7 @@ absl::Status IfElseStatement::Validate(ParseContext& ctx) {
 absl::Status ReturnStatement::Validate(ParseContext& ctx) {
   absl::Status status = absl::OkStatus();
   if (expr) {
+    ctx.SetVectorExressionFlag(false);
     auto expr_result = (*expr)->Validate(ctx);
     if (!expr_result.ok()) {
       return expr_result.status();
@@ -81,6 +94,7 @@ absl::Status ReturnStatement::Validate(ParseContext& ctx) {
       return ctx.GetErrorStatus(fmt::format("Can NOT return invalid dtype:{}, while func return dtype:{}",
                                             expr_result->dtype, ctx.GetFuncReturnDType()));
     }
+    is_vector_expr = ctx.IsVectorExpression();
     return absl::OkStatus();
   }
   return status;

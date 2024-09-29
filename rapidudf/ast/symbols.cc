@@ -46,7 +46,7 @@ static std::vector<std::unique_ptr<std::string>>& get_symbol_token_cache() {
 boost::parser::symbols<DType> Symbols::kNumberSymbols = {
     {"u8", DType(DATA_U8)},   {"i8", DType(DATA_I8)},   {"u16", DType(DATA_U16)}, {"i16", DType(DATA_I16)},
     {"u32", DType(DATA_U32)}, {"i32", DType(DATA_U32)}, {"u64", DType(DATA_U64)}, {"i64", DType(DATA_I64)},
-    {"f32", DType(DATA_F32)}, {"f64", DType(DATA_F64)}};
+    {"f32", DType(DATA_F32)}, {"f64", DType(DATA_F64)}, {"f80", DType(DATA_F80)}};
 
 boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID)},
                                                         {"bool", DType(DATA_BIT)},
@@ -58,9 +58,10 @@ boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID
                                                         {"i32", DType(DATA_I32)},
                                                         {"u64", DType(DATA_U64)},
                                                         {"i64", DType(DATA_I64)},
+                                                        {"f16", DType(DATA_F16)},
                                                         {"f32", DType(DATA_F32)},
                                                         {"f64", DType(DATA_F64)},
-                                                        {"f128", DType(DATA_F128)},
+                                                        {"f80", DType(DATA_F80)},
                                                         {"int", DType(DATA_I32)},
                                                         {"long", DType(DATA_I64)},
                                                         {"float", DType(DATA_F32)},

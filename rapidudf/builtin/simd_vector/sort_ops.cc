@@ -88,7 +88,7 @@ void simd_vector_sort_key_value(Context& ctx, Vector<K> key, Vector<V> value, bo
   if (key.IsReadonly() || value.IsReadonly()) {
     THROW_READONLY_ERR("can NOT sort_key_value on readonly vector");
   }
-  RUDF_INFO("Key size:{} ,value size:{}", key.Size(), value.Size());
+
   x86simdsort::keyvalue_qsort(const_cast<K*>(key.Data()), const_cast<V*>(value.Data()), key.Size(), ctx.HasNan(),
                               descending);
 }

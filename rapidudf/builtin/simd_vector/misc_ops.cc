@@ -161,6 +161,11 @@ Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indic
     VectorData vdata(raw, indices.Size());
     vdata.SetTemporary(true);
     return Vector<T>(vdata);
+  } else if constexpr (std::is_same_v<T, Pointer>) {
+    Vector<uint64_t> pointers(data.GetVectorData());
+    HWY_EXPORT_T(Table1, simd_vector_gather_impl<uint64_t>);
+    auto result = HWY_DYNAMIC_DISPATCH_T(Table1)(ctx, pointers, indices);
+    return Vector<T>(result.GetVectorData());
   } else {
     HWY_EXPORT_T(Table1, simd_vector_gather_impl<T>);
     return HWY_DYNAMIC_DISPATCH_T(Table1)(ctx, data, indices);
@@ -172,14 +177,14 @@ Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indic
 #define DEFINE_SIMD_GATHER_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_GATHER_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_GATHER_OP(float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
-                      StringView, Bit);
+                      StringView, Bit, Pointer);
 
 #define DEFINE_SIMD_FILTER_OP_TEMPLATE(r, op, ii, TYPE) \
   template Vector<TYPE> simd_vector_filter(Context& ctx, Vector<TYPE> data, Vector<Bit> bits);
 #define DEFINE_SIMD_FILTER_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_FILTER_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_FILTER_OP(float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
-                      StringView, Bit);
+                      StringView, Bit, Pointer);
 
 }  // namespace simd
 }  // namespace rapidudf

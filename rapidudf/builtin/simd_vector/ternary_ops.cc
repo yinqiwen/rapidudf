@@ -270,7 +270,8 @@ Vector<typename OPT::operand_t> simd_vector_ternary_op_impl(Context& ctx, Vector
                                                             Vector<typename OPT::operand_t> b,
                                                             Vector<typename OPT::operand_t> c) {
   if (a.Size() != b.Size() || a.Size() != c.Size() || c.Size() != b.Size()) {
-    THROW_SIZE_MISMATCH_ERR(a.Size(), b.Size());
+    RUDF_ERROR("op:{}, a size:{}, b size:{}, c size:{}", OPT::op, a.Size(), b.Size(), c.Size());
+    THROW_SIZE_MISMATCH_ERR(a.Size(), c.Size());
   }
   using operand_t = typename OPT::operand_t;
   using number_t = typename InternalType<operand_t>::internal_type;

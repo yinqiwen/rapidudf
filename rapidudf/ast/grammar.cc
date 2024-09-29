@@ -182,6 +182,18 @@ auto break_func = [](auto& ctx) {
   _val(ctx) = v;
 };
 
+auto expr_stmt_func = [](auto& ctx) {
+  ExpressionStatement v;
+  v.expr = _attr(ctx);
+  _val(ctx) = v;
+};
+
+auto return_stmt_func = [](auto& ctx) {
+  ReturnStatement v;
+  v.expr = _attr(ctx);
+  _val(ctx) = v;
+};
+
 auto const constant_number_def = bp::lexeme[bp::double_ > -('_' > Symbols::kNumberSymbols)];
 // const auto dynamic_param_access_def = identifier > *('[' > (bp::quoted_string | bp::uint_) > ']');
 auto const var_declare_def = ("var" > identifier)[var_declare_func];
@@ -223,10 +235,10 @@ bp::rule<struct block, Block> block = "block";
 
 auto const statements_def =
     *(continue_statement | break_statement | return_statement | while_statement | ifelse_statement | expr_statement);
-auto const return_statement_def = ("return" > -expression > ';');
+auto const return_statement_def = ("return" > -expression > ';')[return_stmt_func];
 auto const continue_statement_def = (Symbols::kContinueSymbols > ';')[continue_func];
 auto const break_statement_def = (Symbols::kBreakSymbols > ';')[break_func];
-auto const expr_statement_def = expression > ';';
+auto const expr_statement_def = (expression > ';')[expr_stmt_func];
 auto const while_statement_def = "while" > choice_statement;
 auto const choice_statement_def = ('(' > expression > ')' > '{' > statements > '}');
 auto const ifelse_statement_def = "if" > choice_statement > *("elif" > choice_statement_def) >

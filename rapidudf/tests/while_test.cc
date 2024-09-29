@@ -30,14 +30,10 @@
 */
 
 #include <gtest/gtest.h>
-#include <cmath>
-#include <functional>
-#include <vector>
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 TEST(JitCompiler, while0) {
-  spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
   std::string content = R"(
     int test_func(int x, int y){ 
@@ -50,12 +46,7 @@ TEST(JitCompiler, while0) {
   )";
   auto rc = compiler.CompileFunction<int, int, int>(content);
   ASSERT_TRUE(rc.ok());
-  // auto f = compiler.GetFunc<int, int, int>(true);
-  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
   ASSERT_EQ(f(10, 1), 101);
   ASSERT_EQ(f(100, 1), 1001);
-
-  int x = 4;
-  printf("%f\n", std::pow(x, 2));
 }

@@ -53,6 +53,14 @@ bool Value::IsWritable() const { return dtype_.IsVoid() || type_ != nullptr; }
   }
   return val_;
 }
+
+::llvm::Value* Value::GetPtrValue() {
+  if (type_ != nullptr) {
+    return val_;
+  }
+  return nullptr;
+}
+
 absl::Status Value::CopyFrom(ValuePtr other) {
   if (!dtype_.IsVoid()) {
     if (dtype_ != other->dtype_) {
@@ -100,33 +108,33 @@ absl::Status Value::SetSimdVectorTemporary(bool v) {
     return absl::InvalidArgumentError(
         fmt::format("Can not set temprary flag on {} with empty type with val:{}", dtype_, v));
   }
-  DType simd_vector_dtype(DATA_U8);
-  simd_vector_dtype = simd_vector_dtype.ToSimdVector();
-  ::llvm::Value* result = nullptr;
-  ::llvm::ConstantInt* neg_one =
-      ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), -1, true);
-  ::llvm::ConstantInt* one = ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), 1, true);
 
-  ::llvm::ConstantInt* index = ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), 0, true);
-  if (v) {
-    //  %mask = shl i128 1, %index
-    //  %set_bit_value = or i128 %value, %mask
-    auto mask = ir_builder_->CreateShl(one, index);
-    result = ir_builder_->CreateOr({GetValue(), mask});
-  } else {
-    //   %mask = xor i128 -1, shl i128 1, %index
-    // %cleared_value = and i128 %value, %mask
-    auto mask = ir_builder_->CreateShl(one, index);
-    mask = ir_builder_->CreateXor(mask, neg_one);
-    result = ir_builder_->CreateAnd({GetValue(), mask});
-  }
-  if (type_ != nullptr) {
-    ir_builder_->CreateStore(result, val_);
-  } else {
-    val_ = result;
-  }
-  // ir_builder_->CreateStore(result, size_field_ptr);
+  // ::llvm::Value* result = nullptr;
+  // ::llvm::ConstantInt* neg_one =
+  //     ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), -1, true);
+  // ::llvm::ConstantInt* one = ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), 1, true);
 
+  // ::llvm::ConstantInt* index = ::llvm::ConstantInt::get(::llvm::Type::getInt128Ty(ir_builder_->getContext()), 0,
+  // true); if (v) {
+  //   //  %mask = shl i128 1, %index
+  //   //  %set_bit_value = or i128 %value, %mask
+  //   auto mask = ir_builder_->CreateShl(one, index);
+  //   result = ir_builder_->CreateOr({GetValue(), mask});
+  // } else {
+  //   //   %mask = xor i128 -1, shl i128 1, %index
+  //   // %cleared_value = and i128 %value, %mask
+  //   auto mask = ir_builder_->CreateShl(one, index);
+  //   mask = ir_builder_->CreateXor(mask, neg_one);
+  //   result = ir_builder_->CreateAnd({GetValue(), mask});
+  // }
+  // if (type_ != nullptr) {
+  //   ir_builder_->CreateStore(result, val_);
+  // } else {
+  //   val_ = result;
+  // }
+
+  // DType simd_vector_dtype(DATA_U8);
+  // simd_vector_dtype = simd_vector_dtype.ToSimdVector();
   // ::llvm::StructType* simd_vector_type =
   //     static_cast<::llvm::StructType*>(get_type(ir_builder_->getContext(), simd_vector_dtype));
   // auto size_field_ptr =

@@ -29,7 +29,7 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rapidudf/types/simd_vector_table.h"
-#include <memory>
+#include <stdexcept>
 #include <variant>
 #include "fmt/format.h"
 #include "rapidudf/types/simd_vector.h"
@@ -38,6 +38,7 @@ namespace simd {
 
 /**
  ** defined in rapidudf/builtin/simd_vector/ops.h
+ ** defined in rapidudf/builtin/simd_vector/column_ops.h
  */
 template <typename T>
 Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
@@ -45,6 +46,14 @@ template <typename T>
 Vector<T> simd_vector_clone(Context& ctx, Vector<T> data);
 Column* simd_column_filter(Column* data, Column* bits);
 Column* simd_column_gather(Column* data, Column* indices);
+
+/**
+ ** defined in rapidudf/builtin/simd_vector/table_ops.h
+ */
+Table* simd_table_filter(simd::Table* table, simd::Column* bits);
+Table* simd_table_order_by(simd::Table* table, simd::Column* by, bool descending);
+Table* simd_table_topk(simd::Table* table, simd::Column* by, uint32_t k, bool descending);
+Table* simd_table_take(simd::Table* table, uint32_t k);
 
 size_t Column::size() const {
   return std::visit(
@@ -111,6 +120,22 @@ absl::StatusOr<Column**> Table::Get(StringView name) {
   return &found->second;
 }
 
+Column* Table::operator[](StringView name) {
+  auto result = Get(name);
+  if (result.ok()) {
+    return *(result.value());
+  }
+  throw std::logic_error(fmt::format("No column:{} found in table.", name));
+}
+Table* Table::Filter(Column* bits) { return simd_table_filter(this, bits); }
+Table* Table::OrderBy(simd::Table* table, simd::Column* by, bool descending) {
+  return simd_table_order_by(this, by, descending);
+}
+Table* Table::Topk(simd::Table* table, simd::Column* by, uint32_t k, bool descending) {
+  return simd_table_topk(this, by, k, descending);
+}
+Table* Table::Take(uint32_t k) { return simd_table_take(this, k); }
+
 void Table::Visit(std::function<void(const std::string&, Column*)>&& f) {
   for (auto& [name, column] : column_table_) {
     f(name, column);
@@ -120,8 +145,12 @@ void Table::Visit(std::function<void(const std::string&, Column*)>&& f) {
 size_t Table::Size() const { return column_table_.size(); }
 
 Vector<int32_t> Table::GetIndices() {
+  if (column_table_.empty()) {
+    throw std::logic_error(fmt::format("Can NOT get indices from empty table"));
+  }
   if (indices_.Size() == 0) {
-    indices_ = simd_vector_iota<int32_t>(ctx_, 0, indices_.Size());
+    auto* first_column = (column_table_.begin()->second);
+    indices_ = simd_vector_iota<int32_t>(ctx_, 0, first_column->size());
   }
   auto* p = ctx_.ArenaAllocate(sizeof(int32_t) * indices_.Size());
   memcpy(p, indices_.Data(), sizeof(int32_t) * indices_.Size());

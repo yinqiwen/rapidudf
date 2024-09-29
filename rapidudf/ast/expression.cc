@@ -49,15 +49,16 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
   return std::visit(
       [&](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
+        absl::StatusOr<VarTag> result;
         if constexpr (std::is_same_v<T, bool>) {
           return absl::StatusOr<VarTag>(get_dtype<T>());
         } else if constexpr (std::is_same_v<T, std::string>) {
           return absl::StatusOr<VarTag>(DATA_STRING_VIEW);
         } else if constexpr (std::is_same_v<T, VarAccessor> || std::is_same_v<T, VarDefine>) {
-          return arg.Validate(ctx);
+          result = arg.Validate(ctx);
         } else if constexpr (std::is_same_v<T, BinaryExprPtr> || std::is_same_v<T, UnaryExprPtr> ||
                              std::is_same_v<T, TernaryExprPtr>) {
-          return arg->Validate(ctx);
+          result = arg->Validate(ctx);
         } else if constexpr (std::is_same_v<T, ConstantNumber>) {
           if (arg.dtype.has_value()) {
             return absl::StatusOr<VarTag>(*arg.dtype);
@@ -76,9 +77,16 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
           static_assert(sizeof(arg) == -1, "No avaialble!");
           return absl::InvalidArgumentError("No avaialble");
         }
+        if (result.ok()) {
+          if (result.value().dtype.IsSimdColumnPtr() || result.value().dtype.IsSimdVector()) {
+            ctx.SetVectorExressionFlag(true);
+          }
+        }
+        return result;
       },
       v);
 }
+
 absl::StatusOr<VarTag> Array::Validate(ParseContext& ctx) {
   if (elements.empty()) {
     return absl::InvalidArgumentError("array can not be empty");
@@ -101,7 +109,9 @@ absl::StatusOr<VarTag> VarRef::Validate(ParseContext& ctx) {
   if (!result.ok()) {
     return result;
   }
-
+  if (result.value().IsSimdColumnPtr() || result.value().IsSimdVector()) {
+    ctx.SetVectorExressionFlag(true);
+  }
   return VarTag(result.value(), name);
 }
 absl::StatusOr<VarTag> VarDefine::Validate(ParseContext& ctx) {
@@ -219,6 +229,7 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
   }
   return result;
 }
+
 static bool IsValidSimdVectorBinaryOperands(ParseContext& ctx, DType left, DType right) {
   if (left.IsSimdVector() || right.IsSimdVector()) {
     if (left.IsSimdVector() && right.IsSimdVector()) {

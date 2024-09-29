@@ -40,6 +40,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
+#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/simd_vector.h"
 #include "rapidudf/types/string_view.h"
 
@@ -84,6 +85,26 @@ class Context {
   }
 
   template <typename T>
+  auto NewSimdVector(const std::vector<T*>& data) {
+    uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
+    Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
+    for (size_t i = 0; i < data.size(); i++) {
+      *(ptrs + i) = Pointer(data[i]);
+    }
+    return simd::Vector<Pointer>(ptrs, data.size());
+  }
+
+  template <typename T>
+  auto NewSimdVector(const std::vector<const T*>& data) {
+    uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
+    Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
+    for (size_t i = 0; i < data.size(); i++) {
+      *(ptrs + i) = Pointer(data[i]);
+    }
+    return simd::Vector<Pointer>(ptrs, data.size());
+  }
+
+  template <typename T>
   auto NewSimdVector(const std::vector<T>& data) {
     if constexpr (std::is_same_v<bool, T>) {
       size_t byte_size = data.size() / 8;
@@ -116,6 +137,24 @@ class Context {
     } else {
       static_assert(sizeof(T) == -1, "unsupported type to NewSimdVector");
     }
+  }
+
+  template <typename T>
+  auto NewSimdVector(std::vector<T>& data) {
+    const std::vector<T>& const_ref = data;
+    auto val = NewSimdVector(const_ref);
+    val.GetVectorData().SetReadonly(false);
+    return val;
+  }
+
+  template <typename T>
+  auto NewSimdVectorOfPointer(const std::vector<T>& data) {
+    uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
+    Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
+    for (size_t i = 0; i < data.size(); i++) {
+      *(ptrs + i) = Pointer(&data[i]);
+    }
+    return simd::Vector<Pointer>(ptrs, data.size());
   }
 
   template <typename T>

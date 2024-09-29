@@ -16,6 +16,13 @@ cc_library(
 )
 
 cc_library(
+    name = "pointer",
+    hdrs = [
+        "pointer.h",
+    ],
+)
+
+cc_library(
     name = "types",
     srcs = ["params.cc"],
     hdrs = [
@@ -24,6 +31,7 @@ cc_library(
         "params.h",
     ],
     deps = [
+        ":pointer",
         ":string_view",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",

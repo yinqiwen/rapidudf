@@ -111,6 +111,9 @@ class ParseContext {
   void SetParseCost(std::chrono::microseconds cost) { parse_cost_ = cost; }
   void SetParseValidateCost(std::chrono::microseconds cost) { parse_validate_cost_ = cost; }
 
+  bool IsVectorExpression() const { return vector_expr_flag_; }
+  void SetVectorExressionFlag(bool v = true) { vector_expr_flag_ = v; }
+
  private:
   using LocalVarMap = std::unordered_map<std::string, DType>;
 
@@ -136,6 +139,7 @@ class ParseContext {
   std::vector<std::string_view> source_lines_;
   std::vector<FunctionParseContext> function_parse_ctxs_;
   uint32_t current_function_cursor_ = 0;
+  bool vector_expr_flag_ = false;
 
   std::string ast_err_;
   uint32_t validate_posistion_ = 0;

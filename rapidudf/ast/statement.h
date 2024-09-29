@@ -71,13 +71,8 @@ struct IfElseStatement {
 };
 struct ExpressionStatement {
   BinaryExprPtr expr;
-  absl::Status Validate(ParseContext& ctx) {
-    auto result = expr->Validate(ctx);
-    if (!result.ok()) {
-      return result.status();
-    }
-    return absl::OkStatus();
-  }
+  bool is_vector_expr = false;
+  absl::Status Validate(ParseContext& ctx);
 };
 
 struct WhileStatement {
@@ -87,7 +82,7 @@ struct WhileStatement {
 
 struct ReturnStatement {
   std::optional<BinaryExprPtr> expr;
-  // uint32_t position = 0;
+  bool is_vector_expr = false;
   absl::Status Validate(ParseContext& ctx);
 };
 

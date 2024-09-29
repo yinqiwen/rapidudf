@@ -30,6 +30,7 @@
 */
 
 #pragma once
+#include <variant>
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
@@ -108,6 +109,12 @@ void simd_vector_topk_key_value(Context& ctx, Vector<K> key, Vector<V> value, si
 
 template <typename T>
 T simd_vector_or_equals(Vector<T> left, absl::Span<const T> right);
+
+template <typename T>
+using Operand = std::variant<OpToken, T, Vector<T>>;
+
+template <typename T>
+Vector<T> simd_vector_fused_op(Context& ctx, std::vector<Operand<T>>& operands);
 
 }  // namespace simd
 }  // namespace rapidudf

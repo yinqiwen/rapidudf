@@ -35,6 +35,7 @@
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <cstring>
+#include <stack>
 #include <type_traits>
 
 #undef HWY_TARGET_INCLUDE
@@ -44,6 +45,7 @@
 #include "hwy/highway.h"
 
 // #include "hwy/bit_set.h"
+#include "hwy/cache_control.h"
 #include "hwy/contrib/algo/transform-inl.h"
 #include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/contrib/math/math-inl.h"
@@ -93,6 +95,7 @@ void do_binary_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func
         v1 = in1;
       } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T1>) {
         v1 = hn::LoadU(d, in1 + idx);
+        hwy::Prefetch(in1);
       } else {
         static_assert(sizeof(T1) == -1, "invalid T1");
       }
@@ -101,6 +104,7 @@ void do_binary_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func
         v2 = in2;
       } else if constexpr (std::is_same_v<const hn::TFromD<D>*, T2>) {
         v2 = hn::LoadU(d, in2 + idx);
+        hwy::Prefetch(in2);
       } else {
         static_assert(sizeof(T2) == -1, "invalid T2");
       }
@@ -182,20 +186,10 @@ void do_binary_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func
 }
 
 template <class D, OpToken op, typename V = hn::VFromD<D>>
-static inline auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
+inline auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
   if constexpr (op == OP_PLUS || op == OP_PLUS_ASSIGN) {
-    // if constexpr (is_bit) {
-    //   return hn::Or(lv, rv);
-    // } else {
-    //   return hn::Add(lv, rv);
-    // }
     return hn::Add(lv, rv);
   } else if constexpr (op == OP_MINUS || op == OP_MINUS_ASSIGN) {
-    // if constexpr (is_bit) {
-    //   return hn::And(lv, hn::Not(rv));
-    // } else {
-    //   return hn::Sub(lv, rv);
-    // }
     return hn::Sub(lv, rv);
   } else if constexpr (op == OP_MULTIPLY || op == OP_MULTIPLY_ASSIGN) {
     return hn::Mul(lv, rv);

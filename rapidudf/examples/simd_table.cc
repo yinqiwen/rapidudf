@@ -29,65 +29,74 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "rapidudf/types/simd_vector.h"
-#include <cmath>
-#include <string>
-#include "rapidudf/context/context.h"
 #include "rapidudf/rapidudf.h"
 
-static float wilson_ctr(float click, float show, float z = 1.96) {
-  const float epsilon = 1e-6;
-  if (click > show) show = click;
-  float p = click / (show + epsilon);
-  if (show < epsilon) return 0.0;
-  float n = show;
-  float A = p + z * z / (2 * n);
-  float B = std::sqrt(p * (1 - p) / n + z * z / (4 * (n * n)));
-  float C = z * B;
-  float D = 1 + z * z / n;
-  float ctr = (A - C) / D;
-  return ctr;
-}
+struct User {
+  std::string city;
+};
+RUDF_STRUCT_FIELDS(User, city)  // 绑定User类，可在UDF里访问city字段
+
+struct Feed {
+  std::string city;
+  float score;
+};
+struct Feeds {
+  rapidudf::simd::Vector<rapidudf::StringView> city;
+  rapidudf::simd::Vector<float> score;
+};
+RUDF_STRUCT_FIELDS(Feeds, city, score)  // 绑定Feeds类，可在UDF里访问city/score字段
 
 int main() {
-  // 1. 如果需要, 可以设置rapidudf logger
-  //   std::shared_ptr<spdlog::logger> mylogger;
-  //   rapidudf::set_default_logger(mylogger);
-
+  spdlog::set_level(spdlog::level::debug);
   // 2. UDF string
   std::string source = R"(
-    simd_vector<f32> wilson_ctr(Context ctx, simd_vector<f32> click, simd_vector<f32> show, f32 z) 
+    void boost_scores(Context ctx, User user,Feeds feeds) 
     { 
-       var epsilon = 0.000001_f32;
-       //if (click > show) show = click;
-       show = (click>show)?click:show;
-       var p = click/(show+epsilon);
-       var n = show;
-       var A = p + z * z / (2 * n);
-       var B = sqrt(p * (1 - p) / n + z * z / (4 * (n * n)));
-       var C = z * B;
-       var D = 1 + z * z / n;
-       var ctr = (A - C) / D;
-       // if (show < epsilon) return 0.0;
-       ctr = (show < epsilon)?0_f32:ctr;
-       return ctr;
+      // 注意boost是个float数组
+      var boost=(feeds.city==user.city?2.0_f32:1.1_f32);
+      feeds.score*=boost;
     } 
   )";
 
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
   rapidudf::JitCompiler compiler;
-  rapidudf::Context ctx;
-  using simd_vector_f32 = rapidudf::simd::Vector<float>;
   // CompileExpression的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
-  auto result = compiler.CompileFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, simd_vector_f32, float>(
-      source, true);
+  // 'rapidudf::Context' 是在simd 实现中必须的参数，涉及arena内存分配
+  auto result = compiler.CompileFunction<void, rapidudf::Context&, const User&, Feeds&>(source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;
   }
 
-  // // 4. 执行function
-  // rapidudf::JitFunction<int, int> f = std::move(result.value());
+  // 4.1 测试数据， 需要将原始数据转成列式数据
+  User user;
+  user.city = "sz";
+  std::vector<Feed> feeds;
+  for (size_t i = 0; i < 1024; i++) {
+    Feed feed;
+    feed.city = (i % 2 == 0 ? "sz" : "bj");
+    feed.score = i + 1.1;
+    feeds.emplace_back(feed);
+  }
+
+  // 4.2 将原始数据转成列式数据
+  std::vector<rapidudf::StringView> citys;
+  std::vector<float> scores;
+  for (auto& feed : feeds) {
+    citys.emplace_back(feed.city);
+    scores.emplace_back(feed.score);
+  }
+  Feeds column_feeds;
+  column_feeds.city = citys;
+  column_feeds.score = scores;
+
+  // 5. 执行function
+  rapidudf::Context ctx;
+  rapidudf::JitFunction<void, rapidudf::Context&, const User&, Feeds&> f = std::move(result.value());
+  f(ctx, user, column_feeds);
+  for (size_t i = 0; i < column_feeds.score.Size(); i++) {
+    RUDF_INFO("{} {}/{}", citys[i], scores[i], column_feeds.score[i]);
+  }
 
   return 0;
 };

@@ -47,13 +47,14 @@
 #include <unordered_set>
 #include <vector>
 
-#include <fmt/format.h>
 #include "absl/types/span.h"
 #include "flatbuffers/flatbuffers.h"
+#include "fmt/format.h"
 
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/json_object.h"
+#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/scalar.h"
 #include "rapidudf/types/simd_vector.h"
 #include "rapidudf/types/simd_vector_table.h"
@@ -79,6 +80,7 @@ constexpr std::array<std::string_view, COLLECTION_SIMD_VECTOR + 1> kCollectionTy
 enum FundamentalType {
   DATA_INVALID = 0,
   DATA_VOID,
+  DATA_POINTER,
   DATA_BIT,
   DATA_U8,
   DATA_I8,
@@ -88,9 +90,10 @@ enum FundamentalType {
   DATA_I32,
   DATA_U64,
   DATA_I64,
+  DATA_F16,
   DATA_F32,
   DATA_F64,
-  DATA_F128,
+  DATA_F80,
   DATA_STD_STRING_VIEW,
   DATA_STRING_VIEW,
   DATA_STRING,
@@ -116,12 +119,31 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double;
 
-constexpr std::array<std::string_view, DATA_SIMD_COLUMN + 1> kFundamentalTypeStrs = {
-    "invalid",     "void",       "bit",        "u8",     "i8",
-    "u16",         "i16",        "u32",        "i32",    "u64",
-    "i64",         "f32",        "f64",        "f128",   "std_string_view",
-    "string_view", "string",     "fbs_string", "scalar", "json",
-    "Context",     "simd_table", "simd_column"};
+constexpr std::array<std::string_view, DATA_SIMD_COLUMN + 1> kFundamentalTypeStrs = {"invalid",
+                                                                                     "void",
+                                                                                     "pointer",
+                                                                                     "bit",
+                                                                                     "u8",
+                                                                                     "i8",
+                                                                                     "u16",
+                                                                                     "i16",
+                                                                                     "u32",
+                                                                                     "i32",
+                                                                                     "u64",
+                                                                                     "i64",
+                                                                                     "f16",
+                                                                                     "f32",
+                                                                                     "f64",
+                                                                                     "f80",
+                                                                                     "std_string_view",
+                                                                                     "string_view",
+                                                                                     "string",
+                                                                                     "fbs_string",
+                                                                                     "scalar",
+                                                                                     "json",
+                                                                                     "Context",
+                                                                                     "simd_table",
+                                                                                     "simd_column"};
 
 class DType {
  public:
@@ -151,11 +173,12 @@ class DType {
   bool IsSimdVectorBit() const { return container_type_ == COLLECTION_SIMD_VECTOR && t0_ == DATA_BIT; }
   bool IsPrimitive() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_STRING_VIEW); }
   bool IsFundamental() const { return ptr_bit_ == 0 && container_type_ == 0; }
-  bool IsNumber() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_F128); }
+  bool IsNumber() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_F80); }
+  bool IsF16() const { return IsFundamental() && t0_ == DATA_F16; }
   bool IsF32() const { return IsFundamental() && t0_ == DATA_F32; }
   bool IsF64() const { return IsFundamental() && t0_ == DATA_F64; }
-  bool IsF128() const { return IsFundamental() && t0_ == DATA_F128; }
-  bool IsFloat() const { return IsF32() || IsF64() || IsF128(); }
+  bool IsF128() const { return IsFundamental() && t0_ == DATA_F80; }
+  bool IsFloat() const { return IsF16() || IsF32() || IsF64() || IsF128(); }
   bool IsInteger() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_I64); }
   bool IsSigned() const;
   bool IsVoid() const { return t0_ == DATA_VOID; }
@@ -527,8 +550,11 @@ DType get_dtype() {
     return DType(DATA_F64);
   }
   if constexpr (std::is_same_v<long double, T>) {
-    return DType(DATA_F128);
+    return DType(DATA_F80);
   }
+  // if constexpr (std::is_same_v<hwy::float16_t, T>) {
+  //   return DType(DATA_F16);
+  // }
   if constexpr (std::is_same_v<std::string_view, T>) {
     return DType(DATA_STD_STRING_VIEW);
   }
@@ -558,6 +584,9 @@ DType get_dtype() {
   }
   if constexpr (std::is_same_v<Scalar, T>) {
     return DType(DATA_SCALAR);
+  }
+  if constexpr (std::is_same_v<Pointer, T>) {
+    return DType(DATA_POINTER);
   }
   static uint32_t id = nextTypeId();
   DType dtype(static_cast<FundamentalType>(id));

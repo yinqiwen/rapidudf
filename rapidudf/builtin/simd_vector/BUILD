@@ -13,6 +13,7 @@ cc_library(
     hdrs = [
         "column_ops.h",
         "ops.h",
+        "table_ops.h",
     ],
     deps = [
         "//rapidudf/log",
@@ -42,11 +43,14 @@ cc_library(
         "column_sort_ops.cc",
         "column_ternary_ops.cc",
         "column_unary_ops.cc",
+        "fused_ops.cc",
         "misc_ops.cc",
         "sort_ops.cc",
+        "table_ops.cc",
         "ternary_ops.cc",
         "unary_ops.cc",
     ],
+    copts = ["-O3"],
     deps = [
         ":simd_vector_ops_api",
         "//rapidudf/log",
@@ -56,6 +60,7 @@ cc_library(
         "//rapidudf/meta:optype",
         "//rapidudf/reflect",
         "//rapidudf/types:scalar",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/status:statusor",
         "@com_google_highway//:algo",
         "@com_google_highway//:bit_set",

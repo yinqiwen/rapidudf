@@ -41,6 +41,7 @@
 
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/scalar.h"
 #include "rapidudf/types/simd_vector.h"
 namespace rapidudf {
@@ -53,7 +54,7 @@ class Column {
  private:
   using Internal = std::variant<TablePtr, Vector<StringView>, Vector<double>, Vector<float>, Vector<uint64_t>,
                                 Vector<int64_t>, Vector<uint32_t>, Vector<int32_t>, Vector<uint16_t>, Vector<int16_t>,
-                                Vector<uint8_t>, Vector<int8_t>, Vector<Bit>>;
+                                Vector<uint8_t>, Vector<int8_t>, Vector<Bit>, Vector<Pointer>>;
 
  public:
   explicit Column(Context& ctx, Vector<double> data) : ctx_(ctx), data_(data){};
@@ -68,6 +69,7 @@ class Column {
   explicit Column(Context& ctx, Vector<uint8_t> data) : ctx_(ctx), data_(data){};
   explicit Column(Context& ctx, Vector<int8_t> data) : ctx_(ctx), data_(data){};
   explicit Column(Context& ctx, Vector<Bit> data) : ctx_(ctx), data_(data){};
+  explicit Column(Context& ctx, Vector<Pointer> data) : ctx_(ctx), data_(data){};
 
   template <typename T>
   static Column* FromVector(Context& ctx, Vector<T> data) {
@@ -126,6 +128,12 @@ class Table {
     return Add(name, p);
   }
 
+  template <typename T>
+  absl::Status Add(const std::string& name, simd::Vector<T> data) {
+    auto p = ctx_.New<Column>(ctx_, data);
+    return Add(name, p);
+  }
+
   template <template <class, class> class Map, template <class> class Vec, class V>
   absl::Status AddMap(Map<std::string, Vec<V>>&& values) {
     for (auto& [name, v] : values) {
@@ -139,6 +147,12 @@ class Table {
   }
   absl::Status Add(const std::string& name, Column* column);
   absl::StatusOr<Column**> Get(StringView name);
+  Column* operator[](StringView name);
+  Table* Filter(Column* column);
+  Table* OrderBy(simd::Table* table, simd::Column* by, bool descending);
+  Table* Topk(simd::Table* table, simd::Column* by, uint32_t k, bool descending);
+  Table* Take(uint32_t k);
+
   void Set(const std::string& name, Column* column);
   size_t Size() const;
   Vector<int32_t> GetIndices();
@@ -148,7 +162,7 @@ class Table {
  private:
   using ColumnTable = absl::flat_hash_map<std::string, Column*>;
   template <typename T>
-  absl::Status AddColumn(const std::string& name, const std::vector<T>& data) {
+  absl::Status AddColumn(const std::string& name, std::vector<T>& data) {
     auto vec = ctx_.NewSimdVector(data);
     auto p = ctx_.New<Column>(ctx_, vec);
     return Add(name, p);

@@ -107,7 +107,7 @@ static void DoRapidUDFVectorExprSetup(const benchmark::State& state) {
   )";
   rapidudf::JitCompiler compiler;
   auto result = compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&,
-                                         rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source, false);
+                                         rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source, true);
 
   g_vector_expr_func = std::move(result.value());
 
@@ -121,11 +121,11 @@ static void BM_rapidudf_vector_expr_func(benchmark::State& state) {
   for (auto _ : state) {
     ctx.Reset();
     auto results = g_vector_expr_func(ctx, xx, yy);
-    for (size_t i = 0; i < results.Size(); i++) {
-      // if (results[i] != actuals[i]) {
-      //   RUDF_INFO("[{}]Error result:{}, while expected:{}", i, results[i], actuals[i]);
-      // }
-    }
+    // for (size_t i = 0; i < results.Size(); i++) {
+    //  if (results[i] != actuals[i]) {
+    //    RUDF_INFO("[{}]Error result:{}, while expected:{}", i, results[i], actuals[i]);
+    //  }
+    //}
   }
 }
 BENCHMARK(BM_rapidudf_vector_expr_func)->Setup(DoRapidUDFVectorExprSetup)->Teardown(DoRapidUDFVectorExprTeardown);

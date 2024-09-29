@@ -30,12 +30,14 @@
 */
 
 #include <gtest/gtest.h>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/simd_vector.h"
 #include "rapidudf/types/simd_vector_table.h"
 
@@ -141,5 +143,186 @@ TEST(JitCompiler, table_func1) {
         std::pow(table_data_clone["PositiveCommentV1"][i] + 0.0038, 1.0) *
         std::pow(table_data_clone["ExpoTimeV1"][i], 1.5);
     ASSERT_DOUBLE_EQ(actual, result[i]);
+  }
+}
+
+TEST(JitCompiler, table_filter) {
+  Context ctx;
+  simd::Table table(ctx);
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<std::string> city;
+  std::vector<int> ids;
+  for (size_t i = 0; i < N; i++) {
+    ids.emplace_back(i + 10);
+    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
+  }
+  std::ignore = table.Add("id", std::move(ids));
+  std::ignore = table.Add("city", std::move(city));
+
+  std::string expr = R"(
+    table.filter(table["city"]=="sz")
+  )";
+  JitCompiler compiler;
+  auto rc = compiler.CompileExpression<simd::Table*, Context&, simd::Table*>(expr, {"_", "table"});
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  simd::Table* new_table = f(ctx, &table);
+
+  simd::Column* new_id_column = (*new_table)["id"];
+  simd::Column* new_city_column = (*new_table)["city"];
+  ASSERT_EQ(25, new_city_column->size());
+  ASSERT_EQ(new_id_column->size(), new_city_column->size());
+  auto new_ids = new_id_column->ToVector<int>().value();
+  auto new_citys = new_city_column->ToVector<StringView>().value();
+  int expect_id = 10;
+  for (size_t i = 0; i < new_id_column->size(); i++) {
+    ASSERT_EQ(new_ids[i], expect_id);
+    ASSERT_EQ(new_citys[i], "sz");
+    expect_id += 4;
+  }
+}
+struct TestUser {
+  int id;
+  double score;
+};
+
+TEST(JitCompiler, table_order_by) {
+  Context ctx;
+  simd::Table table(ctx);
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<std::string> city;
+  std::vector<int> ids;
+  std::vector<double> scores;
+  std::vector<TestUser> users;
+
+  for (size_t i = 0; i < N; i++) {
+    ids.emplace_back(i + 10);
+    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
+    scores.emplace_back(1.1 + i);
+    TestUser user;
+    user.id = ids[ids.size() - 1];
+    user.score = scores[scores.size() - 1];
+    users.emplace_back(user);
+  }
+  auto user_ptrs = ctx.NewSimdVectorOfPointer(users);
+  std::ignore = table.Add("id", std::move(ids));
+  std::ignore = table.Add("city", std::move(city));
+  std::ignore = table.Add("score", std::move(scores));
+  std::ignore = table.Add("user", user_ptrs);
+  std::string expr = R"(
+    table.order_by(table["score"], true)
+  )";
+  JitCompiler compiler;
+  auto rc = compiler.CompileExpression<simd::Table*, Context&, simd::Table*>(expr, {"_", "table"});
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  simd::Table* new_table = f(ctx, &table);
+
+  simd::Column* new_id_column = (*new_table)["id"];
+  simd::Column* new_city_column = (*new_table)["city"];
+  simd::Column* new_score_column = (*new_table)["score"];
+  simd::Column* new_user_column = (*new_table)["user"];
+  ASSERT_EQ(N, new_city_column->size());
+  ASSERT_EQ(new_id_column->size(), new_city_column->size());
+  auto new_ids = new_id_column->ToVector<int>().value();
+  auto new_citys = new_city_column->ToVector<StringView>().value();
+  auto new_scores = new_score_column->ToVector<double>().value();
+  auto new_users = new_user_column->ToVector<Pointer>().value();
+  for (size_t i = 0; i < N; i++) {
+    RUDF_INFO("{} {} {}", new_ids[i], new_citys[i], new_scores[i]);
+    ASSERT_EQ(new_ids[i], new_users[i].As<TestUser>()->id);
+    ASSERT_DOUBLE_EQ(new_scores[i], new_users[i].As<TestUser>()->score);
+  }
+}
+
+TEST(JitCompiler, table_topk) {
+  Context ctx;
+  simd::Table table(ctx);
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<std::string> city;
+  std::vector<int> ids;
+  std::vector<double> scores;
+  for (size_t i = 0; i < N; i++) {
+    ids.emplace_back(i + 10);
+    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
+    scores.emplace_back(1.1 + i);
+  }
+  std::ignore = table.Add("id", std::move(ids));
+  std::ignore = table.Add("city", std::move(city));
+  std::ignore = table.Add("score", std::move(scores));
+
+  std::string expr = R"(
+    table.topk(table["score"],5,true)
+  )";
+  JitCompiler compiler;
+  auto rc = compiler.CompileExpression<simd::Table*, Context&, simd::Table*>(expr, {"_", "table"});
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  simd::Table* new_table = f(ctx, &table);
+
+  simd::Column* new_id_column = (*new_table)["id"];
+  simd::Column* new_city_column = (*new_table)["city"];
+  simd::Column* new_score_column = (*new_table)["score"];
+  ASSERT_EQ(5, new_city_column->size());
+  ASSERT_EQ(new_id_column->size(), new_city_column->size());
+  auto new_ids = new_id_column->ToVector<int>().value();
+  auto new_citys = new_city_column->ToVector<StringView>().value();
+  auto new_scores = new_score_column->ToVector<double>().value();
+  for (size_t i = 0; i < new_id_column->size(); i++) {
+    RUDF_INFO("{} {} {}", new_ids[i], new_citys[i], new_scores[i]);
+  }
+}
+
+TEST(JitCompiler, table_take) {
+  Context ctx;
+  simd::Table table(ctx);
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<std::string> city;
+  std::vector<int> ids;
+  std::vector<double> scores;
+  for (size_t i = 0; i < N; i++) {
+    ids.emplace_back(i + 10);
+    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
+    scores.emplace_back(1.1 + i);
+  }
+  std::ignore = table.Add("id", std::move(ids));
+  std::ignore = table.Add("city", std::move(city));
+  std::ignore = table.Add("score", std::move(scores));
+
+  std::string expr = R"(
+    table.take(5)
+  )";
+  JitCompiler compiler;
+  auto rc = compiler.CompileExpression<simd::Table*, Context&, simd::Table*>(expr, {"_", "table"});
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  simd::Table* new_table = f(ctx, &table);
+
+  simd::Column* new_id_column = (*new_table)["id"];
+  simd::Column* new_city_column = (*new_table)["city"];
+  simd::Column* new_score_column = (*new_table)["score"];
+  ASSERT_EQ(5, new_city_column->size());
+  ASSERT_EQ(new_id_column->size(), new_city_column->size());
+  auto new_ids = new_id_column->ToVector<int>().value();
+  auto new_citys = new_city_column->ToVector<StringView>().value();
+  auto new_scores = new_score_column->ToVector<double>().value();
+  for (size_t i = 0; i < new_id_column->size(); i++) {
+    RUDF_INFO("{} {} {}", new_ids[i], new_citys[i], new_scores[i]);
   }
 }

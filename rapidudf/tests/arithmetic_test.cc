@@ -47,11 +47,15 @@ TEST(JitCompiler, add) {
   auto f0 = std::move(rc0.value());
   ASSERT_EQ(f0(1, 2), 3);
   ASSERT_EQ(f0(111, 222), 333);
-  auto rc1 = compiler.CompileExpression<float, float, float>(expr, {"x", "y"});
+  auto rc1 = compiler.CompileExpression<long double, long double, long double>(expr, {"x", "y"}, true);
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
-  ASSERT_FLOAT_EQ(f1(1.1, 2.2), 3.3);
-  ASSERT_FLOAT_EQ(f1(111.1, 222.2), 333.3);
+  long double x = 1.1;
+  long double y = 2.2;
+  long double r = f1(x, y);
+  ASSERT_DOUBLE_EQ(r, 3.3);
+  r = f1(111.1, 222.2);
+  ASSERT_DOUBLE_EQ(r, 333.3);
 }
 TEST(JitCompiler, vector_add) {
   std::vector<int> i_left{1, -2, 3, -4, 4, 8, -1};

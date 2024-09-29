@@ -59,6 +59,7 @@ class Value : public std::enable_shared_from_this<Value> {
 
   ::llvm::Value* GetValue();
   ::llvm::Value* GetRawValue() { return val_; }
+  ::llvm::Value* GetPtrValue();
   DType GetDType() { return dtype_; }
   bool IsWritable() const;
 

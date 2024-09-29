@@ -30,6 +30,8 @@
 */
 #include "rapidudf/jit/llvm/jit.h"
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/InstrTypes.h>
+#include <llvm/Support/Alignment.h>
 #include <memory>
 #include <vector>
 
@@ -138,7 +140,7 @@ void JitCompiler::NewSession(bool print_asm) {
   session_->ir_builder = std::make_unique<::llvm::IRBuilder<>>(*session_->context);
   session_->module->setDataLayout(session_->jit->getDataLayout());
   if (opts_.fast_math) {
-    session_->ir_builder->setFastMathFlags(::llvm::FastMathFlags::getFast());
+    // session_->ir_builder->setFastMathFlags(::llvm::FastMathFlags::getFast());
   }
 
   init_buitin_types(*session_->context);
@@ -186,7 +188,7 @@ void JitCompiler::NewSession(bool print_asm) {
   }
 
   auto func_pass_manager =
-      pass_builder.buildFunctionSimplificationPipeline(opt_level, ::llvm::ThinOrFullLTOPhase::None);
+      pass_builder.buildFunctionSimplificationPipeline(opt_level, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
 
   session_->func_pass_manager = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
   session_->func_pass_manager->addPass(::llvm::InstCombinePass());
@@ -196,8 +198,6 @@ void JitCompiler::NewSession(bool print_asm) {
   session_->func_pass_manager->addPass(::llvm::PartiallyInlineLibCallsPass());
   session_->func_pass_manager->addPass(::llvm::MergedLoadStoreMotionPass());
   session_->func_pass_manager->addPass(::llvm::TailCallElimPass());
-
-  // func_pass_manager_->addPass(::llvm::createPartiallyInlineLibCallsPass());
 }
 
 JitFunctionStat JitCompiler::GetStat() {
@@ -286,6 +286,19 @@ absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& fun
     extern_func->func = ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, extern_func->desc.name,
                                                  *GetLLVMModule());
     extern_func->func_type = func_type;
+
+    if (!extern_func->func->arg_empty()) {
+      for (size_t i = 0; i < extern_func->func->arg_size(); i++) {
+        if (desc->PassArgByValue(i)) {
+          auto* arg_type = get_type(*GetSession()->context, desc->arg_types[i]);
+          extern_func->func->addParamAttr(i, ::llvm::Attribute::getWithByValType(*GetSession()->context, arg_type));
+          extern_func->func->addParamAttr(
+              i, ::llvm::Attribute::getWithAlignment(*GetSession()->context, ::llvm::Align(8)));
+          extern_func->func->addParamAttr(i, ::llvm::Attribute::AttrKind::NoUndef);
+        }
+      }
+    }
+
     GetSession()->extern_funcs[desc->name] = extern_func;
   }
   const auto& member_func_calls = ast_ctx_.GetAllMemberFuncCalls(GetSession()->compile_function_idx);
@@ -430,16 +443,6 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
           GetSession()->GetIRBuilder()->CreateStore(arg, arg_val);
           val = NewValue(dtype, arg_val, arg->getType());
         }
-        // if (dtype.IsStdStringView()) {
-        //   auto* string_view_type = get_type(*GetSession()->context, DATA_STD_STRING_VIEW);
-        //   auto* arg_val = GetSession()->GetIRBuilder()->CreateAlloca(string_view_type);
-        //   auto load_val = GetSession()->GetIRBuilder()->CreateLoad(string_view_type, arg);
-        //   GetSession()->GetIRBuilder()->CreateStore(load_val, arg_val);
-        //   val = NewValue(dtype, arg_val, string_view_type);
-        //   f->addParamAttr(i, ::llvm::Attribute::getWithByValType(*GetSession()->context, string_view_type));
-        // } else {
-
-        // }
 
         func_compile_ctx->named_values[name] = val;
       }
@@ -548,6 +551,8 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name,
   }
 
   std::vector<::llvm::Value*> arg_vals(arg_values.size());
+  std::vector<::llvm::Value*> byval_args;
+
   for (size_t i = 0; i < arg_values.size(); i++) {
     ValuePtr arg_val = arg_values[i];
     if (arg_val->GetDType() != found_func_desc.arg_types[i]) {
@@ -558,9 +563,26 @@ absl::StatusOr<ValuePtr> JitCompiler::CallFunction(const std::string& name,
             fmt::format("Func:{} cast arg:{} from {} to {} failed.", name, i, src_dtype, found_func_desc.arg_types[i]));
       }
     }
-    arg_vals[i] = arg_val->GetValue();
+    if (found_func_desc.PassArgByValue(i)) {
+      arg_vals[i] = arg_val->GetPtrValue();
+      if (arg_vals[i] == nullptr) {
+        auto* arg_type = get_type(*GetSession()->context, arg_val->GetDType());
+        auto* arg_tmp_ptr_val = GetSession()->GetIRBuilder()->CreateAlloca(arg_type);
+        GetSession()->GetIRBuilder()->CreateStore(arg_val->GetValue(), arg_tmp_ptr_val);
+        arg_vals[i] = arg_tmp_ptr_val;
+      }
+      byval_args.emplace_back(arg_vals[i]);
+    } else {
+      arg_vals[i] = arg_val->GetValue();
+    }
   }
-  ::llvm::Value* result = GetSession()->GetIRBuilder()->CreateCall(found_func, arg_vals);
+  // std::vector<::llvm::OperandBundleDef> operand_bundles{::llvm::OperandBundleDef("", arg_vals)};
+  std::vector<::llvm::OperandBundleDef> operand_bundles;
+  if (!byval_args.empty()) {
+    operand_bundles.emplace_back(::llvm::OperandBundleDef("byval", byval_args));
+  }
+  ::llvm::FunctionCallee callee(found_func);
+  ::llvm::Value* result = GetSession()->GetIRBuilder()->CreateCall(callee, arg_vals, operand_bundles);
   ::llvm::Type* return_val_type = nullptr;
   DType return_type = found_func_desc.return_type;
 
