@@ -11,6 +11,7 @@
 - `i64`, `int64_t` in c++
 - `f32`, `float` in c++
 - `f64`, `double` in c++
+- `f80`, `long double` in c++
 - `bit`, `bool` in c++
 - `string_view`,  `rapidudf::StringView` in c++
 - `string`, `std::string*` in c++

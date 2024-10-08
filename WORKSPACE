@@ -1,6 +1,22 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//:rapidudf.bzl", "rapidudf_workspace")
 
+# _LLVM_BUILD_FILE = """
+# cc_library(
+#     name = "x86_simd_sort",
+#     srcs = glob(["lib64/libx86simdsortcpp.a"]),
+#     hdrs = glob(["include/x86simdsort.h"]),
+#     includes = ["include"],
+#     visibility = [ "//visibility:public" ],
+# )
+# """
+
+# new_local_repository(
+#     name = "x86_simd_sort",
+#     build_file_content = _LLVM_BUILD_FILE,
+#     path = "/usr/local",
+# )
+
 rapidudf_workspace()
 
 # load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
@@ -26,11 +42,11 @@ rules_foreign_cc_dependencies(register_preinstalled_tools = False)
 # https://github.com/hedronvision/bazel-compile-commands-extractor
 http_archive(
     name = "hedron_compile_commands",
-    strip_prefix = "bazel-compile-commands-extractor-0e990032f3c5a866e72615cf67e5ce22186dcb97",
+    strip_prefix = "bazel-compile-commands-extractor-1e08f8e0507b6b6b1f4416a9a22cf5c28beaba93",
 
-    # Replace the commit hash (0e990032f3c5a866e72615cf67e5ce22186dcb97) in both places (below) with the latest (https://github.com/hedronvision/bazel-compile-commands-extractor/commits/main), rather than using the stale one here.
+    # Replace the commit hash (1e08f8e0507b6b6b1f4416a9a22cf5c28beaba93) in both places (below) with the latest (https://github.com/hedronvision/bazel-compile-commands-extractor/commits/main), rather than using the stale one here.
     # Even better, set up Renovate and let it do the work for you (see "Suggestion: Updates" in the README).
-    url = "https://github.com/hedronvision/bazel-compile-commands-extractor/archive/0e990032f3c5a866e72615cf67e5ce22186dcb97.tar.gz",
+    url = "https://github.com/hedronvision/bazel-compile-commands-extractor/archive/1e08f8e0507b6b6b1f4416a9a22cf5c28beaba93.tar.gz",
     # When you first run this tool, it'll recommend a sha256 hash to put here with a message like: "DEBUG: Rule 'hedron_compile_commands' indicated that a canonical reproducible form can be obtained by modifying arguments sha256 = ..."
 )
 

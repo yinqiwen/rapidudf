@@ -1,21 +1,7 @@
-# RapidUDF
+<h1 align="center">RapidUDF</h1>
+
 `RapidUDF` is a C++ vectorized expression/script calculation execution engine primarily based on `vectorization` and `JIT compilation` technologies. Compared to similar implementations, it offers significant performance improvements. Users can apply it in scenarios requiring high-performance online calculations with complex and flexible needs, such as rule engines, storage UDFs, and feature computations.
 
-## Dependencies
-
-- [LLVM 17/18/19](https://llvm.org/)
-- [highway](https://github.com/google/highway)
-- [x86-simd-sort](https://github.com/intel/x86-simd-sort)
-- [sleef](https://github.com/shibatch/sleef)
-- [fmtlib](https://github.com/fmtlib/fmt)
-- [spdlog](https://github.com/gabime/spdlog)
-- [abseil-cpp](https://github.com/abseil/abseil-cpp)
-- boost
-  - [preprocessor](http://boost.org/libs/preprocessor)
-  - [parser](https://github.com/tzlaine/parser)
-- [protobuf](https://github.com/protocolbuffers)
-- [flatbuffers](https://github.com/google/flatbuffers)
-- [json](https://github.com/nlohmann/json)
 
 ## Limitations
 
@@ -232,7 +218,10 @@ int main() {
 - Using STL objects in expressions/UDFs
   - [doc](docs/ffi.md)
   - [example code](rapidudf/tests/stl_test.cc)
-
+- Using `if/elif*/else` in UDFs
+  - [example code](rapidudf/tests/ifelse_test.cc)
+- Using `while` in UDFs
+  - [example code](rapidudf/tests/while_test.cc)
 ## Performance
 ### Comparison with Native C++
 Due to its implementation based on LLVM JIT, RapidUDF theoretically can achieve performance very close to native C++ code.     
@@ -263,5 +252,21 @@ BM_rapidudf_vector_expr_func       8395 ns         8395 ns        83350
 BM_exprtk_expr_func               65001 ns        65001 ns        10869
 BM_native_func                    50161 ns        50160 ns        13953
 ```
+
+## Dependencies
+
+- [LLVM 17/18/19](https://llvm.org/)
+- [highway](https://github.com/google/highway)
+- [x86-simd-sort](https://github.com/intel/x86-simd-sort)
+- [sleef](https://github.com/shibatch/sleef)
+- [fmtlib](https://github.com/fmtlib/fmt)
+- [spdlog](https://github.com/gabime/spdlog)
+- [abseil-cpp](https://github.com/abseil/abseil-cpp)
+- boost
+  - [preprocessor](http://boost.org/libs/preprocessor)
+  - [parser](https://github.com/tzlaine/parser)
+- [protobuf](https://github.com/protocolbuffers)
+- [flatbuffers](https://github.com/google/flatbuffers)
+- [json](https://github.com/nlohmann/json)
 
 
