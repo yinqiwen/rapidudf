@@ -40,18 +40,22 @@ namespace llvm {
 void init_buitin_types(::llvm::LLVMContext& ctx) {
   auto size_type = ::llvm::IntegerType::get(ctx, 64);
   auto pointer_type = ::llvm::PointerType::getUnqual(::llvm::Type::getInt8Ty(ctx));
-  // auto* string_view_type = ::llvm::StructType::create(ctx, "string_view");
-  // string_view_type->setBody(size_type, pointer_type);
+  auto* string_view_type = ::llvm::StructType::create(ctx, "string_view");
+  string_view_type->setBody(size_type, pointer_type);
 
   auto* std_string_view_type = ::llvm::StructType::create(ctx, "std_string_view");
-  std_string_view_type->setBody(size_type, pointer_type);
+  std_string_view_type->setBody({size_type, pointer_type});
 
   auto* absl_span_type = ::llvm::StructType::create(ctx, "absl_span");
-  absl_span_type->setBody(pointer_type, size_type);
+  absl_span_type->setBody({pointer_type, size_type});
 
-  // auto* simd_vector_type = ::llvm::StructType::create(ctx, "simd_vector");
-  // simd_vector_type->setBody({size_type, pointer_type});
+  auto* simd_vector_type = ::llvm::StructType::create(ctx, "simd_vector");
+  simd_vector_type->setBody({size_type, pointer_type});
   // auto* simd_vector_type = ::llvm::IntegerType::get(ctx, 128);
+
+  auto* rpn_value_type = ::llvm::StructType::create(ctx, "rpn_value");
+  // rpn_value_type->setBody({size_type, size_type, pointer_type});
+  rpn_value_type->setBody({size_type, simd_vector_type});
 }
 ::llvm::Type* get_type(::llvm::LLVMContext& ctx, DType dtype) {
   if (dtype.IsPtr()) {
@@ -71,8 +75,8 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
     // return ::llvm::IntegerType::get(ctx, 128);
   }
   if (dtype.IsSimdVector()) {
-    // return ::llvm::StructType::getTypeByName(ctx, "simd_vector");
-    return ::llvm::IntegerType::get(ctx, 128);
+    return ::llvm::StructType::getTypeByName(ctx, "simd_vector");
+    // return ::llvm::IntegerType::get(ctx, 128);
   }
 
   switch (dtype.GetFundamentalType()) {
@@ -109,8 +113,8 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
       // return ::llvm::IntegerType::get(ctx, 128);
     }
     case DATA_STRING_VIEW: {
-      // return ::llvm::StructType::getTypeByName(ctx, "string_view");
-      return ::llvm::IntegerType::get(ctx, 128);
+      return ::llvm::StructType::getTypeByName(ctx, "string_view");
+      // return ::llvm::IntegerType::get(ctx, 128);
     }
     default: {
       // RUDF_ERROR("Unsupported dtype:{} to get llvm type.", dtype);

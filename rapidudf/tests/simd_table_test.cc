@@ -63,7 +63,7 @@ TEST(JitCompiler, table_simple) {
   )";
 
   JitCompiler compiler;
-  auto rc = compiler.CompileExpression<void, Context&, simd::Table&>(content, {"_", "x"});
+  auto rc = compiler.CompileExpression<void, Context&, simd::Table&>(content, {"_", "x"}, true);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
 
@@ -121,9 +121,9 @@ TEST(JitCompiler, table_func1) {
   table_data["ExpoTimeV1"] = {1, 2, 3, 5};
 
   std::unordered_map<std::string, std::vector<double>> table_data_clone = table_data;
-  // std::string multiple_pow =
-  //     "(Click^10.0)*((Like+0.000082)^4.7)*(Inter^3.5)*((Join+0.000024)^5.5)*(TimeV1^7.0)*((PostComment+0.000024)^3.5)*("
-  //     "(PositiveCommentV1+0.0038)^1.0)*(ExpoTimeV1^1.5)";
+  std::string multiple_pow =
+      "(Click^10.0)*((Like+0.000082)^4.7)*(Inter^3.5)*((Join+0.000024)^5.5)*(TimeV1^7.0)*((PostComment+0.000024)^3.5)*("
+      "(PositiveCommentV1+0.0038)^1.0)*(ExpoTimeV1^1.5)";
   auto _ = table.AddMap(std::move(table_data));
   std::string content = R"(
     (table["Click"]^10.0)*((table["Like"]+0.000082)^4.7)*(table["Inter"]^3.5)*((table["Join"]+0.000024)^5.5)*(table["TimeV1"]^7.0)*((table["PostComment"]+0.000024)^3.5)*((table["PositiveCommentV1"]+0.0038)^1.0)*(table["ExpoTimeV1"]^1.5)

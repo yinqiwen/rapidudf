@@ -60,7 +60,7 @@ struct BreakStatement {
 struct ChoiceStatement {
   BinaryExprPtr expr;
   std::vector<Statement> statements;
-
+  RPN rpn;
   absl::Status Validate(ParseContext& ctx);
 };
 struct IfElseStatement {
@@ -71,6 +71,7 @@ struct IfElseStatement {
 };
 struct ExpressionStatement {
   BinaryExprPtr expr;
+  RPN rpn;
   bool is_vector_expr = false;
   absl::Status Validate(ParseContext& ctx);
 };
@@ -81,6 +82,7 @@ struct WhileStatement {
 };
 
 struct ReturnStatement {
+  RPN rpn;
   std::optional<BinaryExprPtr> expr;
   bool is_vector_expr = false;
   absl::Status Validate(ParseContext& ctx);

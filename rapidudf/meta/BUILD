@@ -67,6 +67,7 @@ cc_library(
         "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/types",
+        "//rapidudf/types:eval_value",
         "//rapidudf/types:scalar",
         "//rapidudf/types:simd_vector",
         "//rapidudf/types:simd_vector_table",

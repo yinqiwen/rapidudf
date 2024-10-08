@@ -32,6 +32,7 @@
 #pragma once
 
 #include <chrono>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -48,6 +49,7 @@
 #include "rapidudf/jit/function.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
+#include "rapidudf/meta/optype.h"
 
 namespace llvm {
 class Value;
@@ -72,8 +74,9 @@ class JitFunctionCache;
 class JitCompiler {
  public:
   struct Options {
-    bool fast_math = true;
     uint8_t optimize_level = 2;
+    bool fast_math = true;
+    bool fuse_vector_ops = false;
     Options() {}
   };
   static constexpr std::string_view kExpressionFuncName = "rapidudf_expresion";
@@ -175,6 +178,8 @@ class JitCompiler {
   }
 
  private:
+  using RPNEvalNode = std::variant<ValuePtr, OpToken>;
+
   // void Init();
   void NewSession(bool print_asm);
   absl::Status Compile();
@@ -210,13 +215,21 @@ class JitCompiler {
   absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::ContinueStatement& statement);
   absl::Status BuildIR(FunctionCompileContextPtr ctx, const ast::BreakStatement& statement);
 
-  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ast::UnaryExprPtr expr);
-  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ast::BinaryExprPtr expr);
-  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ast::TernaryExprPtr expr);
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ast::SelectRPNNodePtr select);
+
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::VarAccessor& expr);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::VarDefine& expr);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::Array& expr);
-  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::Operand& expr);
+
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::ConstantNumber& expr);
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, OpToken op, ValuePtr val);
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, OpToken op, ValuePtr left, ValuePtr right);
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, OpToken op, ValuePtr a, ValuePtr b, ValuePtr z);
+
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, DType dtype, const std::deque<RPNEvalNode>& nodes);
+  absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::RPN& rpn);
+  absl::StatusOr<ValuePtr> BuildVectorEvalIR(FunctionCompileContextPtr ctx, DType dtype,
+                                             std::deque<RPNEvalNode>& nodes);
 
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, double v, DType dtype);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, double v);
@@ -225,16 +238,13 @@ class JitCompiler {
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const std::string& v);
 
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const ast::FieldAccess& field);
-  // absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, uint32_t idx);
-  // absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, ValuePtr var, const std::string& key);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::VarRef& key);
 
   absl::StatusOr<ValuePtr> GetLocalVar(const std::string& name);
   ExternFunctionPtr GetFunction(const std::string& name);
   // std::string GetMemberFuncName(DType dtype, const std::string& member);
   absl::StatusOr<ValuePtr> CallFunction(const std::string& name, const std::vector<ValuePtr>& arg_values);
-  absl::StatusOr<ValuePtr> CallFunction(std::string_view name, const std::vector<ValuePtr>& arg_values,
-                                        bool writable_return_val) {
+  absl::StatusOr<ValuePtr> CallFunction(std::string_view name, const std::vector<ValuePtr>& arg_values) {
     return CallFunction(std::string(name), arg_values);
   }
 

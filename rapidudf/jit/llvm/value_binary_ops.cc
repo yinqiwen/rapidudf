@@ -271,7 +271,7 @@ ValuePtr Value::BinaryOp(OpToken op, ValuePtr right) {
   if (dst_dtype.IsStringView() && op >= OP_EQUAL && op <= OP_GREATER_EQUAL) {
     auto op_arg = New(DATA_U32, compiler_, ir_builder_->getInt32(op));
     std::vector<ValuePtr> args{op_arg, left, right};
-    auto result = compiler_->CallFunction(kBuiltinStringViewCmp, args, false);
+    auto result = compiler_->CallFunction(kBuiltinStringViewCmp, args);
     if (result.ok()) {
       return result.value();
     } else {
@@ -361,7 +361,7 @@ ValuePtr Value::JsonCmp(OpToken op, ValuePtr right, bool reverse) {
     RUDF_ERROR("Can NOT cmp json with left:{}, right:{}", dtype_, other.dtype_);
     return {};
   }
-  auto result = compiler_->CallFunction(cmp_func, cmp_args, false);
+  auto result = compiler_->CallFunction(cmp_func, cmp_args);
   if (!result.ok()) {
     return {};
   }

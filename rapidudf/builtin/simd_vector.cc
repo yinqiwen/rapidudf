@@ -35,6 +35,7 @@
 #include <boost/preprocessor/variadic/to_seq.hpp>
 
 #include "rapidudf/builtin/builtin.h"
+#include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/builtin/simd_vector/ops.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
@@ -242,6 +243,14 @@ static void register_simd_vector_key_valye_sort() {
   void (*simd_f2)(Context&, simd::Vector<K>, simd::Vector<V>, size_t, bool) = simd::simd_vector_topk_key_value<K, V>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f2);
 }
+
+template <typename T>
+static void register_simd_vector_eval() {
+  DType key_dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(kBuiltinVectorEval, key_dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd::simd_vector_eval<T>);
+}
+
 #define KEY_VALUE_SORT_DTYPES (uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)
 #define RUDF_SIMD_VECTOR_SORT_KV_REGISTER(r, kv) \
   register_simd_vector_key_valye_sort<BOOST_PP_SEQ_ELEM(0, kv), BOOST_PP_SEQ_ELEM(1, kv)>();
@@ -352,5 +361,9 @@ void init_builtin_simd_vector_funcs() {
                           int64_t, float, double, Bit, StringView)
 
   BOOST_PP_SEQ_FOR_EACH_PRODUCT(RUDF_SIMD_VECTOR_SORT_KV_REGISTER, (KEY_VALUE_SORT_DTYPES)(KEY_VALUE_SORT_DTYPES))
+
+  REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_eval, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+                             int64_t, float, double, Bit, StringView);
+  RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinColumnEval, simd::simd_column_eval);
 }
 }  // namespace rapidudf

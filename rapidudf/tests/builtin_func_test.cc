@@ -32,6 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 using namespace rapidudf;
 using namespace rapidudf::ast;
@@ -39,6 +40,9 @@ TEST(JitCompiler, abs) {
   JitCompiler compiler;
   std::string content = "abs(x)";
   auto rc0 = compiler.CompileExpression<int64_t, int64_t>(content, {"x"});
+  if (!rc0.ok()) {
+    RUDF_ERROR("{}", rc0.status().ToString());
+  }
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   ASSERT_EQ(f0(-11), 11);

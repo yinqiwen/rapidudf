@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,22 +28,18 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-#pragma once
-
-#include <string_view>
+#include "rapidudf/meta//dtype.h"
+#include "rapidudf/meta/optype.h"
+#include "rapidudf/types/eval_value.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
-static constexpr std::string_view kBuiltinStringViewCmp = "rapidudf_compare_string_view";
-static constexpr std::string_view kBuiltinCastStdStrToStringView = "rapidudf_cast_stdstr_to_string_view";
-static constexpr std::string_view kBuiltinCastFbsStrToStringView = "rapidudf_cast_fbsstr_to_string_view";
-static constexpr std::string_view kBuiltinCastStdStrViewToStringView = "rapidudf_cast_stdstrview_to_string_view";
-static constexpr std::string_view kBuiltinJsonMemberGet = "rapidudf_json_member_get";
-static constexpr std::string_view kBuiltinJsonArrayGet = "rapidudf_json_array_get";
-static constexpr std::string_view kBuiltinJsonCmpString = "rapidudf_json_cmp_string";
-static constexpr std::string_view kBuiltinJsonCmpInt = "rapidudf_json_cmp_int";
-static constexpr std::string_view kBuiltinJsonCmpFloat = "rapidudf_json_cmp_float";
-static constexpr std::string_view kBuiltinJsonCmpBool = "rapidudf_json_cmp_bool";
-static constexpr std::string_view kBuiltinJsonCmpJson = "rapidudf_json_cmp_json";
-static constexpr std::string_view kBuiltinVectorEval = "rapidudf_vector_eval";
-static constexpr std::string_view kBuiltinColumnEval = "rapidudf_column_eval";
+template <typename T>
+EvalValue to_eval_value(simd::Vector<T> v);
+
+EvalValue to_eval_value(OpToken op);
+
+EvalValue to_eval_value(bool bv);
+
+EvalValue to_eval_value(StringView sv);
+
 }  // namespace rapidudf

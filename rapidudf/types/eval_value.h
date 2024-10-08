@@ -30,20 +30,46 @@
 */
 
 #pragma once
-
-#include <string_view>
+#include <cstdint>
+// #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
+#include "rapidudf/types/simd_vector.h"
+#include "rapidudf/types/simd_vector_table.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
-static constexpr std::string_view kBuiltinStringViewCmp = "rapidudf_compare_string_view";
-static constexpr std::string_view kBuiltinCastStdStrToStringView = "rapidudf_cast_stdstr_to_string_view";
-static constexpr std::string_view kBuiltinCastFbsStrToStringView = "rapidudf_cast_fbsstr_to_string_view";
-static constexpr std::string_view kBuiltinCastStdStrViewToStringView = "rapidudf_cast_stdstrview_to_string_view";
-static constexpr std::string_view kBuiltinJsonMemberGet = "rapidudf_json_member_get";
-static constexpr std::string_view kBuiltinJsonArrayGet = "rapidudf_json_array_get";
-static constexpr std::string_view kBuiltinJsonCmpString = "rapidudf_json_cmp_string";
-static constexpr std::string_view kBuiltinJsonCmpInt = "rapidudf_json_cmp_int";
-static constexpr std::string_view kBuiltinJsonCmpFloat = "rapidudf_json_cmp_float";
-static constexpr std::string_view kBuiltinJsonCmpBool = "rapidudf_json_cmp_bool";
-static constexpr std::string_view kBuiltinJsonCmpJson = "rapidudf_json_cmp_json";
-static constexpr std::string_view kBuiltinVectorEval = "rapidudf_vector_eval";
-static constexpr std::string_view kBuiltinColumnEval = "rapidudf_column_eval";
+
+struct EvalValue {
+  uint64_t dtype;
+  union {
+    simd::VectorData vector;
+    StringView scalar_sv;
+    uint64_t scalar_u64;
+    int64_t scalar_i64;
+    uint32_t scalar_u32;
+    int32_t scalar_i32;
+    uint16_t scalar_u16;
+    int16_t scalar_i16;
+    uint8_t scalar_u8;
+    int8_t scalar_i8;
+    double scalar_f64;
+    float scalar_f32;
+    bool scalar_bv;
+    simd::Column* column;
+    uint32_t op;
+  };
+  EvalValue() : dtype(0) {}
+  explicit EvalValue(OpToken v) {
+    dtype = 0;
+    op = static_cast<uint32_t>(v);
+  }
+  explicit EvalValue(uint64_t dtype, simd::VectorData v) {
+    this->dtype = dtype;
+    vector = v;
+  }
+  template <typename T>
+  simd::Vector<T> ToVector() {
+    return simd::Vector<T>(vector);
+  }
+};
+
 }  // namespace rapidudf

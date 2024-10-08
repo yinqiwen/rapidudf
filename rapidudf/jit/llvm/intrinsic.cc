@@ -30,10 +30,30 @@
 */
 #include "llvm/Config/llvm-config.h"
 #include "rapidudf/jit/llvm/jit.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace llvm {
 bool JitCompiler::HasIntrinsic(OpToken op) {
   switch (op) {
+    case OP_PLUS:
+    case OP_MINUS:
+    case OP_DIVIDE:
+    case OP_MULTIPLY:
+    case OP_MOD:
+    case OP_PLUS_ASSIGN:
+    case OP_MINUS_ASSIGN:
+    case OP_DIVIDE_ASSIGN:
+    case OP_MULTIPLY_ASSIGN:
+    case OP_MOD_ASSIGN:
+    case OP_EQUAL:
+    case OP_NOT_EQUAL:
+    case OP_GREATER_EQUAL:
+    case OP_GREATER:
+    case OP_LESS_EQUAL:
+    case OP_LESS:
+    case OP_LOGIC_AND:
+    case OP_LOGIC_OR:
+    case OP_LOGIC_XOR:
     case OP_NEGATIVE:
     case OP_NOT:
     case OP_SIN:

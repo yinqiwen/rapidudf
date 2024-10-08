@@ -82,31 +82,39 @@ bool DTypeFactory::AddNameDType(const std::string& name, DType dtype) {
   }
   return r;
 }
-DType::DType(const DType& other) : control_(other.Control()), element_types_(other.element_types_) {}
+DType::DType(const DType& other) : element_types_(other.element_types_) { ctrl_.control_ = other.Control(); }
 DType& DType::operator=(const DType& other) {
-  control_ = other.Control();
+  ctrl_.control_ = other.Control();
   element_types_ = other.element_types_;
   return *this;
 }
 
-bool DType::IsComplexObj() const { return t0_ == DATA_COMPLEX_OBJECT; }
+bool DType::IsComplexObj() const { return ctrl_.t0_ == DATA_COMPLEX_OBJECT; }
 
-uint64_t DType::Control() const { return control_; }
+uint64_t DType::Control() const { return ctrl_.control_; }
 int DType::Compare(const DType& other) const {
   int64_t ret = static_cast<int64_t>(Control()) - static_cast<int64_t>(other.Control());
   if (ret != 0) {
     return ret;
   }
-  if (element_types_.size() != other.element_types_.size()) {
-    return static_cast<int64_t>(element_types_.size()) - static_cast<int64_t>(other.element_types_.size());
+  size_t element_types_size = 0;
+  if (element_types_) {
+    element_types_size = element_types_->size();
   }
-  for (size_t i = 0; i < other.element_types_.size(); i++) {
+  size_t other_element_types_size = 0;
+  if (other.element_types_) {
+    other_element_types_size = other.element_types_->size();
+  }
+  if (element_types_size != other_element_types_size) {
+    return static_cast<int64_t>(element_types_size) - static_cast<int64_t>(other_element_types_size);
+  }
+  for (size_t i = 0; i < other_element_types_size; i++) {
     int cmp_ret = 0;
-    if (element_types_[i] && other.element_types_[i]) {
-      cmp_ret = element_types_[i]->Compare(*other.element_types_[i]);
+    if (element_types_->at(i) && other.element_types_->at(i)) {
+      cmp_ret = element_types_->at(i)->Compare(*other.element_types_->at(i));
     } else {
-      int left = element_types_[i] ? 1 : 0;
-      int right = other.element_types_[i] ? 1 : 0;
+      int left = element_types_->at(i) ? 1 : 0;
+      int right = other.element_types_->at(i) ? 1 : 0;
       cmp_ret = left - right;
     }
     if (cmp_ret != 0) {
@@ -123,7 +131,7 @@ bool DType::operator>=(const DType& other) const { return Compare(other) >= 0; }
 bool DType::operator<=(const DType& other) const { return Compare(other) <= 0; }
 
 bool DType::IsSigned() const {
-  switch (t0_) {
+  switch (ctrl_.t0_) {
     case DATA_I8:
     case DATA_I16:
     case DATA_I32:
@@ -138,85 +146,93 @@ bool DType::IsSigned() const {
   }
 }
 
+void DType::Reset() {
+  ctrl_.control_ = 0;
+  element_types_.reset();
+}
+
 void DType::SetElement(size_t idx, DType&& dtype) {
-  if (element_types_.size() <= idx) {
-    element_types_.resize(idx + 1);
+  if (!element_types_) {
+    element_types_ = std::make_shared<std::vector<std::shared_ptr<DType>>>();
   }
-  element_types_[idx] = std::make_shared<DType>(std::move(dtype));
+  if (element_types_->size() <= idx) {
+    element_types_->resize(idx + 1);
+  }
+  (*element_types_)[idx] = std::make_shared<DType>(std::move(dtype));
 }
 DType DType::PtrTo() const {
-  if (IsComplexObj() && element_types_.size() > 0) {
-    return *element_types_[0];
+  if (IsComplexObj() && element_types_->size() > 0) {
+    return *((*element_types_)[0]);
   }
   DType result;
-  result.control_ = control_;
-  result.ptr_bit_ = 0;
+  result.ctrl_.control_ = ctrl_.control_;
+  result.ctrl_.ptr_bit_ = 0;
   result.element_types_ = element_types_;
   return result;
 }
 DType DType::ToSimdVector() const {
   DType result;
-  result.control_ = control_;
-  result.container_type_ = COLLECTION_SIMD_VECTOR;
+  result.ctrl_.control_ = ctrl_.control_;
+  result.ctrl_.container_type_ = COLLECTION_SIMD_VECTOR;
   result.element_types_ = element_types_;
   return result;
 }
 DType DType::ToPtr() const {
-  DType ret(this->control_);
-  ret.ptr_bit_ = 1;
+  DType ret(this->ctrl_.control_);
+  ret.ctrl_.ptr_bit_ = 1;
   ret.element_types_ = element_types_;
   return ret;
 }
 DType DType::ToVector() const {
   DType result;
-  result.control_ = control_;
-  result.container_type_ = COLLECTION_VECTOR;
+  result.ctrl_.control_ = ctrl_.control_;
+  result.ctrl_.container_type_ = COLLECTION_VECTOR;
   result.element_types_ = element_types_;
   return result;
 }
 DType DType::ToAbslSpan() const {
   DType result;
-  result.control_ = control_;
-  result.container_type_ = COLLECTION_ABSL_SPAN;
+  result.ctrl_.control_ = ctrl_.control_;
+  result.ctrl_.container_type_ = COLLECTION_ABSL_SPAN;
   result.element_types_ = element_types_;
   return result;
 }
 DType DType::ToCollection(CollectionType t) const {
   DType result;
-  result.control_ = control_;
-  result.container_type_ = t;
+  result.ctrl_.control_ = ctrl_.control_;
+  result.ctrl_.container_type_ = t;
   result.element_types_ = element_types_;
   return result;
 }
 
 DType DType::Key() const {
   DType result;
-  if (container_type_ == COLLECTION_MAP || container_type_ == COLLECTION_UNORDERED_MAP) {
-    if (element_types_.size() > 0 && element_types_[0]) {
-      return *element_types_[0];
+  if (ctrl_.container_type_ == COLLECTION_MAP || ctrl_.container_type_ == COLLECTION_UNORDERED_MAP) {
+    if (element_types_ && element_types_->size() > 0 && element_types_->at(0)) {
+      return *element_types_->at(0);
     }
-    result.t0_ = t0_;
+    result.ctrl_.t0_ = ctrl_.t0_;
   }
   return result;
 }
 DType DType::Elem() const {
-  if (element_types_.size() > 0) {
+  if (element_types_ && element_types_->size() > 0) {
     if (IsMap() || IsUnorderedMap()) {
-      if (element_types_.size() == 2 && element_types_[1]) {
-        return *element_types_[1];
+      if (element_types_->size() == 2 && element_types_->at(1)) {
+        return *element_types_->at(1);
       }
     } else {
-      if (element_types_[0]) {
-        return *element_types_[0];
+      if (element_types_->at(0)) {
+        return *element_types_->at(0);
       }
     }
   }
   DType result;
-  result.control_ = control_;
-  if (result.container_type_ == COLLECTION_MAP || result.container_type_ == COLLECTION_UNORDERED_MAP) {
-    result.t0_ = result.t1_;
+  result.ctrl_.control_ = ctrl_.control_;
+  if (result.ctrl_.container_type_ == COLLECTION_MAP || result.ctrl_.container_type_ == COLLECTION_UNORDERED_MAP) {
+    result.ctrl_.t0_ = result.ctrl_.t1_;
   }
-  result.container_type_ = 0;
+  result.ctrl_.container_type_ = 0;
   return result;
 }
 
@@ -228,7 +244,7 @@ std::string DType::GetTypeString() const {
   }
   std::string name(base_name);
   if (IsCollection()) {
-    std::string_view collection_type = kCollectionTypeStrs[container_type_];
+    std::string_view collection_type = kCollectionTypeStrs[ctrl_.container_type_];
     if (IsMap() || IsUnorderedMap() || IsTuple()) {
       auto key_dtype = Key();
       auto key_name = DTypeFactory::GetNameByDType(key_dtype);
@@ -250,13 +266,13 @@ std::string DType::ToString() const {
   auto base_dtype = Elem().PtrTo();
   auto base_name = DTypeFactory::GetNameByDType(base_dtype);
   if (base_name.empty()) {
-    return fmt::format("[type:{}, ptr:{}, container:{}]", GetFundamentalType(), ptr_bit_,
-                       kCollectionTypeStrs[container_type_]);
+    return fmt::format("[type:{}, ptr:{}, container:{}]", GetFundamentalType(), ctrl_.ptr_bit_,
+                       kCollectionTypeStrs[ctrl_.container_type_]);
   }
   std::string name(base_name);
   std::string_view collection_type;
   if (IsCollection()) {
-    collection_type = kCollectionTypeStrs[container_type_];
+    collection_type = kCollectionTypeStrs[ctrl_.container_type_];
     name = fmt::format("{}<{}>", collection_type, name);
   }
   if (IsPtr()) {
@@ -303,22 +319,22 @@ std::vector<DType> DType::ExtractTupleDtypes() const {
     return {*this};
   }
   std::vector<DType> dtypes;
-  if (t0_ == 0) {
+  if (ctrl_.t0_ == 0) {
     return dtypes;
   }
-  dtypes.emplace_back(DType(static_cast<FundamentalType>(t0_)));
-  if (t1_ == 0) {
+  dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t0_)));
+  if (ctrl_.t1_ == 0) {
     return dtypes;
   }
-  dtypes.emplace_back(DType(static_cast<FundamentalType>(t1_)));
-  if (t2_ == 0) {
+  dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t1_)));
+  if (ctrl_.t2_ == 0) {
     return dtypes;
   }
-  dtypes.emplace_back(DType(static_cast<FundamentalType>(t2_)));
-  if (t3_ == 0) {
+  dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t2_)));
+  if (ctrl_.t3_ == 0) {
     return dtypes;
   }
-  dtypes.emplace_back(DType(static_cast<FundamentalType>(t3_)));
+  dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t3_)));
   return dtypes;
 }
 
@@ -326,16 +342,16 @@ uint32_t DType::TupleSize() const {
   if (!IsTuple()) {
     return 0;
   }
-  if (t0_ == 0) {
+  if (ctrl_.t0_ == 0) {
     return 0;
   }
-  if (t1_ == 0) {
+  if (ctrl_.t1_ == 0) {
     return 1;
   }
-  if (t2_ == 0) {
+  if (ctrl_.t2_ == 0) {
     return 2;
   }
-  if (t3_ == 0) {
+  if (ctrl_.t3_ == 0) {
     return 3;
   }
   return 4;
@@ -350,7 +366,7 @@ uint32_t DType::ByteSize() const {
   } else if (IsSimdVector()) {
     return 16;
   }
-  switch (t0_) {
+  switch (ctrl_.t0_) {
     case DATA_U8:
     case DATA_I8: {
       return 1;

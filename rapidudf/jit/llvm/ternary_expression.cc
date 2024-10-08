@@ -34,45 +34,20 @@
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace llvm {
-
-absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast::TernaryExprPtr expr) {
-  ast_ctx_.SetPosition(expr->position);
-  auto cond_result = BuildIR(ctx, expr->cond);
-  if (expr->true_false_operands.has_value()) {
-    if (!cond_result.ok()) {
-      return cond_result.status();
-    }
-    auto cond_val = cond_result.value();
-    auto [true_expr, false_expr] = *(expr->true_false_operands);
+absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, OpToken op, ValuePtr cond_val,
+                                              ValuePtr true_expr_val, ValuePtr false_expr_val) {
+  if (op == OP_CONDITIONAL) {
     if (cond_val->GetDType().IsBool()) {
-      auto true_val_result = BuildIR(ctx, true_expr);
-      if (!true_val_result.ok()) {
-        return true_val_result.status();
-      }
-      auto false_val_result = BuildIR(ctx, false_expr);
-      if (!false_val_result.ok()) {
-        return false_val_result.status();
-      }
-      auto result = cond_val->Select(true_val_result.value(), false_val_result.value());
+      auto result = cond_val->Select(true_expr_val, false_expr_val);
       if (!result) {
-        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Can NOT do select true:{}, false:{}",
-                                                                  true_val_result.value()->GetDType(),
-                                                                  false_val_result.value()->GetDType())));
+        RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(
+            fmt::format("Can NOT do select true:{}, false:{}", true_expr_val->GetDType(), false_expr_val->GetDType())));
       }
       return result;
     } else if (cond_val->GetDType().IsSimdVectorBit() || cond_val->GetDType().IsSimdColumnPtr()) {
-      auto true_expr_result = BuildIR(ctx, true_expr);
-      if (!true_expr_result.ok()) {
-        return true_expr_result.status();
-      }
-      auto true_expr_val = true_expr_result.value();
-      auto false_expr_result = BuildIR(ctx, false_expr);
-      if (!false_expr_result.ok()) {
-        return false_expr_result.status();
-      }
-      auto false_expr_val = false_expr_result.value();
       auto func_name =
           GetFunctionName(OP_CONDITIONAL, cond_val->GetDType(), true_expr_val->GetDType(), false_expr_val->GetDType());
       std::vector<ValuePtr> args{cond_val, true_expr_val, false_expr_val};
@@ -88,8 +63,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
           }
         }
       }
-
-      auto result = CallFunction(func_name, args, false);
+      auto result = CallFunction(func_name, args);
       if (!result.ok()) {
         return result.status();
       }
@@ -97,8 +71,56 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
     }
     RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("ternary op with cond:{}", cond_val->GetDType())));
   } else {
-    return cond_result;
+    auto a = cond_val;
+    auto b = true_expr_val;
+    auto c = false_expr_val;
+    ValuePtr result;
+    if (a->GetDType().IsSimdVector() || a->GetDType().IsSimdColumnPtr() || b->GetDType().IsSimdVector() ||
+        b->GetDType().IsSimdColumnPtr() || c->GetDType().IsSimdVector() || c->GetDType().IsSimdColumnPtr()) {
+      auto func_name = GetFunctionName(op, a->GetDType(), b->GetDType(), c->GetDType());
+      std::vector<ValuePtr> args{a, b, c};
+      auto call_result = CallFunction(func_name, args);
+      if (!call_result.ok()) {
+        return call_result.status();
+      }
+      result = call_result.value();
+    } else {
+      if (HasIntrinsic(op)) {
+        result = a->TernaryOp(op, b, c);
+      } else {
+        auto func_name = GetFunctionName(op, a->GetDType());
+        std::vector<ValuePtr> args{a, b, c};
+        auto call_result = CallFunction(func_name, args);
+        if (!call_result.ok()) {
+          return call_result.status();
+        }
+        result = call_result.value();
+      }
+    }
+    return result;
   }
+}
+
+absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast::SelectRPNNodePtr select) {
+  auto cond_result = BuildIR(ctx, select->cond_rpn);
+  if (!cond_result.ok()) {
+    return cond_result.status();
+  }
+  auto cond_value = cond_result.value();
+  // if (!select->true_false_operands.has_value()) {
+  //   return cond_value;
+  // }
+  auto true_value_result = BuildIR(ctx, select->true_rpn);
+  auto false_value_result = BuildIR(ctx, select->false_rpn);
+  if (!true_value_result.ok()) {
+    return true_value_result.status();
+  }
+  if (!false_value_result.ok()) {
+    return false_value_result.status();
+  }
+  auto true_value = true_value_result.value();
+  auto false_value = false_value_result.value();
+  return BuildIR(ctx, OP_CONDITIONAL, cond_value, true_value, false_value);
 }
 
 }  // namespace llvm

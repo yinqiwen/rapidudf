@@ -397,7 +397,7 @@ OpToken get_buitin_func_op(const std::string& name) {
 }
 
 void init_builtin_math_funcs() {
-  for (uint32_t op = OP_CONDITIONAL; op < OP_END; op++) {
+  for (uint32_t op = OP_UNARY_BEGIN; op < OP_END; op++) {
     get_builtin_func_op_mapping().emplace(kOpTokenStrs[op], static_cast<OpToken>(op));
   }
 

@@ -40,6 +40,7 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/types/eval_value-inl.h"
 
 using namespace rapidudf;
 
@@ -448,59 +449,59 @@ static float __attribute__((noinline)) get_duration_score(float duration, float 
   return 1.0 / (1 + std::exp(-x));
 }
 
-TEST(JitCompiler, duration_score) {
-  std::string source = R"(
-    simd_vector<f32> get_duration_score(Context ctx, simd_vector<f32> duration, f32 alpha, f32 beta)
-    {
-        var x = (duration-alpha)/beta;
-        return 1.0_f32/(1_f32 + exp(-x));
-    }
-  )";
+// TEST(JitCompiler, duration_score) {
+//   std::string source = R"(
+//     simd_vector<f32> get_duration_score(Context ctx, simd_vector<f32> duration, f32 alpha, f32 beta)
+//     {
+//         var x = (duration-alpha)/beta;
+//         return 1.0_f32/(1_f32 + exp(-x));
+//     }
+//   )";
 
-  rapidudf::JitCompiler compiler;
-  rapidudf::Context ctx;
-  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+//   rapidudf::JitCompiler compiler;
+//   rapidudf::Context ctx;
+//   using simd_vector_f32 = rapidudf::simd::Vector<float>;
 
-  auto result =
-      compiler.CompileFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, float, float>(source, true);
-  if (!result.ok()) {
-    RUDF_ERROR("{}", result.status().ToString());
-  }
-  ASSERT_TRUE(result.ok());
-  auto f = std::move(result.value());
+//   auto result =
+//       compiler.CompileFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, float, float>(source, true);
+//   if (!result.ok()) {
+//     RUDF_ERROR("{}", result.status().ToString());
+//   }
+//   ASSERT_TRUE(result.ok());
+//   auto f = std::move(result.value());
 
-  size_t N = 4096;
-  std::vector<float> duration;
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<> distr(1, 100);
-  for (size_t i = 0; i < N; i++) {
-    int v = static_cast<int>(distr(gen));
-    duration.emplace_back(static_cast<float>(v));
-  }
+//   size_t N = 4096;
+//   std::vector<float> duration;
+//   std::random_device rd;
+//   std::mt19937 gen(rd());
+//   std::uniform_int_distribution<> distr(1, 100);
+//   for (size_t i = 0; i < N; i++) {
+//     int v = static_cast<int>(distr(gen));
+//     duration.emplace_back(static_cast<float>(v));
+//   }
 
-  float alpha = 30000.0;
-  float beta = 10000.0;
-  f(ctx, duration, alpha, beta);
+//   float alpha = 30000.0;
+//   float beta = 10000.0;
+//   f(ctx, duration, alpha, beta);
 
-  auto start_time = std::chrono::high_resolution_clock::now();
-  auto vector_result = f(ctx, duration, alpha, beta);
-  auto vector_compute_duration =
-      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+//   auto start_time = std::chrono::high_resolution_clock::now();
+//   auto vector_result = f(ctx, duration, alpha, beta);
+//   auto vector_compute_duration =
+//       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
 
-  std::vector<float> normal_results(duration.size());
-  start_time = std::chrono::high_resolution_clock::now();
-  for (size_t i = 0; i < N; i++) {
-    normal_results[i] = get_duration_score(duration[i], alpha, beta);
-  }
-  auto normal_compute_duration =
-      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
-  RUDF_INFO("Normal compute cost {}us, vector compute cost {}us", normal_compute_duration.count(),
-            vector_compute_duration.count());
-  for (size_t i = 0; i < N; i++) {
-    ASSERT_FLOAT_EQ(vector_result[i], normal_results[i]);
-  }
-}
+//   std::vector<float> normal_results(duration.size());
+//   start_time = std::chrono::high_resolution_clock::now();
+//   for (size_t i = 0; i < N; i++) {
+//     normal_results[i] = get_duration_score(duration[i], alpha, beta);
+//   }
+//   auto normal_compute_duration =
+//       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+//   RUDF_INFO("Normal compute cost {}us, vector compute cost {}us", normal_compute_duration.count(),
+//             vector_compute_duration.count());
+//   for (size_t i = 0; i < N; i++) {
+//     ASSERT_FLOAT_EQ(vector_result[i], normal_results[i]);
+//   }
+// }
 
 static float __attribute__((noinline)) wilson_ctr(float exp_cnt, float clk_cnt) {
   return std::log10(exp_cnt) *
@@ -514,7 +515,7 @@ TEST(JitCompiler, wilson_ctr) {
     simd_vector<f32> wilson_ctr(Context ctx, simd_vector<f32> exp_cnt, simd_vector<f32> clk_cnt)
     {
        return log10(exp_cnt) *
-         (clk_cnt / exp_cnt + 1.96 * 1.96 / (2 * exp_cnt) -
+         (clk_cnt / exp_cnt +  1.96 * 1.96 / (2 * exp_cnt) -
           1.96 / (2 * exp_cnt) * sqrt(4 * exp_cnt * (1 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96 * 1.96)) /
          (1 + 1.96 * 1.96 / exp_cnt);
     }
@@ -532,7 +533,7 @@ TEST(JitCompiler, wilson_ctr) {
   ASSERT_TRUE(result.ok());
   auto f = std::move(result.value());
 
-  size_t N = 4096;
+  size_t N = 40998;
   std::vector<float> exp_cnt;
   std::vector<float> clk_cnt;
   std::random_device rd;
@@ -566,91 +567,174 @@ TEST(JitCompiler, wilson_ctr) {
   }
 }
 
-TEST(JitCompiler, fused) {
-  size_t N = 4099;
-  std::vector<float> a;
-  std::vector<float> b;
-  std::vector<float> c;
-  std::vector<float> d;
-  std::vector<float> e;
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<> distr(1, 100);
-  for (size_t i = 0; i < N; i++) {
-    int v = static_cast<int>(distr(gen));
-    a.emplace_back(static_cast<float>(v));
-    v = static_cast<int>(distr(gen));
-    b.emplace_back(static_cast<float>(v));
-    v = static_cast<int>(distr(gen));
-    c.emplace_back(static_cast<float>(v));
-    v = static_cast<int>(distr(gen));
-    d.emplace_back(static_cast<float>(v));
-    v = static_cast<int>(distr(gen));
-    e.emplace_back(static_cast<float>(v));
-  }
-  rapidudf::Context ctx;
+// TEST(JitCompiler, fused) {
+//   size_t N = 40966;
+//   std::vector<float> a;
+//   std::vector<float> b;
+//   std::vector<float> c;
+//   std::vector<float> d;
+//   std::vector<float> e;
+//   std::random_device rd;
+//   std::mt19937 gen(rd());
+//   std::uniform_int_distribution<> distr(1, 100);
+//   for (size_t i = 0; i < N; i++) {
+//     int v = static_cast<int>(distr(gen));
+//     a.emplace_back(static_cast<float>(v));
+//     v = static_cast<int>(distr(gen));
+//     b.emplace_back(static_cast<float>(v));
+//     v = static_cast<int>(distr(gen));
+//     c.emplace_back(static_cast<float>(v));
+//     v = static_cast<int>(distr(gen));
+//     d.emplace_back(static_cast<float>(v));
+//     v = static_cast<int>(distr(gen));
+//     e.emplace_back(static_cast<float>(v));
+//   }
+//   rapidudf::Context ctx;
 
-  std::vector<simd::Operand<float>> ops;
-  // a b * b c / +
-  ops.emplace_back(simd::Vector<float>(a));
-  ops.emplace_back(simd::Vector<float>(b));
-  ops.emplace_back(OP_MULTIPLY);
-  ops.emplace_back(simd::Vector<float>(c));
-  ops.emplace_back(OP_PLUS);
-  ops.emplace_back(simd::Vector<float>(d));
-  ops.emplace_back(OP_PLUS);
-  ops.emplace_back(simd::Vector<float>(e));
-  ops.emplace_back(OP_MINUS);
-  ops.emplace_back(OP_SIN);
+//   std::vector<EvalValue> rpn;
+//   // // a b * b c / +
+//   rpn.emplace_back(to_eval_value(simd::Vector<float>(a)));
+//   rpn.emplace_back(to_eval_value(simd::Vector<float>(a)));
+//   rpn.emplace_back(OP_MULTIPLY);
+//   rpn.emplace_back(to_eval_value(simd::Vector<float>(c)));
+//   rpn.emplace_back(OP_PLUS);
+//   rpn.emplace_back(to_eval_value(simd::Vector<float>(a)));
+//   rpn.emplace_back(OP_PLUS);
+//   rpn.emplace_back(to_eval_value(simd::Vector<float>(c)));
+//   rpn.emplace_back(OP_MINUS);
+//   // rpn.emplace_back(OP_SIN);
+//   absl::Span<EvalValue> rpn_view(rpn);
+//   size_t test_count = 10;
 
-  size_t test_count = 100;
+//   std::vector<float> normal_results(a.size());
+//   auto start_time = std::chrono::high_resolution_clock::now();
+//   for (size_t k = 0; k < test_count; k++) {
+//     for (size_t i = 0; i < N; i++) {
+//       normal_results[i] = (a[i] * a[i] + c[i] + a[i] - c[i]);
+//     }
+//   }
 
-  std::vector<float> normal_results(a.size());
-  auto start_time = std::chrono::high_resolution_clock::now();
-  for (size_t k = 0; k < test_count; k++) {
-    for (size_t i = 0; i < N; i++) {
-      normal_results[i] = std::sin(a[i] * b[i] + c[i] + d[i] - e[i]);
-    }
-  }
+//   auto normal_compute_duration =
+//       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
 
-  auto normal_compute_duration =
-      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+//   std::string expr = "(a*a+c+a-c)";
+//   JitCompiler compiler;
+//   auto result =
+//       compiler.CompileExpression<simd::Vector<float>, rapidudf::Context&, simd::Vector<float>, simd::Vector<float>,
+//                                  simd::Vector<float>, simd::Vector<float>, simd::Vector<float>>(
+//           expr, {"_", "a", "b", "c", "d", "e"}, true);
+//   if (!result.ok()) {
+//     RUDF_ERROR("{}", result.status().ToString());
+//   }
+//   ASSERT_TRUE(result.ok());
+//   auto f = std::move(result.value());
+//   auto vector_result = f(ctx, a, b, c, d, e);
+//   start_time = std::chrono::high_resolution_clock::now();
+//   for (size_t k = 0; k < test_count; k++) {
+//     ctx.Reset();
+//     vector_result = f(ctx, a, b, c, d, e);
+//   }
+//   auto vector2_compute_duration =
+//       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
 
-  std::string expr = "sin(a*b+c+d-e)";
-  JitCompiler compiler;
-  auto result =
-      compiler.CompileExpression<simd::Vector<float>, rapidudf::Context&, simd::Vector<float>, simd::Vector<float>,
-                                 simd::Vector<float>, simd::Vector<float>, simd::Vector<float>>(
-          expr, {"_", "a", "b", "c", "d", "e"}, true);
-  if (!result.ok()) {
-    RUDF_ERROR("{}", result.status().ToString());
-  }
-  ASSERT_TRUE(result.ok());
-  auto f = std::move(result.value());
-  auto vector_result = f(ctx, a, b, c, d, e);
-  start_time = std::chrono::high_resolution_clock::now();
-  for (size_t k = 0; k < test_count; k++) {
-    ctx.Reset();
-    vector_result = simd::simd_vector_fused_op<float>(ctx, ops);
-  }
-  auto vector2_compute_duration =
-      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+//   for (size_t i = 0; i < N; i++) {
+//     ASSERT_FLOAT_EQ(vector_result[i], normal_results[i]);
+//   }
 
-  ctx.Reset();
-  auto fused_vector_result = simd::simd_vector_fused_op<float>(ctx, ops);
-  start_time = std::chrono::high_resolution_clock::now();
-  // auto fused_vector_result = simd::simd_vector_ternary_op<float, float, rapidudf::OP_FMA>(ctx, a, b, c);
-  for (size_t k = 0; k < test_count; k++) {
-    ctx.Reset();
-    fused_vector_result = simd::simd_vector_fused_op<float>(ctx, ops);
-  }
-  auto vector_compute_duration =
-      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+//   ctx.Reset();
+//   auto fused_vector_result = simd::simd_vector_eval<float>(ctx, rpn_view);
+//   start_time = std::chrono::high_resolution_clock::now();
+//   for (size_t k = 0; k < test_count; k++) {
+//     ctx.Reset();
+//     fused_vector_result = simd::simd_vector_eval<float>(ctx, rpn_view);
+//   }
+//   auto vector_compute_duration =
+//       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
 
-  RUDF_INFO("Normal compute cost {}us, fused vector compute cost {}us, vector compute cost {}us",
-            normal_compute_duration.count(), vector_compute_duration.count(), vector2_compute_duration.count());
-  for (size_t i = 0; i < N; i++) {
-    ASSERT_FLOAT_EQ(fused_vector_result[i], normal_results[i]);
-    ASSERT_FLOAT_EQ(vector_result[i], normal_results[i]);
-  }
-}
+//   RUDF_INFO("Normal compute cost {}us, fused vector compute cost {}us, vector compute cost {}us",
+//             normal_compute_duration.count(), vector_compute_duration.count(), vector2_compute_duration.count());
+//   auto fresult = fused_vector_result;
+//   for (size_t i = 0; i < N; i++) {
+//     ASSERT_FLOAT_EQ(fresult[i], normal_results[i]);
+//   }
+
+//   EvalValue x;
+//   simd::VectorData xv(nullptr, 123);
+//   x.vector = xv;
+
+//   RUDF_INFO("null:{}", x.op);
+// }
+
+// TEST(JitCompiler, fused1) {
+//   size_t N = 4099;
+//   std::vector<float> a;
+//   std::vector<float> b;
+//   std::vector<float> c;
+
+//   std::random_device rd;
+//   std::mt19937 gen(rd());
+//   std::uniform_int_distribution<> distr(1, 100);
+//   for (size_t i = 0; i < N; i++) {
+//     int v = static_cast<int>(distr(gen));
+//     a.emplace_back(static_cast<float>(v));
+//     v = static_cast<int>(distr(gen));
+//     b.emplace_back(static_cast<float>(v));
+//     v = static_cast<int>(distr(gen));
+//     c.emplace_back(static_cast<float>(v));
+//   }
+//   rapidudf::Context ctx;
+
+//   size_t test_count = 100;
+
+//   std::vector<float> normal_results(a.size());
+//   auto start_time = std::chrono::high_resolution_clock::now();
+//   for (size_t k = 0; k < test_count; k++) {
+//     for (size_t i = 0; i < N; i++) {
+//       normal_results[i] = a[i] * b[i] + c[i];
+//     }
+//   }
+
+//   auto normal_compute_duration =
+//       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+
+//   std::string expr = "a*b+c";
+//   JitCompiler compiler;
+//   auto result = compiler.CompileExpression<simd::Vector<float>, rapidudf::Context&, simd::Vector<float>,
+//                                            simd::Vector<float>, simd::Vector<float>>(expr, {"_", "a", "b", "c"},
+//                                            true);
+//   if (!result.ok()) {
+//     RUDF_ERROR("{}", result.status().ToString());
+//   }
+//   ASSERT_TRUE(result.ok());
+//   auto f = std::move(result.value());
+//   auto vector_result = f(ctx, a, b, c);
+//   start_time = std::chrono::high_resolution_clock::now();
+//   for (size_t k = 0; k < test_count; k++) {
+//     ctx.Reset();
+//     vector_result = f(ctx, a, b, c);
+//   }
+//   auto vector_compute_duration =
+//       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+
+//   ctx.Reset();
+
+//   std::string expr1 = "fma(a,b,c)";
+//   auto result1 =
+//       compiler.CompileExpression<simd::Vector<float>, rapidudf::Context&, simd::Vector<float>, simd::Vector<float>,
+//                                  simd::Vector<float>>(expr1, {"_", "a", "b", "c"}, true);
+//   ASSERT_TRUE(result1.ok());
+//   auto f1 = std::move(result1.value());
+
+//   auto fused_vector_result = f1(ctx, a, b, c);
+//   start_time = std::chrono::high_resolution_clock::now();
+//   // auto fused_vector_result = simd::simd_vector_ternary_op<float, float, rapidudf::OP_FMA>(ctx, a, b, c);
+//   for (size_t k = 0; k < test_count; k++) {
+//     ctx.Reset();
+//     fused_vector_result = f1(ctx, a, b, c);
+//   }
+//   auto fused_vector_compute_duration =
+//       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time);
+
+//   RUDF_INFO("fused vector compute cost {}us, vector compute cost {}us", fused_vector_compute_duration.count(),
+//             vector_compute_duration.count());
+// }

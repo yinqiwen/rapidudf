@@ -49,6 +49,7 @@ class SizeMismatchException : public std::logic_error {
   explicit SizeMismatchException(size_t current, size_t expect, const std::string& msg)
       : std::logic_error(fmt::format("expect size:{}, but got size:{} at {}", expect, current, msg)) {}
 };
+
 class OutOfRangeException : public std::logic_error {
  public:
   explicit OutOfRangeException(size_t requested, size_t limit, const std::string& msg)

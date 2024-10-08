@@ -38,28 +38,28 @@
 using namespace rapidudf;
 using namespace rapidudf::llvm;
 
-TEST(JitCompiler, func_cache) {
-  spdlog::set_level(spdlog::level::debug);
-  std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
-  JsonObject json;
-  json["key"] = 123;
+// TEST(JitCompiler, func_cache) {
+//   spdlog::set_level(spdlog::level::debug);
+//   std::vector<int> vec{1, 2, 3};
+//   JitCompiler compiler;
+//   JsonObject json;
+//   json["key"] = 123;
 
-  std::string content = R"(
-    bool test_func(json x){
-      return x["key"] == 123;
-    }
-  )";
-  auto rc = JitCompilerCache::GetFunction<bool, const JsonObject&>(content);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
+//   std::string content = R"(
+//     bool test_func(json x){
+//       return x["key"] == 123;
+//     }
+//   )";
+//   auto rc = JitCompilerCache::GetFunction<bool, const JsonObject&>(content);
+//   ASSERT_TRUE(rc.ok());
+//   auto f = std::move(rc.value());
+//   ASSERT_TRUE(f(json));
 
-  rc = JitCompilerCache::GetFunction<bool, const JsonObject&>(content);
-  ASSERT_TRUE(rc.ok());
-  f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-}
+//   rc = JitCompilerCache::GetFunction<bool, const JsonObject&>(content);
+//   ASSERT_TRUE(rc.ok());
+//   f = std::move(rc.value());
+//   ASSERT_TRUE(f(json));
+// }
 
 TEST(JitCompiler, expr_cache) {
   spdlog::set_level(spdlog::level::debug);

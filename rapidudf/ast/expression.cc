@@ -29,37 +29,95 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rapidudf/ast/expression.h"
-#include <fmt/core.h>
 #include <cstdint>
+#include <memory>
+#include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <variant>
 #include <vector>
+#include "fmt/core.h"
 #include "rapidudf/ast/context.h"
 #include "rapidudf/builtin/builtin.h"
 #include "rapidudf/builtin/builtin_symbols.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
+#include "rapidudf/meta/operand.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/reflect/reflect.h"
 namespace rapidudf {
 namespace ast {
-static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
+void RPN::SetDType(ParseContext& ctx, DType dtype) {
+  this->dtype = dtype;
+  if (dtype.IsSimdVector()) {
+    auto fname = GetFunctionName(kBuiltinVectorEval, dtype.Elem());
+    std::ignore = ctx.CheckFuncExist(fname, false);
+  }
+  if (dtype.IsSimdColumnPtr()) {
+    std::ignore = ctx.CheckFuncExist(kBuiltinColumnEval, false);
+  }
+}
+void RPN::Print() {
+  std::string info;
+
+  for (auto& e : nodes) {
+    std::visit(
+        [&](auto&& arg) {
+          using T = std::decay_t<decltype(arg)>;
+          absl::StatusOr<VarTag> result;
+          if constexpr (std::is_same_v<T, bool>) {
+            info.append(std::to_string(arg));
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            info.append(arg);
+          } else if constexpr (std::is_same_v<T, VarDefine>) {
+            info.append("var_def");
+          } else if constexpr (std::is_same_v<T, VarAccessor>) {
+            info.append("var_access");
+          } else if constexpr (std::is_same_v<T, ConstantNumber>) {
+            info.append(arg.ToString());
+          } else if constexpr (std::is_same_v<T, Array>) {
+            info.append("array");
+          } else if constexpr (std::is_same_v<T, SelectRPNNodePtr>) {
+            info.append("select");
+          } else {
+            info.append(fmt::format("{}", arg));
+          }
+          info.append(" ");
+        },
+        e);
+  }
+  RUDF_ERROR("RPN: {}", info);
+}
+
+static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v, RPN& rpn) {
   return std::visit(
       [&](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
         absl::StatusOr<VarTag> result;
         if constexpr (std::is_same_v<T, bool>) {
+          rpn.nodes.emplace_back(arg);
           return absl::StatusOr<VarTag>(get_dtype<T>());
         } else if constexpr (std::is_same_v<T, std::string>) {
+          rpn.nodes.emplace_back(arg);
           return absl::StatusOr<VarTag>(DATA_STRING_VIEW);
-        } else if constexpr (std::is_same_v<T, VarAccessor> || std::is_same_v<T, VarDefine>) {
+        } else if constexpr (std::is_same_v<T, VarDefine>) {
           result = arg.Validate(ctx);
-        } else if constexpr (std::is_same_v<T, BinaryExprPtr> || std::is_same_v<T, UnaryExprPtr> ||
-                             std::is_same_v<T, TernaryExprPtr>) {
-          result = arg->Validate(ctx);
+          rpn.nodes.emplace_back(arg);
+        } else if constexpr (std::is_same_v<T, VarAccessor>) {
+          bool as_builtin_op = false;
+          result = arg.Validate(ctx, rpn, as_builtin_op);
+          if (!as_builtin_op) {
+            rpn.nodes.emplace_back(arg);
+          }
+        } else if constexpr (std::is_same_v<T, BinaryExprPtr> || std::is_same_v<T, UnaryExprPtr>) {
+          result = arg->Validate(ctx, rpn);
+        } else if constexpr (std::is_same_v<T, SelectExprPtr>) {
+          result = arg->Validate(ctx, rpn);
+          // rpn.nodes.emplace_back(arg);
         } else if constexpr (std::is_same_v<T, ConstantNumber>) {
+          rpn.nodes.emplace_back(arg);
           if (arg.dtype.has_value()) {
             return absl::StatusOr<VarTag>(*arg.dtype);
           }
@@ -72,7 +130,8 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
           }
           return absl::StatusOr<VarTag>(get_dtype<double>());
         } else if constexpr (std::is_same_v<T, Array>) {
-          return arg.Validate(ctx);
+          result = arg.Validate(ctx);
+          rpn.nodes.emplace_back(arg);
         } else {
           static_assert(sizeof(arg) == -1, "No avaialble!");
           return absl::InvalidArgumentError("No avaialble");
@@ -87,18 +146,24 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v) {
       v);
 }
 
+std::string ConstantNumber::ToString() const { return std::to_string(dv); }
+
 absl::StatusOr<VarTag> Array::Validate(ParseContext& ctx) {
   if (elements.empty()) {
     return absl::InvalidArgumentError("array can not be empty");
   }
   for (size_t i = 0; i < elements.size(); i++) {
-    auto result = elements[i]->Validate(ctx);
+    RPN rpn;
+    auto result = elements[i]->Validate(ctx, rpn);
     if (!result.ok()) {
       return result.status();
     }
+    // rpn.dtype = result->dtype;
+    rpn.SetDType(ctx, result->dtype);
     if (i == 0) {
       dtype = result->dtype.ToAbslSpan();
     }
+    rpns.emplace_back(rpn);
   }
   return dtype;
 }
@@ -123,13 +188,19 @@ absl::StatusOr<VarTag> VarDefine::Validate(ParseContext& ctx) {
   ctx.AddLocalVar(name, DType(DATA_VOID));
   return VarTag(DATA_VOID, name);
 }
-absl::StatusOr<std::vector<VarTag>> FuncInvokeArgs::Validate(ParseContext& ctx) {
+absl::StatusOr<std::vector<VarTag>> FuncInvokeArgs::Validate(ParseContext& ctx, RPN* rpn) {
   std::vector<VarTag> arg_dtypes;
   if (args.has_value()) {
     for (auto expr : *args) {
-      auto result = expr->Validate(ctx);
+      RPN arg_rpn;
+      auto result = expr->Validate(ctx, rpn == nullptr ? arg_rpn : *rpn);
       if (!result.ok()) {
         return result.status();
+      }
+      // rpn.dtype = result->dtype;
+      if (nullptr == rpn) {
+        arg_rpn.SetDType(ctx, result->dtype);
+        rpns.emplace_back(arg_rpn);
       }
       arg_dtypes.emplace_back(result.value());
     }
@@ -165,13 +236,14 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, DType src_dtype)
     return struct_member.member_func->return_type;
   }
 }
-absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
+absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
   ctx.SetPosition(position);
-  auto result = validate_operand(ctx, operand);
+  auto result = validate_operand(ctx, operand, rpn);
   if (!result.ok()) {
     return result.status();
   }
   if (op.has_value()) {
+    rpn.nodes.emplace_back(*op);
     switch (*op) {
       case OP_NOT: {
         bool can_not = false;
@@ -227,6 +299,8 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx) {
       }
     }
   }
+  // rpn.dtype = result->dtype;
+  rpn.SetDType(ctx, result->dtype);
   return result;
 }
 
@@ -251,18 +325,19 @@ static bool IsValidSimdVectorBinaryOperands(ParseContext& ctx, DType left, DType
   }
   return false;
 }
-absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
+absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
   ctx.SetPosition(position);
-  auto left_result = validate_operand(ctx, left);
+  auto left_result = validate_operand(ctx, left, rpn);
   if (!left_result.ok()) {
     return left_result.status();
   }
   VarTag left_var = left_result.value();
   for (auto [op, right_operand] : right) {
-    auto right_result = validate_operand(ctx, right_operand);
+    auto right_result = validate_operand(ctx, right_operand, rpn);
     if (!right_result.ok()) {
       return right_result.status();
     }
+    rpn.nodes.emplace_back(op);
     bool can_binary_op = true;
     std::string implicit_func_call;
     do {
@@ -428,6 +503,14 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           implicit_func_call = kBuiltinJsonCmpJson;
         } else if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           can_cmp = true;
+          auto left_ele_dtype = left_var.dtype.Elem();
+          auto right_ele_dtype = right_result->dtype.Elem();
+          if (!left_ele_dtype.IsNumber() && !left_ele_dtype.IsStringView()) {
+            can_cmp = false;
+          }
+          if (!right_ele_dtype.IsNumber() && !right_ele_dtype.IsStringView()) {
+            can_cmp = false;
+          }
           implicit_func_call = GetFunctionName(op, left_var.dtype, right_result->dtype);
           // left_var = VarTag(DType(DATA_BIT).ToSimdVector());
         } else if (left_var.dtype.IsSimdColumnPtr() || right_result->dtype.IsSimdColumnPtr()) {
@@ -436,8 +519,8 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
           // left_var = VarTag(DType(DATA_SIMD_COLUMN).ToPtr());
         }
         if (!can_cmp) {
-          return ctx.GetErrorStatus(
-              fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op, left_var.dtype, right_result->dtype));
+          return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} for cmp expression",
+                                                op, left_var.dtype, right_result->dtype));
         }
         if (!implicit_func_call.empty()) {
           auto result = ctx.CheckFuncExist(implicit_func_call, true);
@@ -475,7 +558,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
             return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                   left_var.dtype, right_result->dtype));
           }
-          left_var = VarTag(DType(DATA_U8));
+          left_var = VarTag(DType(DATA_BIT));
         }
         break;
       }
@@ -485,25 +568,36 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx) {
       }
     }
   }
+  // rpn.dtype = left_var.dtype;
+  rpn.SetDType(ctx, left_var.dtype);
   return left_var;
 }
 
-absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
+absl::StatusOr<VarTag> SelectExpr::Validate(ParseContext& ctx, RPN& rpn) {
   ctx.SetPosition(position);
-  auto cond_result = validate_operand(ctx, cond);
+  if (true_false_operands.has_value()) {
+    select_rpn = std::make_shared<SelectRPNNode>();
+    rpn.nodes.emplace_back(select_rpn);
+  }
+  auto cond_result = validate_operand(ctx, cond, true_false_operands.has_value() ? select_rpn->cond_rpn : rpn);
   if (true_false_operands.has_value()) {
     if (!cond_result.ok()) {
       return cond_result.status();
     }
+    select_rpn->cond_rpn.SetDType(ctx, cond_result->dtype);
     auto [true_expr, false_expr] = *true_false_operands;
-    auto true_expr_result = validate_operand(ctx, true_expr);
-    auto false_expr_result = validate_operand(ctx, false_expr);
+    auto true_expr_result = validate_operand(ctx, true_expr, select_rpn->true_rpn);
+    auto false_expr_result = validate_operand(ctx, false_expr, select_rpn->false_rpn);
     if (!true_expr_result.ok()) {
       return true_expr_result.status();
     }
     if (!false_expr_result.ok()) {
       return false_expr_result.status();
     }
+    // true_rpn.dtype = true_expr_result->dtype;
+    // false_rpn.dtype = false_expr_result->dtype;
+    select_rpn->true_rpn.SetDType(ctx, true_expr_result->dtype);
+    select_rpn->false_rpn.SetDType(ctx, false_expr_result->dtype);
     if (cond_result->dtype.IsBool()) {
       if (ctx.CanCastTo(true_expr_result->dtype, false_expr_result->dtype)) {
         ternary_result_dtype = false_expr_result->dtype;
@@ -588,11 +682,16 @@ absl::StatusOr<VarTag> TernaryExpr::Validate(ParseContext& ctx) {
         fmt::format("can NOT do ternary with cond dtype:{}, true_expr_dtype:{}, false_expr_dtype:{}",
                     cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype));
   } else {
+    if (cond_result.ok()) {
+      // cond_rpn.dtype = cond_result->dtype;
+      rpn.SetDType(ctx, cond_result->dtype);
+    }
     return cond_result;
   }
 }
 
-absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
+absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& as_builtin_op) {
+  as_builtin_op = false;
   ctx.SetPosition(position);
   if (access_args.has_value()) {
     auto result = ctx.IsVarExist(name, false);
@@ -698,33 +797,34 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     }
     return var_dtype;
   } else if (func_args.has_value()) {
-    std::vector<DType> arg_dtypes;
     DType largest_dtype;
     bool has_simd_vector = false;
     bool has_simd_column = false;
-    DType first_number_dtype;
-    if (func_args->args.has_value()) {
-      for (auto expr : *(func_args->args)) {
-        auto result = expr->Validate(ctx);
-        if (!result.ok()) {
-          return result.status();
-        }
-        arg_dtypes.emplace_back(result->dtype);
-        if (result->dtype > largest_dtype) {
-          largest_dtype = result->dtype;
-        }
-        if (result->dtype.IsSimdVector()) {
-          has_simd_vector = true;
-        }
-        if (result->dtype.IsSimdColumnPtr()) {
-          has_simd_column = true;
-        }
-        if (result->dtype.IsNumber() && first_number_dtype.IsInvalid()) {
-          first_number_dtype = result->dtype;
-        }
-      }
-    }
     builtin_op = get_buitin_func_op(name);
+    int operand_count = get_operand_count(builtin_op);
+    DType first_number_dtype;
+    auto validate_result = func_args->Validate(ctx, operand_count > 0 ? &rpn : nullptr);
+    if (!validate_result.ok()) {
+      return validate_result.status();
+    }
+
+    std::vector<VarTag> arg_tag_dtypes = validate_result.value();
+    std::vector<DType> arg_dtypes;
+    for (auto arg_dtype : arg_tag_dtypes) {
+      if (arg_dtype.dtype > largest_dtype) {
+        largest_dtype = arg_dtype.dtype;
+      }
+      if (arg_dtype.dtype.IsSimdVector()) {
+        has_simd_vector = true;
+      }
+      if (arg_dtype.dtype.IsSimdColumnPtr()) {
+        has_simd_column = true;
+      }
+      if (arg_dtype.dtype.IsNumber() && first_number_dtype.IsInvalid()) {
+        first_number_dtype = arg_dtype.dtype;
+      }
+      arg_dtypes.emplace_back(arg_dtype.dtype);
+    }
     if (builtin_op != OP_INVALID) {
       if (name == kOpTokenStrs[OP_IOTA]) {
         name = GetFunctionName(OP_IOTA, first_number_dtype);
@@ -738,6 +838,12 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
     if (!result.ok()) {
       return result.status();
     }
+    auto* desc = result.value();
+    if (operand_count > 0) {
+      rpn.nodes.emplace_back(builtin_op);
+      as_builtin_op = true;
+      return desc->return_type;
+    }
     if (has_simd_column) {
       for (auto arg_dtype : arg_dtypes) {
         if (arg_dtype.IsPrimitive()) {
@@ -749,7 +855,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx) {
         }
       }
     }
-    auto* desc = result.value();
+
     if (desc->context_arg_idx >= 0) {
       if (ctx.GetFuncContextArgIdx() >= 0 && arg_dtypes.size() == desc->arg_types.size() - 1) {
         DType ctx_ptr_dtype = DType(DATA_CONTEXT).ToPtr();

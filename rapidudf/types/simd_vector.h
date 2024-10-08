@@ -70,6 +70,10 @@ class VectorData {
   T* MutableData() {
     return reinterpret_cast<T*>(const_cast<void*>(data_));
   }
+  template <typename T>
+  const T* ReadableData() {
+    return reinterpret_cast<const T*>(data_);
+  }
 
  private:
   union {

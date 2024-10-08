@@ -37,11 +37,13 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+#include "absl/status/statusor.h"
+#include "fmt/format.h"
+
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
-
-#include "absl/status/statusor.h"
 namespace rapidudf {
 namespace ast {
 

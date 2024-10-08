@@ -50,7 +50,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const std::vect
 }
 absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::ReturnStatement& statement) {
   if (statement.expr.has_value()) {
-    auto val_result = BuildIR(ctx, *statement.expr);
+    auto val_result = BuildIR(ctx, statement.rpn);
     if (!val_result.ok()) {
       return val_result.status();
     }
@@ -72,7 +72,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Retu
 }
 absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfElseStatement& statement) {
   RUDF_DEBUG("Start compile ifelse statement.");
-  auto if_cond_val_result = BuildIR(ctx, statement.if_statement.expr);
+  auto if_cond_val_result = BuildIR(ctx, statement.if_statement.rpn);
   if (!if_cond_val_result.ok()) {
     return if_cond_val_result.status();
   }
@@ -123,7 +123,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfEl
   }
   for (size_t i = 0; i < elif_cond_blocks.size(); i++) {
     GetSession()->GetIRBuilder()->SetInsertPoint(elif_cond_blocks[i]);
-    auto elif_cond_val_result = BuildIR(ctx, statement.elif_statements[i].expr);
+    auto elif_cond_val_result = BuildIR(ctx, statement.elif_statements[i].rpn);
     if (!elif_cond_val_result.ok()) {
       return elif_cond_val_result.status();
     }
@@ -178,7 +178,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Whil
     GetSession()->GetIRBuilder()->CreateBr(while_cond_block);
   }
   GetSession()->GetIRBuilder()->SetInsertPoint(while_cond_block);
-  auto cond_result = BuildIR(ctx, statement.body.expr);
+  auto cond_result = BuildIR(ctx, statement.body.rpn);
   if (!cond_result.ok()) {
     return cond_result.status();
   }
@@ -199,7 +199,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Whil
   return absl::OkStatus();
 }
 absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::ExpressionStatement& statement) {
-  auto val = BuildIR(ctx, statement.expr);
+  auto val = BuildIR(ctx, statement.rpn);
   if (!val.ok()) {
     return val.status();
   }

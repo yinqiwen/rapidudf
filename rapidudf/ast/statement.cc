@@ -46,7 +46,7 @@ static absl::Status check_statements(ParseContext& ctx, std::vector<Statement>& 
 absl::Status ExpressionStatement::Validate(ParseContext& ctx) {
   is_vector_expr = false;
   ctx.SetVectorExressionFlag(false);
-  auto result = expr->Validate(ctx);
+  auto result = expr->Validate(ctx, rpn);
   if (!result.ok()) {
     return result.status();
   }
@@ -55,7 +55,7 @@ absl::Status ExpressionStatement::Validate(ParseContext& ctx) {
 }
 
 absl::Status ChoiceStatement::Validate(ParseContext& ctx) {
-  auto result = expr->Validate(ctx);
+  auto result = expr->Validate(ctx, rpn);
   if (!result.ok()) {
     return result.status();
   }
@@ -66,6 +66,10 @@ absl::Status ChoiceStatement::Validate(ParseContext& ctx) {
 }
 
 absl::Status IfElseStatement::Validate(ParseContext& ctx) {
+  if (!if_statement.expr && elif_statements.size() > 0) {
+    if_statement = elif_statements[0];
+    elif_statements.erase(elif_statements.begin());
+  }
   absl::Status rc = if_statement.Validate(ctx);
   if (!rc.ok()) {
     return rc;
@@ -86,7 +90,7 @@ absl::Status ReturnStatement::Validate(ParseContext& ctx) {
   absl::Status status = absl::OkStatus();
   if (expr) {
     ctx.SetVectorExressionFlag(false);
-    auto expr_result = (*expr)->Validate(ctx);
+    auto expr_result = (*expr)->Validate(ctx, rpn);
     if (!expr_result.ok()) {
       return expr_result.status();
     }

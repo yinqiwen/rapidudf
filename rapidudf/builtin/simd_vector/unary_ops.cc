@@ -114,7 +114,7 @@ static constexpr size_t get_lanes() {
 }
 
 template <class D, typename T, class Func>
-void do_unary_transform(D d, const T* in1, size_t count, T* out, const Func& func) {
+HWY_INLINE void do_unary_transform(D d, const T* in1, size_t count, T* out, const Func& func) {
   const size_t N = hn::Lanes(d);
   size_t idx = 0;
   if (count >= N) {
@@ -133,7 +133,7 @@ void do_unary_transform(D d, const T* in1, size_t count, T* out, const Func& fun
 }
 
 template <class D, OpToken op, typename V = hn::VFromD<D>>
-static inline auto do_simd_unary_op([[maybe_unused]] D d, V lv) {
+static HWY_INLINE auto do_simd_unary_op([[maybe_unused]] D d, V lv) {
   if constexpr (op == OP_SQRT) {
     return hn::Sqrt(lv);
   } else if constexpr (op == OP_FLOOR) {
@@ -370,7 +370,8 @@ static auto get_constant(T v) {
 }
 
 template <typename OPT>
-Vector<typename OPT::operand_t> simd_vector_unary_op_impl(Context& ctx, Vector<typename OPT::operand_t> left) {
+HWY_INLINE Vector<typename OPT::operand_t> simd_vector_unary_op_impl(Context& ctx,
+                                                                     Vector<typename OPT::operand_t> left) {
   using number_t = typename InternalType<typename OPT::operand_t>::internal_type;
   const hn::ScalableTag<number_t> d;
   constexpr auto lanes = hn::Lanes(d);

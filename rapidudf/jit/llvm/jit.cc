@@ -77,6 +77,7 @@ JitCompiler::JitCompiler(const Options& opts) : opts_(opts) {
   ::llvm::InitializeNativeTarget();
   ::llvm::InitializeNativeTargetAsmPrinter();
   ::llvm::InitializeNativeTargetAsmParser();
+  opts_.fuse_vector_ops = true;
 }
 
 absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {
@@ -348,7 +349,8 @@ absl::Status JitCompiler::CompileExpression(const std::string& expr, ast::Functi
   GetSession()->stat.parse_cost = ast_ctx_.GetParseCost();
   GetSession()->stat.parse_validate_cost = ast_ctx_.GetParseValidateCost();
   ast::ReturnStatement return_statement;
-  return_statement.expr = *f;
+  return_statement.expr = f->expr;
+  return_statement.rpn = f->rpn_expr;
   function.body.statements.emplace_back(return_statement);
   auto status = CompileFunctions(std::vector<ast::Function>{function});
   return status;

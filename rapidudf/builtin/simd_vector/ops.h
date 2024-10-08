@@ -34,6 +34,7 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/eval_value.h"
 #include "rapidudf/types/scalar.h"
 
 namespace rapidudf {
@@ -108,13 +109,8 @@ template <typename K, typename V>
 void simd_vector_topk_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
 
 template <typename T>
-T simd_vector_or_equals(Vector<T> left, absl::Span<const T> right);
-
-template <typename T>
-using Operand = std::variant<OpToken, T, Vector<T>>;
-
-template <typename T>
-Vector<T> simd_vector_fused_op(Context& ctx, std::vector<Operand<T>>& operands);
+Vector<T> simd_vector_eval(Context& ctx, absl::Span<EvalValue> nodes);
+Column* simd_column_eval(Context& ctx, absl::Span<EvalValue> nodes);
 
 }  // namespace simd
 }  // namespace rapidudf

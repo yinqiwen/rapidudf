@@ -154,5 +154,28 @@ absl::Status Value::SetSimdVectorTemporary(bool v) {
   return absl::OkStatus();
 }
 
+absl::StatusOr<::llvm::Value*> Value::GetStructPtrValue() {
+  if (!dtype_.IsSimdVector() && !dtype_.IsStringView()) {
+    return absl::InvalidArgumentError(fmt::format("Can not retirve simd vector ptr field on {}", dtype_));
+  }
+  if (type_ == nullptr) {
+    return absl::InvalidArgumentError(fmt::format("Can not retirve simd vector ptr field  with empty type"));
+  }
+  auto ptr_field_ptr = ir_builder_->CreateInBoundsGEP(
+      type_, val_, std::vector<::llvm::Value*>{ir_builder_->getInt32(0), ir_builder_->getInt32(1)});
+  return ir_builder_->CreateLoad(::llvm::PointerType::get(ir_builder_->getInt64Ty(), 0), ptr_field_ptr);
+}
+absl::StatusOr<::llvm::Value*> Value::GetStructSizeValue() {
+  if (!dtype_.IsSimdVector() && !dtype_.IsStringView()) {
+    return absl::InvalidArgumentError(fmt::format("Can not retirve simd vector size field on {}", dtype_));
+  }
+  if (type_ == nullptr) {
+    return absl::InvalidArgumentError(fmt::format("Can not retirve simd vector size field  with empty type"));
+  }
+  auto size_field_ptr = ir_builder_->CreateInBoundsGEP(
+      type_, val_, std::vector<::llvm::Value*>{ir_builder_->getInt32(0), ir_builder_->getInt32(0)});
+  return ir_builder_->CreateLoad(ir_builder_->getInt64Ty(), size_field_ptr);
+}
+
 }  // namespace llvm
 }  // namespace rapidudf

@@ -76,7 +76,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
     arg_values.emplace_back(var);
 
     if (field.func_args->args.has_value()) {
-      for (auto func_arg_expr : *(field.func_args->args)) {
+      for (auto func_arg_expr : (field.func_args->rpns)) {
         auto arg_val = BuildIR(ctx, func_arg_expr);
         if (!arg_val.ok()) {
           return arg_val.status();
@@ -85,7 +85,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, Val
       }
     }
     std::string member_func_name = GetMemberFuncName(var->GetDType().PtrTo(), field.field);
-    return CallFunction(member_func_name, arg_values, false);
+    return CallFunction(member_func_name, arg_values);
   } else {
     if (!var->GetDType().IsPtr()) {
       RUDF_LOG_ERROR_STATUS(
@@ -139,11 +139,10 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
   if (expr.func_args.has_value()) {
     // name is func name
     OpToken builtin_op = expr.builtin_op;
-
     std::vector<ValuePtr> arg_values;
     bool is_simd_func = false;
     if (expr.func_args->args.has_value()) {
-      for (auto func_arg_expr : *(expr.func_args->args)) {
+      for (auto func_arg_expr : (expr.func_args->rpns)) {
         auto arg_val = BuildIR(ctx, func_arg_expr);
         if (!arg_val.ok()) {
           return arg_val.status();
@@ -172,7 +171,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
         }
       }
     }
-    return CallFunction(expr.name, arg_values, false);
+    return CallFunction(expr.name, arg_values);
   } else if (expr.access_args.has_value()) {
     // name is var name
     ValuePtr var;
@@ -198,7 +197,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
                 return absl::StatusOr<ValuePtr>(ast_ctx_.GetErrorStatus("Empty access func."));
               }
               std::vector<ValuePtr> arg_values{var, param_result.value()};
-              return CallFunction(expr.access_func_names[access_idx], arg_values, true);
+              return CallFunction(expr.access_func_names[access_idx], arg_values);
             } else {
               static_assert(sizeof(arg) == -1, "non-exhaustive visitor!");
               return absl::StatusOr<ValuePtr>(absl::OkStatus());

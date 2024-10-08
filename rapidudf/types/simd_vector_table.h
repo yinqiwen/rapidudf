@@ -57,19 +57,19 @@ class Column {
                                 Vector<uint8_t>, Vector<int8_t>, Vector<Bit>, Vector<Pointer>>;
 
  public:
-  explicit Column(Context& ctx, Vector<double> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<float> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<StringView> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<uint64_t> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<int64_t> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<uint32_t> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<int32_t> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<uint16_t> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<int16_t> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<uint8_t> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<int8_t> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<Bit> data) : ctx_(ctx), data_(data){};
-  explicit Column(Context& ctx, Vector<Pointer> data) : ctx_(ctx), data_(data){};
+  explicit Column(Context& ctx, Vector<double> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<float> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<StringView> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<uint64_t> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<int64_t> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<uint32_t> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<int32_t> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<uint16_t> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<int16_t> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<uint8_t> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<int8_t> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<Bit> data) : ctx_(ctx), data_(data) {};
+  explicit Column(Context& ctx, Vector<Pointer> data) : ctx_(ctx), data_(data) {};
 
   template <typename T>
   static Column* FromVector(Context& ctx, Vector<T> data) {

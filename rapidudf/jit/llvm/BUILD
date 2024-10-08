@@ -31,6 +31,7 @@ cc_library(
     srcs = [
         "binary_expression.cc",
         "constants.cc",
+        "eval.cc",
         "intrinsic.cc",
         "jit.cc",
         "statement.cc",

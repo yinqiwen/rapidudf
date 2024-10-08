@@ -30,20 +30,47 @@
 */
 
 #pragma once
-
-#include <string_view>
+#include <vector>
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
-static constexpr std::string_view kBuiltinStringViewCmp = "rapidudf_compare_string_view";
-static constexpr std::string_view kBuiltinCastStdStrToStringView = "rapidudf_cast_stdstr_to_string_view";
-static constexpr std::string_view kBuiltinCastFbsStrToStringView = "rapidudf_cast_fbsstr_to_string_view";
-static constexpr std::string_view kBuiltinCastStdStrViewToStringView = "rapidudf_cast_stdstrview_to_string_view";
-static constexpr std::string_view kBuiltinJsonMemberGet = "rapidudf_json_member_get";
-static constexpr std::string_view kBuiltinJsonArrayGet = "rapidudf_json_array_get";
-static constexpr std::string_view kBuiltinJsonCmpString = "rapidudf_json_cmp_string";
-static constexpr std::string_view kBuiltinJsonCmpInt = "rapidudf_json_cmp_int";
-static constexpr std::string_view kBuiltinJsonCmpFloat = "rapidudf_json_cmp_float";
-static constexpr std::string_view kBuiltinJsonCmpBool = "rapidudf_json_cmp_bool";
-static constexpr std::string_view kBuiltinJsonCmpJson = "rapidudf_json_cmp_json";
-static constexpr std::string_view kBuiltinVectorEval = "rapidudf_vector_eval";
-static constexpr std::string_view kBuiltinColumnEval = "rapidudf_column_eval";
+namespace simd {
+
+template <typename T>
+struct EvalOperand {
+  void* vector_ptr = nullptr;
+  T scalar;
+  bool is_vector = false;
+  bool operator==(const EvalOperand<T>& other) const {
+    if (is_vector != other.is_vector) {
+      return false;
+    }
+    if (is_vector) {
+      return vector_ptr == other.vector_ptr;
+    } else {
+      return scalar == other.scalar;
+    }
+  }
+};
+
+template <typename T>
+struct EvalSubTree {
+  EvalOperand<T> operands[3];
+  uint8_t count = 0;
+  OpToken op = OP_INVALID;
+
+  bool operator==(const EvalSubTree<T>& other) const {
+    if (op != other.op) {
+      return false;
+    }
+    for (uint8_t i = 0; i < count; i++) {
+      bool v = (operands[i] == other.operands[i]);
+      if (!v) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
+}  // namespace simd
 }  // namespace rapidudf

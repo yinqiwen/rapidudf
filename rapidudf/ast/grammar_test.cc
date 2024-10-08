@@ -174,3 +174,18 @@ TEST(Grammar, array) {
   }
   ASSERT_FALSE(f.ok());
 }
+
+TEST(Grammar, rpn) {
+  ParseContext ctx;
+  std::string content = R"(
+      2*(3+5)/4-8%2+4
+  )";
+  FunctionDesc desc;
+  auto f = parse_expression_ast(ctx, content, desc);
+  if (!f.ok()) {
+    RUDF_ERROR("{}", f.status().ToString());
+  }
+  ASSERT_TRUE(f.ok());
+  RUDF_ERROR("expr:{}", content);
+  f->rpn_expr.Print();
+}

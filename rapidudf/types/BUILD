@@ -82,3 +82,28 @@ cc_library(
         "@com_google_absl//absl/status:statusor",
     ],
 )
+
+cc_library(
+    name = "eval_value",
+    hdrs = [
+        "eval_value.h",
+    ],
+    deps = [
+        ":scalar",
+        ":simd_vector",
+        ":simd_vector_table",
+        ":string_view",
+    ],
+)
+
+cc_library(
+    name = "eval_value_impl",
+    srcs = ["eval_value.cc"],
+    hdrs = [
+        "eval_value-inl.h",
+    ],
+    deps = [
+        ":eval_value",
+        "//rapidudf/meta:dtype",
+    ],
+)

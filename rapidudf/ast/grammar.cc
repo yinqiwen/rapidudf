@@ -85,7 +85,7 @@ bp::rule<struct additive_expr, BinaryExprPtr> additive_expr = "additive_expr";
 bp::rule<struct multiplicative_expr, BinaryExprPtr> multiplicative_expr = "multiplicative_expr";
 bp::rule<struct power_expr, BinaryExprPtr> power_expr = "power_expr";
 bp::rule<struct unary_expr, UnaryExprPtr> unary_expr = "unary_expr";
-bp::rule<struct ternary_expr, TernaryExprPtr> ternary_expr = "ternary_expr";
+bp::rule<struct ternary_expr, SelectExprPtr> ternary_expr = "ternary_expr";
 bp::rule<struct expression, BinaryExprPtr> expression = "expression";
 bp::rule<struct func_invoke_args, FuncInvokeArgs> func_invoke_args = "func_invoke_args";
 
@@ -136,7 +136,7 @@ auto binary_expr_func = [](auto& ctx) {
   _val(ctx) = v;
 };
 auto ternary_expr_func = [](auto& ctx) {
-  auto v = std::make_shared<TernaryExpr>();
+  auto v = std::make_shared<SelectExpr>();
   v->cond = std::get<0>(_attr(ctx));
   v->true_false_operands = std::get<1>(_attr(ctx));
   v->position = _where(ctx).begin() - _begin(ctx);
@@ -194,6 +194,27 @@ auto return_stmt_func = [](auto& ctx) {
   _val(ctx) = v;
 };
 
+auto choice_stmt_func = [](auto& ctx) {
+  ChoiceStatement v;
+  v.expr = std::get<0>(_attr(ctx));
+  v.statements = std::get<1>(_attr(ctx));
+  _val(ctx) = v;
+};
+
+auto ifelse_stmt_func = [](auto& ctx) {
+  IfElseStatement v;
+  // v.if_statement = std::get<0>(_attr(ctx));
+  v.elif_statements = std::get<0>(_attr(ctx));
+  v.else_statements = std::get<1>(_attr(ctx));
+  _val(ctx) = v;
+};
+
+auto func_invoke_args_func = [](auto& ctx) {
+  FuncInvokeArgs f;
+  f.args = _attr(ctx);
+  _val(ctx) = f;
+};
+
 auto const constant_number_def = bp::lexeme[bp::double_ > -('_' > Symbols::kNumberSymbols)];
 // const auto dynamic_param_access_def = identifier > *('[' > (bp::quoted_string | bp::uint_) > ']');
 auto const var_declare_def = ("var" > identifier)[var_declare_func];
@@ -201,7 +222,7 @@ auto const var_ref_def = identifier[var_ref_func];
 auto const array_def = ('[' > (expression % ',') > ']')[array_func];
 auto const operand_def =
     constant_number | bp::bool_ | bp::quoted_string | var_declare | var_accessor | ('(' >> expression >> ')') | array;
-auto const func_invoke_args_def = '(' > -(expression % ',') > ')';
+auto const func_invoke_args_def = ('(' > -(expression % ',') > ')')[func_invoke_args_func];
 auto const expression_def = assign;
 auto const assign_def = (ternary_expr >> -(Symbols::kAssignOpSymbols >> expression))[binary_expr_func];
 auto const ternary_expr_def = (logic_expr > -('?' > expression > ':' > expression))[ternary_expr_func];
@@ -240,9 +261,9 @@ auto const continue_statement_def = (Symbols::kContinueSymbols > ';')[continue_f
 auto const break_statement_def = (Symbols::kBreakSymbols > ';')[break_func];
 auto const expr_statement_def = (expression > ';')[expr_stmt_func];
 auto const while_statement_def = "while" > choice_statement;
-auto const choice_statement_def = ('(' > expression > ')' > '{' > statements > '}');
-auto const ifelse_statement_def = "if" > choice_statement > *("elif" > choice_statement_def) >
-                                  -("else" > *bp::ws > '{' > statements > '}');
+auto const choice_statement_def = ('(' > expression > ')' > '{' > statements > '}')[choice_stmt_func];
+auto const ifelse_statement_def = ("if" > choice_statement > *("elif" > choice_statement) >
+                                   -("else" > *bp::ws > '{' > statements > '}'))[ifelse_stmt_func];
 auto const block_def = '{' > statements > '}';
 
 bp::rule<struct func_arg, FunctionArg> func_arg = "func_arg";
@@ -320,13 +341,15 @@ absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::st
   ctx.SetSource(source, false);
   bp::callback_error_handler error_handler([&](std::string const& msg) { ctx.SetAstErr(msg); });
   auto const parser = bp::with_error_handler(expression, error_handler);
-  std::optional<Expression> result = bp::parse(source, parser, bp::ws | comment);
+  std::optional<BinaryExprPtr> result = bp::parse(source, parser, bp::ws | comment);
   ctx.SetParseCost(
       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
   start_time = std::chrono::high_resolution_clock::now();
+  Expression expr;
   if (result) {
     ctx.SetFuncDesc(desc);
-    auto rc = (*result)->Validate(ctx);
+    expr.expr = *result;
+    auto rc = (*result)->Validate(ctx, expr.rpn_expr);
     if (!rc.ok()) {
       return rc.status();
     }
@@ -337,7 +360,7 @@ absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::st
   if (!result) {
     return absl::InvalidArgumentError(fmt::format("parse {} failed with ast_error:{}", source, ctx.GetAstErr()));
   }
-  return *result;
+  return expr;
 }
 
 }  // namespace ast

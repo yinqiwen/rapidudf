@@ -174,28 +174,6 @@ cc_library(
         build_file_content = _SPDLOG_BUILD_FILE,
     )
 
-    #     _XBYAK_BUILD_FILE = """
-    # cc_library(
-    #     name = "xbyak",
-    #     hdrs = glob([
-    #         "**/*.h",
-    #     ]),
-    #     includes=["./"],
-    #     visibility = [ "//visibility:public" ],
-    # )
-    # """
-    #     xbyak_ver = kwargs.get("xbyak_ver", "7.07")
-    #     xbyak_name = "xbyak-{ver}".format(ver = xbyak_ver)
-    #     http_archive(
-    #         name = "com_github_xbyak",
-    #         strip_prefix = xbyak_name,
-    #         urls = [
-    #             "https://mirrors.tencent.com/github.com/herumi/xbyak/archive/v{ver}.tar.gz".format(ver = xbyak_ver),
-    #             "https://github.com/herumi/xbyak/archive/v{ver}.tar.gz".format(ver = xbyak_ver),
-    #         ],
-    #         build_file_content = _XBYAK_BUILD_FILE,
-    #     )
-
     abseil_ver = kwargs.get("abseil_ver", "20240116.2")
     abseil_name = "abseil-cpp-{ver}".format(ver = abseil_ver)
     maybe(
@@ -208,7 +186,25 @@ cc_library(
         ],
     )
 
-    git_repository(
+    _FP16_BUILD_FILE = """
+cc_library(
+    name = "FP16",
+    hdrs = glob(["include/**/*.h"]),
+    includes = ["include"],
+    deps = ["@psimd"],
+    visibility = [ "//visibility:public" ],
+)
+"""
+    maybe(
+        new_git_repository,
+        name = "FP16",
+        remote = "https://github.com/Maratyszcza/FP16.git",
+        commit = "98b0a46bce017382a6351a19577ec43a715b6835",
+        build_file_content = _FP16_BUILD_FILE,
+    )
+
+    maybe(
+        git_repository,
         name = "com_google_highway",
         remote = "https://github.com/google/highway.git",
         tag = "1.2.0",

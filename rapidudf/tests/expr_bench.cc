@@ -107,7 +107,7 @@ static void DoRapidUDFVectorExprSetup(const benchmark::State& state) {
   )";
   rapidudf::JitCompiler compiler;
   auto result = compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&,
-                                         rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source, true);
+                                         rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source, false);
 
   g_vector_expr_func = std::move(result.value());
 

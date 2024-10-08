@@ -72,7 +72,7 @@ static constexpr size_t get_lanes() {
 }
 
 template <class D, typename T1, typename T2, typename T3, typename OUT, class Func>
-void do_ternary_transform(D d, T1 in1, T2 in2, T3 in3, size_t count, OUT* out, const Func& func) {
+HWY_INLINE void do_ternary_transform(D d, T1 in1, T2 in2, T3 in3, size_t count, OUT* out, const Func& func) {
   const size_t N = hn::Lanes(d);
   size_t idx = 0;
   if (count >= N) {
@@ -140,7 +140,7 @@ void do_ternary_transform(D d, T1 in1, T2 in2, T3 in3, size_t count, OUT* out, c
 }
 
 template <class D, typename T2, typename T3, typename OUT = hn::TFromD<D>>
-void do_select(D d, Vector<Bit> cond, T2 in2, T3 in3, size_t count, OUT* out) {
+HWY_INLINE void do_select(D d, Vector<Bit> cond, T2 in2, T3 in3, size_t count, OUT* out) {
   const size_t N = hn::Lanes(d);
   size_t idx = 0;
   if (count >= N) {
@@ -217,13 +217,14 @@ void do_select(D d, Vector<Bit> cond, T2 in2, T3 in3, size_t count, OUT* out) {
 }
 
 template <class D, OpToken op, typename V = hn::VFromD<D>>
-static inline auto do_simd_ternary_op(D d, V a, V b, V c) {
+static HWY_INLINE auto do_simd_ternary_op(D d, V a, V b, V c) {
   if constexpr (op == OP_CLAMP) {
     return hn::Clamp(a, b, c);
   } else if constexpr (op == OP_CONDITIONAL) {
     return hn::IfThenElse(a, b, c);
   } else if constexpr (op == OP_FMA) {
     return hn::MulAdd(a, b, c);
+    // return hn::Add(hn::Mul(a, b), c);
   } else if constexpr (op == OP_FMS) {
     return hn::MulSub(a, b, c);
   } else if constexpr (op == OP_FNMA) {
@@ -246,7 +247,8 @@ static auto get_constant(T v) {
 }
 
 template <typename T, typename D>
-static inline auto select_ternary_value(Vector<Bit> cond, hn::VFromD<D> true_val, hn::VFromD<D> false_val, size_t i) {
+static HWY_INLINE auto select_ternary_value(Vector<Bit> cond, hn::VFromD<D> true_val, hn::VFromD<D> false_val,
+                                            size_t i) {
   const D d;
   constexpr auto lanes = hn::Lanes(d);
   size_t bits_byte_cursor = i / 8;

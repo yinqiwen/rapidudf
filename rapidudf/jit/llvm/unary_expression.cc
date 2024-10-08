@@ -35,65 +35,57 @@
 #include "rapidudf/jit/llvm/value.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace llvm {
-absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Operand& expr) {
-  return std::visit(
-      [&](auto&& arg) {
-        using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, bool> || std::is_same_v<T, std::string>) {
-          return BuildIR(ctx, arg);
-        } else if constexpr (std::is_same_v<T, ast::VarAccessor> || std::is_same_v<T, ast::VarDefine>) {
-          return BuildIR(ctx, arg);
-        } else if constexpr (std::is_same_v<T, ast::BinaryExprPtr> || std::is_same_v<T, ast::UnaryExprPtr> ||
-                             std::is_same_v<T, ast::TernaryExprPtr>) {
-          return BuildIR(ctx, arg);
-        } else if constexpr (std::is_same_v<T, ast::ConstantNumber>) {
-          if (arg.dtype.has_value()) {
-            return BuildIR(ctx, arg.dv, *arg.dtype);
-          } else {
-            return BuildIR(ctx, arg.dv);
-          }
-        } else if constexpr (std::is_same_v<T, ast::Array>) {
-          return BuildIR(ctx, arg);
-        } else {
-          static_assert(sizeof(arg) == -1, "non-exhaustive visitor!");
-          ValuePtr empty;
-          return empty;
-        }
-      },
-      expr);
-}
-absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast::UnaryExprPtr expr) {
-  ast_ctx_.SetPosition(expr->position);
-  auto val_result = BuildIR(ctx, expr->operand);
-  if (!val_result.ok()) {
-    return val_result.status();
+
+absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, OpToken op, ValuePtr val) {
+  if (val->GetDType().IsVoid()) {
+    RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Can NOT do op:{} with void operands", op)));
   }
-  auto val = val_result.value();
-  if (expr->op.has_value()) {
-    if (val->GetDType().IsVoid()) {
-      RUDF_LOG_ERROR_STATUS(ast_ctx_.GetErrorStatus(fmt::format("Can NOT do op:{} with void operands", *(expr->op))));
-    }
-    auto op = *(expr->op);
-    ValuePtr result;
-    switch (op) {
-      case OP_NOT: {
-        if (val->GetDType().IsSimdVector() || val->GetDType().IsSimdColumnPtr()) {
-          auto func_name = GetFunctionName(op, val->GetDType());
-          std::vector<ValuePtr> args{val};
-          auto call_result = CallFunction(func_name, args, false);
-          if (!call_result.ok()) {
-            return call_result.status();
-          }
-          result = call_result.value();
-        } else {
-          result = val->UnaryOp(op);
+  ValuePtr result;
+  switch (op) {
+    case OP_NOT: {
+      if (val->GetDType().IsSimdVector() || val->GetDType().IsSimdColumnPtr()) {
+        auto func_name = GetFunctionName(op, val->GetDType());
+        std::vector<ValuePtr> args{val};
+        auto call_result = CallFunction(func_name, args);
+        if (!call_result.ok()) {
+          return call_result.status();
         }
-        break;
+        result = call_result.value();
+      } else {
+        result = val->UnaryOp(op);
       }
-      case OP_NEGATIVE: {
-        if (val->GetDType().IsSimdVector() || val->GetDType().IsSimdColumnPtr()) {
+      break;
+    }
+    case OP_NEGATIVE: {
+      if (val->GetDType().IsSimdVector() || val->GetDType().IsSimdColumnPtr()) {
+        auto func_name = GetFunctionName(op, val->GetDType());
+        std::vector<ValuePtr> args{val};
+        auto call_result = CallFunction(func_name, args);
+        if (!call_result.ok()) {
+          return call_result.status();
+        }
+        result = call_result.value();
+      } else {
+        result = val->UnaryOp(op);
+      }
+      break;
+    }
+    default: {
+      if (val->GetDType().IsSimdVector() || val->GetDType().IsSimdColumnPtr()) {
+        auto func_name = GetFunctionName(op, val->GetDType());
+        std::vector<ValuePtr> args{val};
+        auto call_result = CallFunction(func_name, args);
+        if (!call_result.ok()) {
+          return call_result.status();
+        }
+        result = call_result.value();
+      } else {
+        if (HasIntrinsic(op)) {
+          result = val->UnaryOp(op);
+        } else {
           auto func_name = GetFunctionName(op, val->GetDType());
           std::vector<ValuePtr> args{val};
           auto call_result = CallFunction(func_name, args);
@@ -101,23 +93,16 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, ast
             return call_result.status();
           }
           result = call_result.value();
-        } else {
-          result = val->UnaryOp(op);
         }
-        break;
       }
-      default: {
-        result = val->UnaryOp(op);
-        break;
-      }
+      break;
     }
-    if (!result) {
-      RUDF_LOG_ERROR_STATUS(
-          ast_ctx_.GetErrorStatus(fmt::format("Can NOT do op:{} with  operands:{}", *(expr->op), val->GetDType())));
-    }
-    return result;
   }
-  return val;
+  if (!result) {
+    RUDF_LOG_ERROR_STATUS(
+        ast_ctx_.GetErrorStatus(fmt::format("Can NOT do op:{} with  operands:{}", op, val->GetDType())));
+  }
+  return result;
 }
 
 }  // namespace llvm

@@ -53,6 +53,7 @@
 
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/type_traits.h"
+#include "rapidudf/types/eval_value.h"
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/scalar.h"
@@ -101,6 +102,7 @@ enum FundamentalType {
   DATA_SCALAR,
   DATA_JSON,
   DATA_CONTEXT,
+  DATA_EVAL_VALUE,
   DATA_SIMD_TABLE,
   DATA_SIMD_COLUMN,
 
@@ -142,70 +144,85 @@ constexpr std::array<std::string_view, DATA_SIMD_COLUMN + 1> kFundamentalTypeStr
                                                                                      "scalar",
                                                                                      "json",
                                                                                      "Context",
+                                                                                     "eval_value",
                                                                                      "simd_table",
                                                                                      "simd_column"};
 
 class DType {
  public:
-  DType(uint64_t control = 0) : control_(control) {}
+  DType(uint64_t control = 0) { ctrl_.control_ = control; }
   DType(FundamentalType t0, FundamentalType t1 = DATA_INVALID, FundamentalType t2 = DATA_INVALID,
-        FundamentalType t3 = DATA_INVALID)
-      : control_(0) {
-    t0_ = t0;
-    t1_ = t1;
-    t2_ = t2;
-    t3_ = t3;
+        FundamentalType t3 = DATA_INVALID) {
+    ctrl_.control_ = 0;
+    ctrl_.t0_ = t0;
+    ctrl_.t1_ = t1;
+    ctrl_.t2_ = t2;
+    ctrl_.t3_ = t3;
   }
   DType(const DType& other);
   void SetElement(size_t idx, DType&& dtype);
   uint64_t Control() const;
-  FundamentalType GetFundamentalType() const { return static_cast<FundamentalType>(t0_); }
-  bool IsSimdVector() const { return container_type_ == COLLECTION_SIMD_VECTOR; }
-  bool IsVector() const { return container_type_ == COLLECTION_VECTOR; }
-  bool IsAbslSpan() const { return container_type_ == COLLECTION_ABSL_SPAN; }
-  bool IsTuple() const { return container_type_ == COLLECTION_TUPLE; }
-  bool IsMap() const { return container_type_ == COLLECTION_MAP; }
-  bool IsUnorderedMap() const { return container_type_ == COLLECTION_UNORDERED_MAP; }
-  bool IsSet() const { return container_type_ == COLLECTION_SET; }
-  bool IsCollection() const { return container_type_ != 0; }
-  bool IsPtr() const { return ptr_bit_ == 1; }
+  void Reset();
+  FundamentalType GetFundamentalType() const { return static_cast<FundamentalType>(ctrl_.t0_); }
+  bool IsSimdVector() const { return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR; }
+  bool IsVector() const { return ctrl_.container_type_ == COLLECTION_VECTOR; }
+  bool IsAbslSpan() const { return ctrl_.container_type_ == COLLECTION_ABSL_SPAN; }
+  bool IsTuple() const { return ctrl_.container_type_ == COLLECTION_TUPLE; }
+  bool IsMap() const { return ctrl_.container_type_ == COLLECTION_MAP; }
+  bool IsUnorderedMap() const { return ctrl_.container_type_ == COLLECTION_UNORDERED_MAP; }
+  bool IsSet() const { return ctrl_.container_type_ == COLLECTION_SET; }
+  bool IsCollection() const { return ctrl_.container_type_ != 0; }
+  bool IsPtr() const { return ctrl_.ptr_bit_ == 1; }
   bool IsIntegerPtr() const { return IsPtr() && (PtrTo().IsInteger()); }
-  bool IsSimdVectorBit() const { return container_type_ == COLLECTION_SIMD_VECTOR && t0_ == DATA_BIT; }
-  bool IsPrimitive() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_STRING_VIEW); }
-  bool IsFundamental() const { return ptr_bit_ == 0 && container_type_ == 0; }
-  bool IsNumber() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_F80); }
-  bool IsF16() const { return IsFundamental() && t0_ == DATA_F16; }
-  bool IsF32() const { return IsFundamental() && t0_ == DATA_F32; }
-  bool IsF64() const { return IsFundamental() && t0_ == DATA_F64; }
-  bool IsF128() const { return IsFundamental() && t0_ == DATA_F80; }
-  bool IsFloat() const { return IsF16() || IsF32() || IsF64() || IsF128(); }
-  bool IsInteger() const { return IsFundamental() && (t0_ >= DATA_U8 && t0_ <= DATA_I64); }
+  bool IsSimdVectorBit() const { return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR && ctrl_.t0_ == DATA_BIT; }
+  bool IsPrimitive() const { return IsFundamental() && (ctrl_.t0_ >= DATA_BIT && ctrl_.t0_ <= DATA_STRING_VIEW); }
+  bool IsFundamental() const { return ctrl_.ptr_bit_ == 0 && ctrl_.container_type_ == 0; }
+  bool IsNumber() const { return IsFundamental() && (ctrl_.t0_ >= DATA_U8 && ctrl_.t0_ <= DATA_F80); }
+  bool IsF16() const { return IsFundamental() && ctrl_.t0_ == DATA_F16; }
+  bool IsF32() const { return IsFundamental() && ctrl_.t0_ == DATA_F32; }
+  bool IsF64() const { return IsFundamental() && ctrl_.t0_ == DATA_F64; }
+  bool IsF80() const { return IsFundamental() && ctrl_.t0_ == DATA_F80; }
+  bool IsFloat() const { return IsF16() || IsF32() || IsF64() || IsF80(); }
+  bool IsInteger() const { return IsFundamental() && (ctrl_.t0_ >= DATA_U8 && ctrl_.t0_ <= DATA_I64); }
   bool IsSigned() const;
-  bool IsVoid() const { return t0_ == DATA_VOID; }
-  bool IsBit() const { return IsFundamental() && t0_ == DATA_BIT; }
+  bool IsVoid() const { return ctrl_.t0_ == DATA_VOID; }
+  bool IsBit() const { return IsFundamental() && ctrl_.t0_ == DATA_BIT; }
   bool IsBool() const { return IsBit(); }
-  bool IsStringView() const { return IsFundamental() && t0_ == DATA_STRING_VIEW; }
-  bool IsStdStringView() const { return IsFundamental() && t0_ == DATA_STD_STRING_VIEW; }
-  bool IsString() const { return IsFundamental() && t0_ == DATA_STRING; }
-  bool IsFlatbuffersString() const { return IsFundamental() && t0_ == DATA_FLATBUFFERS_STRING; }
-  bool IsJson() const { return IsFundamental() && t0_ == DATA_JSON; }
+  bool IsStringView() const { return IsFundamental() && ctrl_.t0_ == DATA_STRING_VIEW; }
+  bool IsStdStringView() const { return IsFundamental() && ctrl_.t0_ == DATA_STD_STRING_VIEW; }
+  bool IsString() const { return IsFundamental() && ctrl_.t0_ == DATA_STRING; }
+  bool IsFlatbuffersString() const { return IsFundamental() && ctrl_.t0_ == DATA_FLATBUFFERS_STRING; }
+  bool IsJson() const { return IsFundamental() && ctrl_.t0_ == DATA_JSON; }
   bool IsJsonPtr() const { return IsPtr() && (PtrTo().IsJson()); }
   bool IsVectorPtr() const { return IsPtr() && (PtrTo().IsVector()); }
   bool IsMapPtr() const { return IsPtr() && (PtrTo().IsMap()); }
   bool IsUnorderedMapPtr() const { return IsPtr() && (PtrTo().IsUnorderedMap()); }
-  bool IsContext() const { return IsFundamental() && t0_ == DATA_CONTEXT; }
+  bool IsContext() const { return IsFundamental() && ctrl_.t0_ == DATA_CONTEXT; }
   bool IsContextPtr() const { return IsPtr() && (PtrTo().IsContext()); }
   bool IsStringPtr() const { return IsPtr() && (PtrTo().IsString()); }
-  bool IsSimdTable() const { return IsFundamental() && t0_ == DATA_SIMD_TABLE; }
+  bool IsSimdTable() const { return IsFundamental() && ctrl_.t0_ == DATA_SIMD_TABLE; }
   bool IsSimdTablePtr() const { return IsPtr() && (PtrTo().IsSimdTable()); }
-  bool IsSimdColumn() const { return IsFundamental() && t0_ == DATA_SIMD_COLUMN; }
+  bool IsSimdColumn() const { return IsFundamental() && ctrl_.t0_ == DATA_SIMD_COLUMN; }
   bool IsSimdColumnPtr() const { return IsPtr() && (PtrTo().IsSimdColumn()); }
-  bool IsScalar() const { return IsFundamental() && t0_ == DATA_SCALAR; }
+  bool IsScalar() const { return IsFundamental() && ctrl_.t0_ == DATA_SCALAR; }
   bool IsScalarPtr() const { return IsPtr() && (PtrTo().IsScalar()); }
   bool IsInvalid() const { return Control() == 0; }
   bool IsComplexObj() const;
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
   bool CanCastTo(DType other) const;
+
+  // static bool IsSimdVector(uint64_t control) {
+  //   ControlValue ctrl(control);
+  //   return ctrl.container_type_ == COLLECTION_SIMD_VECTOR;
+  // }
+  // static bool IsFloat(uint64_t control) {
+  //   ControlValue ctrl(control);
+  //   return ctrl.ptr_bit_ == 0 && ctrl.container_type_ == 0; ctrl.container_type_ == COLLECTION_SIMD_VECTOR;
+  // }
+  // static bool IsInteger(uint64_t control) {
+  //   ControlValue ctrl(control);
+  //   return ctrl.container_type_ == COLLECTION_SIMD_VECTOR;
+  // }
 
   DType Key() const;
   DType Elem() const;
@@ -218,7 +235,7 @@ class DType {
   uint32_t TupleSize() const;
   std::vector<DType> ExtractTupleDtypes() const;
 
-  bool IsSameFundamentalType(const DType& other) const { return t0_ == other.t0_; }
+  bool IsSameFundamentalType(const DType& other) const { return ctrl_.t0_ == other.ctrl_.t0_; }
   uint32_t ByteSize() const;
   uint32_t Bits() const { return ByteSize() * 8; }
   uint32_t QwordSize() const {
@@ -251,7 +268,8 @@ class DType {
  private:
   static constexpr uint32_t kContainerTypeBits = 6;
   static constexpr uint32_t kPrimitiveTypeBits = 14;
-  union {
+
+  union ControlValue {
     struct {
       uint64_t container_type_ : kContainerTypeBits;
       uint64_t ptr_bit_ : 1;
@@ -262,8 +280,11 @@ class DType {
       uint64_t reserved_ : 64 - kContainerTypeBits - 4 * kPrimitiveTypeBits - 1;
     };
     uint64_t control_;
-  };
-  std::vector<std::shared_ptr<DType>> element_types_;
+    ControlValue(uint64_t v = 0) { control_ = v; }
+  } ctrl_;
+
+  std::shared_ptr<std::vector<std::shared_ptr<DType>>> element_types_;
+  // std::vector<std::shared_ptr<DType>> element_types_;
 };
 // static_assert(sizeof(DType) == 8, "sizeof(DType) != 8");
 
@@ -582,6 +603,9 @@ DType get_dtype() {
   if constexpr (std::is_same_v<simd::Column, T>) {
     return DType(DATA_SIMD_COLUMN);
   }
+  if constexpr (std::is_same_v<EvalValue, T>) {
+    return DType(DATA_EVAL_VALUE);
+  }
   if constexpr (std::is_same_v<Scalar, T>) {
     return DType(DATA_SCALAR);
   }
@@ -740,6 +764,12 @@ std::optional<uint64_t> DType::FromPrimitiveValue(T val) {
   }
 }
 
+class DTypeMismatchException : public std::logic_error {
+ public:
+  explicit DTypeMismatchException(DType current, DType expect, const std::string& msg)
+      : std::logic_error(fmt::format("expect dtype:{}, but got dtype:{} at {}", expect, current, msg)) {}
+};
+
 }  // namespace rapidudf
 
 template <>
@@ -769,3 +799,8 @@ struct hash<::rapidudf::DType> {
   size_t operator()(const ::rapidudf::DType dtype) const { return std::hash<uint64_t>{}(dtype.Control()); }
 };
 }  // namespace std
+
+#define THROW_DTYPE_MISMATCH_ERR(current, expect)                                                      \
+  do {                                                                                                 \
+    throw rapidudf::DTypeMismatchException(current, expect, fmt::format("{}:{}", __FILE__, __LINE__)); \
+  } while (0)

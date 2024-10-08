@@ -30,12 +30,14 @@
 */
 
 #pragma once
+
 #include <memory>
 #include <optional>
 #include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
+
 #include "rapidudf/ast/context.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
@@ -59,31 +61,51 @@ struct VarRef {
 struct ConstantNumber {
   double dv = 0;
   std::optional<DType> dtype;
+  std::string ToString() const;
 };
 
 struct BinaryExpr;
 struct UnaryExpr;
-struct TernaryExpr;
+struct SelectExpr;
 struct FuncInvoke;
 struct VarAccessor;
+struct Array;
+struct SelectRPNNode;
 using BinaryExprPtr = std::shared_ptr<BinaryExpr>;
 using UnaryExprPtr = std::shared_ptr<UnaryExpr>;
-using TernaryExprPtr = std::shared_ptr<TernaryExpr>;
+using SelectExprPtr = std::shared_ptr<SelectExpr>;
+using SelectRPNNodePtr = std::shared_ptr<SelectRPNNode>;
 
+using RPNNode =
+    std::variant<OpToken, bool, ConstantNumber, std::string, SelectRPNNodePtr, VarDefine, Array, VarAccessor>;
+
+struct RPN {
+  std::vector<RPNNode> nodes;
+  DType dtype;
+  void SetDType(ParseContext& ctx, DType dtype);
+  void Print();
+};
 struct Array {
   std::vector<BinaryExprPtr> elements;
   DType dtype;
   uint32_t position = 0;
+
+  std::vector<RPN> rpns;
   absl::StatusOr<VarTag> Validate(ParseContext& ctx);
 };
 
-using Operand = std::variant<bool, ConstantNumber, std::string, VarAccessor, TernaryExprPtr, BinaryExprPtr,
-                             UnaryExprPtr, VarDefine, Array>;
-using Expression = BinaryExprPtr;
+using Operand = std::variant<bool, ConstantNumber, std::string, VarAccessor, SelectExprPtr, BinaryExprPtr, UnaryExprPtr,
+                             VarDefine, Array>;
+
+struct Expression {
+  BinaryExprPtr expr;
+  RPN rpn_expr;
+};
 
 struct FuncInvokeArgs {
   std::optional<std::vector<BinaryExprPtr>> args;
-  absl::StatusOr<std::vector<VarTag>> Validate(ParseContext& ctx);
+  std::vector<RPN> rpns;
+  absl::StatusOr<std::vector<VarTag>> Validate(ParseContext& ctx, RPN* rpn = nullptr);
 };
 
 struct FieldAccess {
@@ -106,15 +128,22 @@ struct VarAccessor {
   std::vector<std::string> access_func_names;
   uint32_t position = 0;
 
-  absl::StatusOr<VarTag> Validate(ParseContext& ctx);
+  absl::StatusOr<VarTag> Validate(ParseContext& ctx, RPN& rpn, bool& as_builtin_op);
 };
 
-struct TernaryExpr {
+struct SelectRPNNode {
+  RPN cond_rpn;
+  RPN true_rpn;
+  RPN false_rpn;
+};
+
+struct SelectExpr {
   Operand cond;
   std::optional<std::tuple<Operand, Operand>> true_false_operands;
   uint32_t position = 0;
   DType ternary_result_dtype;
-  absl::StatusOr<VarTag> Validate(ParseContext& ctx);
+  SelectRPNNodePtr select_rpn;
+  absl::StatusOr<VarTag> Validate(ParseContext& ctx, RPN& rpn);
 };
 
 struct BinaryExpr {
@@ -148,13 +177,13 @@ struct BinaryExpr {
       right.emplace_back(std::make_tuple(op, operand));
     }
   }
-  absl::StatusOr<VarTag> Validate(ParseContext& ctx);
+  absl::StatusOr<VarTag> Validate(ParseContext& ctx, RPN& rpn);
 };
 struct UnaryExpr {
   std::optional<OpToken> op;
   Operand operand;
   uint32_t position = 0;
-  absl::StatusOr<VarTag> Validate(ParseContext& ctx);
+  absl::StatusOr<VarTag> Validate(ParseContext& ctx, RPN& rpn);
 };
 
 }  // namespace ast

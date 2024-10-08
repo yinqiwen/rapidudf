@@ -85,7 +85,7 @@ static constexpr size_t get_lanes() {
 }
 
 template <class D, typename T1, typename T2, typename OUT, class Func>
-void do_binary_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func& func) {
+HWY_INLINE void do_binary_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func& func) {
   constexpr size_t N = Lanes(d);
   size_t idx = 0;
   if (count >= N) {
@@ -186,7 +186,7 @@ void do_binary_transform(D d, T1 in1, T2 in2, size_t count, OUT* out, const Func
 }
 
 template <class D, OpToken op, typename V = hn::VFromD<D>>
-inline auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
+HWY_INLINE auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
   if constexpr (op == OP_PLUS || op == OP_PLUS_ASSIGN) {
     return hn::Add(lv, rv);
   } else if constexpr (op == OP_MINUS || op == OP_MINUS_ASSIGN) {
@@ -264,7 +264,7 @@ static auto get_constant(T v) {
   }
 }
 template <OpToken op, typename T = void>
-static inline bool do_string_view_cmp(StringView lv, StringView rv) {
+static HWY_INLINE bool do_string_view_cmp(StringView lv, StringView rv) {
   if constexpr (op == OP_GREATER) {
     return lv > rv;
   } else if constexpr (op == OP_GREATER_EQUAL) {

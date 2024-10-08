@@ -28,6 +28,7 @@ flatbuffer_cc_library(
 cc_binary(
     name = "expr_bench",
     srcs = ["expr_bench.cc"],
+    copts = ["-O2"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     deps = [
         "//rapidudf",
@@ -281,11 +282,12 @@ cc_test(
     name = "simd_vector_test",
     size = "small",
     srcs = ["simd_vector_test.cc"],
-    # copts = ["-O2"],
+    copts = ["-O0"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
         "//rapidudf",
+        "//rapidudf/types:eval_value_impl",
         "@com_google_googletest//:gtest_main",
     ],
 )
