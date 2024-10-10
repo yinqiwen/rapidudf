@@ -36,24 +36,30 @@
 #include "fmt/format.h"
 
 namespace rapidudf {
-class NullPointerException : public std::logic_error {
+
+class UDFRuntimeException : public std::logic_error {
  public:
-  explicit NullPointerException(const std::string& msg) : std::logic_error(msg) {}
-};
-class ReadonlyException : public std::logic_error {
- public:
-  explicit ReadonlyException(const std::string& msg) : std::logic_error(msg) {}
-};
-class SizeMismatchException : public std::logic_error {
- public:
-  explicit SizeMismatchException(size_t current, size_t expect, const std::string& msg)
-      : std::logic_error(fmt::format("expect size:{}, but got size:{} at {}", expect, current, msg)) {}
+  explicit UDFRuntimeException(const std::string& msg) : std::logic_error(msg) {}
 };
 
-class OutOfRangeException : public std::logic_error {
+class NullPointerException : public UDFRuntimeException {
+ public:
+  explicit NullPointerException(const std::string& msg) : UDFRuntimeException(msg) {}
+};
+class ReadonlyException : public UDFRuntimeException {
+ public:
+  explicit ReadonlyException(const std::string& msg) : UDFRuntimeException(msg) {}
+};
+class SizeMismatchException : public UDFRuntimeException {
+ public:
+  explicit SizeMismatchException(size_t current, size_t expect, const std::string& msg)
+      : UDFRuntimeException(fmt::format("expect size:{}, but got size:{} at {}", expect, current, msg)) {}
+};
+
+class OutOfRangeException : public UDFRuntimeException {
  public:
   explicit OutOfRangeException(size_t requested, size_t limit, const std::string& msg)
-      : std::logic_error(fmt::format("limit size:{}, but requested:{} at {}", limit, requested, msg)) {}
+      : UDFRuntimeException(fmt::format("limit size:{}, but requested:{} at {}", limit, requested, msg)) {}
 };
 }  // namespace rapidudf
 

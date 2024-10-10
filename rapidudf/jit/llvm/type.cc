@@ -29,13 +29,17 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "llvm/IR/Type.h"
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Type.h>
+#include "cpuinfo_x86.h"
 #include "llvm/IR/DerivedTypes.h"
+
+#include "rapidudf/jit/llvm/type.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
+
 namespace rapidudf {
 namespace llvm {
+
+static const cpu_features::X86Features features = cpu_features::GetX86Info().features;
 
 void init_buitin_types(::llvm::LLVMContext& ctx) {
   auto size_type = ::llvm::IntegerType::get(ctx, 64);
@@ -121,6 +125,19 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
       return nullptr;
     }
   }
+}
+
+::llvm::VectorType* get_vector_type(::llvm::LLVMContext& ctx, DType dtype) {
+  DType ele_dtype = dtype.Elem();
+  uint32_t n = 0;
+  if (ele_dtype.Bits() > 0 && ele_dtype.Bits() <= 64) {
+    n = k_vector_size;
+  }
+  ::llvm::Type* ele_type = get_type(ctx, ele_dtype);
+  if (n > 0 && ele_type != nullptr) {
+    return ::llvm::VectorType::get(ele_type, n, false);
+  }
+  return nullptr;
 }
 
 }  // namespace llvm

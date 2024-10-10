@@ -48,6 +48,7 @@ namespace llvm {
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, DType dtype,
                                               const std::deque<RPNEvalNode>& nodes) {
   std::vector<ValuePtr> operands;
+
   for (auto& node : nodes) {
     const OpToken* op_ptr = std::get_if<OpToken>(&node);
     if (op_ptr != nullptr) {
@@ -147,7 +148,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(FunctionCompileContextPtr ctx, con
   }
   if (eval_nodes.size() > 1 && (is_simd_vector_expr || is_simd_column_expr)) {
     if (opts_.fuse_vector_ops) {
-      return BuildVectorEvalIR(ctx, rpn.dtype, eval_nodes);
+      return BuildVectorEvalIR2(ctx, rpn.dtype, eval_nodes);
     }
   }
   return BuildIR(ctx, rpn.dtype, eval_nodes);

@@ -71,6 +71,7 @@ struct FunctionCompileContext {
   ::llvm::Type* return_type = nullptr;
   ValuePtr return_value = nullptr;
   ::llvm::BasicBlock* exit_block = nullptr;
+  ::llvm::BasicBlock* exception_block = nullptr;
   ValuePtr context_arg_value;
   std::unordered_map<std::string, ValuePtr> named_values;
   std::vector<LoopBlocks> loop_blocks;

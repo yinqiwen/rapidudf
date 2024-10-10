@@ -22,6 +22,24 @@ cc_library(
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "@com_google_absl//absl/status:statusor",
+        "@cpu_features//:cpuinfo",
+        "@local_llvm//:libllvm",
+    ],
+)
+
+cc_library(
+    name = "codegen",
+    srcs = [
+        "codegen.cc",
+    ],
+    hdrs = [
+        "codegen.h",
+    ],
+    copts = RUDF_DEFAULT_COPTS,
+    deps = [
+        ":type",
+        "//rapidudf/meta:dtype",
+        "//rapidudf/meta:optype",
         "@local_llvm//:libllvm",
     ],
 )
@@ -44,6 +62,7 @@ cc_library(
         "value_ternary_ops.cc",
         "value_unary_ops.cc",
         "var.cc",
+        "vector.cc",
     ],
     hdrs = [
         "jit.h",
@@ -53,6 +72,7 @@ cc_library(
     ],
     copts = RUDF_DEFAULT_COPTS,
     deps = [
+        ":codegen",
         ":type",
         "//rapidudf/ast",
         "//rapidudf/jit:function",

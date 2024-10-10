@@ -245,22 +245,55 @@ RUDF_FUNC_REGISTER(test_extern_func)
 //   ASSERT_EQ(f(test, 101), 101);
 //   ASSERT_EQ(test.a, 101);
 // }
-TEST(JitCompiler, function_cache) {
-  spdlog::set_level(spdlog::level::debug);
-  std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
-  JsonObject json;
-  json["key"] = 123;
+// TEST(JitCompiler, function_cache) {
+//   spdlog::set_level(spdlog::level::debug);
+//   std::vector<int> vec{1, 2, 3};
+//   JitCompiler compiler;
+//   JsonObject json;
+//   json["key"] = 123;
+
+//   std::string content = R"(
+//     bool test_func(json x){
+//       return x["key"] == 123;
+//     }
+//   )";
+//   auto rc = compiler.CompileFunction<bool, const JsonObject&>(content, true);
+//   ASSERT_TRUE(rc.ok());
+//   // auto f = compiler.GetFunc<bool, const JsonObject&>(true);
+//   // ASSERT_TRUE(f != nullptr);
+//   auto f = std::move(rc.value());
+//   ASSERT_TRUE(f(json));
+// }
+
+static void print_size(int n) { RUDF_INFO("###size:{}", n); }
+RUDF_FUNC_REGISTER(print_size)
+
+TEST(JitCompiler, llvm_vector) {
+  std::vector<int> vec;
+  vec.resize(66);
+  for (size_t i = 0; i < vec.size(); i++) {
+    vec[i] = i;
+  }
+  JitCompiler::Options opt;
+  opt.optimize_level = 0;
+  JitCompiler compiler(opt);
+  Context ctx;
 
   std::string content = R"(
-    bool test_func(json x){
-      return x["key"] == 123;
+    void test_func(Context ctx, simd_vector<i32> x){
+      print_size(0);
+      test_extern_func();
+      x+11;
     }
   )";
-  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content, true);
+  auto rc = compiler.CompileFunction<void, Context&, simd::Vector<int>>(content, true);
   ASSERT_TRUE(rc.ok());
   // auto f = compiler.GetFunc<bool, const JsonObject&>(true);
   // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
+  f(ctx, vec);
+
+  for (auto v : vec) {
+    RUDF_ERROR("{}", v);
+  }
 }

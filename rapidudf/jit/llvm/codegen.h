@@ -30,19 +30,40 @@
 */
 
 #pragma once
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Type.h"
 
-#include "rapidudf/log/log.h"
+#include "absl/status/statusor.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/optype.h"
+
+namespace llvm {
+class IRBuilderBase;
+class Value;
+class Type;
+class Constant;
+}  // namespace llvm
 
 namespace rapidudf {
 namespace llvm {
-static constexpr uint32_t k_vector_size = 16;
-::llvm::Type* get_type(::llvm::LLVMContext& ctx, DType dtype);
-::llvm::VectorType* get_vector_type(::llvm::LLVMContext& ctx, DType dtype);
+class CodeGen {
+ public:
+  explicit CodeGen(::llvm::IRBuilderBase* builder, uint32_t& label_cursor);
+  absl::StatusOr<::llvm::Value*> NewConstVectorValue(DType dtype, ::llvm::Value* val);
+  absl::StatusOr<::llvm::Value*> LoadVector(DType dtype, ::llvm::Value* ptr, ::llvm::Value* idx);
+  absl::StatusOr<::llvm::Value*> LoadNVector(DType dtype, ::llvm::Value* ptr, ::llvm::Value* idx, ::llvm::Value* n);
+  absl::Status StoreVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx);
+  absl::Status StoreNVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx, ::llvm::Value* n);
 
-void init_buitin_types(::llvm::LLVMContext& ctx);
+  absl::StatusOr<::llvm::Value*> CastTo(::llvm::Value* val, DType src_dtype, DType dst_dtype);
+  absl::StatusOr<::llvm::Value*> CastTo(::llvm::Value* val, DType src_dtype, ::llvm::Value* dst_dtype);
+  absl::StatusOr<::llvm::Value*> UnaryOp(OpToken op, DType dtype, ::llvm::Value* val);
+  absl::StatusOr<::llvm::Value*> BinaryOp(OpToken op, DType dtype, ::llvm::Value* left, ::llvm::Value* right);
+  absl::StatusOr<::llvm::Value*> TernaryOp(OpToken op, DType dtype, ::llvm::Value* a, ::llvm::Value* b,
+                                           ::llvm::Value* c);
 
+ private:
+  uint32_t GetLabelCursor() { return label_cursor_++; }
+  ::llvm::IRBuilderBase* builder_ = nullptr;
+  uint32_t& label_cursor_;
+};
 }  // namespace llvm
 }  // namespace rapidudf

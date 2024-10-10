@@ -313,3 +313,10 @@ cc_library(
             "https://github.com/google/benchmark/archive/v{ver}.tar.gz".format(ver = bench_ver),
         ],
     )
+
+    maybe(
+        git_repository,
+        name = "cpu_features",
+        remote = "https://github.com/google/cpu_features.git",
+        tag = "v0.9.0",
+    )

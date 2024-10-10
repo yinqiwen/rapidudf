@@ -49,6 +49,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const std::vect
   return absl::OkStatus();
 }
 absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::ReturnStatement& statement) {
+  auto* ir_builder = GetSession()->GetIRBuilder();
   if (statement.expr.has_value()) {
     auto val_result = BuildIR(ctx, statement.rpn);
     if (!val_result.ok()) {
@@ -61,17 +62,18 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::Retu
           fmt::format("Can NOT cast to return dtype:{} from dtype:{}", ctx->desc.return_type, val->GetDType())));
     }
     if (GetCompileContext()->return_value != nullptr) {
-      GetSession()->GetIRBuilder()->CreateStore(ret_val->GetValue(), GetCompileContext()->return_value->GetRawValue());
+      ir_builder->CreateStore(ret_val->GetValue(), GetCompileContext()->return_value->GetRawValue());
     }
-    GetSession()->GetIRBuilder()->CreateBr(GetCompileContext()->exit_block);
+    ir_builder->CreateBr(GetCompileContext()->exit_block);
   } else {
     // GetSession()->GetIRBuilder()->CreateRetVoid();
-    GetSession()->GetIRBuilder()->CreateBr(GetCompileContext()->exit_block);
+    ir_builder->CreateBr(GetCompileContext()->exit_block);
   }
   return absl::OkStatus();
 }
 absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfElseStatement& statement) {
   RUDF_DEBUG("Start compile ifelse statement.");
+  auto* ir_builder = GetSession()->GetIRBuilder();
   auto if_cond_val_result = BuildIR(ctx, statement.if_statement.rpn);
   if (!if_cond_val_result.ok()) {
     return if_cond_val_result.status();
@@ -83,8 +85,7 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfEl
   uint32_t label_cursor = GetLabelCursor();
   std::string if_block_label = fmt::format("if_block_{}", label_cursor);
   std::string continue_label = fmt::format("continue_{}", label_cursor);
-  ::llvm::BasicBlock* if_block =
-      ::llvm::BasicBlock::Create(GetSession()->GetIRBuilder()->getContext(), if_block_label, current_func);
+  ::llvm::BasicBlock* if_block = ::llvm::BasicBlock::Create(ir_builder->getContext(), if_block_label, current_func);
 
   std::vector<::llvm::BasicBlock*> elif_blocks;
   std::vector<::llvm::BasicBlock*> elif_cond_blocks;
@@ -92,19 +93,18 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfEl
   for (size_t i = 0; i < statement.elif_statements.size(); i++) {
     std::string elif_cond_label = fmt::format("elif_cond_{}_{}", label_cursor, i);
     ::llvm::BasicBlock* elif_cond_block =
-        ::llvm::BasicBlock::Create(GetSession()->GetIRBuilder()->getContext(), elif_cond_label, current_func);
+        ::llvm::BasicBlock::Create(ir_builder->getContext(), elif_cond_label, current_func);
     elif_cond_blocks.emplace_back(elif_cond_block);
     std::string elif_label = fmt::format("elif_{}_{}", label_cursor, i);
-    ::llvm::BasicBlock* elif_block =
-        ::llvm::BasicBlock::Create(GetSession()->GetIRBuilder()->getContext(), elif_label, current_func);
+    ::llvm::BasicBlock* elif_block = ::llvm::BasicBlock::Create(ir_builder->getContext(), elif_label, current_func);
     elif_blocks.emplace_back(elif_block);
   }
   if (statement.else_statements.has_value()) {
     std::string else_label = fmt::format("else_{}", label_cursor);
-    else_block = ::llvm::BasicBlock::Create(GetSession()->GetIRBuilder()->getContext(), else_label, current_func);
+    else_block = ::llvm::BasicBlock::Create(ir_builder->getContext(), else_label, current_func);
   }
   ::llvm::BasicBlock* continue_block =
-      ::llvm::BasicBlock::Create(GetSession()->GetIRBuilder()->getContext(), continue_label, current_func);
+      ::llvm::BasicBlock::Create(ir_builder->getContext(), continue_label, current_func);
   ::llvm::BasicBlock* if_next_block = continue_block;
   if (elif_cond_blocks.size() > 0) {
     if_next_block = elif_cond_blocks[0];
@@ -112,17 +112,17 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfEl
     if_next_block = else_block;
   }
 
-  GetSession()->GetIRBuilder()->CreateCondBr(if_cond_val->GetValue(), if_block, if_next_block);
-  GetSession()->GetIRBuilder()->SetInsertPoint(if_block);
+  ir_builder->CreateCondBr(if_cond_val->GetValue(), if_block, if_next_block);
+  ir_builder->SetInsertPoint(if_block);
   auto status = BuildIR(ctx, statement.if_statement.statements);
   if (!status.ok()) {
     return status;
   }
   if (if_block->getTerminator() == nullptr) {
-    GetSession()->GetIRBuilder()->CreateBr(continue_block);  // end if
+    ir_builder->CreateBr(continue_block);  // end if
   }
   for (size_t i = 0; i < elif_cond_blocks.size(); i++) {
-    GetSession()->GetIRBuilder()->SetInsertPoint(elif_cond_blocks[i]);
+    ir_builder->SetInsertPoint(elif_cond_blocks[i]);
     auto elif_cond_val_result = BuildIR(ctx, statement.elif_statements[i].rpn);
     if (!elif_cond_val_result.ok()) {
       return elif_cond_val_result.status();
@@ -134,67 +134,67 @@ absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::IfEl
     } else if (else_block != nullptr) {
       next_block = else_block;
     }
-    GetSession()->GetIRBuilder()->CreateCondBr(elif_cond_val->GetValue(), elif_blocks[i], next_block);
-    GetSession()->GetIRBuilder()->SetInsertPoint(elif_blocks[i]);
+    ir_builder->CreateCondBr(elif_cond_val->GetValue(), elif_blocks[i], next_block);
+    ir_builder->SetInsertPoint(elif_blocks[i]);
     auto status = BuildIR(ctx, statement.elif_statements[i].statements);
     if (!status.ok()) {
       return status;
     }
     if (elif_blocks[i]->getTerminator() == nullptr) {
-      GetSession()->GetIRBuilder()->CreateBr(continue_block);  // end elif
+      ir_builder->CreateBr(continue_block);  // end elif
     }
   }
   if (else_block != nullptr) {
-    GetSession()->GetIRBuilder()->SetInsertPoint(else_block);
+    ir_builder->SetInsertPoint(else_block);
     auto status = BuildIR(ctx, *statement.else_statements);
     if (!status.ok()) {
       return status;
     }
     if (else_block->getTerminator() == nullptr) {
-      GetSession()->GetIRBuilder()->CreateBr(continue_block);  // end else
+      ir_builder->CreateBr(continue_block);  // end else
     }
   }
   // Continue
   if (!continue_block->hasNPredecessorsOrMore(1)) {
     continue_block->removeFromParent();
   } else {
-    GetSession()->GetIRBuilder()->SetInsertPoint(continue_block);
+    ir_builder->SetInsertPoint(continue_block);
   }
   return absl::OkStatus();
 }
 absl::Status JitCompiler::BuildIR(FunctionCompileContextPtr ctx, const ast::WhileStatement& statement) {
   uint32_t label_cursor = GetLabelCursor();
+  auto* ir_builder = GetSession()->GetIRBuilder();
   std::string while_cond_label = fmt::format("while_cond_{}", label_cursor);
   std::string while_body_label = fmt::format("while_body_{}", label_cursor);
   std::string while_end_label = fmt::format("while_end_{}", label_cursor);
-  auto* current_func = GetSession()->GetIRBuilder()->GetInsertBlock()->getParent();
+  auto* current_func = ir_builder->GetInsertBlock()->getParent();
   ::llvm::BasicBlock* while_cond_block =
-      ::llvm::BasicBlock::Create(GetSession()->GetIRBuilder()->getContext(), while_cond_label, current_func);
+      ::llvm::BasicBlock::Create(ir_builder->getContext(), while_cond_label, current_func);
   ::llvm::BasicBlock* while_end_block = ::llvm::BasicBlock::Create(*GetLLVMContext(), while_end_label);
-  ::llvm::BasicBlock* while_body_block =
-      ::llvm::BasicBlock::Create(GetSession()->GetIRBuilder()->getContext(), while_body_label);
+  ::llvm::BasicBlock* while_body_block = ::llvm::BasicBlock::Create(ir_builder->getContext(), while_body_label);
   ctx->loop_blocks.emplace_back(std::make_pair(while_cond_block, while_end_block));
-  if (GetSession()->GetIRBuilder()->GetInsertBlock()->getTerminator() == nullptr) {
-    GetSession()->GetIRBuilder()->CreateBr(while_cond_block);
+  if (ir_builder->GetInsertBlock()->getTerminator() == nullptr) {
+    ir_builder->CreateBr(while_cond_block);
   }
-  GetSession()->GetIRBuilder()->SetInsertPoint(while_cond_block);
+  ir_builder->SetInsertPoint(while_cond_block);
   auto cond_result = BuildIR(ctx, statement.body.rpn);
   if (!cond_result.ok()) {
     return cond_result.status();
   }
   auto cond_val = cond_result.value();
-  GetSession()->GetIRBuilder()->CreateCondBr(cond_val->GetValue(), while_body_block, while_end_block);
+  ir_builder->CreateCondBr(cond_val->GetValue(), while_body_block, while_end_block);
   while_body_block->insertInto(current_func);
-  GetSession()->GetIRBuilder()->SetInsertPoint(while_body_block);
+  ir_builder->SetInsertPoint(while_body_block);
   auto status = BuildIR(ctx, statement.body.statements);
   if (!status.ok()) {
     return status;
   }
-  if (GetSession()->GetIRBuilder()->GetInsertBlock()->getTerminator() == nullptr) {
-    GetSession()->GetIRBuilder()->CreateBr(while_cond_block);  // end while body
+  if (ir_builder->GetInsertBlock()->getTerminator() == nullptr) {
+    ir_builder->CreateBr(while_cond_block);  // end while body
   }
   while_end_block->insertInto(current_func);
-  GetSession()->GetIRBuilder()->SetInsertPoint(while_end_block);
+  ir_builder->SetInsertPoint(while_end_block);
   ctx->loop_blocks.pop_back();
   return absl::OkStatus();
 }

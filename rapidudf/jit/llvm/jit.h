@@ -230,6 +230,8 @@ class JitCompiler {
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, const ast::RPN& rpn);
   absl::StatusOr<ValuePtr> BuildVectorEvalIR(FunctionCompileContextPtr ctx, DType dtype,
                                              std::deque<RPNEvalNode>& nodes);
+  absl::StatusOr<ValuePtr> BuildVectorEvalIR2(FunctionCompileContextPtr ctx, DType dtype,
+                                              std::deque<RPNEvalNode>& nodes);
 
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, double v, DType dtype);
   absl::StatusOr<ValuePtr> BuildIR(FunctionCompileContextPtr ctx, double v);

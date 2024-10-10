@@ -176,6 +176,18 @@ absl::StatusOr<::llvm::Value*> Value::GetStructSizeValue() {
       type_, val_, std::vector<::llvm::Value*>{ir_builder_->getInt32(0), ir_builder_->getInt32(0)});
   return ir_builder_->CreateLoad(ir_builder_->getInt64Ty(), size_field_ptr);
 }
+absl::StatusOr<::llvm::Value*> Value::GetVectorSizeValue() {
+  auto size_result = GetStructSizeValue();
+  if (!size_result.ok()) {
+    return size_result.status();
+  }
+  ::llvm::Value* size_capacity_val = size_result.value();
+  size_capacity_val = ir_builder_->CreateLShr(size_capacity_val, ir_builder_->getInt64(1));
+  auto mask = ir_builder_->getInt64(0x7FFFFFFFLL);
+  size_capacity_val = ir_builder_->CreateAnd(size_capacity_val, mask);
+  size_capacity_val = ir_builder_->CreateTrunc(size_capacity_val, ir_builder_->getInt32Ty());
+  return size_capacity_val;
+}
 
 }  // namespace llvm
 }  // namespace rapidudf

@@ -33,6 +33,8 @@
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/Support/Alignment.h>
 #include <memory>
+#include <stdexcept>
+#include <string_view>
 #include <vector>
 
 #include "fmt/core.h"
@@ -56,6 +58,7 @@
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Scalar/TailRecursionElimination.h"
+#include "llvm/Transforms/Vectorize/LoadStoreVectorizer.h"
 
 #include "rapidudf/ast/context.h"
 #include "rapidudf/ast/grammar.h"
@@ -70,6 +73,11 @@
 #include "rapidudf/meta/function.h"
 namespace rapidudf {
 namespace llvm {
+
+static void throw_size_mismatch_exception(int current, int expected) { THROW_SIZE_MISMATCH_ERR(current, expected); }
+static constexpr std::string_view k_throw_size_exception_func = "throw_size_mismatch_exception";
+
+RUDF_FUNC_REGISTER_WITH_NAME(k_throw_size_exception_func, throw_size_mismatch_exception);
 
 JitCompiler::JitCompiler(const Options& opts) : opts_(opts) {
   init_builtin();
@@ -199,6 +207,7 @@ void JitCompiler::NewSession(bool print_asm) {
   session_->func_pass_manager->addPass(::llvm::PartiallyInlineLibCallsPass());
   session_->func_pass_manager->addPass(::llvm::MergedLoadStoreMotionPass());
   session_->func_pass_manager->addPass(::llvm::TailCallElimPass());
+  session_->func_pass_manager->addPass(::llvm::LoadStoreVectorizerPass());
 }
 
 JitFunctionStat JitCompiler::GetStat() {
@@ -268,6 +277,10 @@ absl::Status JitCompiler::CompileFunctions(const std::vector<ast::Function>& fun
         all_member_func_calls[dtype].emplace(name, desc);
       }
     }
+  }
+  auto throw_func = FunctionFactory::GetFunction(std::string(k_throw_size_exception_func));
+  if (nullptr != throw_func) {
+    all_func_calls[std::string(k_throw_size_exception_func)] = throw_func;
   }
 
   auto& dylib = GetSession()->jit->getMainJITDylib();
@@ -397,11 +410,12 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
                                                  func_compile_ctx->func_ast.name, *GetLLVMModule());
 
   RUDF_DEBUG("create func:{}", func_compile_ctx->func_ast.name);
-  // Add a basic block to the function. As before, it automatically inserts
-  // because of the last argument.
+
+  auto* ir_builder = GetSession()->GetIRBuilder();
   ::llvm::BasicBlock* entry_block = ::llvm::BasicBlock::Create(*GetLLVMContext(), "entry", f);
   func_compile_ctx->exit_block = ::llvm::BasicBlock::Create(*GetLLVMContext(), "exit");
-  GetSession()->GetIRBuilder()->SetInsertPoint(entry_block);
+  // func_compile_ctx->exception_block = ::llvm::BasicBlock::Create(*GetLLVMContext(), "exception");
+  ir_builder->SetInsertPoint(entry_block);
   if (!function.return_type.IsVoid()) {
     auto return_type_result = GetType(function.return_type);
     if (!return_type_result.ok()) {
@@ -409,13 +423,9 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
     }
     auto* return_type = return_type_result.value();
     func_compile_ctx->return_type = return_type;
-    ValuePtr return_value =
-        NewValue(function.return_type, GetSession()->GetIRBuilder()->CreateAlloca(return_type), return_type);
+    ValuePtr return_value = NewValue(function.return_type, ir_builder->CreateAlloca(return_type), return_type);
     func_compile_ctx->return_value = return_value;
   }
-
-  // Create a basic block builder with default parameters.  The builder will
-  // automatically append instructions to the basic block `BB'.
 
   GetSession()->current_compile_functon_ctx = func_compile_ctx;
   GetSession()->compile_functon_ctxs.emplace(function.name, func_compile_ctx);
@@ -435,14 +445,14 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
         auto* arg_type = get_type(*GetSession()->context, dtype);
         ValuePtr val;
         if (arg_type != arg->getType()) {
-          auto* arg_val = GetSession()->GetIRBuilder()->CreateAlloca(arg_type);
-          auto load_val = GetSession()->GetIRBuilder()->CreateLoad(arg_type, arg);
-          GetSession()->GetIRBuilder()->CreateStore(load_val, arg_val);
+          auto* arg_val = ir_builder->CreateAlloca(arg_type);
+          auto load_val = ir_builder->CreateLoad(arg_type, arg);
+          ir_builder->CreateStore(load_val, arg_val);
           val = NewValue(dtype, arg_val, arg_type);
           f->addParamAttr(i, ::llvm::Attribute::getWithByValType(*GetSession()->context, arg_type));
         } else {
-          auto* arg_val = GetSession()->GetIRBuilder()->CreateAlloca(arg->getType());
-          GetSession()->GetIRBuilder()->CreateStore(arg, arg_val);
+          auto* arg_val = ir_builder->CreateAlloca(arg->getType());
+          ir_builder->CreateStore(arg, arg_val);
           val = NewValue(dtype, arg_val, arg->getType());
         }
 
@@ -458,16 +468,24 @@ absl::Status JitCompiler::BuildIR(const ast::Function& function) {
     return status;
   }
 
-  if (GetSession()->GetIRBuilder()->GetInsertBlock()->getTerminator() == nullptr) {
-    GetSession()->GetIRBuilder()->CreateBr(func_compile_ctx->exit_block);
+  if (ir_builder->GetInsertBlock()->getTerminator() == nullptr) {
+    ir_builder->CreateBr(func_compile_ctx->exit_block);
   }
   func_compile_ctx->exit_block->insertInto(f);
-  GetSession()->GetIRBuilder()->SetInsertPoint(func_compile_ctx->exit_block);
+  ir_builder->SetInsertPoint(func_compile_ctx->exit_block);
   if (nullptr != func_compile_ctx->return_value) {
-    GetSession()->GetIRBuilder()->CreateRet(func_compile_ctx->return_value->GetValue());
+    ir_builder->CreateRet(func_compile_ctx->return_value->GetValue());
   } else {
-    GetSession()->GetIRBuilder()->CreateRetVoid();
+    ir_builder->CreateRetVoid();
   }
+  // func_compile_ctx->exception_block->insertInto(f);
+  // ir_builder->SetInsertPoint(func_compile_ctx->exception_block);
+
+  // if (nullptr != func_compile_ctx->return_value) {
+  //   ir_builder->CreateRet(func_compile_ctx->return_value->GetValue());
+  // } else {
+  //   ir_builder->CreateRetVoid();
+  // }
 
   // Validate the generated code, checking for consistency.
   std::string err_str;
