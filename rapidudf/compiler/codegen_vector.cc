@@ -31,6 +31,7 @@
 
 #include <llvm/ADT/APFloat.h>
 #include <tuple>
+#include <utility>
 #include "rapidudf/compiler/codegen.h"
 
 #include "llvm/IR/DerivedTypes.h"
@@ -56,25 +57,25 @@ absl::StatusOr<::llvm::Value*> CodeGen::NewConstVectorValue(DType dtype, ::llvm:
     auto vector_type = get_vector_type(builder_->getContext(), dtype);
     return ::llvm::ConstantVector::getSplat(vector_type->getElementCount(), reinterpret_cast<::llvm::Constant*>(val));
   }
-
   return builder_->CreateVectorSplat(k_vector_size, val);
 }
 absl::StatusOr<::llvm::Value*> CodeGen::NewConstVectorValue(ValuePtr val) {
   return NewConstVectorValue(val->GetDType(), val->LoadValue());
 }
 
-absl::StatusOr<::llvm::Value*> CodeGen::LoadVector(DType dtype, ::llvm::Value* ptr, ::llvm::Value* idx) {
+absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> CodeGen::LoadVector(DType dtype, ::llvm::Value* ptr,
+                                                                              ::llvm::Value* idx) {
   auto ele_type = get_type(builder_->getContext(), dtype.Elem());
   auto vector_type = get_vector_type(builder_->getContext(), dtype);
   auto offset_ptr = builder_->CreateInBoundsGEP(ele_type, ptr, {idx});
   auto* load = builder_->CreateLoad(vector_type, offset_ptr);
   ::llvm::Align align(1);
   load->setAlignment(align);
-  return load;
+  return std::make_pair(offset_ptr, load);
 }
 
-absl::StatusOr<::llvm::Value*> CodeGen::LoadNVector(DType dtype, ::llvm::Value* ptr, ::llvm::Value* idx,
-                                                    ::llvm::Value* n) {
+absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> CodeGen::LoadNVector(DType dtype, ::llvm::Value* ptr,
+                                                                               ::llvm::Value* idx, ::llvm::Value* n) {
   auto ele_type = get_type(builder_->getContext(), dtype.Elem());
   auto vector_type = get_vector_type(builder_->getContext(), dtype);
   auto offset_ptr = builder_->CreateGEP(ele_type, ptr, {idx});
@@ -128,7 +129,7 @@ absl::StatusOr<::llvm::Value*> CodeGen::LoadNVector(DType dtype, ::llvm::Value* 
   builder_->CreateMemCpy(vector_ptr_value, align, offset_ptr, align,
                          builder_->CreateMul(n, builder_->getInt32(ele_type->getScalarSizeInBits() / 8)));
   auto vector_value = builder_->CreateLoad(vector_type, vector_ptr_value);
-  return vector_value;
+  return std::make_pair(vector_ptr_value, vector_value);
 }
 
 absl::Status CodeGen::StoreVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx) {

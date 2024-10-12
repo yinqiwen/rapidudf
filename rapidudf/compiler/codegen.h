@@ -34,6 +34,7 @@
 #include <llvm/IR/Value.h>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
@@ -130,8 +131,10 @@ class CodeGen {
 
   absl::StatusOr<::llvm::Value*> NewConstVectorValue(DType dtype, ::llvm::Value* val);
   absl::StatusOr<::llvm::Value*> NewConstVectorValue(ValuePtr val);
-  absl::StatusOr<::llvm::Value*> LoadVector(DType dtype, ::llvm::Value* ptr, ::llvm::Value* idx);
-  absl::StatusOr<::llvm::Value*> LoadNVector(DType dtype, ::llvm::Value* ptr, ::llvm::Value* idx, ::llvm::Value* n);
+  absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> LoadVector(DType dtype, ::llvm::Value* ptr,
+                                                                       ::llvm::Value* idx);
+  absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> LoadNVector(DType dtype, ::llvm::Value* ptr,
+                                                                        ::llvm::Value* idx, ::llvm::Value* n);
   absl::Status StoreVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx);
   absl::Status StoreNVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx, ::llvm::Value* n);
 

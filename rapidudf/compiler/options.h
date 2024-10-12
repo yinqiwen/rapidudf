@@ -35,8 +35,7 @@ namespace rapidudf {
 namespace compiler {
 struct Options {
   uint8_t optimize_level = 2;
-  bool fast_math = true;
-  bool fuse_vector_ops = false;
+  bool fast_math = false;
   Options() {}
 };
 }  // namespace compiler

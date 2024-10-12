@@ -143,54 +143,94 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(DType dtype, const std::vector<RPN
 
 absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode>& nodes, ValuePtr cursor,
                                             ValuePtr remaining, ::llvm::Value* output) {
-  std::vector<::llvm::Value*> operands;
+  using Operand = std::pair<DType, ::llvm::Value*>;
+  std::vector<Operand> operands;
+  auto normalize_operand_dtype = [&](int count) -> absl::StatusOr<DType> {
+    DType compute_dtype;
+    for (int i = 0; i < count; i++) {
+      auto [dtype, _] = operands[operands.size() - count + i];
+      if (dtype.IsSimdVector()) {
+        compute_dtype = dtype.Elem();
+        break;
+      }
+    }
+    if (compute_dtype.IsInvalid()) {
+      compute_dtype = operands[operands.size() - count].first;
+    }
+    for (int i = 0; i < count; i++) {
+      auto [dtype, val] = operands[operands.size() - count + i];
+      if (dtype.Elem() == compute_dtype) {
+        continue;
+      }
+      auto result = codegen_->CastTo(val, dtype, compute_dtype);
+      if (!result.ok()) {
+        return result.status();
+      }
+      operands[operands.size() - count + i].first = compute_dtype.ToSimdVector();
+      operands[operands.size() - count + i].second = result.value();
+    }
+    return compute_dtype;
+  };
   for (size_t i = 0; i < nodes.size(); i++) {
     RPNEvalNode& node = nodes[i];
     OpToken op = node.op;
     if (op != OP_INVALID) {
       int operand_count = get_operand_count(op);
-      DType dtype = node.op_result_dtype;
+      DType dtype;
       absl::StatusOr<::llvm::Value*> result;
       if (operand_count == 1) {
-        result = codegen_->UnaryOp(op, dtype, operands[operands.size() - 1]);
+        result = codegen_->UnaryOp(op, dtype, operands[operands.size() - 1].second);
+        dtype = operands[operands.size() - 1].first;
         operands.pop_back();
       } else if (operand_count == 2) {
-        result = codegen_->BinaryOp(op, dtype, operands[operands.size() - 2], operands[operands.size() - 1]);
+        auto normalize_result = normalize_operand_dtype(2);
+        if (!normalize_result.ok()) {
+          return normalize_result.status();
+        }
+        dtype = normalize_result.value();
+        result =
+            codegen_->BinaryOp(op, dtype, operands[operands.size() - 2].second, operands[operands.size() - 1].second);
         operands.pop_back();
         operands.pop_back();
       } else if (operand_count == 3) {
-        result = codegen_->TernaryOp(op, dtype, operands[operands.size() - 3], operands[operands.size() - 2],
-                                     operands[operands.size() - 1]);
+        auto normalize_result = normalize_operand_dtype(op == OP_CONDITIONAL ? 2 : 3);
+        if (!normalize_result.ok()) {
+          return normalize_result.status();
+        }
+        dtype = normalize_result.value();
+        result = codegen_->TernaryOp(op, dtype, operands[operands.size() - 3].second,
+                                     operands[operands.size() - 2].second, operands[operands.size() - 1].second);
         operands.pop_back();
         operands.pop_back();
         operands.pop_back();
       }
       if (result.ok()) {
-        operands.emplace_back(result.value());
+        operands.emplace_back(std::make_pair(dtype, result.value()));
       } else {
         return result.status();
       }
     } else {
       auto value = node.val;
-      absl::StatusOr<::llvm::Value*> result;
       if (value->GetDType().IsSimdVector()) {
+        absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> load_result;
         auto ptr_val = value->GetStructPtrValue().value();
         if (remaining) {
-          result =
+          load_result =
               codegen_->LoadNVector(value->GetDType().Elem(), ptr_val, cursor->LoadValue(), remaining->LoadValue());
         } else {
-          result = codegen_->LoadVector(value->GetDType().Elem(), ptr_val, cursor->LoadValue());
+          load_result = codegen_->LoadVector(value->GetDType().Elem(), ptr_val, cursor->LoadValue());
+        }
+        if (!load_result.ok()) {
+          return load_result.status();
         }
       } else {
-        result = codegen_->NewConstVectorValue(value);
+        auto result = codegen_->NewConstVectorValue(value);
       }
-      if (!result.ok()) {
-        return result.status();
-      }
-      operands.emplace_back(result.value());
+      operands.emplace_back(std::make_pair(value->GetDType(), result.value().second));
     }
   }
-  ::llvm::Value* eval_result = operands[0];
+  ::llvm::Value* eval_result = operands[0].second;
+
   if (remaining) {
     return codegen_->StoreNVector(dtype.Elem(), eval_result, output, cursor->LoadValue(), remaining->LoadValue());
   } else {
@@ -239,67 +279,17 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
     }
   }
 
-  using ValidateOperandRef = std::pair<DType, int>;
+  // using ValidateOperandRef = std::pair<DType, int>;
 
   ValuePtr vector_size_val;
-  std::vector<ValidateOperandRef> operand_refs;
-  auto normalize_operand_dtype = [&](int count) -> absl::StatusOr<DType> {
-    DType compute_dtype;
-    for (int i = 0; i < count; i++) {
-      auto [dtype, idx] = operand_refs[operand_refs.size() - count + i];
-      if (dtype.IsSimdVector()) {
-        compute_dtype = dtype.Elem();
-      }
-    }
-    if (compute_dtype.IsInvalid()) {
-      compute_dtype = operand_refs[operand_refs.size() - count].first;
-    }
-
-    for (int i = 0; i < count; i++) {
-      auto [_, idx] = operand_refs[operand_refs.size() - count + i];
-      if (idx < 0) {
-        continue;
-      }
-      ValuePtr val = nodes[idx].val;
-      if (!val->GetDType().IsSimdVector()) {
-        auto result = codegen_->CastTo(nodes[idx].val, compute_dtype);
-        if (!result.ok()) {
-          return result.status();
-        }
-        nodes[idx].val = result.value();
-      }
-    }
-    return compute_dtype;
-  };
-
+  // std::vector<ValidateOperandRef> operand_refs;
   for (size_t i = 0; i < nodes.size(); i++) {
     auto& node = nodes[i];
     OpToken op = node.op;
     if (op != OP_INVALID) {
-      int operand_count = get_operand_count(op);
-      absl::StatusOr<DType> normalize_result;
-      if (operand_count > 1) {
-        if (op == OP_CONDITIONAL) {
-          normalize_result = normalize_operand_dtype(2);
-        } else {
-          normalize_result = normalize_operand_dtype(operand_count);
-        }
-        if (!normalize_result.ok()) {
-          return normalize_result.status();
-        }
-        nodes[i].op_result_dtype = normalize_result.value();
-      } else {
-        auto [dtype, _] = operand_refs[operand_refs.size() - 1];
-        nodes[i].op_result_dtype = dtype;
-      }
-      while (operand_count > 0) {
-        operand_count--;
-        operand_refs.pop_back();
-      }
-      operand_refs.emplace_back(std::make_pair(nodes[i].op_result_dtype, -1));
     } else {
       auto value = node.val;
-      operand_refs.emplace_back(std::make_pair(value->GetDType(), static_cast<int>(i)));
+      // operand_refs.emplace_back(std::make_pair(value->GetDType(), static_cast<int>(i)));
       if (value->GetDType().IsSimdVector()) {
         auto result = value->GetVectorSizeValue();
         if (!result.ok()) {
