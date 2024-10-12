@@ -120,7 +120,6 @@ enum OpToken {
   OP_ARG_SELECT,
   OP_SUM,
   OP_CLONE,
-  OP_SCALAR_CAST,
   OP_FILTER,
   OP_GATHER,
   OP_MISC_END,
@@ -167,8 +166,8 @@ constexpr std::array<std::string_view, OP_END> kOpTokenStrs = {"invalid",       
                                                                "select_kv",     "topk_kv",
                                                                "argsort",       "argselect",
                                                                "sum",           "clone",
-                                                               "to_scalar",     "filter",
-                                                               "gather",        "misc_end"};
+                                                               "filter",        "gather",
+                                                               "misc_end"};
 }  // namespace rapidudf
 
 template <>

@@ -31,9 +31,7 @@
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
-#include <atomic>
 #include <memory>
-#include <string>
 
 #include "spdlog/spdlog.h"
 
@@ -87,4 +85,10 @@ spdlog::logger* get_default_raw_logger();
       RUDF_ERROR("Error:{}", return_status.ToString()); \
       return status;                                    \
     }                                                   \
+  } while (0)
+
+#define RUDF_LOG_RETURN_FMT_ERROR(...)                           \
+  do {                                                           \
+    RUDF_ERROR(__VA_ARGS__);                                     \
+    return absl::InvalidArgumentError(fmt::format(__VA_ARGS__)); \
   } while (0)

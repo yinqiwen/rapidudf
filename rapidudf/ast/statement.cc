@@ -30,7 +30,8 @@
 */
 #include "rapidudf/ast/statement.h"
 #include "fmt/core.h"
-#include "rapidudf/builtin/builtin_symbols.h"
+// #include "rapidudf/builtin/builtin_symbols.h"
+
 namespace rapidudf {
 namespace ast {
 static absl::Status check_statements(ParseContext& ctx, std::vector<Statement>& statements) {

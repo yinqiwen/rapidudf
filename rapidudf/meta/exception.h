@@ -34,6 +34,7 @@
 #include <stdexcept>
 #include <string>
 #include "fmt/format.h"
+#include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 
@@ -60,6 +61,11 @@ class OutOfRangeException : public UDFRuntimeException {
  public:
   explicit OutOfRangeException(size_t requested, size_t limit, const std::string& msg)
       : UDFRuntimeException(fmt::format("limit size:{}, but requested:{} at {}", limit, requested, msg)) {}
+};
+class VectorExpressionException : public UDFRuntimeException {
+ public:
+  explicit VectorExpressionException(int line, StringView src_line, StringView msg)
+      : UDFRuntimeException(fmt::format("Error:{} occurred at line:{}, source ' {} '", msg, line, src_line)) {}
 };
 }  // namespace rapidudf
 

@@ -75,6 +75,9 @@ class ParseContext {
 
   std::string GetErrorLine() const;
 
+  int GetLineNo() const;
+  std::string GetSourceLine(int line) const;
+
   bool AddLocalVar(const std::string& name, DType dtype);
 
   absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name, bool implicit = false);

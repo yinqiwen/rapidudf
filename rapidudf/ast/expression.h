@@ -76,8 +76,7 @@ using UnaryExprPtr = std::shared_ptr<UnaryExpr>;
 using SelectExprPtr = std::shared_ptr<SelectExpr>;
 using SelectRPNNodePtr = std::shared_ptr<SelectRPNNode>;
 
-using RPNNode =
-    std::variant<OpToken, bool, ConstantNumber, std::string, SelectRPNNodePtr, VarDefine, Array, VarAccessor>;
+using RPNNode = std::variant<OpToken, bool, ConstantNumber, std::string, VarDefine, Array, VarAccessor>;
 
 struct RPN {
   std::vector<RPNNode> nodes;
@@ -131,18 +130,18 @@ struct VarAccessor {
   absl::StatusOr<VarTag> Validate(ParseContext& ctx, RPN& rpn, bool& as_builtin_op);
 };
 
-struct SelectRPNNode {
-  RPN cond_rpn;
-  RPN true_rpn;
-  RPN false_rpn;
-};
+// struct SelectRPNNode {
+//   RPN cond_rpn;
+//   RPN true_rpn;
+//   RPN false_rpn;
+// };
 
 struct SelectExpr {
   Operand cond;
   std::optional<std::tuple<Operand, Operand>> true_false_operands;
   uint32_t position = 0;
   DType ternary_result_dtype;
-  SelectRPNNodePtr select_rpn;
+  // SelectRPNNodePtr select_rpn;
   absl::StatusOr<VarTag> Validate(ParseContext& ctx, RPN& rpn);
 };
 

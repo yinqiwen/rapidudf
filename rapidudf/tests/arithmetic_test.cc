@@ -38,7 +38,6 @@
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
-using namespace rapidudf::ast;
 TEST(JitCompiler, add) {
   JitCompiler compiler;
   std::string expr = "x+y";
@@ -47,7 +46,7 @@ TEST(JitCompiler, add) {
   auto f0 = std::move(rc0.value());
   ASSERT_EQ(f0(1, 2), 3);
   ASSERT_EQ(f0(111, 222), 333);
-  auto rc1 = compiler.CompileExpression<long double, long double, long double>(expr, {"x", "y"}, true);
+  auto rc1 = compiler.CompileExpression<long double, long double, long double>(expr, {"x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   long double x = 1.1;
@@ -76,7 +75,7 @@ TEST(JitCompiler, vector_add) {
     ASSERT_EQ(result0[i], i_left[i] + i_right[i]);
   }
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"});
+      expr, {"_", "x", "y"}, true);
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -259,7 +258,7 @@ TEST(JitCompiler, vector_div) {
     ASSERT_EQ(result0[i], i_left[i] / i_right[i]);
   }
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"});
+      expr, {"_", "x", "y"}, true);
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -286,9 +285,9 @@ TEST(JitCompiler, mod) {
   JitCompiler compiler;
   std::string expr = "x%y";
   int i_left = 100, i_right = 121;
-  // double f_left = 30000.14, f_right = 12421.4;
+  double f_left = 30000.14, f_right = 12421.4;
   auto rc0 = compiler.CompileExpression<double, double, double>(expr, {"x", "y"});
-  ASSERT_FALSE(rc0.ok());
+  ASSERT_TRUE(rc0.ok());
 
   auto rc1 = compiler.CompileExpression<int, int, int>(expr, {"x", "y"});
   ASSERT_TRUE(rc1.ok());
@@ -319,7 +318,7 @@ TEST(JitCompiler, vector_mod) {
   }
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
       expr, {"_", "x", "y"});
-  ASSERT_FALSE(rc1.ok());
+  ASSERT_TRUE(rc1.ok());
 
   auto rc2 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
       expr, {"_", "x", "y"});

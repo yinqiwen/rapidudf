@@ -104,7 +104,7 @@ void Symbols::Init() {
         reg_dtype = dtype.ToPtr();
       }
       kDtypeSymbols.insert_for_next_parse(name_view, reg_dtype);
-      // RUDF_DEBUG("Add symbol {}:{}", name, reg_dtype);
+      RUDF_DEBUG("Add symbol {}:{}", name, reg_dtype);
     }
   });
   // kDtypeSymbols.insert_for_next_parse("vector<int>", DType(DATA_I32).ToVector().ToPtr());

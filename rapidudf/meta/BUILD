@@ -57,20 +57,27 @@ cc_library(
 )
 
 cc_library(
+    name = "dtype_enums",
+    hdrs = [
+        "dtype_enums.h",
+    ],
+)
+
+cc_library(
     name = "dtype",
     srcs = ["dtype.cc"],
     hdrs = [
         "dtype.h",
     ],
     deps = [
+        ":dtype_enums",
         ":meta",
         "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/types",
-        "//rapidudf/types:eval_value",
-        "//rapidudf/types:scalar",
-        "//rapidudf/types:simd_vector",
-        "//rapidudf/types:simd_vector_table",
+        "//rapidudf/types/simd:column",
+        "//rapidudf/types/simd:table",
+        "//rapidudf/types/simd:vector",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_google_absl//absl/types:span",
     ],

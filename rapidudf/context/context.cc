@@ -30,6 +30,7 @@
 */
 #include "rapidudf/context/context.h"
 #include <memory>
+
 namespace rapidudf {
 Context::Context(Arena* arena) : arena_(arena) {
   if (nullptr == arena_) {
@@ -44,6 +45,7 @@ uint8_t* Context::ArenaAllocate(size_t n) {
   allocated_arena_ptrs_.insert(p);
   return p;
 }
+
 void Context::Reset() {
   GetArena().Reset();
   allocated_arena_ptrs_.clear();

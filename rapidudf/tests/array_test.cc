@@ -33,10 +33,12 @@
 #include <vector>
 #include "absl/strings/str_join.h"
 
+#include "rapidudf/context/context.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
-using namespace rapidudf::ast;
+
 static void print_span(absl::Span<const StringView> x) {
   RUDF_ERROR("@@@{}", x.size());
   for (auto v : x) {
@@ -58,4 +60,27 @@ TEST(JitCompiler, array_simple) {
   ASSERT_TRUE(result.ok());
   auto f = std::move(result.value());
   f();
+
+  std::string source1 = R"(
+    simd_vector<f64> test_func(Context ctx, simd_vector<f64> x,simd_vector<f64> y){
+        return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
+      // return  x * y;
+    }
+  )";
+
+  auto result1 =
+      compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&, rapidudf::simd::Vector<double>,
+                               rapidudf::simd::Vector<double>>(source1, true);
+  if (!result1.ok()) {
+    RUDF_ERROR("###{}", result1.status().ToString());
+  }
+  auto ff = std::move(result1.value());
+  std::vector<double> xx, yy, actuals, final_results;
+  size_t test_n = 16;
+  for (size_t i = 0; i < test_n; i++) {
+    xx.emplace_back(i + 1);
+    yy.emplace_back(i + 101);
+  }
+  rapidudf::Context ctx;
+  auto fr = ff(ctx, xx, yy);
 }

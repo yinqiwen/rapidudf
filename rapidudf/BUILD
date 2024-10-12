@@ -8,9 +8,7 @@ cc_library(
         "rapidudf.h",
     ],
     deps = [
-        "//rapidudf/jit/llvm:jit",
-        "//rapidudf/jit/llvm:jit_cache",
-        # "//rapidudf/jit/xbyak:jit",
+        "//rapidudf/compiler",
         "//rapidudf/reflect",
     ],
 )

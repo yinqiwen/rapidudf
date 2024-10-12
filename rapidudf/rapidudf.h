@@ -30,16 +30,16 @@
 */
 
 #pragma once
-#include "rapidudf/jit/llvm/jit.h"
-#include "rapidudf/jit/llvm/jit_cache.h"
-// #include "rapidudf/jit/xbyak/jit.h"
+#include "rapidudf/compiler/compiler.h"
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/reflect/macros.h"
 
 namespace rapidudf {
+using JitCompiler = compiler::JitCompiler;
+// using JitCompilerCache = llvm::JitCompilerCache;
 
-// using JitCompiler = xbyak::JitCompiler;
-using JitCompiler = llvm::JitCompiler;
-using JitCompilerCache = llvm::JitCompilerCache;
+template <typename RET, typename... Args>
+using JitFunction = compiler::JitFunction<RET, Args...>;
+
 }  // namespace rapidudf

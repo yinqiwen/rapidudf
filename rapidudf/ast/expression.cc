@@ -37,10 +37,12 @@
 #include <type_traits>
 #include <variant>
 #include <vector>
-#include "fmt/core.h"
+
+#include "fmt/format.h"
+
 #include "rapidudf/ast/context.h"
-#include "rapidudf/builtin/builtin.h"
-#include "rapidudf/builtin/builtin_symbols.h"
+#include "rapidudf/functions/functions.h"
+#include "rapidudf/functions/names.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
@@ -52,12 +54,17 @@ namespace ast {
 void RPN::SetDType(ParseContext& ctx, DType dtype) {
   this->dtype = dtype;
   if (dtype.IsSimdVector()) {
-    auto fname = GetFunctionName(kBuiltinVectorEval, dtype.Elem());
-    std::ignore = ctx.CheckFuncExist(fname, false);
+    std::string fname = GetFunctionName(functions::kBuiltinNewSimdVector, dtype.Elem());
+    std::ignore = ctx.CheckFuncExist(fname);
+    std::ignore = ctx.CheckFuncExist(functions::kBuiltinThrowVectorExprEx);
   }
-  if (dtype.IsSimdColumnPtr()) {
-    std::ignore = ctx.CheckFuncExist(kBuiltinColumnEval, false);
-  }
+  // if (dtype.IsSimdVector()) {
+  //   auto fname = GetFunctionName(kBuiltinVectorEval, dtype.Elem());
+  //   std::ignore = ctx.CheckFuncExist(fname, false);
+  // }
+  // if (dtype.IsSimdColumnPtr()) {
+  //   std::ignore = ctx.CheckFuncExist(kBuiltinColumnEval, false);
+  // }
 }
 void RPN::Print() {
   std::string info;
@@ -79,8 +86,6 @@ void RPN::Print() {
             info.append(arg.ToString());
           } else if constexpr (std::is_same_v<T, Array>) {
             info.append("array");
-          } else if constexpr (std::is_same_v<T, SelectRPNNodePtr>) {
-            info.append("select");
           } else {
             info.append(fmt::format("{}", arg));
           }
@@ -357,13 +362,6 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
         if (!right_result->dtype.IsSimdColumnPtr() && !right_result->dtype.IsPrimitive()) {
           can_binary_op = false;
         }
-        if (can_binary_op) {
-          if (left_var.dtype.IsPrimitive()) {
-            implicit_func_call = GetFunctionName(OP_SCALAR_CAST, left_var.dtype);
-          } else if (right_result->dtype.IsPrimitive()) {
-            implicit_func_call = GetFunctionName(OP_SCALAR_CAST, right_result->dtype);
-          }
-        }
         break;
       }
       if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
@@ -403,13 +401,13 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
       return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{} by expression validate ",
                                             op, left_var.dtype, right_result->dtype));
     }
-    if (implicit_func_call.empty()) {
-      if (left_var.dtype.IsStringPtr() || right_result->dtype.IsStringPtr()) {
-        implicit_func_call = kBuiltinCastStdStrToStringView;
-      } else if (left_var.dtype.IsFlatbuffersStringPtr() || right_result->dtype.IsFlatbuffersStringPtr()) {
-        implicit_func_call = kBuiltinCastFbsStrToStringView;
-      }
-    }
+    // if (implicit_func_call.empty()) {
+    //   if (left_var.dtype.IsStringPtr() || right_result->dtype.IsStringPtr()) {
+    //     implicit_func_call = functions::kBuiltinCastStdStrToStringView;
+    //   } else if (left_var.dtype.IsFlatbuffersStringPtr() || right_result->dtype.IsFlatbuffersStringPtr()) {
+    //     implicit_func_call = functions::kBuiltinCastFbsStrToStringView;
+    //   }
+    // }
     if (!implicit_func_call.empty()) {
       auto result = ctx.CheckFuncExist(implicit_func_call, true);
       if (!result.ok()) {
@@ -428,34 +426,19 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
       case OP_DIVIDE_ASSIGN:
       case OP_MOD_ASSIGN:
       case OP_POW: {
-        if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
-          auto result = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype, right_result->dtype), true);
-          if (!result.ok()) {
-            return result.status();
-          }
-          if (!left_var.dtype.IsSimdVector()) {
-            left_var.dtype = right_result->dtype;
-          }
-          break;
-        } else if (left_var.dtype.IsSimdColumnPtr() || right_result->dtype.IsSimdColumnPtr()) {
-          auto result = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype, right_result->dtype), true);
-          if (!result.ok()) {
-            return result.status();
-          }
-          DType result_dtype(DATA_SIMD_COLUMN);
-          left_var.dtype = result_dtype.ToPtr();
-          break;
-        }
-        if (!left_var.dtype.IsNumber() || !right_result->dtype.IsNumber()) {
+        if (!left_var.dtype.Elem().IsNumber() || !right_result->dtype.Elem().IsNumber()) {
           return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                 left_result->dtype, right_result->dtype));
         }
-        if (op == OP_MOD || op == OP_MOD_ASSIGN) {
-          if (left_var.dtype.IsFloat() || right_result->dtype.IsFloat()) {
-            return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
-                                                  left_result->dtype, right_result->dtype));
-          }
+        if (right_result->dtype.IsSimdVector()) {
+          left_var.dtype = right_result->dtype;
         }
+        // if (op == OP_MOD || op == OP_MOD_ASSIGN) {
+        //   if (left_var.dtype.Elem().IsFloat() || right_result->dtype.Elem().IsFloat()) {
+        //     return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
+        //                                           left_result->dtype, right_result->dtype));
+        //   }
+        // }
         break;
       }
       case OP_ASSIGN: {
@@ -479,28 +462,28 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
           can_cmp = true;
         } else if (left_var.dtype.IsStringView() && right_result->dtype.IsStringView()) {
           can_cmp = true;
-          implicit_func_call = kBuiltinStringViewCmp;
+          implicit_func_call = functions::kBuiltinStringViewCmp;
         } else if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsPrimitive()) {
           can_cmp = true;
           if (right_result->dtype.IsFloat()) {
-            implicit_func_call = kBuiltinJsonCmpFloat;
+            implicit_func_call = functions::kBuiltinJsonCmpFloat;
           } else if (right_result->dtype.IsStringView()) {
-            implicit_func_call = kBuiltinJsonCmpString;
+            implicit_func_call = functions::kBuiltinJsonCmpString;
           } else {
-            implicit_func_call = kBuiltinJsonCmpInt;
+            implicit_func_call = functions::kBuiltinJsonCmpInt;
           }
         } else if (left_var.dtype.IsPrimitive() && right_result->dtype.IsJsonPtr()) {
           can_cmp = true;
           if (left_result->dtype.IsFloat()) {
-            implicit_func_call = kBuiltinJsonCmpFloat;
+            implicit_func_call = functions::kBuiltinJsonCmpFloat;
           } else if (left_result->dtype.IsStringView()) {
-            implicit_func_call = kBuiltinJsonCmpString;
+            implicit_func_call = functions::kBuiltinJsonCmpString;
           } else {
-            implicit_func_call = kBuiltinJsonCmpInt;
+            implicit_func_call = functions::kBuiltinJsonCmpInt;
           }
         } else if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsJsonPtr()) {
           can_cmp = true;
-          implicit_func_call = kBuiltinJsonCmpJson;
+          implicit_func_call = functions::kBuiltinJsonCmpJson;
         } else if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
           can_cmp = true;
           auto left_ele_dtype = left_var.dtype.Elem();
@@ -575,29 +558,28 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
 
 absl::StatusOr<VarTag> SelectExpr::Validate(ParseContext& ctx, RPN& rpn) {
   ctx.SetPosition(position);
-  if (true_false_operands.has_value()) {
-    select_rpn = std::make_shared<SelectRPNNode>();
-    rpn.nodes.emplace_back(select_rpn);
-  }
-  auto cond_result = validate_operand(ctx, cond, true_false_operands.has_value() ? select_rpn->cond_rpn : rpn);
+  // if (true_false_operands.has_value()) {
+  //   select_rpn = std::make_shared<SelectRPNNode>();
+  //   rpn.nodes.emplace_back(select_rpn);
+  // }
+  auto cond_result = validate_operand(ctx, cond, rpn);
   if (true_false_operands.has_value()) {
     if (!cond_result.ok()) {
       return cond_result.status();
     }
-    select_rpn->cond_rpn.SetDType(ctx, cond_result->dtype);
+    // select_rpn->cond_rpn.SetDType(ctx, cond_result->dtype);
     auto [true_expr, false_expr] = *true_false_operands;
-    auto true_expr_result = validate_operand(ctx, true_expr, select_rpn->true_rpn);
-    auto false_expr_result = validate_operand(ctx, false_expr, select_rpn->false_rpn);
+    auto true_expr_result = validate_operand(ctx, true_expr, rpn);
+    auto false_expr_result = validate_operand(ctx, false_expr, rpn);
     if (!true_expr_result.ok()) {
       return true_expr_result.status();
     }
     if (!false_expr_result.ok()) {
       return false_expr_result.status();
     }
-    // true_rpn.dtype = true_expr_result->dtype;
-    // false_rpn.dtype = false_expr_result->dtype;
-    select_rpn->true_rpn.SetDType(ctx, true_expr_result->dtype);
-    select_rpn->false_rpn.SetDType(ctx, false_expr_result->dtype);
+    rpn.nodes.emplace_back(OP_CONDITIONAL);
+    rpn.SetDType(ctx, true_expr_result->dtype);
+    // select_rpn->false_rpn.SetDType(ctx, false_expr_result->dtype);
     if (cond_result->dtype.IsBool()) {
       if (ctx.CanCastTo(true_expr_result->dtype, false_expr_result->dtype)) {
         ternary_result_dtype = false_expr_result->dtype;
@@ -653,16 +635,10 @@ absl::StatusOr<VarTag> SelectExpr::Validate(ParseContext& ctx, RPN& rpn) {
       std::vector<std::string> implicit_func_calls;
       if (true_expr_result->dtype.IsSimdColumnPtr() || true_expr_result->dtype.IsPrimitive()) {
         valid_true_dtype = true;
-        if (true_expr_result->dtype.IsPrimitive()) {
-          implicit_func_calls.emplace_back(GetFunctionName(OP_SCALAR_CAST, true_expr_result->dtype));
-        }
       }
       bool valid_false_dtype = false;
       if (false_expr_result->dtype.IsSimdColumnPtr() || false_expr_result->dtype.IsPrimitive()) {
         valid_false_dtype = true;
-        if (false_expr_result->dtype.IsPrimitive()) {
-          implicit_func_calls.emplace_back(GetFunctionName(OP_SCALAR_CAST, false_expr_result->dtype));
-        }
       }
 
       if (valid_true_dtype && valid_false_dtype) {
@@ -749,9 +725,9 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
                         }
                       }
                       if (get_by_member) {
-                        implicit_func_call = kBuiltinJsonMemberGet;
+                        implicit_func_call = functions::kBuiltinJsonMemberGet;
                       } else {
-                        implicit_func_call = kBuiltinJsonArrayGet;
+                        implicit_func_call = functions::kBuiltinJsonArrayGet;
                       }
                       DType json_dtype(DATA_JSON);
                       ret_dtype = json_dtype.ToPtr();
@@ -797,10 +773,10 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
     }
     return var_dtype;
   } else if (func_args.has_value()) {
-    DType largest_dtype;
+    DType compute_dtype;
     bool has_simd_vector = false;
     bool has_simd_column = false;
-    builtin_op = get_buitin_func_op(name);
+    builtin_op = functions::get_buitin_func_op(name);
     int operand_count = get_operand_count(builtin_op);
     DType first_number_dtype;
     auto validate_result = func_args->Validate(ctx, operand_count > 0 ? &rpn : nullptr);
@@ -811,14 +787,12 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
     std::vector<VarTag> arg_tag_dtypes = validate_result.value();
     std::vector<DType> arg_dtypes;
     for (auto arg_dtype : arg_tag_dtypes) {
-      if (arg_dtype.dtype > largest_dtype) {
-        largest_dtype = arg_dtype.dtype;
+      if (!has_simd_vector && arg_dtype.dtype > compute_dtype) {
+        compute_dtype = arg_dtype.dtype;
       }
       if (arg_dtype.dtype.IsSimdVector()) {
         has_simd_vector = true;
-      }
-      if (arg_dtype.dtype.IsSimdColumnPtr()) {
-        has_simd_column = true;
+        compute_dtype = arg_dtype.dtype;
       }
       if (arg_dtype.dtype.IsNumber() && first_number_dtype.IsInvalid()) {
         first_number_dtype = arg_dtype.dtype;
@@ -826,12 +800,20 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
       arg_dtypes.emplace_back(arg_dtype.dtype);
     }
     if (builtin_op != OP_INVALID) {
+      if (operand_count > 0) {
+        rpn.nodes.emplace_back(builtin_op);
+        as_builtin_op = true;
+        DType ret_dtype = compute_dtype;
+        rpn.SetDType(ctx, ret_dtype);
+        return ret_dtype;
+      }
+
       if (name == kOpTokenStrs[OP_IOTA]) {
         name = GetFunctionName(OP_IOTA, first_number_dtype);
       } else if (has_simd_vector || has_simd_column) {
         name = GetFunctionName(builtin_op, arg_dtypes);
       } else {
-        name = GetFunctionName(builtin_op, largest_dtype);
+        name = GetFunctionName(builtin_op, compute_dtype);
       }
     }
     auto result = ctx.CheckFuncExist(name);
@@ -843,17 +825,6 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
       rpn.nodes.emplace_back(builtin_op);
       as_builtin_op = true;
       return desc->return_type;
-    }
-    if (has_simd_column) {
-      for (auto arg_dtype : arg_dtypes) {
-        if (arg_dtype.IsPrimitive()) {
-          std::string implicit_func_call = GetFunctionName(OP_SCALAR_CAST, arg_dtype);
-          result = ctx.CheckFuncExist(implicit_func_call, true);
-          if (!result.ok()) {
-            return result.status();
-          }
-        }
-      }
     }
 
     if (desc->context_arg_idx >= 0) {

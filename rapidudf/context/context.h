@@ -41,7 +41,7 @@
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
 #include "rapidudf/types/pointer.h"
-#include "rapidudf/types/simd_vector.h"
+#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {

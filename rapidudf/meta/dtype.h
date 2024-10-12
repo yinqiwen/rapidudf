@@ -52,101 +52,16 @@
 #include "fmt/format.h"
 
 #include "rapidudf/context/context.h"
+#include "rapidudf/meta//dtype_enums.h"
 #include "rapidudf/meta/type_traits.h"
-#include "rapidudf/types/eval_value.h"
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/pointer.h"
-#include "rapidudf/types/scalar.h"
-#include "rapidudf/types/simd_vector.h"
-#include "rapidudf/types/simd_vector_table.h"
+#include "rapidudf/types/simd/column.h"
+#include "rapidudf/types/simd/table.h"
+#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
-
-enum CollectionType {
-  COLLECTION_INVALID = 0,
-  COLLECTION_VECTOR,
-  COLLECTION_MAP,
-  COLLECTION_SET,
-  COLLECTION_UNORDERED_MAP,
-  COLLECTION_UNORDERED_SET,
-  COLLECTION_ABSL_SPAN,
-  COLLECTION_TUPLE,
-  COLLECTION_SIMD_VECTOR,
-  COLLECTION_END = 64,
-};
-
-constexpr std::array<std::string_view, COLLECTION_SIMD_VECTOR + 1> kCollectionTypeStrs = {
-    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector"};
-enum FundamentalType {
-  DATA_INVALID = 0,
-  DATA_VOID,
-  DATA_POINTER,
-  DATA_BIT,
-  DATA_U8,
-  DATA_I8,
-  DATA_U16,
-  DATA_I16,
-  DATA_U32,
-  DATA_I32,
-  DATA_U64,
-  DATA_I64,
-  DATA_F16,
-  DATA_F32,
-  DATA_F64,
-  DATA_F80,
-  DATA_STD_STRING_VIEW,
-  DATA_STRING_VIEW,
-  DATA_STRING,
-  DATA_FLATBUFFERS_STRING,
-  DATA_SCALAR,
-  DATA_JSON,
-  DATA_CONTEXT,
-  DATA_EVAL_VALUE,
-  DATA_SIMD_TABLE,
-  DATA_SIMD_COLUMN,
-
-  DATA_OBJECT_BEGIN = 64,
-  DATA_COMPLEX_OBJECT = (1 << 14) - 1,
-};
-
-using u8 = uint8_t;
-using u16 = uint16_t;
-using u32 = uint32_t;
-using u64 = uint64_t;
-using i8 = int8_t;
-using i16 = int16_t;
-using i32 = int32_t;
-using i64 = int64_t;
-using f32 = float;
-using f64 = double;
-
-constexpr std::array<std::string_view, DATA_SIMD_COLUMN + 1> kFundamentalTypeStrs = {"invalid",
-                                                                                     "void",
-                                                                                     "pointer",
-                                                                                     "bit",
-                                                                                     "u8",
-                                                                                     "i8",
-                                                                                     "u16",
-                                                                                     "i16",
-                                                                                     "u32",
-                                                                                     "i32",
-                                                                                     "u64",
-                                                                                     "i64",
-                                                                                     "f16",
-                                                                                     "f32",
-                                                                                     "f64",
-                                                                                     "f80",
-                                                                                     "std_string_view",
-                                                                                     "string_view",
-                                                                                     "string",
-                                                                                     "fbs_string",
-                                                                                     "scalar",
-                                                                                     "json",
-                                                                                     "Context",
-                                                                                     "eval_value",
-                                                                                     "simd_table",
-                                                                                     "simd_column"};
 
 class DType {
  public:
@@ -184,6 +99,10 @@ class DType {
   bool IsF80() const { return IsFundamental() && ctrl_.t0_ == DATA_F80; }
   bool IsFloat() const { return IsF16() || IsF32() || IsF64() || IsF80(); }
   bool IsInteger() const { return IsFundamental() && (ctrl_.t0_ >= DATA_U8 && ctrl_.t0_ <= DATA_I64); }
+  bool IsI64() const { return IsFundamental() && (ctrl_.t0_ == DATA_I64); }
+  bool IsU64() const { return IsFundamental() && (ctrl_.t0_ == DATA_U64); }
+  bool IsI32() const { return IsFundamental() && (ctrl_.t0_ == DATA_I32); }
+  bool IsU32() const { return IsFundamental() && (ctrl_.t0_ == DATA_U32); }
   bool IsSigned() const;
   bool IsVoid() const { return ctrl_.t0_ == DATA_VOID; }
   bool IsBit() const { return IsFundamental() && ctrl_.t0_ == DATA_BIT; }
@@ -204,25 +123,10 @@ class DType {
   bool IsSimdTablePtr() const { return IsPtr() && (PtrTo().IsSimdTable()); }
   bool IsSimdColumn() const { return IsFundamental() && ctrl_.t0_ == DATA_SIMD_COLUMN; }
   bool IsSimdColumnPtr() const { return IsPtr() && (PtrTo().IsSimdColumn()); }
-  bool IsScalar() const { return IsFundamental() && ctrl_.t0_ == DATA_SCALAR; }
-  bool IsScalarPtr() const { return IsPtr() && (PtrTo().IsScalar()); }
   bool IsInvalid() const { return Control() == 0; }
   bool IsComplexObj() const;
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
   bool CanCastTo(DType other) const;
-
-  // static bool IsSimdVector(uint64_t control) {
-  //   ControlValue ctrl(control);
-  //   return ctrl.container_type_ == COLLECTION_SIMD_VECTOR;
-  // }
-  // static bool IsFloat(uint64_t control) {
-  //   ControlValue ctrl(control);
-  //   return ctrl.ptr_bit_ == 0 && ctrl.container_type_ == 0; ctrl.container_type_ == COLLECTION_SIMD_VECTOR;
-  // }
-  // static bool IsInteger(uint64_t control) {
-  //   ControlValue ctrl(control);
-  //   return ctrl.container_type_ == COLLECTION_SIMD_VECTOR;
-  // }
 
   DType Key() const;
   DType Elem() const;
@@ -603,12 +507,7 @@ DType get_dtype() {
   if constexpr (std::is_same_v<simd::Column, T>) {
     return DType(DATA_SIMD_COLUMN);
   }
-  if constexpr (std::is_same_v<EvalValue, T>) {
-    return DType(DATA_EVAL_VALUE);
-  }
-  if constexpr (std::is_same_v<Scalar, T>) {
-    return DType(DATA_SCALAR);
-  }
+
   if constexpr (std::is_same_v<Pointer, T>) {
     return DType(DATA_POINTER);
   }

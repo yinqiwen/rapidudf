@@ -34,7 +34,7 @@
 #include <vector>
 #include "rapidudf/rapidudf.h"
 using namespace rapidudf;
-using namespace rapidudf::ast;
+
 TEST(JitCompiler, u64_f64) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;

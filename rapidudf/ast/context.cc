@@ -34,7 +34,7 @@
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
 
-#include "rapidudf/builtin/builtin_symbols.h"
+#include "rapidudf/functions/names.h"
 #include "rapidudf/meta/constants.h"
 
 namespace rapidudf {
@@ -101,6 +101,25 @@ absl::StatusOr<DType> ParseContext::IsVarExist(const std::string& name, bool err
   }
   return DType(DATA_VOID);
 }
+std::string ParseContext::GetSourceLine(int line) const {
+  int idx = line - 1;
+  if (idx >= 0 && idx < source_lines_.size()) {
+    return std::string(source_lines_[idx]);
+  }
+  return "";
+}
+int ParseContext::GetLineNo() const {
+  uint32_t cursor = 0;
+  uint32_t lineno = 1;
+  for (auto line : source_lines_) {
+    if (validate_posistion_ <= (cursor + line.size())) {
+      break;
+    }
+    cursor += line.size();
+    lineno++;
+  }
+  return lineno;
+}
 std::string ParseContext::GetErrorLine() const {
   uint32_t cursor = 0;
   uint32_t lineno = 1;
@@ -129,11 +148,11 @@ bool ParseContext::CanCastTo(DType from_dtype, DType to_dtype) {
     std::string implicit_func_call;
     if (to_dtype.IsStringView()) {
       if (from_dtype.IsStringPtr()) {
-        implicit_func_call = kBuiltinCastStdStrToStringView;
+        implicit_func_call = functions::kBuiltinCastStdStrToStringView;
       } else if (from_dtype.IsFlatbuffersStringPtr()) {
-        implicit_func_call = kBuiltinCastFbsStrToStringView;
+        implicit_func_call = functions::kBuiltinCastFbsStrToStringView;
       } else if (from_dtype.IsStdStringView()) {
-        implicit_func_call = kBuiltinCastStdStrViewToStringView;
+        implicit_func_call = functions::kBuiltinCastStdStrViewToStringView;
       }
     }
     if (!implicit_func_call.empty()) {

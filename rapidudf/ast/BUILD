@@ -15,11 +15,12 @@ cc_library(
         "context.h",
     ],
     deps = [
-        "//rapidudf/builtin:builtin_symbols",
+        "//rapidudf/functions:names",
         "//rapidudf/log",
         "//rapidudf/meta:constants",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",
+        "//rapidudf/meta:operand",
         "//rapidudf/meta:optype",
         "@com_google_absl//absl/status:statusor",
     ],
@@ -44,7 +45,7 @@ cc_library(
     ],
     deps = [
         ":context",
-        "//rapidudf/builtin",
+        "//rapidudf/functions",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",
