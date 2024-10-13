@@ -42,11 +42,23 @@
 
 #include "fmt/format.h"
 
+#include "rapidudf/compiler/type.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace compiler {
+absl::StatusOr<::llvm::Value*> CodeGen::VectorTernaryOp(OpToken op, DType dtype, ::llvm::Value* a, ::llvm::Value* b,
+                                                        ::llvm::Value* c, ::llvm::Value* output) {
+  std::string fname = GetFunctionName(op, dtype.ToSimdVector());
+  auto vector_type = get_vector_type(builder_->getContext(), dtype);
+  auto result = CallFunction(fname, std::vector<::llvm::Value*>{a, b, c, output});
+  if (!result.ok()) {
+    return result.status();
+  }
+  return builder_->CreateLoad(vector_type, output);
+}
+
 absl::StatusOr<::llvm::Value*> CodeGen::TernaryOp(OpToken op, DType dtype, ::llvm::Value* a, ::llvm::Value* b,
                                                   ::llvm::Value* c) {
   ::llvm::Intrinsic::ID builtin_intrinsic = 0;
@@ -130,10 +142,23 @@ absl::StatusOr<ValuePtr> CodeGen::TernaryOp(OpToken op, ValuePtr a, ValuePtr b, 
     a = cast_result.value();
   }
   auto result = TernaryOp(op, compute_dtype, a->LoadValue(), b->LoadValue(), c->LoadValue());
+  ValuePtr result_val;
   if (!result.ok()) {
-    return result.status();
+    std::string extern_func_name = GetFunctionName(op, compute_dtype);
+    auto val_result = CallFunction(extern_func_name, {a, b, c});
+    if (val_result.ok()) {
+      result_val = val_result.value();
+    } else {
+      return result.status();
+    }
+  } else {
+    result_val = NewValue(compute_dtype, result.value());
   }
-  return NewValue(compute_dtype, result.value());
+  // if (!result.ok()) {
+  //   return result.status();
+  // }
+  // return NewValue(compute_dtype, result_val);
+  return result_val;
 }
 }  // namespace compiler
 }  // namespace rapidudf

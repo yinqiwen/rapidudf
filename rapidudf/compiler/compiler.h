@@ -160,7 +160,10 @@ class JitCompiler {
   struct RPNEvalNode {
     ValuePtr val;
     OpToken op = OP_INVALID;
-    ValuePtr op_temp_val;
+    DType op_compute_dtype;
+    ::llvm::Value* op_temp_val = nullptr;
+    ::llvm::Value* constant_vector_val = nullptr;
+    ::llvm::Value* constant_vector_val_ptr = nullptr;
     explicit RPNEvalNode(OpToken v) : op(v) {}
     explicit RPNEvalNode(ValuePtr v) : val(v) {}
   };

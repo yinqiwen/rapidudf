@@ -48,13 +48,21 @@
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace compiler {
-
+absl::StatusOr<::llvm::Value*> CodeGen::VectorUnaryOp(OpToken op, DType dtype, ::llvm::Value* input,
+                                                      ::llvm::Value* output) {
+  std::string fname = GetFunctionName(op, dtype.ToSimdVector());
+  auto vector_type = get_vector_type(builder_->getContext(), dtype);
+  auto result = CallFunction(fname, std::vector<::llvm::Value*>{input, output});
+  if (!result.ok()) {
+    return result.status();
+  }
+  return builder_->CreateLoad(vector_type, output);
+}
 absl::StatusOr<::llvm::Value*> CodeGen::UnaryOp(OpToken op, DType dtype, ::llvm::Value* val) {
   ::llvm::Intrinsic::ID builtin_intrinsic = 0;
   std::vector<::llvm::Value*> builtin_intrinsic_args;
   ::llvm::Value* ret_value = nullptr;
   ::llvm::Type* element_type = GetElementType(val->getType());
-
   switch (op) {
     case OP_NEGATIVE: {
       if (element_type->isFloatingPointTy()) {

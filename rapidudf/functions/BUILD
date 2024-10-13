@@ -26,10 +26,12 @@ cc_library(
     ],
     deps = [
         ":names",
+        "//rapidudf/functions/simd:vector",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",
         "//rapidudf/meta:optype",
         "//rapidudf/reflect",
+        "@sleef",
     ],
 )

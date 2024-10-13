@@ -30,78 +30,90 @@
 */
 
 #include <gtest/gtest.h>
+#include <functional>
 #include <vector>
-#include "absl/strings/str_join.h"
-
-#include "rapidudf/context/context.h"
-#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 
-static void print_span(absl::Span<const StringView> x) {
-  RUDF_ERROR("@@@{}", x.size());
-  for (auto v : x) {
-    RUDF_ERROR("{}", v);
-  }
-}
-RUDF_FUNC_REGISTER(print_span)
-TEST(JitCompiler, array_simple) {
+TEST(JitCompiler, json_read_int) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  std::string source = R"(
-     print_span(["ehllo", "adas", "aas"])
-  )";
-  auto result = compiler.CompileExpression<void>(source, {});
-  if (!result.ok()) {
-    RUDF_ERROR("{}", result.status().ToString());
-  }
-  ASSERT_TRUE(result.ok());
-  auto f = std::move(result.value());
-  f();
+  JsonObject json;
+  json["key"] = 123;
 
-  std::string source1 = R"(
-    simd_vector<f64> test_func(Context ctx, simd_vector<f64> x,simd_vector<f64> y){
-        return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
-      // return  x * y;
+  std::string content = R"(
+    bool test_func(json x){
+      return x["key"] == 123;
     }
   )";
+  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  // auto f = compiler.GetFunc<bool, const JsonObject&>(true);
+  // ASSERT_TRUE(f != nullptr);
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
+}
+TEST(JitCompiler, json_read_str) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
 
-  auto result1 =
-      compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&, rapidudf::simd::Vector<double>,
-                               rapidudf::simd::Vector<double>>(source1, true);
-  if (!result1.ok()) {
-    RUDF_ERROR("###{}", result1.status().ToString());
-  }
-  auto ff = std::move(result1.value());
-  std::vector<double> xx, yy, actuals, final_results;
-  size_t test_n = 16;
-  for (size_t i = 0; i < test_n; i++) {
-    xx.emplace_back(i + 1);
-    yy.emplace_back(i + 101);
-  }
-  rapidudf::Context ctx;
-  auto fr = ff(ctx, xx, yy);
+  JsonObject json;
+  json["key"] = "hello,world";
+
+  std::string content = R"(
+    bool test_func(json x){
+      return x["key"] == "hello,world";
+    }
+  )";
+  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  // auto f = compiler.GetFunc<bool, const JsonObject&>(true);
+  // ASSERT_TRUE(f != nullptr);
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
 }
 
-TEST(JitCompiler, vector_iota) {
+TEST(JitCompiler, json_read_float) {
   spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
+
+  JsonObject json;
+  json["key"] = 3.14;
+
   std::string content = R"(
-    simd_vector<f64> test_func(Context ctx){
-      var t = iota(1_f64,12);
-      return t;
+    bool test_func(json x){
+      return x["key"] == 3.14;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>, Context&>(content, true);
+  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content);
   ASSERT_TRUE(rc.ok());
+  // auto f = compiler.GetFunc<bool, const JsonObject&>(true);
+  // ASSERT_TRUE(f != nullptr);
   auto f = std::move(rc.value());
-  Context ctx;
-  auto result = f(ctx);
-  RUDF_INFO("IsTemporary:{}", result.IsTemporary());
-  ASSERT_EQ(result.Size(), 12);
-  for (size_t i = 0; i < result.Size(); i++) {
-    ASSERT_DOUBLE_EQ(result[i], i + 1);
-  }
+  ASSERT_TRUE(f(json));
+}
+
+TEST(JitCompiler, json_array_get) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+
+  JsonObject json;
+  json["key"] = {1, 2, 3};
+
+  std::string content = R"(
+    bool test_func(json x){
+      return x["key"][1] == 2;
+    }
+  )";
+  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  // auto f = compiler.GetFunc<bool, const JsonObject&>(true);
+  // ASSERT_TRUE(f != nullptr);
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
 }

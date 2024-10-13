@@ -369,7 +369,8 @@ static void register_fnms() {
 template <typename T>
 static void register_clamp() {
   T (*f)(T, T, T) = &scalar_clamp<T>;
-  std::string func_name = "clamp_" + get_dtype<T>().GetTypeString();
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_CLAMP, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
 }
 

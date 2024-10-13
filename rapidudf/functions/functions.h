@@ -31,6 +31,7 @@
 
 #pragma once
 #include <string>
+#include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace functions {
@@ -38,6 +39,7 @@ namespace functions {
 void init_builtin();
 
 OpToken get_buitin_func_op(const std::string& name);
+bool has_vector_buitin_func(OpToken op, DType dtype);
 
 }  // namespace functions
 }  // namespace rapidudf

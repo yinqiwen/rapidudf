@@ -129,14 +129,18 @@ class CodeGen {
   absl::Status ContinueLoop();
   absl::Status FinishFunction();
 
-  absl::StatusOr<::llvm::Value*> NewConstVectorValue(DType dtype, ::llvm::Value* val);
-  absl::StatusOr<::llvm::Value*> NewConstVectorValue(ValuePtr val);
+  absl::StatusOr<::llvm::Value*> NewConstantVectorValue(DType dtype, ::llvm::Value* val);
+  absl::StatusOr<::llvm::Value*> NewConstantVectorValue(ValuePtr val);
+  absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> NewStackConstantVector(ValuePtr constant);
+  ::llvm::Value* NewVectorVar(DType dtype);
+
   absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> LoadVector(DType dtype, ::llvm::Value* ptr,
                                                                        ::llvm::Value* idx);
   absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> LoadNVector(DType dtype, ::llvm::Value* ptr,
                                                                         ::llvm::Value* idx, ::llvm::Value* n);
   absl::Status StoreVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx);
   absl::Status StoreNVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx, ::llvm::Value* n);
+  void Store(::llvm::Value* val, ::llvm::Value* ptr);
 
   absl::StatusOr<ValuePtr> CastTo(ValuePtr val, DType dst_dtype);
   absl::StatusOr<::llvm::Value*> CastTo(::llvm::Value* val, DType src_dtype, DType dst_dtype);
@@ -147,6 +151,12 @@ class CodeGen {
   absl::StatusOr<ValuePtr> UnaryOp(OpToken op, ValuePtr val);
   absl::StatusOr<ValuePtr> BinaryOp(OpToken op, ValuePtr left, ValuePtr right);
   absl::StatusOr<ValuePtr> TernaryOp(OpToken op, ValuePtr a, ValuePtr b, ValuePtr c);
+
+  absl::StatusOr<::llvm::Value*> VectorUnaryOp(OpToken op, DType dtype, ::llvm::Value* input, ::llvm::Value* output);
+  absl::StatusOr<::llvm::Value*> VectorBinaryOp(OpToken op, DType dtype, ::llvm::Value* left, ::llvm::Value* right,
+                                                ::llvm::Value* output);
+  absl::StatusOr<::llvm::Value*> VectorTernaryOp(OpToken op, DType dtype, ::llvm::Value* a, ::llvm::Value* b,
+                                                 ::llvm::Value* c, ::llvm::Value* output);
 
   absl::StatusOr<ValuePtr> CallFunction(const std::string& name, const std::vector<ValuePtr>& const_arg_values);
   absl::StatusOr<ValuePtr> CallFunction(std::string_view name, const std::vector<ValuePtr>& arg_values) {
@@ -183,6 +193,8 @@ class CodeGen {
  private:
   uint32_t GetLabelCursor() { return label_cursor_++; }
   ::llvm::Type* GetElementType(::llvm::Type* t);
+
+  absl::StatusOr<::llvm::Value*> CallFunction(const std::string& name, const std::vector<::llvm::Value*>& arg_values);
 
   absl::StatusOr<DType> NormalizeDType(const std::vector<DType>& dtypes);
 

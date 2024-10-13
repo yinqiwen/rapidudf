@@ -44,6 +44,7 @@ cc_library(
         ":type",
         "//rapidudf/meta:function",
         "//rapidudf/meta:optype",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 

@@ -28,55 +28,58 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/functions/functions.h"
-#include <mutex>
-#include <unordered_map>
-#include "rapidudf/meta/function.h"
-namespace rapidudf {
-namespace functions {
 
-static std::unordered_map<std::string, OpToken>& get_builtin_func_op_mapping() {
-  static std::unordered_map<std::string, OpToken> mapping;
-  return mapping;
+#include <gtest/gtest.h>
+#include <functional>
+#include <vector>
+#include "rapidudf/rapidudf.h"
+using namespace rapidudf;
+
+TEST(JitCompiler, ifelse0) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+
+  std::string content = R"(
+    int test_func(int x){ 
+      if(x>10){
+         return 20;
+      }elif(x > 5){
+       return 10;
+      }else{
+        return 0;
+      }
+    }
+  )";
+  auto rc = compiler.CompileFunction<int, int>(content, true);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_DOUBLE_EQ(f(11), 20);
+  ASSERT_DOUBLE_EQ(f(9), 10);
+  ASSERT_DOUBLE_EQ(f(6), 10);
+  ASSERT_DOUBLE_EQ(f(4), 0);
 }
 
-extern void init_builtin_stl_sets_funcs();
-extern void init_builtin_stl_maps_funcs();
-extern void init_builtin_stl_vectors_funcs();
-extern void init_builtin_strings_funcs();
-extern void init_builtin_math_funcs();
-extern void init_builtin_json_funcs();
-extern void init_builtin_simd_vector_funcs();
+TEST(JitCompiler, ifelse1) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
 
-static std::once_flag g_init_builtin_flag;
-void init_builtin() {
-  for (uint32_t op = OP_UNARY_BEGIN; op < OP_END; op++) {
-    get_builtin_func_op_mapping().emplace(kOpTokenStrs[op], static_cast<OpToken>(op));
-  }
-  std::call_once(g_init_builtin_flag, []() {
-    init_builtin_math_funcs();
-    init_builtin_stl_vectors_funcs();
-    init_builtin_stl_maps_funcs();
-    init_builtin_stl_sets_funcs();
-
-    init_builtin_strings_funcs();
-    init_builtin_json_funcs();
-    init_builtin_simd_vector_funcs();
-  });
+  std::string content = R"(
+    int test_func(int x){ 
+      if(x>10){
+         x=20;
+      }elif(x > 5){
+       x= 10;
+      }else{
+        x= 0;
+      }
+      return x;
+    }
+  )";
+  auto rc = compiler.CompileFunction<int, int>(content, true);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_DOUBLE_EQ(f(11), 20);
+  ASSERT_DOUBLE_EQ(f(9), 10);
+  ASSERT_DOUBLE_EQ(f(6), 10);
+  ASSERT_DOUBLE_EQ(f(4), 0);
 }
-
-OpToken get_buitin_func_op(const std::string& name) {
-  auto found = get_builtin_func_op_mapping().find(name);
-  if (found != get_builtin_func_op_mapping().end()) {
-    return found->second;
-  }
-  return OP_INVALID;
-}
-
-bool has_vector_buitin_func(OpToken op, DType dtype) {
-  std::string fname = GetFunctionName(op, dtype.ToSimdVector());
-  return FunctionFactory::GetFunction(fname) != nullptr;
-}
-
-}  // namespace functions
-}  // namespace rapidudf

@@ -40,6 +40,7 @@
 
 #include "fmt/format.h"
 
+#include "rapidudf/compiler/type.h"
 #include "rapidudf/functions/names.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
@@ -48,6 +49,21 @@
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace compiler {
+absl::StatusOr<::llvm::Value*> CodeGen::VectorBinaryOp(OpToken op, DType dtype, ::llvm::Value* left,
+                                                       ::llvm::Value* right, ::llvm::Value* output) {
+  std::string fname = GetFunctionName(op, dtype.ToSimdVector());
+  auto result_dtype = dtype;
+  if (is_compare_op(op)) {
+    result_dtype = DType(DATA_BIT);
+  }
+  auto vector_type = get_vector_type(builder_->getContext(), result_dtype);
+  auto result = CallFunction(fname, std::vector<::llvm::Value*>{left, right, output});
+  if (!result.ok()) {
+    return result.status();
+  }
+  return builder_->CreateLoad(vector_type, output);
+}
+
 absl::StatusOr<::llvm::Value*> CodeGen::BinaryOp(OpToken op, DType dtype, ::llvm::Value* left, ::llvm::Value* right) {
   ::llvm::Intrinsic::ID builtin_intrinsic = 0;
   std::vector<::llvm::Value*> builtin_intrinsic_args;
@@ -56,6 +72,7 @@ absl::StatusOr<::llvm::Value*> CodeGen::BinaryOp(OpToken op, DType dtype, ::llvm
   ::llvm::Type* element_type = GetElementType(left->getType());
   DType element_dtype = dtype.Elem();
   std::function<::llvm::Value*(::llvm::Value*)> intrinsic_post_transformer;
+
   switch (op) {
     case OP_PLUS: {
       if (element_type->isFloatingPointTy()) {
@@ -244,6 +261,7 @@ absl::StatusOr<::llvm::Value*> CodeGen::BinaryOp(OpToken op, DType dtype, ::llvm
   if (ret_value != nullptr) {
     return ret_value;
   }
+
   if (builtin_intrinsic > 0) {
     ::llvm::Value* v = builder_->CreateIntrinsic(ret_type, builtin_intrinsic, builtin_intrinsic_args);
     if (intrinsic_post_transformer) {
@@ -251,6 +269,17 @@ absl::StatusOr<::llvm::Value*> CodeGen::BinaryOp(OpToken op, DType dtype, ::llvm
     }
     return v;
   }
+  // if (dtype.IsStringView() && left->getType()->isVectorTy() && op >= OP_EQUAL && op <= OP_GREATER_EQUAL) {
+  //   auto op_arg = NewU32(static_cast<uint32_t>(op));
+  //   std::vector<ValuePtr> args{op_arg, left, right};
+  //   auto result = CallFunction(functions::kBuiltinStringViewVectorCmp, std::vector<::llvm::Value*>{nullptr, left,
+  //   right}); if (result.ok()) {
+  //     return result.value();
+  //   } else {
+  //     return result.status();
+  //   }
+  // }
+  // RUDF_ERROR("enter bin op:{}, dtype:{}, vector:{}", op, dtype, ret_type->isVectorTy());
   return absl::InvalidArgumentError(fmt::format("Unsupported op:{} for dtype:{}", op, dtype));
 }
 

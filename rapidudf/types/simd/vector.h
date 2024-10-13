@@ -40,6 +40,8 @@
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
 namespace simd {
+
+static constexpr uint32_t kVectorUnitSize = 64;
 template <typename T>
 struct InternalType {
   using internal_type = T;

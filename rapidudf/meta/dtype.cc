@@ -304,6 +304,9 @@ bool DType::CanCastTo(DType other) const {
   if (IsNumber() && other.IsNumber()) {
     return true;
   }
+  if (IsJsonPtr() && other.IsPrimitive()) {
+    return true;
+  }
   if (other.IsStringView()) {
     if (IsPtr()) {
       if (PtrTo().IsString() || PtrTo().IsFlatbuffersString()) {

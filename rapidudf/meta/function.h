@@ -74,12 +74,6 @@ DType get_function_arg_dtype() {
 
 class FunctionFactory {
  public:
-  static constexpr std::string_view kSimdVectorUnaryFuncPrefix = "simd_vector_unary";
-  static constexpr std::string_view kSimdColumnUnaryFuncPrefix = "simd_column_unary";
-  static constexpr std::string_view kSimdVectorBinaryFuncPrefix = "simd_vector_binary";
-  static constexpr std::string_view kSimdColumnBinaryFuncPrefix = "simd_column_binary";
-  static constexpr std::string_view kSimdVectorTernaryFuncPrefix = "simd_vector_ternary";
-  static constexpr std::string_view kSimdColumnTernaryFuncPrefix = "simd_column_ternary";
   static constexpr std::string_view kSimdVectorFuncPrefix = "simd_vector";
   template <typename RET, typename... Args>
   bool Register(std::string_view name, RET (*f)(Args...)) {
@@ -117,13 +111,8 @@ class FuncRegister {
 };
 std::string GetMemberFuncName(DType dtype, const std::string& member);
 std::string GetFunctionName(OpToken op, DType dtype);
-std::string GetFunctionName(OpToken op, DType left_dtype, DType right_dtype);
-std::string GetFunctionName(OpToken op, DType a, DType b, DType c);
-std::string GetFunctionName(OpToken op, const std::vector<DType>& arg_dtypes);
+std::string GetFunctionName(OpToken op, DType dtype0, DType dtype1);
 std::string GetFunctionName(std::string_view op, DType dtype);
-std::string GetFunctionName(std::string_view op, DType left_dtype, DType right_dtype);
-std::string GetFunctionName(std::string_view op, DType a, DType b, DType c);
-std::string GetFunctionName(std::string_view op, const std::vector<DType>& arg_dtypes);
 
 template <uint64_t, uint32_t, uint64_t, typename F>
 struct MemberFunctionWrapper;

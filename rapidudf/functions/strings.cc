@@ -36,9 +36,12 @@
 
 #include "rapidudf/functions/names.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/reflect/macros.h"
+#include "rapidudf/types/bit.h"
+#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
@@ -84,10 +87,37 @@ bool compare_string_view(uint32_t op, StringView left, StringView right) {
   return result;
 }
 
-StringView cast_stdstr_to_string_view(const std::string& str) {
-  RUDF_DEBUG("cast_stdstr_to_string_view #{}#", str);
-  return StringView(str);
+template <OpToken op>
+void compare_string_views(const StringView* left, const StringView* right, uint8_t* ret) {
+  for (size_t i = 0; i < simd::kVectorUnitSize; i++) {
+    bool v = compare_string_view(static_cast<uint32_t>(op), left[i], right[i]);
+    uint32_t byte_idx = i / 8;
+    uint8_t bit_cursor = i % 8;
+    if (v) {
+      ret[byte_idx] = bit_set(ret[byte_idx], bit_cursor);
+    } else {
+      ret[byte_idx] = bit_clear(ret[byte_idx], bit_cursor);
+    }
+  }
 }
+
+static void register_string_view_vector_cmp_func() {
+  DType simd_vector_string = DType(DATA_STRING_VIEW).ToSimdVector();
+  std::string func_name = GetFunctionName(OP_EQUAL, simd_vector_string);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), compare_string_views<OP_EQUAL>);
+  func_name = GetFunctionName(OP_NOT_EQUAL, simd_vector_string);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), compare_string_views<OP_NOT_EQUAL>);
+  func_name = GetFunctionName(OP_GREATER_EQUAL, simd_vector_string);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), compare_string_views<OP_GREATER_EQUAL>);
+  func_name = GetFunctionName(OP_LESS_EQUAL, simd_vector_string);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), compare_string_views<OP_LESS_EQUAL>);
+  func_name = GetFunctionName(OP_GREATER, simd_vector_string);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), compare_string_views<OP_GREATER>);
+  func_name = GetFunctionName(OP_LESS, simd_vector_string);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), compare_string_views<OP_LESS>);
+}
+
+StringView cast_stdstr_to_string_view(const std::string& str) { return StringView(str); }
 StringView cast_fbsstr_to_string_view(const flatbuffers::String& str) { return StringView(str.c_str(), str.size()); }
 StringView cast_stdstrview_to_string_view(std::string_view str) { return StringView(str); }
 
@@ -114,9 +144,12 @@ void init_builtin_strings_funcs() {
                                   starts_with_ignore_case, ends_with_ignore_case)
   RUDF_STRUCT_HELPER_METHODS_BIND(StdStringViewHelper, size)
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinStringViewCmp, compare_string_view);
+
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrToStringView, cast_stdstr_to_string_view);
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastFbsStrToStringView, cast_fbsstr_to_string_view);
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinCastStdStrViewToStringView, cast_stdstrview_to_string_view);
+
+  register_string_view_vector_cmp_func();
 }
 }  // namespace functions
 

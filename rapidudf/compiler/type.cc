@@ -35,6 +35,7 @@
 
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/types/simd/vector.h"
 
 namespace rapidudf {
 namespace compiler {
@@ -126,8 +127,8 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
 ::llvm::VectorType* get_vector_type(::llvm::LLVMContext& ctx, DType dtype) {
   DType ele_dtype = dtype.Elem();
   uint32_t n = 0;
-  if (ele_dtype.Bits() > 0 && ele_dtype.Bits() <= 64) {
-    n = k_vector_size;
+  if (ele_dtype.Bits() > 0 && ele_dtype.Bits() <= 128) {
+    n = simd::kVectorUnitSize;
   }
   ::llvm::Type* ele_type = get_type(ctx, ele_dtype);
   if (n > 0 && ele_type != nullptr) {

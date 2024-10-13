@@ -28,27 +28,38 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/types/simd/column.h"
-namespace rapidudf {
-namespace simd {
 
-Column* simd_column_filter(Column* data, Column* bits);
-Column* simd_column_gather(Column* data, Column* indices);
+#include <gtest/gtest.h>
+#include <vector>
 
-size_t Column::size() const { return data_.Size(); }
+#include "rapidudf/rapidudf.h"
 
-Column* Column::take(size_t n) {
-  //   auto new_vec = data_.Resize(n);
-  //   return ctx_.New<Column>(ctx_, new_vec);
-  return nullptr;
+using namespace rapidudf;
+using namespace rapidudf::ast;
+TEST(JitCompiler, string_size) {
+  JitCompiler compiler;
+  std::string content = R"(str.size())";
+  auto rc = compiler.CompileExpression<size_t, StringView>(content, {"str"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f("hello"), 5);
+  ASSERT_EQ(f("he"), 2);
 }
-
-Column* Column::clone() {
-  //   auto new_vec = simd_vector_clone(ctx_, arg);
-  //   return ctx_.New<Column>(ctx_, new_vec);
-  return nullptr;
+TEST(JitCompiler, string_contains) {
+  JitCompiler compiler;
+  std::string content = R"(str.contains("hello"))";
+  auto rc = compiler.CompileExpression<bool, StringView>(content, {"str"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f("hello"), true);
+  ASSERT_EQ(f("he"), false);
 }
-Column* Column::filter(Column* bits) { return simd_column_filter(this, bits); }
-Column* Column::gather(Column* indices) { return simd_column_gather(this, indices); }
-}  // namespace simd
-}  // namespace rapidudf
+TEST(JitCompiler, string_starts_with) {
+  JitCompiler compiler;
+  std::string content = R"(str.starts_with("hello"))";
+  auto rc = compiler.CompileExpression<bool, StringView>(content, {"str"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f("hello"), true);
+  ASSERT_EQ(f("he"), false);
+}

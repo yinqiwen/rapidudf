@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,55 +28,17 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/functions/functions.h"
-#include <mutex>
-#include <unordered_map>
-#include "rapidudf/meta/function.h"
+
+#pragma once
+#include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace functions {
-
-static std::unordered_map<std::string, OpToken>& get_builtin_func_op_mapping() {
-  static std::unordered_map<std::string, OpToken> mapping;
-  return mapping;
-}
-
-extern void init_builtin_stl_sets_funcs();
-extern void init_builtin_stl_maps_funcs();
-extern void init_builtin_stl_vectors_funcs();
-extern void init_builtin_strings_funcs();
-extern void init_builtin_math_funcs();
-extern void init_builtin_json_funcs();
-extern void init_builtin_simd_vector_funcs();
-
-static std::once_flag g_init_builtin_flag;
-void init_builtin() {
-  for (uint32_t op = OP_UNARY_BEGIN; op < OP_END; op++) {
-    get_builtin_func_op_mapping().emplace(kOpTokenStrs[op], static_cast<OpToken>(op));
-  }
-  std::call_once(g_init_builtin_flag, []() {
-    init_builtin_math_funcs();
-    init_builtin_stl_vectors_funcs();
-    init_builtin_stl_maps_funcs();
-    init_builtin_stl_sets_funcs();
-
-    init_builtin_strings_funcs();
-    init_builtin_json_funcs();
-    init_builtin_simd_vector_funcs();
-  });
-}
-
-OpToken get_buitin_func_op(const std::string& name) {
-  auto found = get_builtin_func_op_mapping().find(name);
-  if (found != get_builtin_func_op_mapping().end()) {
-    return found->second;
-  }
-  return OP_INVALID;
-}
-
-bool has_vector_buitin_func(OpToken op, DType dtype) {
-  std::string fname = GetFunctionName(op, dtype.ToSimdVector());
-  return FunctionFactory::GetFunction(fname) != nullptr;
-}
-
+template <typename T, OpToken opt>
+struct OperandType {
+  using operand_t = T;
+  static constexpr OpToken op = opt;
+};
+template <typename T, OpToken op>
+void simd_vector_unary_op(const T* input, T* output);
 }  // namespace functions
 }  // namespace rapidudf

@@ -56,8 +56,6 @@
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/pointer.h"
-#include "rapidudf/types/simd/column.h"
-#include "rapidudf/types/simd/table.h"
 #include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
 
@@ -119,10 +117,10 @@ class DType {
   bool IsContext() const { return IsFundamental() && ctrl_.t0_ == DATA_CONTEXT; }
   bool IsContextPtr() const { return IsPtr() && (PtrTo().IsContext()); }
   bool IsStringPtr() const { return IsPtr() && (PtrTo().IsString()); }
-  bool IsSimdTable() const { return IsFundamental() && ctrl_.t0_ == DATA_SIMD_TABLE; }
+  bool IsSimdTable() const { return IsFundamental() && ctrl_.container_type_ == COLLECTION_SIMD_TABLE; }
   bool IsSimdTablePtr() const { return IsPtr() && (PtrTo().IsSimdTable()); }
-  bool IsSimdColumn() const { return IsFundamental() && ctrl_.t0_ == DATA_SIMD_COLUMN; }
-  bool IsSimdColumnPtr() const { return IsPtr() && (PtrTo().IsSimdColumn()); }
+  // bool IsSimdColumn() const { return IsFundamental() && ctrl_.t0_ == DATA_SIMD_COLUMN; }
+  // bool IsSimdColumnPtr() const { return IsPtr() && (PtrTo().IsSimdColumn()); }
   bool IsInvalid() const { return Control() == 0; }
   bool IsComplexObj() const;
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
@@ -141,7 +139,12 @@ class DType {
 
   bool IsSameFundamentalType(const DType& other) const { return ctrl_.t0_ == other.ctrl_.t0_; }
   uint32_t ByteSize() const;
-  uint32_t Bits() const { return ByteSize() * 8; }
+  uint32_t Bits() const {
+    if (IsBit()) {
+      return 1;
+    }
+    return ByteSize() * 8;
+  }
   uint32_t QwordSize() const {
     uint32_t n = ByteSize() / 8;
     if (ByteSize() % 8 > 0) {
@@ -501,12 +504,12 @@ DType get_dtype() {
   if constexpr (std::is_same_v<Context, T>) {
     return DType(DATA_CONTEXT);
   }
-  if constexpr (std::is_same_v<simd::Table, T>) {
-    return DType(DATA_SIMD_TABLE);
-  }
-  if constexpr (std::is_same_v<simd::Column, T>) {
-    return DType(DATA_SIMD_COLUMN);
-  }
+  // if constexpr (std::is_same_v<simd::Table, T>) {
+  //   return DType(DATA_SIMD_TABLE);
+  // }
+  // if constexpr (std::is_same_v<simd::Column, T>) {
+  //   return DType(DATA_SIMD_COLUMN);
+  // }
 
   if constexpr (std::is_same_v<Pointer, T>) {
     return DType(DATA_POINTER);
@@ -683,7 +686,7 @@ struct fmt::formatter<rapidudf::FundamentalType> : formatter<std::string> {
   // parse is inherited from formatter<string_view>.
   auto format(rapidudf::FundamentalType c, format_context& ctx) const -> format_context::iterator {
     std::string view = "object";
-    if (c <= rapidudf::DATA_SIMD_COLUMN) {
+    if (c < rapidudf::DATA_BUILTIN_TYPE_END) {
       view = std::string(rapidudf::kFundamentalTypeStrs[c]);
     } else {
       view = fmt::format("object/{}", static_cast<int>(c));

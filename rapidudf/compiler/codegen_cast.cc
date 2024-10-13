@@ -41,6 +41,7 @@
 #include "rapidudf/functions/names.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
@@ -102,6 +103,10 @@ absl::StatusOr<ValuePtr> CodeGen::CastTo(ValuePtr val, DType dst_dtype) {
   }
   if (!src_dtype.CanCastTo(dst_dtype)) {
     RUDF_LOG_RETURN_FMT_ERROR("Can NOT cast from {} to {}", src_dtype, dst_dtype);
+  }
+  if (src_dtype.IsJsonPtr() && dst_dtype.IsPrimitive()) {
+    std::string func_name = GetFunctionName(functions::kBuiltinJsonExtract, dst_dtype);
+    return CallFunction(func_name, {val});
   }
   // auto* dst_type = get_type(builder_->getContext(), dst_dtype);
   if (dst_dtype.IsNumber()) {

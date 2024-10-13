@@ -28,55 +28,29 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "rapidudf/functions/functions.h"
-#include <mutex>
-#include <unordered_map>
-#include "rapidudf/meta/function.h"
-namespace rapidudf {
-namespace functions {
 
-static std::unordered_map<std::string, OpToken>& get_builtin_func_op_mapping() {
-  static std::unordered_map<std::string, OpToken> mapping;
-  return mapping;
+#include <gtest/gtest.h>
+#include <functional>
+#include <vector>
+#include "rapidudf/rapidudf.h"
+
+using namespace rapidudf;
+
+TEST(JitCompiler, vector_size) {
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  std::string content = R"(
+    int test_f(int x){
+       return x+1;
+    }
+    int test_func(int x){
+      return test_f(x) + 10;
+    }
+  )";
+  auto rc = compiler.CompileSource(content, true);
+  ASSERT_TRUE(rc.ok());
+  auto func_result = compiler.LoadFunction<int, int>("test_func");
+  ASSERT_TRUE(func_result.ok());
+  auto f = std::move(func_result.value());
+  ASSERT_EQ(f(1), 12);
 }
-
-extern void init_builtin_stl_sets_funcs();
-extern void init_builtin_stl_maps_funcs();
-extern void init_builtin_stl_vectors_funcs();
-extern void init_builtin_strings_funcs();
-extern void init_builtin_math_funcs();
-extern void init_builtin_json_funcs();
-extern void init_builtin_simd_vector_funcs();
-
-static std::once_flag g_init_builtin_flag;
-void init_builtin() {
-  for (uint32_t op = OP_UNARY_BEGIN; op < OP_END; op++) {
-    get_builtin_func_op_mapping().emplace(kOpTokenStrs[op], static_cast<OpToken>(op));
-  }
-  std::call_once(g_init_builtin_flag, []() {
-    init_builtin_math_funcs();
-    init_builtin_stl_vectors_funcs();
-    init_builtin_stl_maps_funcs();
-    init_builtin_stl_sets_funcs();
-
-    init_builtin_strings_funcs();
-    init_builtin_json_funcs();
-    init_builtin_simd_vector_funcs();
-  });
-}
-
-OpToken get_buitin_func_op(const std::string& name) {
-  auto found = get_builtin_func_op_mapping().find(name);
-  if (found != get_builtin_func_op_mapping().end()) {
-    return found->second;
-  }
-  return OP_INVALID;
-}
-
-bool has_vector_buitin_func(OpToken op, DType dtype) {
-  std::string fname = GetFunctionName(op, dtype.ToSimdVector());
-  return FunctionFactory::GetFunction(fname) != nullptr;
-}
-
-}  // namespace functions
-}  // namespace rapidudf

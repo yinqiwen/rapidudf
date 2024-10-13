@@ -30,78 +30,107 @@
 */
 
 #include <gtest/gtest.h>
+#include <exception>
+#include <functional>
+#include <stdexcept>
+#include <type_traits>
 #include <vector>
-#include "absl/strings/str_join.h"
-
-#include "rapidudf/context/context.h"
-#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
+using namespace rapidudf::ast;
 
-static void print_span(absl::Span<const StringView> x) {
-  RUDF_ERROR("@@@{}", x.size());
-  for (auto v : x) {
-    RUDF_ERROR("{}", v);
-  }
-}
-RUDF_FUNC_REGISTER(print_span)
-TEST(JitCompiler, array_simple) {
+static int test_user_func() { throw std::logic_error("aaa"); }
+
+struct TestStruct {
+  void test_funcx() { throw std::logic_error("aaa"); }
+};
+
+RUDF_FUNC_REGISTER(test_user_func)
+
+RUDF_STRUCT_MEMBER_METHODS(TestStruct, test_funcx)
+
+TEST(JitCompiler, exception) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
   JitCompiler compiler;
-  std::string source = R"(
-     print_span(["ehllo", "adas", "aas"])
-  )";
-  auto result = compiler.CompileExpression<void>(source, {});
-  if (!result.ok()) {
-    RUDF_ERROR("{}", result.status().ToString());
-  }
-  ASSERT_TRUE(result.ok());
-  auto f = std::move(result.value());
-  f();
 
-  std::string source1 = R"(
-    simd_vector<f64> test_func(Context ctx, simd_vector<f64> x,simd_vector<f64> y){
-        return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
-      // return  x * y;
-    }
-  )";
-
-  auto result1 =
-      compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&, rapidudf::simd::Vector<double>,
-                               rapidudf::simd::Vector<double>>(source1, true);
-  if (!result1.ok()) {
-    RUDF_ERROR("###{}", result1.status().ToString());
-  }
-  auto ff = std::move(result1.value());
-  std::vector<double> xx, yy, actuals, final_results;
-  size_t test_n = 16;
-  for (size_t i = 0; i < test_n; i++) {
-    xx.emplace_back(i + 1);
-    yy.emplace_back(i + 101);
-  }
-  rapidudf::Context ctx;
-  auto fr = ff(ctx, xx, yy);
-}
-
-TEST(JitCompiler, vector_iota) {
-  spdlog::set_level(spdlog::level::debug);
-  JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f64> test_func(Context ctx){
-      var t = iota(1_f64,12);
-      return t;
-    }
+      test_user_func()
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>, Context&>(content, true);
+  auto rc = compiler.CompileExpression<int>(content, {}, true);
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  Context ctx;
-  auto result = f(ctx);
-  RUDF_INFO("IsTemporary:{}", result.IsTemporary());
-  ASSERT_EQ(result.Size(), 12);
-  for (size_t i = 0; i < result.Size(); i++) {
-    ASSERT_DOUBLE_EQ(result[i], i + 1);
+  ASSERT_ANY_THROW(f());
+}
+
+TEST(JitCompiler, rethrow_exception) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  ParseContext ctx;
+  std::string content = R"(
+      test_user_func()
+  )";
+  auto rc = compiler.CompileExpression<int>(content, {}, true);
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
   }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  try {
+    f();
+    ASSERT_TRUE(1 == 0);
+  } catch (...) {
+    ASSERT_TRUE(1 == 1);
+  }
+}
+
+TEST(JitCompiler, member_func_exception) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  std::string content = R"(
+    void test_func(TestStruct x){
+      x.test_funcx();
+    }
+   )";
+  auto rc = compiler.CompileFunction<void, TestStruct*>(content);
+  ASSERT_TRUE(rc.ok());
+  TestStruct t;
+  auto f = std::move(rc.value());
+  ASSERT_ANY_THROW(f(&t));
+}
+
+struct Helper {
+  static void test0(TestStruct*) {
+    RUDF_DEBUG("test0");
+    throw std::logic_error("test0");
+  }
+  static void test1(TestStruct*) {
+    RUDF_DEBUG("test1");
+    throw std::logic_error("test1");
+  }
+};
+
+RUDF_STRUCT_HELPER_METHODS_BIND(Helper, test0, test1)
+
+TEST(JitCompiler, member_func_bind) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  std::string content = R"(
+    void test_func(TestStruct x){
+      x.test0();
+      x.test1();
+    }
+   )";
+  auto rc = compiler.CompileFunction<void, TestStruct*>(content);
+  ASSERT_TRUE(rc.ok());
+  TestStruct t;
+  auto f = std::move(rc.value());
+  ASSERT_ANY_THROW(f(&t));
 }

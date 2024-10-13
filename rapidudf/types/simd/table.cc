@@ -33,83 +33,83 @@
 namespace rapidudf {
 namespace simd {
 
-/**
- ** defined in rapidudf/builtin/simd_vector/ops.h
- ** defined in rapidudf/builtin/simd_vector/column_ops.h
- */
-template <typename T>
-Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
+// /**
+//  ** defined in rapidudf/builtin/simd_vector/ops.h
+//  ** defined in rapidudf/builtin/simd_vector/column_ops.h
+//  */
+// template <typename T>
+// Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
 
-Column* simd_column_filter(Column* data, Column* bits);
-Column* simd_column_gather(Column* data, Column* indices);
+// Column* simd_column_filter(Column* data, Column* bits);
+// Column* simd_column_gather(Column* data, Column* indices);
 
-/**
- ** defined in rapidudf/builtin/simd_vector/table_ops.h
- */
-Table* simd_table_filter(simd::Table* table, simd::Column* bits);
-Table* simd_table_order_by(simd::Table* table, simd::Column* by, bool descending);
-Table* simd_table_topk(simd::Table* table, simd::Column* by, uint32_t k, bool descending);
-Table* simd_table_take(simd::Table* table, uint32_t k);
+// /**
+//  ** defined in rapidudf/builtin/simd_vector/table_ops.h
+//  */
+// Table* simd_table_filter(simd::Table* table, simd::Column* bits);
+// Table* simd_table_order_by(simd::Table* table, simd::Column* by, bool descending);
+// Table* simd_table_topk(simd::Table* table, simd::Column* by, uint32_t k, bool descending);
+// Table* simd_table_take(simd::Table* table, uint32_t k);
 
-void Table::Set(const std::string& name, Column* column) { column_table_[name] = column; }
+// void Table::Set(const std::string& name, Column* column) { column_table_[name] = column; }
 
-absl::Status Table::Add(const std::string& name, Column* column) {
-  std::string column_name = name;
-  if (column_name.empty()) {
-    column_name = fmt::format("__column_{}", column_table_.size());
-  }
-  if (column_table_.find(column_name) != column_table_.end()) {
-    return absl::InvalidArgumentError(fmt::format("duplicate column name:{} to add", column_name));
-  }
-  column_table_.emplace(column_name, column);
-  return absl::OkStatus();
-}
+// absl::Status Table::Add(const std::string& name, Column* column) {
+//   std::string column_name = name;
+//   if (column_name.empty()) {
+//     column_name = fmt::format("__column_{}", column_table_.size());
+//   }
+//   if (column_table_.find(column_name) != column_table_.end()) {
+//     return absl::InvalidArgumentError(fmt::format("duplicate column name:{} to add", column_name));
+//   }
+//   column_table_.emplace(column_name, column);
+//   return absl::OkStatus();
+// }
 
-absl::StatusOr<Column**> Table::Get(StringView name) {
-  auto found = column_table_.find(std::string_view(name));
-  if (found == column_table_.end()) {
-    return absl::NotFoundError("");
-  }
-  return &found->second;
-}
+// absl::StatusOr<Column**> Table::Get(StringView name) {
+//   auto found = column_table_.find(std::string_view(name));
+//   if (found == column_table_.end()) {
+//     return absl::NotFoundError("");
+//   }
+//   return &found->second;
+// }
 
-Column* Table::operator[](StringView name) {
-  auto result = Get(name);
-  if (result.ok()) {
-    return *(result.value());
-  }
-  throw std::logic_error(fmt::format("No column:{} found in table.", name));
-}
-Table* Table::Filter(Column* bits) { return simd_table_filter(this, bits); }
-Table* Table::OrderBy(simd::Table* table, simd::Column* by, bool descending) {
-  return simd_table_order_by(this, by, descending);
-}
-Table* Table::Topk(simd::Table* table, simd::Column* by, uint32_t k, bool descending) {
-  return simd_table_topk(this, by, k, descending);
-}
-Table* Table::Take(uint32_t k) { return simd_table_take(this, k); }
+// Column* Table::operator[](StringView name) {
+//   auto result = Get(name);
+//   if (result.ok()) {
+//     return *(result.value());
+//   }
+//   throw std::logic_error(fmt::format("No column:{} found in table.", name));
+// }
+// Table* Table::Filter(Column* bits) { return simd_table_filter(this, bits); }
+// Table* Table::OrderBy(simd::Table* table, simd::Column* by, bool descending) {
+//   return simd_table_order_by(this, by, descending);
+// }
+// Table* Table::Topk(simd::Table* table, simd::Column* by, uint32_t k, bool descending) {
+//   return simd_table_topk(this, by, k, descending);
+// }
+// Table* Table::Take(uint32_t k) { return simd_table_take(this, k); }
 
-void Table::Visit(std::function<void(const std::string&, Column*)>&& f) {
-  for (auto& [name, column] : column_table_) {
-    f(name, column);
-  }
-}
+// void Table::Visit(std::function<void(const std::string&, Column*)>&& f) {
+//   for (auto& [name, column] : column_table_) {
+//     f(name, column);
+//   }
+// }
 
-size_t Table::Size() const { return column_table_.size(); }
+// size_t Table::Size() const { return column_table_.size(); }
 
-Vector<int32_t> Table::GetIndices() {
-  if (column_table_.empty()) {
-    throw std::logic_error(fmt::format("Can NOT get indices from empty table"));
-  }
-  if (indices_.Size() == 0) {
-    auto* first_column = (column_table_.begin()->second);
-    indices_ = simd_vector_iota<int32_t>(ctx_, 0, first_column->size());
-  }
-  auto* p = ctx_.ArenaAllocate(sizeof(int32_t) * indices_.Size());
-  memcpy(p, indices_.Data(), sizeof(int32_t) * indices_.Size());
-  VectorData vdata(p, indices_.Size(), sizeof(int32_t) * indices_.Size());
-  vdata.SetTemporary(true);
-  return Vector<int32_t>(vdata);
-}
+// Vector<int32_t> Table::GetIndices() {
+//   if (column_table_.empty()) {
+//     throw std::logic_error(fmt::format("Can NOT get indices from empty table"));
+//   }
+//   if (indices_.Size() == 0) {
+//     auto* first_column = (column_table_.begin()->second);
+//     indices_ = simd_vector_iota<int32_t>(ctx_, 0, first_column->size());
+//   }
+//   auto* p = ctx_.ArenaAllocate(sizeof(int32_t) * indices_.Size());
+//   memcpy(p, indices_.Data(), sizeof(int32_t) * indices_.Size());
+//   VectorData vdata(p, indices_.Size(), sizeof(int32_t) * indices_.Size());
+//   vdata.SetTemporary(true);
+//   return Vector<int32_t>(vdata);
+// }
 }  // namespace simd
 }  // namespace rapidudf

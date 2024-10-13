@@ -46,11 +46,12 @@ enum CollectionType {
   COLLECTION_ABSL_SPAN,
   COLLECTION_TUPLE,
   COLLECTION_SIMD_VECTOR,
-  COLLECTION_END = 64,
+  COLLECTION_SIMD_TABLE,
+  COLLECTION_END,
 };
 
-constexpr std::array<std::string_view, COLLECTION_SIMD_VECTOR + 1> kCollectionTypeStrs = {
-    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector"};
+constexpr std::array<std::string_view, COLLECTION_END> kCollectionTypeStrs = {
+    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector", "simd_table"};
 enum FundamentalType {
   DATA_INVALID = 0,
   DATA_VOID,
@@ -74,8 +75,8 @@ enum FundamentalType {
   DATA_FLATBUFFERS_STRING,
   DATA_JSON,
   DATA_CONTEXT,
-  DATA_SIMD_TABLE,
-  DATA_SIMD_COLUMN,
+  DATA_BUILTIN_TYPE_END,
+  // DATA_SIMD_COLUMN,
 
   DATA_OBJECT_BEGIN = 64,
   DATA_COMPLEX_OBJECT = (1 << 14) - 1,
@@ -92,28 +93,26 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double;
 
-constexpr std::array<std::string_view, DATA_SIMD_COLUMN + 1> kFundamentalTypeStrs = {"invalid",
-                                                                                     "void",
-                                                                                     "pointer",
-                                                                                     "bit",
-                                                                                     "u8",
-                                                                                     "i8",
-                                                                                     "u16",
-                                                                                     "i16",
-                                                                                     "u32",
-                                                                                     "i32",
-                                                                                     "u64",
-                                                                                     "i64",
-                                                                                     "f16",
-                                                                                     "f32",
-                                                                                     "f64",
-                                                                                     "f80",
-                                                                                     "std_string_view",
-                                                                                     "string_view",
-                                                                                     "string",
-                                                                                     "fbs_string",
-                                                                                     "json",
-                                                                                     "Context",
-                                                                                     "simd_table",
-                                                                                     "simd_column"};
+constexpr std::array<std::string_view, DATA_BUILTIN_TYPE_END> kFundamentalTypeStrs = {"invalid",
+                                                                                      "void",
+                                                                                      "pointer",
+                                                                                      "bit",
+                                                                                      "u8",
+                                                                                      "i8",
+                                                                                      "u16",
+                                                                                      "i16",
+                                                                                      "u32",
+                                                                                      "i32",
+                                                                                      "u64",
+                                                                                      "i64",
+                                                                                      "f16",
+                                                                                      "f32",
+                                                                                      "f64",
+                                                                                      "f80",
+                                                                                      "std_string_view",
+                                                                                      "string_view",
+                                                                                      "string",
+                                                                                      "fbs_string",
+                                                                                      "json",
+                                                                                      "Context"};
 }  // namespace rapidudf

@@ -38,8 +38,9 @@
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace ast {
-static std::vector<std::unique_ptr<std::string>>& get_symbol_token_cache() {
-  static std::vector<std::unique_ptr<std::string>> c;
+using SymbolCache = std::unordered_map<std::string, std::unique_ptr<std::string>>;
+static SymbolCache& get_symbol_token_cache() {
+  static SymbolCache c;
   return c;
 }
 
@@ -70,8 +71,7 @@ boost::parser::symbols<DType> Symbols::kDtypeSymbols = {{"void", DType(DATA_VOID
                                                         {"string", DType(DATA_STRING).ToPtr()},
                                                         {"std_string_view", DType(DATA_STD_STRING_VIEW)},
                                                         {"Context", DType(DATA_CONTEXT).ToPtr()},
-                                                        {"simd_table", DType(DATA_SIMD_TABLE).ToPtr()},
-                                                        {"simd_column", DType(DATA_SIMD_COLUMN).ToPtr()},
+                                                        // {"simd_table", DType(DATA_SIMD_TABLE).ToPtr()},
                                                         {"string_view", DType(DATA_STRING_VIEW)}};
 
 boost::parser::symbols<OpToken> Symbols::kAssignOpSymbols = {{"=", OP_ASSIGN},         {"+=", OP_PLUS_ASSIGN},
@@ -93,9 +93,19 @@ void Symbols::Init() {
   static std::mutex mutex;
   std::lock_guard<std::mutex> guard(mutex);
   DTypeFactory::Visit([](const std::string& name, DType dtype) {
-    std::unique_ptr<std::string> name_str = std::make_unique<std::string>(name);
-    std::string_view name_view = *name_str;
-    get_symbol_token_cache().emplace_back(std::move(name_str));
+    std::string_view name_view;
+    auto& symbol_cache = get_symbol_token_cache();
+    auto found = symbol_cache.find(name);
+    if (found != symbol_cache.end()) {
+      name_view = *found->second;
+    } else {
+      std::unique_ptr<std::string> name_str = std::make_unique<std::string>(name);
+      name_view = *name_str;
+      symbol_cache.emplace(name, std::move(name_str));
+    }
+    // std::unique_ptr<std::string> name_str = std::make_unique<std::string>(name);
+    // std::string_view name_view = *name_str;
+    // get_symbol_token_cache().emplace_back(std::move(name_str));
     if (dtype.IsPtr()) {
       kDtypeSymbols.insert_for_next_parse(name_view, dtype);
     } else if (!dtype.IsPrimitive()) {
@@ -104,7 +114,7 @@ void Symbols::Init() {
         reg_dtype = dtype.ToPtr();
       }
       kDtypeSymbols.insert_for_next_parse(name_view, reg_dtype);
-      RUDF_DEBUG("Add symbol {}:{}", name, reg_dtype);
+      // RUDF_DEBUG("Add symbol {}:{}", name, reg_dtype);
     }
   });
   // kDtypeSymbols.insert_for_next_parse("vector<int>", DType(DATA_I32).ToVector().ToPtr());

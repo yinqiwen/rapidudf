@@ -80,8 +80,8 @@ CodeGen::CodeGen(const Options& opts, bool print_asm) : opts_(opts), label_curso
   ::llvm::InitializeNativeTargetAsmParser();
 
   auto JTMB = ::llvm::orc::JITTargetMachineBuilder::detectHost();
-  RUDF_INFO("features:{}", JTMB->getFeatures().getString());
-  RUDF_INFO("cpu:{}", JTMB->getCPU());
+  // RUDF_INFO("features:{}", JTMB->getFeatures().getString());
+  // RUDF_INFO("cpu:{}", JTMB->getCPU());
   ::llvm::orc::LLJITBuilder jit_builder;
   jit_builder.setJITTargetMachineBuilder(*JTMB);
   // jit_builder.getJITTargetMachineBuilder()->setCPU("haswell");
@@ -207,6 +207,7 @@ absl::StatusOr<DType> CodeGen::NormalizeDType(const std::vector<DType>& dtypes) 
 absl::StatusOr<::llvm::Type*> CodeGen::GetType(DType dtype) {
   auto type = get_type(*context_, dtype);
   if (nullptr == type) {
+    // abort();
     RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError(fmt::format("get type failed for:{}", dtype)));
   }
   return type;
@@ -568,6 +569,29 @@ void CodeGen::FinishCondition(Condition condition) {
   }
 }
 
+absl::StatusOr<::llvm::Value*> CodeGen::CallFunction(const std::string& name,
+                                                     const std::vector<::llvm::Value*>& arg_values) {
+  ::llvm::Function* found_func = nullptr;
+  FunctionDesc found_func_desc;
+  ExternFunctionPtr func = GetFunction(name);
+  if (func) {
+    found_func_desc = func->desc;
+    found_func = func->func;
+  } else {
+    auto found = funcs_.find(name);
+    if (found != funcs_.end()) {
+      found_func_desc = found->second->desc;
+      found_func = found->second->func;
+    }
+  }
+  if (!found_func) {
+    RUDF_LOG_RETURN_FMT_ERROR("CallFunction:No func:{} found", name);
+  }
+  ::llvm::FunctionCallee callee(found_func);
+  ::llvm::Value* result = builder_->CreateCall(callee, arg_values);
+  return result;
+}
+
 absl::StatusOr<ValuePtr> CodeGen::CallFunction(const std::string& name, const std::vector<ValuePtr>& const_arg_values) {
   ::llvm::Function* found_func = nullptr;
   FunctionDesc found_func_desc;
@@ -634,17 +658,15 @@ absl::StatusOr<ValuePtr> CodeGen::CallFunction(const std::string& name, const st
 
   if (return_type.IsPtr()) {
     auto ret_type_ptr_to = return_type.PtrTo();
-    if (ret_type_ptr_to.IsSimdColumnPtr()) {
-      return_val_type = builder_->getPtrTy();
-      // return_val_type = GetSession()->GetIRBuilder()->getIntPtrTy(session_->jit->getDataLayout());
-      return_type = return_type.PtrTo();
-    } else if (ret_type_ptr_to.IsInteger() || ret_type_ptr_to.IsFloat()) {
+    if (ret_type_ptr_to.IsInteger() || ret_type_ptr_to.IsFloat()) {
       return_val_type = GetType(ret_type_ptr_to).value();
       return_type = return_type.PtrTo();
     }
   }
   return NewValue(return_type, result, return_val_type);
 }
+
+void CodeGen::Store(::llvm::Value* val, ::llvm::Value* ptr) { builder_->CreateStore(val, ptr); }
 
 }  // namespace compiler
 }  // namespace rapidudf

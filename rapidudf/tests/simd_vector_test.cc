@@ -514,8 +514,9 @@ TEST(JitCompiler, wilson_ctr) {
     {
        return log10(exp_cnt) *
          (clk_cnt / exp_cnt +  1.96_f32 * 1.96_f32 / (2 * exp_cnt) -
-          1.96_f32 / (2 * exp_cnt) * sqrt(4 * exp_cnt * (1_f32 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96_f32 * 1.96_f32)) /
-         (1_f32 + 1.96_f32 * 1.96_f32 / exp_cnt);
+          1.96 / (2 * exp_cnt) * sqrt(4 * exp_cnt * (1 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96 * 1.96)) /
+         (1 + 1.96 * 1.96 / exp_cnt);
+      // return  1.96 / (2 * exp_cnt);
 
     }
   )";
@@ -532,7 +533,7 @@ TEST(JitCompiler, wilson_ctr) {
   ASSERT_TRUE(result.ok());
   auto f = std::move(result.value());
 
-  size_t N = 4099;
+  size_t N = 40990;
   std::vector<float> exp_cnt;
   std::vector<float> clk_cnt;
   std::random_device rd;

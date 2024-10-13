@@ -38,7 +38,7 @@
 
 namespace rapidudf {
 namespace compiler {
-static constexpr uint32_t k_vector_size = 8;
+
 ::llvm::Type* get_type(::llvm::LLVMContext& ctx, DType dtype);
 ::llvm::VectorType* get_vector_type(::llvm::LLVMContext& ctx, DType dtype);
 

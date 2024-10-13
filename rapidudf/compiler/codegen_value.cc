@@ -174,7 +174,7 @@ absl::StatusOr<ValuePtr> CodeGen::NewArray(DType dtype, const std::vector<ValueP
 
 absl::StatusOr<ValuePtr> CodeGen::GetStructField(ValuePtr obj, DType field_dtype, uint32_t offset) {
   ::llvm::Value* offset_val = builder_->getInt32(offset);
-  auto field_ptr = builder_->CreateInBoundsGEP(builder_->getInt8Ty(), obj->GetPtrValue(), {offset_val});
+  auto field_ptr = builder_->CreateInBoundsGEP(builder_->getInt8Ty(), obj->LoadValue(), {offset_val});
   if (field_dtype.IsNumber() || field_dtype.IsStringView() || field_dtype.IsStdStringView() ||
       field_dtype.IsSimdVector() || field_dtype.IsAbslSpan() || field_dtype.IsPtr()) {
     auto dst_type_result = GetType(field_dtype);

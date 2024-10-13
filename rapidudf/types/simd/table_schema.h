@@ -39,32 +39,25 @@
 #include "absl/status/statusor.h"
 
 #include "rapidudf/context/context.h"
-// #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/dtype.h"
 
 namespace rapidudf {
 namespace simd {
-
 class TableSchema {
  public:
-  static TableSchema* Get(const std::string& name);
-  static TableSchema* GetOrCreate(const std::string& name);
-
   template <typename T>
   absl::Status AddColumn<T>(const std::string& name) {
-    // DType dtype = get_dtype<T>();
-    // auto [_, success] = columns_.emplace(name, dtype);
-    // if (!success) {
-    // }
-    // return absl::OkStatus();
+    DType dtype = get_dtype<T>();
+    auto [_, success] = columns_.emplace(name, dtype);
+    if (!success) {
+    }
+    return absl::OkStatus();
   }
 
  private:
-  using ColumnTable = absl::flat_hash_map<std::string, uint32_t>;
+  using ColumnTable = absl::flat_hash_map<std::string, DType>;
+  ColumnTable columns_;
 };
-class Table {
- public:
- private:
-  Context* ctx_ = nullptr;
-};
+
 }  // namespace simd
 }  // namespace rapidudf
