@@ -186,7 +186,7 @@ TEST(JitCompiler, sort_kv) {
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<u32> test(Context ctx, simd_vector<f64> x){
-        var ids = iota(0_u32, x.size());
+        auto ids = iota(0_u32, x.size());
         sort_kv(x, ids,true);
         return ids;
     }
@@ -214,7 +214,7 @@ TEST(JitCompiler, select_kv) {
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<u32> test(Context ctx, simd_vector<f64> x){
-        var ids = iota(0_u32, x.size());
+        auto ids = iota(0_u32, x.size());
         select_kv(x, ids, 10, false);
         return ids;
     }
@@ -242,7 +242,7 @@ TEST(JitCompiler, topk_kv) {
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<u32> test(Context ctx, simd_vector<f64> x){
-        var ids = iota(0_u32, x.size());
+        auto ids = iota(0_u32, x.size());
         topk_kv(x, ids, 10, true);
         return ids;
     }

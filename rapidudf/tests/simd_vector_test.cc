@@ -384,7 +384,7 @@ RUDF_STRUCT_FIELDS(Feeds, Click, Like, Inter, Join, TimeV1, PostComment, Positiv
 TEST(JitCompiler, test) {
   JitCompiler compiler;
   std::string source = R"(simd_vector<f64> boost_scores(Context ctx,Feeds feeds) {
-                              var score = pow(feeds.Click, 10.0);
+                              auto score = pow(feeds.Click, 10.0);
                               score *= pow(feeds.Like + 0.000082, 4.7);
                               // score *= pow(feeds.Inter, 3.5);
                               // score *= pow(feeds.Join + 0.000024, 5.5);
@@ -429,7 +429,7 @@ TEST(JitCompiler, duration_score) {
   std::string source = R"(
     simd_vector<f32> get_duration_score(Context ctx, simd_vector<f32> duration, f32 alpha, f32 beta)
     {
-        var x = (duration-alpha)/beta;
+        auto x = (duration-alpha)/beta;
         return 1.0_f32/(1_f32 + exp(-x));
     }
   )";

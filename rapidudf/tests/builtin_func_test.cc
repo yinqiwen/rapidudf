@@ -1124,7 +1124,7 @@ TEST(JitCompiler, vector_iota) {
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<f64> test_func(Context ctx){
-      var t = iota(1_f64,12);
+      auto t = iota(1_f64,12);
       return t;
     }
   )";
