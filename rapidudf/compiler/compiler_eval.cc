@@ -41,6 +41,8 @@
 #include "rapidudf/functions/names.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/dtype_enums.h"
+#include "rapidudf/meta/function.h"
 #include "rapidudf/meta/operand.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/simd/vector.h"
@@ -155,6 +157,10 @@ absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode
       DType compute_dtype = node.op_compute_dtype;
       absl::StatusOr<::llvm::Value*> result;
       bool use_vector_call = functions::has_vector_buitin_func(op, compute_dtype);
+      if (use_vector_call && !codegen_->IsExternFunctionExist(GetFunctionName(op, compute_dtype.ToSimdVector()))) {
+        use_vector_call = false;
+      }
+
       if (operand_count == 1) {
         // result = codegen_->UnaryOp(op, compute_dtype, operands[operands.size() - 1].second);
         if (use_vector_call) {
@@ -330,14 +336,19 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
           return normalize_result.status();
         }
         dtype = normalize_result.value();
-        operands.emplace_back(std::make_pair(dtype, idxs));
+        if (is_compare_op(op)) {
+          operands.emplace_back(std::make_pair(DATA_BIT, idxs));
+        } else {
+          operands.emplace_back(std::make_pair(dtype, idxs));
+        }
+        node.op_compute_dtype = dtype.Elem();
         if (is_compare_op(op)) {
           node.op_temp_val = codegen_->NewVectorVar(DATA_BIT);
+
         } else {
           node.op_temp_val = codegen_->NewVectorVar(dtype);
         }
 
-        node.op_compute_dtype = dtype.Elem();
       } else {
         auto value = node.val;
         operands.emplace_back(std::make_pair(value->GetDType(), std::vector<size_t>{i}));

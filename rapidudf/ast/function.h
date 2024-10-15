@@ -38,13 +38,16 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/dyn_object_schema.h"
 
 namespace rapidudf {
 namespace ast {
 
 struct FunctionArg {
   DType dtype;
+  DTypeAttr attr;
   std::string name;
+  const DynObjectSchema* schema = nullptr;
 };
 struct Function {
   DType return_type;

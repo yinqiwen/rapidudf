@@ -47,7 +47,7 @@ TEST(JitCompiler, vector_size) {
       return test_f(x) + 10;
     }
   )";
-  auto rc = compiler.CompileSource(content, true);
+  auto rc = compiler.CompileSource(content);
   ASSERT_TRUE(rc.ok());
   auto func_result = compiler.LoadFunction<int, int>("test_func");
   ASSERT_TRUE(func_result.ok());

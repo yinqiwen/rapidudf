@@ -1128,12 +1128,12 @@ TEST(JitCompiler, vector_iota) {
       return t;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>, Context&>(content, true);
+  auto rc = compiler.CompileFunction<simd::Vector<double>, Context&>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
   auto result = f(ctx);
-  RUDF_INFO("IsTemporary:{}", result.IsTemporary());
+  RUDF_INFO("IsReadonly:{}", result.IsReadonly());
   ASSERT_EQ(result.Size(), 12);
   for (size_t i = 0; i < result.Size(); i++) {
     ASSERT_DOUBLE_EQ(result[i], i + 1);
@@ -1159,7 +1159,7 @@ TEST(JitCompiler, vector_fma) {
   float fz = {3.5};
 
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy, fz);
@@ -1173,7 +1173,7 @@ TEST(JitCompiler, vector_fma) {
   int32_t iz = 11;
 
   auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);
@@ -1202,7 +1202,7 @@ TEST(JitCompiler, vector_clamp) {
   float fz = {3.5};
 
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy, fz);
@@ -1216,7 +1216,7 @@ TEST(JitCompiler, vector_clamp) {
   int32_t iz = 11;
 
   auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);
@@ -1245,7 +1245,7 @@ TEST(JitCompiler, vector_fms) {
   float fz = {3.5};
 
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy, fz);
@@ -1259,7 +1259,7 @@ TEST(JitCompiler, vector_fms) {
   int32_t iz = 11;
 
   auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);
@@ -1288,7 +1288,7 @@ TEST(JitCompiler, vector_fnma) {
   float fz = {3.5};
 
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy, fz);
@@ -1302,7 +1302,7 @@ TEST(JitCompiler, vector_fnma) {
   int32_t iz = 11;
 
   auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);
@@ -1332,7 +1332,7 @@ TEST(JitCompiler, vector_fnms) {
 
   auto rc1 =
       compiler.CompileExpression<simd::Vector<double>, Context&, simd::Vector<double>, simd::Vector<double>, double>(
-          content, {"_", "x", "y", "z"}, true);
+          content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy, fz);
@@ -1346,7 +1346,7 @@ TEST(JitCompiler, vector_fnms) {
   int32_t iz = 11;
 
   auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"}, true);
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);

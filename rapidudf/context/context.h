@@ -81,6 +81,7 @@ class Context {
     if (temporary) {
       vec.SetTemporary(true);
     }
+    vec.SetReadonly(false);
     return vec;
   }
 
@@ -124,6 +125,7 @@ class Context {
         }
       }
       simd::VectorData vdata(arena_data, data.size(), byte_size);
+      vdata.SetReadonly(false);
       return simd::Vector<Bit>(vdata);
     } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T>) {
       return simd::Vector<T>(data);
@@ -135,7 +137,15 @@ class Context {
       }
       return simd::Vector<StringView>(strs, data.size());
     } else {
-      static_assert(sizeof(T) == -1, "unsupported type to NewSimdVector");
+      // static_assert(sizeof(T) == -1, "unsupported type to NewSimdVector");
+      uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
+      Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
+      for (size_t i = 0; i < data.size(); i++) {
+        *(ptrs + i) = Pointer(&data[i]);
+      }
+      auto ret = simd::Vector<Pointer>(ptrs, data.size());
+      ret.SetReadonly(false);
+      return ret;
     }
   }
 
@@ -148,16 +158,6 @@ class Context {
   }
 
   template <typename T>
-  auto NewSimdVectorOfPointer(const std::vector<T>& data) {
-    uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
-    Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
-    for (size_t i = 0; i < data.size(); i++) {
-      *(ptrs + i) = Pointer(&data[i]);
-    }
-    return simd::Vector<Pointer>(ptrs, data.size());
-  }
-
-  template <typename T>
   void Own(std::unique_ptr<T>&& p) {
     auto* pp = p.release();
     auto f = [pp] { delete pp; };
@@ -165,15 +165,15 @@ class Context {
     // cleanups_.emplace_back(std::move(f));
   }
 
-  template <typename T>
-  bool IsTemporary(simd::Vector<T> data) {
-    bool is_temporary = data.IsTemporary();
-    if (!is_temporary) {
-      return false;
-    }
-    const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data.Data());
-    return allocated_arena_ptrs_.count(ptr) > 0;
-  }
+  // template <typename T>
+  // bool IsTemporary(simd::Vector<T> data) {
+  //   bool is_temporary = data.IsTemporary();
+  //   if (!is_temporary) {
+  //     return false;
+  //   }
+  //   const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data.Data());
+  //   return allocated_arena_ptrs_.count(ptr) > 0;
+  // }
   void SetHasNan(bool v = true) { has_nan_ = v; }
   bool HasNan() const { return has_nan_; }
 
@@ -184,7 +184,7 @@ class Context {
 
   std::unique_ptr<Arena> own_arena_;
   Arena* arena_ = nullptr;
-  absl::flat_hash_set<const uint8_t*> allocated_arena_ptrs_;
+  // absl::flat_hash_set<const uint8_t*> allocated_arena_ptrs_;
   // std::vector<CleanupFunc> cleanups_;
   CleanupFuncWrapper::List cleanups_;
   bool has_nan_ = false;

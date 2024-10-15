@@ -31,11 +31,11 @@
 #include <benchmark/benchmark.h>
 #include <cmath>
 #include <vector>
-#include "exprtk.hpp"
+// #include "exprtk.hpp"
 #include "rapidudf/context/context.h"
 #include "rapidudf/rapidudf.h"
 
-static size_t test_n = 1024;
+static size_t test_n = 4096;
 static const double pi = 3.14159265358979323846264338327950288419716939937510;
 static std::vector<double> xx, yy, actuals, final_results;
 static double xi, yi;
@@ -68,7 +68,7 @@ static void DoRapidUDFExprSetup(const benchmark::State& state) {
     }
   )";
   rapidudf::JitCompiler compiler;
-  auto result = compiler.CompileFunction<double, double, double, double>(source, false);
+  auto result = compiler.CompileFunction<double, double, double, double>(source);
   g_expr_func = std::move(result.value());
   init_test_numbers();
 }
@@ -85,17 +85,17 @@ static void BM_rapidudf_expr_func(benchmark::State& state) {
       results += result;
     }
   }
-  RUDF_INFO("RapidUDF result:{}", results);
-  // double result = 0;
-  // size_t n = 0;
-  // for (auto _ : state) {
-  //   result += g_expr_func(100, 102, pi);
-  //   n++;
-  // }
-  // double x = 100;
-  // double y = 102;
-  // double actual = x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
-  // RUDF_INFO("Result:{} for loop:{}, actual:{}", result, n, actual);
+  RUDF_DEBUG("RapidUDF result:{}", results);
+  //  double result = 0;
+  //  size_t n = 0;
+  //  for (auto _ : state) {
+  //    result += g_expr_func(100, 102, pi);
+  //    n++;
+  //  }
+  //  double x = 100;
+  //  double y = 102;
+  //  double actual = x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
+  //  RUDF_INFO("Result:{} for loop:{}, actual:{}", result, n, actual);
 }
 BENCHMARK(BM_rapidudf_expr_func)->Setup(DoRapidUDFExprSetup)->Teardown(DoRapidUDFExprTeardown);
 
@@ -107,7 +107,7 @@ static void DoRapidUDFVectorExprSetup(const benchmark::State& state) {
   )";
   rapidudf::JitCompiler compiler;
   auto result = compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&,
-                                         rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source, false);
+                                         rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source);
 
   g_vector_expr_func = std::move(result.value());
 
@@ -121,6 +121,7 @@ static void BM_rapidudf_vector_expr_func(benchmark::State& state) {
   for (auto _ : state) {
     ctx.Reset();
     auto results = g_vector_expr_func(ctx, xx, yy);
+    RUDF_DEBUG("size:{}", results.Size());
     // for (size_t i = 0; i < results.Size(); i++) {
     //  if (results[i] != actuals[i]) {
     //    RUDF_INFO("[{}]Error result:{}, while expected:{}", i, results[i], actuals[i]);
@@ -130,37 +131,37 @@ static void BM_rapidudf_vector_expr_func(benchmark::State& state) {
 }
 BENCHMARK(BM_rapidudf_vector_expr_func)->Setup(DoRapidUDFVectorExprSetup)->Teardown(DoRapidUDFVectorExprTeardown);
 
-static exprtk::parser<double> exprtk_parser;
-static exprtk::expression<double> exprtk_expression;
-static exprtk::symbol_table<double> exprtk_symbol_table;
-static void DoExprtkExprSetup(const benchmark::State& state) {
-  exprtk_symbol_table.add_constants();
-  exprtk_symbol_table.add_variable("x", xi);
-  exprtk_symbol_table.add_variable("y", yi);
-  // exprtk_symbol_table.add_vector("results", final_results);
-  exprtk_expression.register_symbol_table(exprtk_symbol_table);
-  std::string expr = "x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y";
-  // std::string expr = "cos(y - sin(2 / x * pi))";
-  if (!exprtk_parser.compile(expr, exprtk_expression)) {
-    RUDF_ERROR("[load_expression] - Parser Error:{}\tExpression: {}", exprtk_parser.error().c_str(), expr);
-  }
-  init_test_numbers();
-}
+// static exprtk::parser<double> exprtk_parser;
+// static exprtk::expression<double> exprtk_expression;
+// static exprtk::symbol_table<double> exprtk_symbol_table;
+// static void DoExprtkExprSetup(const benchmark::State& state) {
+//   exprtk_symbol_table.add_constants();
+//   exprtk_symbol_table.add_variable("x", xi);
+//   exprtk_symbol_table.add_variable("y", yi);
+//   // exprtk_symbol_table.add_vector("results", final_results);
+//   exprtk_expression.register_symbol_table(exprtk_symbol_table);
+//   std::string expr = "x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y";
+//   // std::string expr = "cos(y - sin(2 / x * pi))";
+//   if (!exprtk_parser.compile(expr, exprtk_expression)) {
+//     RUDF_ERROR("[load_expression] - Parser Error:{}\tExpression: {}", exprtk_parser.error().c_str(), expr);
+//   }
+//   init_test_numbers();
+// }
 
-static void DooExprtkExprTeardown(const benchmark::State& state) {}
+// static void DooExprtkExprTeardown(const benchmark::State& state) {}
 
-static void BM_exprtk_expr_func(benchmark::State& state) {
-  double results = 0;
-  for (auto _ : state) {
-    for (size_t i = 0; i < test_n; i++) {
-      xi = xx[i];
-      yi = yy[i];
-      results += exprtk_expression.value();
-    }
-  }
-  RUDF_INFO("Exprtk result:{}", results);
-}
-BENCHMARK(BM_exprtk_expr_func)->Setup(DoExprtkExprSetup)->Teardown(DooExprtkExprTeardown);
+// static void BM_exprtk_expr_func(benchmark::State& state) {
+//   double results = 0;
+//   for (auto _ : state) {
+//     for (size_t i = 0; i < test_n; i++) {
+//       xi = xx[i];
+//       yi = yy[i];
+//       results += exprtk_expression.value();
+//     }
+//   }
+//   RUDF_INFO("Exprtk result:{}", results);
+// }
+// BENCHMARK(BM_exprtk_expr_func)->Setup(DoExprtkExprSetup)->Teardown(DooExprtkExprTeardown);
 
 static void DoNativeFuncSetup(const benchmark::State& state) { init_test_numbers(); }
 
@@ -176,7 +177,7 @@ static void BM_native_func(benchmark::State& state) {
       results += result;
     }
   }
-  RUDF_INFO("Native result:{}", results);
+  RUDF_DEBUG("Native result:{}", results);
 }
 BENCHMARK(BM_native_func)->Setup(DoNativeFuncSetup)->Teardown(DoNativeFuncTeardown);
 

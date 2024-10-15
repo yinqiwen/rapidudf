@@ -74,7 +74,7 @@
 namespace rapidudf {
 namespace compiler {
 
-CodeGen::CodeGen(const Options& opts, bool print_asm) : opts_(opts), label_cursor_(0), print_asm_(print_asm) {
+CodeGen::CodeGen(const Options& opts) : opts_(opts), label_cursor_(0) {
   ::llvm::InitializeNativeTarget();
   ::llvm::InitializeNativeTargetAsmPrinter();
   ::llvm::InitializeNativeTargetAsmParser();
@@ -156,7 +156,7 @@ CodeGen::CodeGen(const Options& opts, bool print_asm) : opts_(opts), label_curso
 }
 
 absl::Status CodeGen::Finish() {
-  if (print_asm_) {
+  if (opts_.print_asm) {
     module_->print(::llvm::errs(), nullptr);
   }
   ::llvm::orc::ThreadSafeModule module(std::move(module_), std::move(context_));
@@ -252,6 +252,8 @@ absl::StatusOr<ValuePtr> CodeGen::GetLocalVar(const std::string& name) {
   return absl::NotFoundError(fmt::format("No var '{}' found", name));
 }
 
+bool CodeGen::IsExternFunctionExist(const std::string& name) { return extern_funcs_.find(name) != extern_funcs_.end(); }
+
 ExternFunctionPtr CodeGen::GetFunction(const std::string& name) {
   auto local_found = funcs_.find(name);
   if (local_found != funcs_.end()) {
@@ -265,7 +267,7 @@ ExternFunctionPtr CodeGen::GetFunction(const std::string& name) {
 }
 
 void CodeGen::PrintAsm() {
-  if (print_asm_) {
+  if (opts_.print_asm) {
     module_->print(::llvm::errs(), nullptr);
   }
 }
@@ -344,7 +346,6 @@ absl::Status CodeGen::DefineFunction(const FunctionDesc& desc, const std::vector
   func_value->func = f;
   ::llvm::BasicBlock* entry_block = ::llvm::BasicBlock::Create(*context_, "entry", f);
   func_value->exit_block = ::llvm::BasicBlock::Create(*context_, "exit");
-  // func_compile_ctx->exception_block = ::llvm::BasicBlock::Create(*GetLLVMContext(), "exception");
   builder_->SetInsertPoint(entry_block);
   if (!desc.return_type.IsVoid()) {
     auto return_type_result = GetType(desc.return_type);
@@ -356,7 +357,7 @@ absl::Status CodeGen::DefineFunction(const FunctionDesc& desc, const std::vector
     ValuePtr return_value = NewValue(desc.return_type, builder_->CreateAlloca(return_type), return_type);
     func_value->return_value = return_value;
   }
-  RUDF_DEBUG("create func:{}", desc.name);
+  // RUDF_DEBUG("create func:{}", desc.name);
   if (!f->arg_empty()) {
     for (size_t i = 0; i < f->arg_size(); i++) {
       ::llvm::Argument* arg = f->getArg(i);

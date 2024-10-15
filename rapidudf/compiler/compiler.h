@@ -51,6 +51,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/dyn_object_schema.h"
 
 namespace rapidudf {
 namespace compiler {
@@ -58,10 +59,15 @@ namespace compiler {
 class CodeGen;
 class JitCompiler {
  public:
-  static constexpr std::string_view kExpressionFuncName = "rapidudf_expresion";
-  JitCompiler(const Options& opts = Options{});
+  struct Arg {
+    std::string name;
+    std::string schema;
+  };
 
-  absl::StatusOr<std::vector<std::string>> CompileSource(const std::string& source, bool dump_asm = false);
+  static constexpr std::string_view kExpressionFuncName = "rapidudf_expresion";
+  JitCompiler(Options opts = Options{});
+
+  absl::StatusOr<std::vector<std::string>> CompileSource(const std::string& source);
 
   template <typename RET, typename... Args>
   absl::StatusOr<JitFunction<RET, Args...>> LoadFunction(const std::string& name) {
@@ -86,9 +92,9 @@ class JitCompiler {
   }
 
   template <typename RET, typename... Args>
-  absl::StatusOr<JitFunction<RET, Args...>> CompileFunction(const std::string& source, bool dump_asm = false) {
+  absl::StatusOr<JitFunction<RET, Args...>> CompileFunction(const std::string& source) {
     std::lock_guard<std::mutex> guard(jit_mutex_);
-    NewCodegen(dump_asm);
+    NewCodegen();
     auto status = CompileFunction(source);
     if (!status.ok()) {
       return status;
@@ -113,32 +119,42 @@ class JitCompiler {
   }
 
   template <typename RET, typename... Args>
-  absl::StatusOr<JitFunction<RET, Args...>> CompileExpression(const std::string& source,
-                                                              const std::vector<std::string>& arg_names,
-                                                              bool dump_asm = false) {
+  absl::StatusOr<JitFunction<RET, Args...>> CompileDynObjExpression(const std::string& source,
+                                                                    const std::vector<Arg>& args) {
     std::lock_guard<std::mutex> guard(jit_mutex_);
-    NewCodegen(dump_asm);
+    NewCodegen();
     auto return_type = get_dtype<RET>();
     std::vector<DType> arg_types;
     (arg_types.emplace_back(get_dtype<Args>()), ...);
-    if (arg_names.size() != arg_types.size()) {
+    if (args.size() != arg_types.size()) {
       return absl::InvalidArgumentError(
-          fmt::format("need {} arg names, while only {} provided", arg_types.size(), arg_names.size()));
+          fmt::format("need {} arg names, while only {} provided", arg_types.size(), args.size()));
     }
     ast::Function gen_func_ast;
     gen_func_ast.return_type = return_type;
-    if (!arg_names.empty()) {
+    if (!args.empty()) {
       gen_func_ast.args = std::vector<ast::FunctionArg>{};
     }
     gen_func_ast.name = std::string(kExpressionFuncName);
     ast_ctx_.ReserveFunctionParseContext(1);
-    for (size_t i = 0; i < arg_names.size(); i++) {
-      if (!ast_ctx_.AddLocalVar(arg_names[i], arg_types[i])) {
-        return absl::InvalidArgumentError(fmt::format("Duplicate arg name:{}", arg_names[i]));
-      }
+    for (size_t i = 0; i < args.size(); i++) {
       ast::FunctionArg ast_arg;
       ast_arg.dtype = arg_types[i];
-      ast_arg.name = arg_names[i];
+      ast_arg.name = args[i].name;
+
+      if (arg_types[i].IsDynObjectPtr()) {
+        if (args[i].schema.empty()) {
+          return absl::InvalidArgumentError(fmt::format("Missing schema for arg:{}", args[i].name));
+        }
+        const DynObjectSchema* schema = DynObjectSchema::Get(args[i].schema);
+        if (schema == nullptr) {
+          return absl::InvalidArgumentError(fmt::format("Invalid schema:{} for arg:{}", args[i].schema, args[i].name));
+        }
+        ast_arg.schema = schema;
+      }
+      if (!ast_ctx_.AddLocalVar(args[i].name, arg_types[i], ast_arg.schema)) {
+        return absl::InvalidArgumentError(fmt::format("Duplicate arg name:{}", args[i].name));
+      }
       gen_func_ast.args->emplace_back(ast_arg);
     }
 
@@ -155,6 +171,15 @@ class JitCompiler {
 
     return JitFunction<RET, Args...>(gen_func_ast.name, func_ptr, codegen_, stat_);
   }
+  template <typename RET, typename... Args>
+  absl::StatusOr<JitFunction<RET, Args...>> CompileExpression(const std::string& source,
+                                                              const std::vector<std::string>& arg_names) {
+    std::vector<Arg> args;
+    for (auto& name : arg_names) {
+      args.emplace_back(Arg{.name = name});
+    }
+    return CompileDynObjExpression<RET, Args...>(source, args);
+  }
 
  private:
   struct RPNEvalNode {
@@ -168,7 +193,7 @@ class JitCompiler {
     explicit RPNEvalNode(ValuePtr v) : val(v) {}
   };
 
-  void NewCodegen(bool print_asm);
+  void NewCodegen();
   absl::Status Compile();
   absl::Status CompileFunction(const std::string& source);
   absl::Status CompileFunction(const ast::Function& function);

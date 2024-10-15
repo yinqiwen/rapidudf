@@ -22,6 +22,7 @@ cc_library(
         "//rapidudf/meta:function",
         "//rapidudf/meta:operand",
         "//rapidudf/meta:optype",
+        "//rapidudf/types:dyn_object_schema",
         "@com_google_absl//absl/status:statusor",
     ],
 )
@@ -51,6 +52,7 @@ cc_library(
         "//rapidudf/meta:function",
         "//rapidudf/meta:optype",
         "//rapidudf/reflect",
+        "//rapidudf/types:dyn_object_schema",
         "@boost_parser//:parser",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",

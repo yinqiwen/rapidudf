@@ -75,7 +75,7 @@ TEST(JitCompiler, vector_add) {
     ASSERT_EQ(result0[i], i_left[i] + i_right[i]);
   }
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"}, true);
+      expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -258,7 +258,7 @@ TEST(JitCompiler, vector_div) {
     ASSERT_EQ(result0[i], i_left[i] / i_right[i]);
   }
   auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"}, true);
+      expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -414,7 +414,7 @@ TEST(JitCompiler, vector_pow) {
 TEST(JitCompiler, pow_mul) {
   JitCompiler compiler;
   std::string content = "2*x^y";
-  auto rc1 = compiler.CompileExpression<float, float, float>(content, {"x", "y"}, true);
+  auto rc1 = compiler.CompileExpression<float, float, float>(content, {"x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   ASSERT_FLOAT_EQ(f1(3, 2), 2 * std::pow(3, 2));

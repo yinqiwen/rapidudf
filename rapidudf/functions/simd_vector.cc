@@ -107,7 +107,9 @@ static void register_simd_vector_sum() {
   std::string func_name = GetFunctionName(OP_SUM, dtype.ToSimdVector());
   T (*simd_f0)(simd::Vector<T>) = simd_vector_sum<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
-  // register_builtin_function("sum");
+
+  func_name = GetFunctionName(OP_AVG, dtype.ToSimdVector());
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_vector_avg<T>);
 }
 template <typename T>
 static void register_simd_vector_filter() {
@@ -241,6 +243,11 @@ void init_builtin_simd_vector_funcs() {
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_HYPOT, float, double)
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_ATAN2, float, double)
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_POW, float, double)
+  // REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_MULTIPLY, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+  // uint32_t,
+  //                                   uint16_t, uint8_t)
+  // REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_DIVIDE, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
+  //                                   uint16_t, uint8_t)
 
   REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_CLAMP, float, double, uint64_t, int64_t, uint32_t, int32_t)
   REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_FMA, float, double, uint64_t, int64_t, uint32_t, int32_t)

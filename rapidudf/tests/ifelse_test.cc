@@ -50,7 +50,7 @@ TEST(JitCompiler, ifelse0) {
       }
     }
   )";
-  auto rc = compiler.CompileFunction<int, int>(content, true);
+  auto rc = compiler.CompileFunction<int, int>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_DOUBLE_EQ(f(11), 20);
@@ -75,7 +75,7 @@ TEST(JitCompiler, ifelse1) {
       return x;
     }
   )";
-  auto rc = compiler.CompileFunction<int, int>(content, true);
+  auto rc = compiler.CompileFunction<int, int>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_DOUBLE_EQ(f(11), 20);

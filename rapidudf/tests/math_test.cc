@@ -56,7 +56,7 @@ TEST(JitCompiler, tanh) {
   JitCompiler compiler;
   std::string content = "tanh(x)";
   double x = 3.14;
-  auto rc1 = compiler.CompileExpression<double, double>(content, {"x"}, true);
+  auto rc1 = compiler.CompileExpression<double, double>(content, {"x"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   ASSERT_DOUBLE_EQ(f1(x), std::tanh(x));
@@ -70,7 +70,7 @@ TEST(JitCompiler, complex_math) {
       return a * exp(2.2/3.3*t) + c;
     }
   )";
-  auto rc = compiler.CompileFunction<double, double, double, double>(content, true);
+  auto rc = compiler.CompileFunction<double, double, double, double>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   double a = 1.2;

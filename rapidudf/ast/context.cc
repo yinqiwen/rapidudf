@@ -83,7 +83,7 @@ void ParseContext::SetSource(const std::string& src, bool clear_vars) {
   source_lines_ = absl::StrSplit(absl::string_view(source_), '\n');
 }
 
-absl::StatusOr<DType> ParseContext::IsVarExist(const std::string& name, bool error_on_exist) {
+absl::StatusOr<VarTag> ParseContext::IsVarExist(const std::string& name, bool error_on_exist) {
   auto found = GetFunctionParseContext(current_function_cursor_).local_vars.find(name);
   if (found != GetFunctionParseContext(current_function_cursor_).local_vars.end()) {
     if (error_on_exist) {
@@ -133,9 +133,10 @@ std::string ParseContext::GetErrorLine() const {
   return fmt::format("cursor:{}, source lines:'{}'", validate_posistion_, source_lines_.size());
 }
 
-bool ParseContext::AddLocalVar(const std::string& name, DType dtype) {
-  auto [iter, success] = GetFunctionParseContext(current_function_cursor_).local_vars.emplace(name, dtype);
-  if (!success && iter->second.IsVoid()) {
+bool ParseContext::AddLocalVar(const std::string& name, DType dtype, const DynObjectSchema* schema) {
+  auto [iter, success] =
+      GetFunctionParseContext(current_function_cursor_).local_vars.emplace(name, VarTag{dtype, name, schema});
+  if (!success && iter->second.dtype.IsVoid()) {
     iter->second = dtype;
     return true;
   }

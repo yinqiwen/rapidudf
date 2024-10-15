@@ -30,34 +30,52 @@
 */
 
 #pragma once
-
-#include <functional>
-#include <string>
-#include <utility>
-#include <vector>
-#include "absl/container/flat_hash_map.h"
-#include "absl/status/statusor.h"
-
-#include "rapidudf/context/context.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
-
+#include "rapidudf/types/dyn_object.h"
+#include "rapidudf/types/dyn_object_schema.h"
 namespace rapidudf {
-namespace simd {
-class TableSchema {
- public:
-  template <typename T>
-  absl::Status AddColumn<T>(const std::string& name) {
-    DType dtype = get_dtype<T>();
-    auto [_, success] = columns_.emplace(name, dtype);
-    if (!success) {
-    }
-    return absl::OkStatus();
+
+template <typename T>
+absl::Status DynObject::DoSet(const std::string& name, const T& v) {
+  auto result = schema_->GetField(name);
+  if (!result.ok()) {
+    return result.status();
   }
+  auto [dtype, offset] = result.value();
+  if (get_dtype<T>() != dtype) {
+    RUDF_RETURN_FMT_ERROR("[DynObject::Set]mismatch dtype:{} for field:{} with dtype:{}", get_dtype<T>(), name, dtype);
+  }
+  uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
+  *(reinterpret_cast<T*>(p)) = v;
+  return absl::OkStatus();
+}
+template <typename T>
+absl::Status DynObject::DoSet(const std::string& name, T&& v) {
+  auto result = schema_->GetField(name);
+  if (!result.ok()) {
+    return result.status();
+  }
+  auto [dtype, offset] = result.value();
+  if (get_dtype<T>() != dtype) {
+    RUDF_RETURN_FMT_ERROR("[DynObject::Set]mismatch dtype:{} for field:{} with dtype:{}", get_dtype<T>(), name, dtype);
+  }
+  uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
+  *(reinterpret_cast<T*>(p)) = v;
+  return absl::OkStatus();
+}
 
- private:
-  using ColumnTable = absl::flat_hash_map<std::string, DType>;
-  ColumnTable columns_;
-};
-
-}  // namespace simd
+template <typename T>
+absl::StatusOr<T> DynObject::Get(const std::string& name) const {
+  auto result = schema_->GetField(name);
+  if (!result.ok()) {
+    return result.status();
+  }
+  auto [dtype, offset] = result.value();
+  if (get_dtype<T>() != dtype) {
+    RUDF_RETURN_FMT_ERROR("[DynObject::Get]mismatch dtype:{} for field:{} with dtype:{}", get_dtype<T>(), name, dtype);
+  }
+  const uint8_t* p = reinterpret_cast<const uint8_t*>(this) + offset;
+  return *(reinterpret_cast<const T*>(p));
+}
 }  // namespace rapidudf

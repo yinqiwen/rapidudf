@@ -70,6 +70,10 @@ HWY_INLINE auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
     return hn::Hypot(d, lv, rv);
   } else if constexpr (op == OP_ATAN2) {
     return hn::Atan2(d, lv, rv);
+  } else if constexpr (op == OP_MULTIPLY) {
+    return hn::Mul(lv, rv);
+  } else if constexpr (op == OP_DIVIDE) {
+    return hn::Div(lv, rv);
   } else if constexpr (op == OP_POW) {
     if constexpr (std::is_same_v<hn::TFromV<V>, float>) {
 #if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
@@ -150,6 +154,10 @@ void simd_vector_binary_op(const T* left, const T* right, T* output) {
 DEFINE_SIMD_BINARY_OP(OP_HYPOT, float, double);
 DEFINE_SIMD_BINARY_OP(OP_ATAN2, float, double);
 DEFINE_SIMD_BINARY_OP(OP_POW, float, double);
+// DEFINE_SIMD_BINARY_OP(OP_MULTIPLY, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
+//                       int8_t);
+// DEFINE_SIMD_BINARY_OP(OP_DIVIDE, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
+//                       int8_t);
 }  // namespace functions
 }  // namespace rapidudf
 #endif  // HWY_ONCE

@@ -30,21 +30,42 @@
 */
 
 #pragma once
-#include "rapidudf/compiler/compiler.h"
-#include "rapidudf/compiler/options.h"
-#include "rapidudf/context/context.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
-#include "rapidudf/types/dyn_object_impl.h"
-#include "rapidudf/types/simd/table.h"
-
+#include <memory>
+#include <string>
+#include <utility>
+#include "absl/status/statusor.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
-using JitCompiler = compiler::JitCompiler;
-// using JitCompilerCache = llvm::JitCompilerCache;
+class DynObjectSchema;
+class DynObject {
+ private:
+  struct Deleter {
+    void operator()(DynObject* ptr) {
+      ptr->~DynObject();
+      uint8_t* bytes = reinterpret_cast<uint8_t*>(ptr);
+      delete[] bytes;
+    }
+  };
 
-template <typename RET, typename... Args>
-using JitFunction = compiler::JitFunction<RET, Args...>;
+ public:
+  typedef std::unique_ptr<DynObject, Deleter> SmartPtr;
+  template <typename T>
+  absl::Status Set(const std::string& name, T&& v) {
+    return DoSet(name, std::forward<T>(v));
+  }
+  absl::Status Set(const std::string& name, const char* sv) { return DoSet(name, StringView(sv)); }
 
-using Options = compiler::Options;
+  template <typename T>
+  absl::StatusOr<T> Get(const std::string& name) const;
 
+ protected:
+  DynObject(const DynObjectSchema* s) : schema_(s) {}
+  template <typename T>
+  absl::Status DoSet(const std::string& name, const T& v);
+  template <typename T>
+  absl::Status DoSet(const std::string& name, T&& v);
+
+  const DynObjectSchema* schema_ = nullptr;
+  friend class DynObjectSchema;
+};
 }  // namespace rapidudf

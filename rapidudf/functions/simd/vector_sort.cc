@@ -86,7 +86,9 @@ simd::Vector<size_t> simd_vector_argselect(Context& ctx, simd::Vector<T> data, s
 template <typename K, typename V>
 void simd_vector_sort_key_value(Context& ctx, simd::Vector<K> key, simd::Vector<V> value, bool descending) {
   if (key.IsReadonly() || value.IsReadonly()) {
-    THROW_READONLY_ERR("can NOT sort_key_value on readonly vector");
+    THROW_READONLY_ERR(
+        fmt::format("can NOT sort_key_value on readonly vector, key vector readobt:{}, value vector readonly:{}",
+                    key.IsReadonly(), value.IsReadonly()));
   }
 
   x86simdsort::keyvalue_qsort(const_cast<K*>(key.Data()), const_cast<V*>(value.Data()), key.Size(), ctx.HasNan(),

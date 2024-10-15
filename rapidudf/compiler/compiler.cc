@@ -38,14 +38,14 @@
 
 namespace rapidudf {
 namespace compiler {
-JitCompiler::JitCompiler(const Options& opts) : opts_(opts) {
+JitCompiler::JitCompiler(Options opts) : opts_(opts) {
   functions::init_builtin();
   ast::Symbols::Init();
 }
 
-absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::string& source, bool dump_asm) {
+absl::StatusOr<std::vector<std::string>> JitCompiler::CompileSource(const std::string& source) {
   std::lock_guard<std::mutex> guard(jit_mutex_);
-  NewCodegen(dump_asm);
+  NewCodegen();
   auto funcs = ast::parse_functions_ast(ast_ctx_, source);
   if (!funcs.ok()) {
     RUDF_LOG_ERROR_STATUS(funcs.status());
@@ -138,9 +138,9 @@ absl::Status JitCompiler::CompileFunction(const ast::Function& function) {
   return CompileFunctions(std::vector<ast::Function>{function});
 }
 
-void JitCompiler::NewCodegen(bool print_asm) {
+void JitCompiler::NewCodegen() {
   ast_ctx_.Clear();
-  codegen_ = std::make_shared<CodeGen>(opts_, print_asm);
+  codegen_ = std::make_shared<CodeGen>(opts_);
   stat_.Clear();
   parsed_ast_funcs_.clear();
 }

@@ -39,7 +39,7 @@ TEST(JitCompiler, u64_f64) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
   std::string content = "x";
-  auto rc = compiler.CompileExpression<double, uint64_t>(content, {"x"}, true);
+  auto rc = compiler.CompileExpression<double, uint64_t>(content, {"x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_DOUBLE_EQ(f(11), 11);
@@ -50,7 +50,7 @@ TEST(JitCompiler, f64_u64) {
   spdlog::set_level(spdlog::level::debug);
   JitCompiler compiler;
   std::string content = "x";
-  auto rc = compiler.CompileExpression<uint64_t, double>(content, {"x"}, true);
+  auto rc = compiler.CompileExpression<uint64_t, double>(content, {"x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(11.1), 11);

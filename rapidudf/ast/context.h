@@ -44,15 +44,18 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/dyn_object_schema.h"
 namespace rapidudf {
 namespace ast {
 
 struct VarTag {
   std::string name;
   DType dtype;
-  VarTag(DType d, const std::string& n = "") {
+  const DynObjectSchema* schema = nullptr;
+  VarTag(DType d, const std::string& n = "", const DynObjectSchema* s = nullptr) {
     dtype = d;
     name = n;
+    schema = s;
   }
 };
 
@@ -71,14 +74,14 @@ class ParseContext {
     return absl::InvalidArgumentError(fmt::format("{} at {}", err, GetErrorLine()));
   }
 
-  absl::StatusOr<DType> IsVarExist(const std::string& name, bool error_on_exist);
+  absl::StatusOr<VarTag> IsVarExist(const std::string& name, bool error_on_exist);
 
   std::string GetErrorLine() const;
 
   int GetLineNo() const;
   std::string GetSourceLine(int line) const;
 
-  bool AddLocalVar(const std::string& name, DType dtype);
+  bool AddLocalVar(const std::string& name, DType dtype, const DynObjectSchema* schema);
 
   absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name, bool implicit = false);
   absl::StatusOr<const FunctionDesc*> CheckFuncExist(std::string_view name, bool implicit = false) {
@@ -120,7 +123,7 @@ class ParseContext {
   void SetVectorExressionFlag(bool v = true) { vector_expr_flag_ = v; }
 
  private:
-  using LocalVarMap = std::unordered_map<std::string, DType>;
+  using LocalVarMap = std::unordered_map<std::string, VarTag>;
 
   using BuiltinFuncationCallSet = std::unordered_set<std::string>;
 

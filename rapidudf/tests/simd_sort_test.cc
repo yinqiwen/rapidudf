@@ -192,7 +192,7 @@ TEST(JitCompiler, sort_kv) {
     }
   )";
 
-  auto rc = compiler.CompileFunction<simd::Vector<uint32_t>, Context&, simd::Vector<double>>(content, true);
+  auto rc = compiler.CompileFunction<simd::Vector<uint32_t>, Context&, simd::Vector<double>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto ids = f(ctx, data);
@@ -220,7 +220,7 @@ TEST(JitCompiler, select_kv) {
     }
   )";
 
-  auto rc = compiler.CompileFunction<simd::Vector<uint32_t>, Context&, simd::Vector<double>>(content, true);
+  auto rc = compiler.CompileFunction<simd::Vector<uint32_t>, Context&, simd::Vector<double>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto ids = f(ctx, data);
@@ -248,7 +248,7 @@ TEST(JitCompiler, topk_kv) {
     }
   )";
 
-  auto rc = compiler.CompileFunction<simd::Vector<uint32_t>, Context&, simd::Vector<double>>(content, true);
+  auto rc = compiler.CompileFunction<simd::Vector<uint32_t>, Context&, simd::Vector<double>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto ids = f(ctx, data);

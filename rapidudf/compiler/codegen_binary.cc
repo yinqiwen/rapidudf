@@ -269,17 +269,7 @@ absl::StatusOr<::llvm::Value*> CodeGen::BinaryOp(OpToken op, DType dtype, ::llvm
     }
     return v;
   }
-  // if (dtype.IsStringView() && left->getType()->isVectorTy() && op >= OP_EQUAL && op <= OP_GREATER_EQUAL) {
-  //   auto op_arg = NewU32(static_cast<uint32_t>(op));
-  //   std::vector<ValuePtr> args{op_arg, left, right};
-  //   auto result = CallFunction(functions::kBuiltinStringViewVectorCmp, std::vector<::llvm::Value*>{nullptr, left,
-  //   right}); if (result.ok()) {
-  //     return result.value();
-  //   } else {
-  //     return result.status();
-  //   }
-  // }
-  // RUDF_ERROR("enter bin op:{}, dtype:{}, vector:{}", op, dtype, ret_type->isVectorTy());
+
   return absl::InvalidArgumentError(fmt::format("Unsupported op:{} for dtype:{}", op, dtype));
 }
 

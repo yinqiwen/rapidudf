@@ -57,14 +57,15 @@ class Vector;
 class VectorData {
  public:
   VectorData(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
-      : temporary_(0), size_(size), readonly_(0), bytes_capacity_(bytes_capacity), data_(data) {}
+      : temporary_(0), size_(size), writable_(0), bytes_capacity_(bytes_capacity), data_(data) {}
   inline size_t Size() const { return size_; }
+  inline void SetSize(size_t n) { size_ = n; }
   inline size_t BytesCapacity() const { return bytes_capacity_; };
   inline const void* Data() const { return data_; }
   inline void SetTemporary(bool v) { temporary_ = v ? 1 : 0; }
-  inline bool IsTemporary() const { return temporary_ && !readonly_; };
-  inline void SetReadonly(bool v) { readonly_ = v ? 1 : 0; }
-  inline bool IsReadonly() const { return readonly_; };
+  inline bool IsTemporary() const { return temporary_ && writable_; };
+  inline void SetReadonly(bool v) { writable_ = (v ? 0 : 1); }
+  inline bool IsReadonly() const { return !writable_; };
 
   template <typename T>
   T* MutableData() {
@@ -80,7 +81,7 @@ class VectorData {
     struct {
       uint64_t temporary_ : 1;
       uint64_t size_ : 31;  // corresponds to logical address
-      uint64_t readonly_ : 1;
+      uint64_t writable_ : 1;
       uint64_t bytes_capacity_ : 31;
     };
   };
@@ -107,8 +108,11 @@ class Vector {
       } else {
         byte_capacity = vdata.Size() * sizeof(T);
       }
+      vec_data_ = VectorData(vdata.Data(), vdata.Size(), byte_capacity);
+      vec_data_.SetReadonly(vdata.IsReadonly());
+    } else {
+      vec_data_ = vdata;
     }
-    vec_data_ = VectorData(vdata.Data(), vdata.Size(), byte_capacity);
   }
   Vector(const std::vector<T>& vec) {
     if constexpr (std::is_same_v<T, Bit>) {
@@ -125,6 +129,7 @@ class Vector {
     } else {
       VectorData vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
       vec_data_ = vdata;
+      vec_data_.SetReadonly(false);
     }
   }
   VectorData RawData() { return vec_data_; }
@@ -225,11 +230,13 @@ class Vector {
       THROW_OUT_OF_RANGE_ERR(n, vec_data_.Size());
     }
     auto new_vec_data = VectorData(vec_data_.Data(), n, vec_data_.BytesCapacity());
+    new_vec_data.SetReadonly(vec_data_.IsReadonly());
     return Vector<T>(new_vec_data);
   }
   VectorData& GetVectorData() { return vec_data_; }
 
-  bool IsTemporary() const { return vec_data_.IsTemporary(); }
+  void SetReadonly(bool v) { vec_data_.SetReadonly(v); }
+  // bool IsTemporary() const { return vec_data_.IsTemporary(); }
   bool IsReadonly() const { return vec_data_.IsReadonly(); }
 
  private:

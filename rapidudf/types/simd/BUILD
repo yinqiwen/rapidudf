@@ -14,20 +14,6 @@ cc_library(
     ],
 )
 
-# cc_library(
-#     name = "column",
-#     srcs = ["column.cc"],
-#     hdrs = [
-#         "column.h",
-#     ],
-#     deps = [
-#         ":vector",
-#         "//rapidudf/context",
-#         "//rapidudf/meta:dtype_enums",
-#         "@com_google_absl//absl/status:statusor",
-#     ],
-# )
-
 cc_library(
     name = "table",
     srcs = ["table.cc"],
@@ -35,8 +21,9 @@ cc_library(
         "table.h",
     ],
     deps = [
-        # ":column",
         "//rapidudf/context",
+        "//rapidudf/functions/simd:vector",
+        "//rapidudf/types:dyn_object_impl",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status:statusor",
     ],

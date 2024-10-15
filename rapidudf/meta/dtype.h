@@ -54,12 +54,17 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta//dtype_enums.h"
 #include "rapidudf/meta/type_traits.h"
+#include "rapidudf/types/dyn_object.h"
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
+
+struct DTypeAttr {
+  std::string schema;  // for 'dyn_obj'
+};
 
 class DType {
  public:
@@ -117,10 +122,8 @@ class DType {
   bool IsContext() const { return IsFundamental() && ctrl_.t0_ == DATA_CONTEXT; }
   bool IsContextPtr() const { return IsPtr() && (PtrTo().IsContext()); }
   bool IsStringPtr() const { return IsPtr() && (PtrTo().IsString()); }
-  bool IsSimdTable() const { return IsFundamental() && ctrl_.container_type_ == COLLECTION_SIMD_TABLE; }
-  bool IsSimdTablePtr() const { return IsPtr() && (PtrTo().IsSimdTable()); }
-  // bool IsSimdColumn() const { return IsFundamental() && ctrl_.t0_ == DATA_SIMD_COLUMN; }
-  // bool IsSimdColumnPtr() const { return IsPtr() && (PtrTo().IsSimdColumn()); }
+  bool IsDynObject() const { return IsFundamental() && ctrl_.t0_ == DATA_DYN_OBJECT; }
+  bool IsDynObjectPtr() const { return IsPtr() && (PtrTo().IsDynObject()); }
   bool IsInvalid() const { return Control() == 0; }
   bool IsComplexObj() const;
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
@@ -480,9 +483,6 @@ DType get_dtype() {
   if constexpr (std::is_same_v<long double, T>) {
     return DType(DATA_F80);
   }
-  // if constexpr (std::is_same_v<hwy::float16_t, T>) {
-  //   return DType(DATA_F16);
-  // }
   if constexpr (std::is_same_v<std::string_view, T>) {
     return DType(DATA_STD_STRING_VIEW);
   }
@@ -504,12 +504,9 @@ DType get_dtype() {
   if constexpr (std::is_same_v<Context, T>) {
     return DType(DATA_CONTEXT);
   }
-  // if constexpr (std::is_same_v<simd::Table, T>) {
-  //   return DType(DATA_SIMD_TABLE);
-  // }
-  // if constexpr (std::is_same_v<simd::Column, T>) {
-  //   return DType(DATA_SIMD_COLUMN);
-  // }
+  if constexpr (std::is_base_of_v<DynObject, T>) {
+    return DType(DATA_DYN_OBJECT);
+  }
 
   if constexpr (std::is_same_v<Pointer, T>) {
     return DType(DATA_POINTER);

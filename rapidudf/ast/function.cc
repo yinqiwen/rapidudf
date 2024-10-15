@@ -31,6 +31,7 @@
 #include "rapidudf/ast/function.h"
 #include <fmt/core.h>
 #include "rapidudf/log/log.h"
+#include "rapidudf/types/dyn_object.h"
 namespace rapidudf {
 namespace ast {
 FunctionDesc Function::ToFuncDesc() const {
@@ -53,7 +54,13 @@ absl::Status Function::Validate(ParseContext& ctx) {
       if (!result.ok()) {
         return result.status();
       }
-      ctx.AddLocalVar(arg.name, arg.dtype);
+      if (!arg.attr.schema.empty()) {
+        arg.schema = DynObjectSchema::Get(arg.attr.schema);
+        if (arg.schema == nullptr) {
+          RUDF_RETURN_FMT_ERROR("No dyn_obj schema:{} found for arg:{}", arg.attr.schema, arg.name);
+        }
+      }
+      ctx.AddLocalVar(arg.name, arg.dtype, arg.schema);
     }
   }
   return body.Validate(ctx);

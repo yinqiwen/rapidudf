@@ -74,7 +74,6 @@ struct FunctionValue {
   ::llvm::Type* return_type = nullptr;
   ValuePtr return_value = nullptr;
   ::llvm::BasicBlock* exit_block = nullptr;
-  ::llvm::BasicBlock* exception_block = nullptr;
   ValuePtr context_arg_value;
   std::unordered_map<std::string, ValuePtr> named_values;
   std::vector<LoopBlocks> loop_blocks;
@@ -102,7 +101,7 @@ class CodeGen {
     friend class CodeGen;
   };
 
-  explicit CodeGen(const Options& opts, bool print_asm);
+  explicit CodeGen(const Options& opts);
 
   absl::Status DeclareExternFunctions(
       std::unordered_map<std::string, const FunctionDesc*>& func_calls,
@@ -188,6 +187,8 @@ class CodeGen {
 
   ::llvm::LLVMContext& GetContext() { return *context_; }
 
+  bool IsExternFunctionExist(const std::string& name);
+
   void PrintAsm();
 
  private:
@@ -221,7 +222,6 @@ class CodeGen {
   std::unique_ptr<::llvm::StandardInstrumentations> std_insts_;
 
   uint32_t label_cursor_;
-  bool print_asm_ = false;
 };
 }  // namespace compiler
 }  // namespace rapidudf

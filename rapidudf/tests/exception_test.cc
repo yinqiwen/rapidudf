@@ -58,7 +58,7 @@ TEST(JitCompiler, exception) {
   std::string content = R"(
       test_user_func()
   )";
-  auto rc = compiler.CompileExpression<int>(content, {}, true);
+  auto rc = compiler.CompileExpression<int>(content, {});
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
@@ -75,7 +75,7 @@ TEST(JitCompiler, rethrow_exception) {
   std::string content = R"(
       test_user_func()
   )";
-  auto rc = compiler.CompileExpression<int>(content, {}, true);
+  auto rc = compiler.CompileExpression<int>(content, {});
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }

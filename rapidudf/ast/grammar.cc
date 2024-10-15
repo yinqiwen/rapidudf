@@ -100,7 +100,7 @@ bp::rule<struct array, Array> array = "array";
 
 auto func_convert = [](auto& ctx) {
   Function f;
-  f.return_type = std::get<0>(_attr(ctx));
+  f.return_type = std::get<0>(_attr(ctx)).first;
   f.name = std::get<1>(_attr(ctx));
   f.args = std::get<2>(_attr(ctx));
   f.body = std::get<3>(_attr(ctx));
@@ -215,6 +215,15 @@ auto func_invoke_args_func = [](auto& ctx) {
   _val(ctx) = f;
 };
 
+auto func_arg_func = [](auto& ctx) {
+  FunctionArg f;
+  auto dtype_attr = std::get<0>(_attr(ctx));
+  f.dtype = dtype_attr.first;
+  f.attr = dtype_attr.second;
+  f.name = std::get<1>(_attr(ctx));
+  _val(ctx) = f;
+};
+
 auto const constant_number_def = bp::lexeme[bp::double_ > -('_' > Symbols::kNumberSymbols)];
 // const auto dynamic_param_access_def = identifier > *('[' > (bp::quoted_string | bp::uint_) > ']');
 auto const var_declare_def = ("var" > identifier)[var_declare_func];
@@ -267,7 +276,7 @@ auto const ifelse_statement_def = ("if" > choice_statement > *("elif" > choice_s
 auto const block_def = '{' > statements > '}';
 
 bp::rule<struct func_arg, FunctionArg> func_arg = "func_arg";
-auto const func_arg_def = Symbols::kDtypeSymbols > identifier;
+auto const func_arg_def = (Symbols::kDtypeSymbols > identifier)[func_arg_func];
 bp::rule<struct func_args, std::vector<FunctionArg>> func_args = "func_args";
 auto const func_args_def = func_arg % ',';
 bp::rule<struct func, Function> func = "func";

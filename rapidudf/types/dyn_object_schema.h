@@ -30,33 +30,63 @@
 */
 
 #pragma once
-#include <utility>
-#include "boost/parser/parser.hpp"
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 #include "rapidudf/meta/dtype.h"
-#include "rapidudf/meta/optype.h"
+#include "rapidudf/types/dyn_object.h"
+
 namespace rapidudf {
-namespace ast {
-
-class Symbols {
+class DynObjectSchema {
  public:
-  static boost::parser::symbols<std::pair<DType, DTypeAttr>> kDtypeSymbols;
-  static boost::parser::symbols<DType> kNumberSymbols;
-  static boost::parser::symbols<OpToken> kAssignOpSymbols;
-  static boost::parser::symbols<OpToken> kLogicOpSymbols;
-  static boost::parser::symbols<OpToken> kCmpOpSymbols;
-  static boost::parser::symbols<OpToken> kAdditiveOpSymbols;
-  static boost::parser::symbols<OpToken> kMultiplicativeOpSymbols;
-  static boost::parser::symbols<OpToken> kPowerOpSymbols;
-  static boost::parser::symbols<OpToken> kUnaryOpSymbols;
-  static boost::parser::symbols<uint32_t> kContinueSymbols;
-  static boost::parser::symbols<uint32_t> kBreakSymbols;
+  using InitFunc = std::function<void(DynObjectSchema* s)>;
+  static const DynObjectSchema* GetOrCreate(const std::string& name, InitFunc&& init, size_t reserved_size = 0);
+  static const DynObjectSchema* Get(const std::string& name);
+  static DynObjectSchema* GetMutable(const std::string& name);
+  static std::vector<std::string> ListAll();
 
-  static void Init();
-  Symbols();
+  typename DynObject::SmartPtr NewObject() const;
 
- private:
-  static void Add(const std::string& name, DType dtype, DTypeAttr attr);
+  template <typename T>
+  absl::Status AddField(const std::string& name) {
+    return Add(name, get_dtype<T>());
+  }
+
+  absl::StatusOr<std::pair<DType, uint32_t>> GetField(const std::string& name) const;
+
+  uint32_t ByteSize() const { return allocated_offset_; }
+
+  bool IsTable() const { return flags_.is_table; }
+
+  void VisitField(std::function<void(const std::string&, const DType&, uint32_t)>&& f) const;
+
+  size_t FieldCount() const { return fields_.size(); }
+
+ protected:
+  struct Flags {
+    uint64_t is_table : 1;
+    uint64_t reserved : 63;
+    Flags(bool table = false) { is_table = table ? 1 : 0; }
+  };
+  DynObjectSchema(const std::string& name, size_t reserved_size, Flags flags);
+  void SetFlags(Flags flags) { flags_ = flags; }
+
+  absl::Status Add(const std::string& name, DType dtype);
+
+  struct Field {
+    DType dtype;
+    uint32_t bytes_offset = 0;
+  };
+
+  using FieldTable = absl::flat_hash_map<std::string, Field>;
+  std::string name_;
+  Flags flags_;
+  FieldTable fields_;
+  uint32_t allocated_offset_ = 0;
 };
-
-}  // namespace ast
+using DynObjectSchemaMap = std::map<std::string, DynObjectSchema*>;
 }  // namespace rapidudf

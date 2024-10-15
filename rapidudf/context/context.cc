@@ -42,13 +42,13 @@ Context::~Context() { Reset(); }
 Arena& Context::GetArena() { return *arena_; }
 uint8_t* Context::ArenaAllocate(size_t n) {
   uint8_t* p = GetArena().Allocate(n);
-  allocated_arena_ptrs_.insert(p);
+  // allocated_arena_ptrs_.insert(p);
   return p;
 }
 
 void Context::Reset() {
   GetArena().Reset();
-  allocated_arena_ptrs_.clear();
+  // allocated_arena_ptrs_.clear();
   // for (auto clean : cleanups_) {
   //   clean();
   // }

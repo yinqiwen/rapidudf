@@ -15,6 +15,7 @@ cc_library(
         "functions.cc",
         "json.cc",
         "math.cc",
+        "simd_table.cc",
         "simd_vector.cc",
         "stl_maps.cc",
         "stl_sets.cc",
@@ -32,6 +33,7 @@ cc_library(
         "//rapidudf/meta:function",
         "//rapidudf/meta:optype",
         "//rapidudf/reflect",
+        "//rapidudf/types/simd:table",
         "@sleef",
     ],
 )

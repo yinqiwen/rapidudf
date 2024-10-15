@@ -113,7 +113,7 @@ struct FieldAccess {
   uint32_t position = 0;
 
   StructMember struct_member;
-  absl::StatusOr<VarTag> Validate(ParseContext& ctx, DType src_dtype);
+  absl::StatusOr<VarTag> Validate(ParseContext& ctx, VarTag src);
 };
 using DynamicParamAccess = std::variant<std::string, uint32_t, VarRef>;
 using MemberAccess = std::variant<FieldAccess, DynamicParamAccess>;

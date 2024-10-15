@@ -100,6 +100,10 @@ class StructAccessHelperRegister {
     BOOST_PP_SEQ_FOR_EACH_I(RUDF_STRUCT_ADD_C_METHOD_ACCESS_CODE, helper, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))     \
   });
 
+#define RUDF_STRUCT_HELPER_METHOD_BIND(NAME, func)                  \
+  static ::rapidudf::StructAccessHelperRegister<void> BOOST_PP_CAT( \
+      rudf_struct_access_helper_, __COUNTER__)([]() { ::rapidudf::Reflect::AddStructMethodAccessor(NAME, func); });
+
 #define RUDF_STRUCT_MEMBER_METHOD_BIND(NAME, member_method)                                         \
   static ::rapidudf::StructAccessHelperRegister BOOST_PP_CAT(rudf_member_bind_, __COUNTER__)([]() { \
     using obj_t = FunctionTraits<decltype(member_method)>::object_type;                             \

@@ -32,6 +32,7 @@
 #include <cxxabi.h>
 #include <memory>
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype_enums.h"
 namespace rapidudf {
 
 static std::unordered_map<std::string, DType>& getNameDTypeMap() {
@@ -57,7 +58,7 @@ std::string_view DTypeFactory::GetNameByDType(DType dtype) {
     return "";
   }
   uint32_t base_type = dtype.GetFundamentalType();
-  if (base_type >= DATA_VOID && base_type <= DATA_JSON) {
+  if (base_type >= DATA_VOID && base_type < DATA_BUILTIN_TYPE_END) {
     return kFundamentalTypeStrs[base_type];
   }
   auto found = getDTypeNameMap().find(dtype);
@@ -370,6 +371,7 @@ uint32_t DType::ByteSize() const {
     return 16;
   }
   switch (ctrl_.t0_) {
+    case DATA_BIT:
     case DATA_U8:
     case DATA_I8: {
       return 1;

@@ -46,12 +46,11 @@ enum CollectionType {
   COLLECTION_ABSL_SPAN,
   COLLECTION_TUPLE,
   COLLECTION_SIMD_VECTOR,
-  COLLECTION_SIMD_TABLE,
   COLLECTION_END,
 };
 
 constexpr std::array<std::string_view, COLLECTION_END> kCollectionTypeStrs = {
-    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector", "simd_table"};
+    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector"};
 enum FundamentalType {
   DATA_INVALID = 0,
   DATA_VOID,
@@ -75,6 +74,8 @@ enum FundamentalType {
   DATA_FLATBUFFERS_STRING,
   DATA_JSON,
   DATA_CONTEXT,
+  DATA_DYN_OBJECT,
+  DATA_TABLE,
   DATA_BUILTIN_TYPE_END,
   // DATA_SIMD_COLUMN,
 
@@ -114,5 +115,7 @@ constexpr std::array<std::string_view, DATA_BUILTIN_TYPE_END> kFundamentalTypeSt
                                                                                       "string",
                                                                                       "fbs_string",
                                                                                       "json",
-                                                                                      "Context"};
+                                                                                      "Context",
+                                                                                      "dyn_obj",
+                                                                                      "table"};
 }  // namespace rapidudf

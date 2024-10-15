@@ -180,10 +180,11 @@ absl::StatusOr<VarTag> VarRef::Validate(ParseContext& ctx) {
   if (!result.ok()) {
     return result;
   }
-  if (result.value().IsSimdVector()) {
+  auto var = result.value();
+  if (var.dtype.IsSimdVector()) {
     ctx.SetVectorExressionFlag(true);
   }
-  return VarTag(result.value(), name);
+  return var;
 }
 absl::StatusOr<VarTag> VarDefine::Validate(ParseContext& ctx) {
   ctx.SetPosition(position);
@@ -191,7 +192,7 @@ absl::StatusOr<VarTag> VarDefine::Validate(ParseContext& ctx) {
   if (!result.ok()) {
     return result.status();
   }
-  ctx.AddLocalVar(name, DType(DATA_VOID));
+  ctx.AddLocalVar(name, DType(DATA_VOID), nullptr);
   return VarTag(DATA_VOID, name);
 }
 absl::StatusOr<std::vector<VarTag>> FuncInvokeArgs::Validate(ParseContext& ctx, RPN* rpn) {
@@ -213,10 +214,40 @@ absl::StatusOr<std::vector<VarTag>> FuncInvokeArgs::Validate(ParseContext& ctx, 
   }
   return arg_dtypes;
 }
-absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, DType src_dtype) {
+absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, VarTag src) {
+  DType src_dtype = src.dtype;
+  bool member_func_call = func_args.has_value();
+  bool is_table = false;
+  if (src_dtype.IsDynObjectPtr() && nullptr != src.schema) {
+    is_table = src.schema->IsTable();
+    if (!member_func_call) {
+      auto result = src.schema->GetField(field);
+      if (!result.ok()) {
+        return result.status();
+      }
+      auto [field_dtype, field_offset] = result.value();
+      struct_member.member_field_offset = field_offset;
+      struct_member.field_name = field;
+      struct_member.member_field_dtype = field_dtype;
+      return field_dtype;
+    } else {
+    }
+  }
+  if (func_args.has_value()) {
+    auto func_arg_dtypes = func_args->Validate(ctx);
+    if (!func_arg_dtypes.ok()) {
+      return func_arg_dtypes.status();
+    }
+    auto arg_dtypes = func_arg_dtypes.value();
+    if (is_table && (field == "topk" || field == "order_by")) {
+      if (arg_dtypes.size() > 1) {
+        field = GetFunctionName(field, arg_dtypes[0].dtype.Elem());
+      }
+    }
+  }
   auto field_accessor = Reflect::GetStructMember(src_dtype.PtrTo(), field);
   if (!field_accessor) {
-    return ctx.GetErrorStatus(fmt::format("Can NOT get member:{} accessor for dtype:{}", field, src_dtype.PtrTo()));
+    return ctx.GetErrorStatus(fmt::format("Can NOT get member:{} accessor for dtype:{}", field, src_dtype));
   }
   struct_member = field_accessor.value();
   if (!func_args.has_value()) {
@@ -233,11 +264,6 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, DType src_dtype)
     if (!struct_member.HasMemberFunc()) {
       return ctx.GetErrorStatus(fmt::format("Can NOT get member func:{} accessor for dtype:{}", field, src_dtype));
     }
-    auto func_arg_dtypes = func_args->Validate(ctx);
-    if (!func_arg_dtypes.ok()) {
-      return func_arg_dtypes.status();
-    }
-
     ctx.AddMemberFuncCall(src_dtype.PtrTo(), field, *struct_member.member_func);
     return struct_member.member_func->return_type;
   }
@@ -274,11 +300,11 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
           can_neg = true;
         } else if (result->dtype.IsSimdVector() && result->dtype.Elem().IsSigned()) {
           can_neg = true;
-          std::string fname = GetFunctionName(*op, result->dtype);
-          auto check_result = ctx.CheckFuncExist(fname, true);
-          if (!check_result.ok()) {
-            return check_result.status();
-          }
+          // std::string fname = GetFunctionName(*op, result->dtype);
+          // auto check_result = ctx.CheckFuncExist(fname, true);
+          // if (!check_result.ok()) {
+          //   return check_result.status();
+          // }
         }
         if (!can_neg) {
           return ctx.GetErrorStatus(fmt::format("can NOT do negative op on non number value:{}", result->dtype));
@@ -411,10 +437,13 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
           left_var.dtype = right_result->dtype;
         }
         if (op == OP_POW) {
+          // RUDF_INFO("#####{}", GetFunctionName(op, left_var.dtype.ToSimdVector()));
+          // std::ignore = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype.ToSimdVector()));
           if (left_var.dtype.IsSimdVector()) {
-            std::ignore = ctx.CheckFuncExist(GetFunctionName(OP_POW, left_var.dtype.ToSimdVector()));
+            std::ignore = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype.ToSimdVector()));
           }
         }
+
         // if (op == OP_MOD || op == OP_MOD_ASSIGN) {
         //   if (left_var.dtype.Elem().IsFloat() || right_result->dtype.Elem().IsFloat()) {
         //     return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
@@ -425,7 +454,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
       }
       case OP_ASSIGN: {
         if (!left_var.name.empty()) {
-          ctx.AddLocalVar(left_var.name, right_result->dtype);
+          ctx.AddLocalVar(left_var.name, right_result->dtype, right_result->schema);
         } else {
           // return ctx.GetErrorStatus(fmt::format("can NOT do {} on non var.", op));
         }
@@ -623,7 +652,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
           [&](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, FieldAccess>) {
-              return arg.Validate(ctx, var_dtype.dtype);
+              return arg.Validate(ctx, var_dtype);
             } else {
               return std::visit(
                   [&](auto&& dynamic_arg) {
@@ -635,8 +664,6 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
                     } else if (var_dtype.dtype.IsVectorPtr()) {
                       can_brackets_op = true;
                     } else if (var_dtype.dtype.IsMapPtr() || var_dtype.dtype.IsUnorderedMapPtr()) {
-                      can_brackets_op = true;
-                    } else if (var_dtype.dtype.IsSimdTablePtr()) {
                       can_brackets_op = true;
                     }
                     if (!can_brackets_op) {
@@ -675,7 +702,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
                       DType json_dtype(DATA_JSON);
                       ret_dtype = json_dtype.ToPtr();
                     } else if (var_dtype.dtype.IsVectorPtr() || var_dtype.dtype.IsMapPtr() ||
-                               var_dtype.dtype.IsUnorderedMapPtr() || var_dtype.dtype.IsSimdTablePtr()) {
+                               var_dtype.dtype.IsUnorderedMapPtr()) {
                       std::string member_func = "get";
                       auto field_accessor = Reflect::GetStructMember(var_dtype.dtype.PtrTo(), member_func);
                       if (!field_accessor) {
@@ -714,6 +741,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
       }
       var_dtype = result.value();
     }
+    var_dtype.name.clear();
     return var_dtype;
   } else if (func_args.has_value()) {
     DType compute_dtype;
@@ -801,7 +829,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
     if (!result.ok()) {
       return result;
     }
-    return VarTag(result.value(), name);
+    return result.value();
   }
 }
 

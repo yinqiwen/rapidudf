@@ -158,6 +158,14 @@ static void register_sqrt() {
 }
 
 template <typename T>
+static void register_cbrt() {
+  T (*abs_f)(T) = &std::cbrt;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_CBRT, dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
+}
+
+template <typename T>
 static void register_log() {
   T (*abs_f)(T) = &std::log;
   DType dtype = get_dtype<T>();
@@ -394,6 +402,7 @@ void init_builtin_math_funcs() {
   REGISTER_MATH_FUNCS(register_rint, float, double, long double)
   REGISTER_MATH_FUNCS(register_trunc, float, double, long double)
   REGISTER_MATH_FUNCS(register_sqrt, float, double, long double)
+  REGISTER_MATH_FUNCS(register_cbrt, float, double, long double)
   REGISTER_MATH_FUNCS(register_log, float, double, long double)
   REGISTER_MATH_FUNCS(register_log10, float, double, long double)
   REGISTER_MATH_FUNCS(register_log1p, float, double, long double)

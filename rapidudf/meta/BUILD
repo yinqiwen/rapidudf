@@ -75,7 +75,6 @@ cc_library(
         "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/types",
-        # "//rapidudf/types/simd:table",
         "//rapidudf/types/simd:vector",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_google_absl//absl/types:span",

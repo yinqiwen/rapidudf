@@ -36,7 +36,7 @@ namespace compiler {
 struct Options {
   uint8_t optimize_level = 2;
   bool fast_math = false;
-  Options() {}
+  bool print_asm = false;
 };
 }  // namespace compiler
 }  // namespace rapidudf

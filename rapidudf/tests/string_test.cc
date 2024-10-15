@@ -39,7 +39,7 @@ using namespace rapidudf::ast;
 TEST(JitCompiler, string_size) {
   JitCompiler compiler;
   std::string content = R"(str.size())";
-  auto rc = compiler.CompileExpression<size_t, StringView>(content, {"str"});
+  auto rc = compiler.CompileExpression<size_t, StringView>(content, {{"str"}});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f("hello"), 5);
@@ -48,7 +48,7 @@ TEST(JitCompiler, string_size) {
 TEST(JitCompiler, string_contains) {
   JitCompiler compiler;
   std::string content = R"(str.contains("hello"))";
-  auto rc = compiler.CompileExpression<bool, StringView>(content, {"str"});
+  auto rc = compiler.CompileExpression<bool, StringView>(content, {{"str"}});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f("hello"), true);
@@ -57,7 +57,7 @@ TEST(JitCompiler, string_contains) {
 TEST(JitCompiler, string_starts_with) {
   JitCompiler compiler;
   std::string content = R"(str.starts_with("hello"))";
-  auto rc = compiler.CompileExpression<bool, StringView>(content, {"str"});
+  auto rc = compiler.CompileExpression<bool, StringView>(content, {{"str"}});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f("hello"), true);

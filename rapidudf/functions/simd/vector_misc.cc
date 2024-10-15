@@ -102,6 +102,7 @@ HWY_INLINE simd::Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t
     auto v = hn::Iota(d, start + i);
     hn::StoreU(v, d, reinterpret_cast<T*>(arena_data + i * sizeof(T)));
   }
+  result_data.SetReadonly(false);
   return simd::Vector<T>(result_data);
 }
 
@@ -115,6 +116,7 @@ simd::Vector<T> simd_vector_gather_impl(Context& ctx, simd::Vector<T> data, simd
   constexpr hn::CappedTag<int32_t, N> indice_d;
   size_t dst_size = indices.Size();
   simd::VectorData result_data = ctx.NewSimdVector<T>(N, dst_size, true);
+  result_data.SetReadonly(false);
   T* dst = result_data.MutableData<T>();
   const int32_t* indice_data = indices.Data();
   size_t idx = 0;
@@ -172,6 +174,12 @@ T simd_vector_dot(simd::Vector<T> left, simd::Vector<T> right) {
 }
 
 template <typename T>
+T simd_vector_avg(simd::Vector<T> left) {
+  T sum = simd_vector_sum(left);
+  return sum / left.Size();
+}
+
+template <typename T>
 simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vector<Bit> bits) {
   T* raw = reinterpret_cast<T*>(ctx.ArenaAllocate(data.BytesCapacity()));
   size_t filter_cursor = 0;
@@ -200,6 +208,7 @@ simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vec
 
   simd::VectorData vdata(raw, filter_cursor, data.BytesCapacity());
   vdata.SetTemporary(true);
+  vdata.SetReadonly(false);
   return simd::Vector<T>(vdata);
 }
 
@@ -252,7 +261,9 @@ DEFINE_SIMD_DOT_OP(float, double);
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_IOTA_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t);
 
-#define DEFINE_SIMD_SUM_OP_TEMPLATE(r, op, ii, TYPE) template TYPE simd_vector_sum(simd::Vector<TYPE> vec);
+#define DEFINE_SIMD_SUM_OP_TEMPLATE(r, op, ii, TYPE)     \
+  template TYPE simd_vector_sum(simd::Vector<TYPE> vec); \
+  template TYPE simd_vector_avg(simd::Vector<TYPE> vec);
 #define DEFINE_SIMD_SUM_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_SUM_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 

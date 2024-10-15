@@ -68,9 +68,8 @@ TEST(JitCompiler, array_simple) {
     }
   )";
 
-  auto result1 =
-      compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&, rapidudf::simd::Vector<double>,
-                               rapidudf::simd::Vector<double>>(source1, true);
+  auto result1 = compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&,
+                                          rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source1);
   if (!result1.ok()) {
     RUDF_ERROR("###{}", result1.status().ToString());
   }
@@ -85,23 +84,23 @@ TEST(JitCompiler, array_simple) {
   auto fr = ff(ctx, xx, yy);
 }
 
-TEST(JitCompiler, vector_iota) {
-  spdlog::set_level(spdlog::level::debug);
+TEST(JitCompiler, vector_cmp) {
+  std::vector<int> vec{1, 2, 3};
+  simd::Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
-    simd_vector<f64> test_func(Context ctx){
-      var t = iota(1_f64,12);
-      return t;
+    simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
+      x>5&&x<5;
+      return 5+x;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>, Context&>(content, true);
+  auto rc = compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
-  auto result = f(ctx);
-  RUDF_INFO("IsTemporary:{}", result.IsTemporary());
-  ASSERT_EQ(result.Size(), 12);
+  auto result = f(ctx, simd_vec);
+  ASSERT_EQ(result.Size(), vec.size());
   for (size_t i = 0; i < result.Size(); i++) {
-    ASSERT_DOUBLE_EQ(result[i], i + 1);
+    ASSERT_FLOAT_EQ(result[i], vec[i] + 5);
   }
 }

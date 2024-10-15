@@ -32,6 +32,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
+#include "rapidudf/compiler/options.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -58,7 +59,7 @@ TEST(JitCompiler, struct_access) {
   opt.optimize_level = 0;
   JitCompiler compiler(opt);
   std::string source = "x.internal.a";
-  auto rc = compiler.CompileExpression<int, const TestStruct&>(source, {"x"}, true);
+  auto rc = compiler.CompileExpression<int, const TestStruct&>(source, {"x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(t), t.internal.a);
@@ -128,7 +129,7 @@ TEST(JitCompiler, struct_write) {
   TestStruct t;
   t.a = 101;
   t.internal.a = 102;
-  JitCompiler compiler;
+  JitCompiler compiler({.fast_math = false});
   ParseContext ctx;
   std::string content = R"(
     int test_func(TestStruct x){
@@ -136,7 +137,7 @@ TEST(JitCompiler, struct_write) {
       return x.internal.a;
     }
   )";
-  auto rc = compiler.CompileFunction<int, TestStruct&>(content, true);
+  auto rc = compiler.CompileFunction<int, TestStruct&>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(t), t.internal.a);
