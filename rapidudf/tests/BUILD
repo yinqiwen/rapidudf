@@ -10,6 +10,28 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
+cc_binary(
+    name = "fib_bench",
+    srcs = ["fib_bench.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        "//rapidudf",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary(
+    name = "expr_bench",
+    srcs = ["expr_bench.cc"],
+    copts = ["-O2"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        "//rapidudf",
+        "@com_google_benchmark//:benchmark",
+        "@exprtk",
+    ],
+)
+
 flatbuffer_cc_library(
     name = "test_fbs",
     srcs = ["test_fbs.fbs"],
@@ -39,6 +61,18 @@ cc_test(
 )
 
 cc_test(
+    name = "global_compiler_test",
+    size = "small",
+    srcs = ["global_compiler_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "fbs_test",
     size = "small",
     srcs = ["fbs_test.cc"],
@@ -48,18 +82,6 @@ cc_test(
         ":test_fbs",
         "//rapidudf",
         "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_binary(
-    name = "expr_bench",
-    srcs = ["expr_bench.cc"],
-    copts = ["-O2"],
-    linkopts = RUDF_DEFAULT_LINKOPTS,
-    deps = [
-        "//rapidudf",
-        "@com_google_benchmark//:benchmark",
-        "@exprtk",
     ],
 )
 

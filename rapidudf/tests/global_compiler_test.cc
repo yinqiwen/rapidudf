@@ -1,7 +1,7 @@
 /*
 ** BSD 3-Clause License
 **
-** Copyright (c) 2024, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
+** Copyright (c) 2023, qiyingwang <qiyingwang@tencent.com>, the respective contributors, as shown by the AUTHORS file.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -28,26 +28,57 @@
 ** OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include <gtest/gtest.h>
+#include "absl/strings/str_join.h"
+#include "rapidudf/rapidudf.h"
 
-#pragma once
-#include "rapidudf/compiler/compiler.h"
-#include "rapidudf/compiler/global_compiler.h"
-#include "rapidudf/compiler/options.h"
-#include "rapidudf/context/context.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
-#include "rapidudf/types/dyn_object_impl.h"
-#include "rapidudf/types/simd/table.h"
+using namespace rapidudf;
 
-namespace rapidudf {
-using JitCompiler = compiler::JitCompiler;
-// using JitCompilerCache = llvm::JitCompilerCache;
+TEST(JitCompiler, func_cache) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  JsonObject json;
+  json["key"] = 123;
 
-template <typename RET, typename... Args>
-using JitFunction = compiler::JitFunction<RET, Args...>;
+  std::string content = R"(
+    bool test_func(json x){
+      return x["key"] == 123;
+    }
+  )";
+  auto rc = GlobalJitCompiler::GetFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
 
-using Options = compiler::Options;
+  rc = GlobalJitCompiler::GetFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
+  ASSERT_TRUE(f.IsFromCache());
+}
 
-using GlobalJitCompiler = compiler::GlobalJitCompiler;
+TEST(JitCompiler, expr_cache) {
+  spdlog::set_level(spdlog::level::debug);
+  std::vector<int> vec{1, 2, 3};
+  JitCompiler compiler;
+  JsonObject json;
+  json["key"] = 123;
 
-}  // namespace rapidudf
+  std::string content = R"(
+    x["key"] == 123
+  )";
+  auto rc = GlobalJitCompiler::GetExpression<bool, const JsonObject&>(content, {"x"});
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+  }
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
+
+  rc = GlobalJitCompiler::GetExpression<bool, const JsonObject&>(content, {"x"});
+  ASSERT_TRUE(rc.ok());
+  f = std::move(rc.value());
+  ASSERT_TRUE(f(json));
+  ASSERT_TRUE(f.IsFromCache());
+}

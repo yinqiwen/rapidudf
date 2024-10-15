@@ -30,12 +30,12 @@
 */
 #include <benchmark/benchmark.h>
 #include <cmath>
+#include <random>
 #include <vector>
-// #include "exprtk.hpp"
 #include "rapidudf/context/context.h"
 #include "rapidudf/rapidudf.h"
 
-static size_t test_n = 4096;
+static size_t test_n = 4099;
 static const double pi = 3.14159265358979323846264338327950288419716939937510;
 static std::vector<double> xx, yy, actuals, final_results;
 static double xi, yi;
@@ -122,46 +122,9 @@ static void BM_rapidudf_vector_expr_func(benchmark::State& state) {
     ctx.Reset();
     auto results = g_vector_expr_func(ctx, xx, yy);
     RUDF_DEBUG("size:{}", results.Size());
-    // for (size_t i = 0; i < results.Size(); i++) {
-    //  if (results[i] != actuals[i]) {
-    //    RUDF_INFO("[{}]Error result:{}, while expected:{}", i, results[i], actuals[i]);
-    //  }
-    //}
   }
 }
 BENCHMARK(BM_rapidudf_vector_expr_func)->Setup(DoRapidUDFVectorExprSetup)->Teardown(DoRapidUDFVectorExprTeardown);
-
-// static exprtk::parser<double> exprtk_parser;
-// static exprtk::expression<double> exprtk_expression;
-// static exprtk::symbol_table<double> exprtk_symbol_table;
-// static void DoExprtkExprSetup(const benchmark::State& state) {
-//   exprtk_symbol_table.add_constants();
-//   exprtk_symbol_table.add_variable("x", xi);
-//   exprtk_symbol_table.add_variable("y", yi);
-//   // exprtk_symbol_table.add_vector("results", final_results);
-//   exprtk_expression.register_symbol_table(exprtk_symbol_table);
-//   std::string expr = "x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y";
-//   // std::string expr = "cos(y - sin(2 / x * pi))";
-//   if (!exprtk_parser.compile(expr, exprtk_expression)) {
-//     RUDF_ERROR("[load_expression] - Parser Error:{}\tExpression: {}", exprtk_parser.error().c_str(), expr);
-//   }
-//   init_test_numbers();
-// }
-
-// static void DooExprtkExprTeardown(const benchmark::State& state) {}
-
-// static void BM_exprtk_expr_func(benchmark::State& state) {
-//   double results = 0;
-//   for (auto _ : state) {
-//     for (size_t i = 0; i < test_n; i++) {
-//       xi = xx[i];
-//       yi = yy[i];
-//       results += exprtk_expression.value();
-//     }
-//   }
-//   RUDF_INFO("Exprtk result:{}", results);
-// }
-// BENCHMARK(BM_exprtk_expr_func)->Setup(DoExprtkExprSetup)->Teardown(DooExprtkExprTeardown);
 
 static void DoNativeFuncSetup(const benchmark::State& state) { init_test_numbers(); }
 
@@ -180,5 +143,73 @@ static void BM_native_func(benchmark::State& state) {
   RUDF_DEBUG("Native result:{}", results);
 }
 BENCHMARK(BM_native_func)->Setup(DoNativeFuncSetup)->Teardown(DoNativeFuncTeardown);
+
+static float __attribute__((noinline)) wilson_ctr(float exp_cnt, float clk_cnt) {
+  return std::log10(exp_cnt) *
+         (clk_cnt / exp_cnt + 1.96 * 1.96 / (2 * exp_cnt) -
+          1.96 / (2 * exp_cnt) * std::sqrt(4 * exp_cnt * (1 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96 * 1.96)) /
+         (1 + 1.96 * 1.96 / exp_cnt);
+}
+
+static std::vector<float> exp_cnt;
+static std::vector<float> clk_cnt;
+static std::random_device rd;
+static std::mt19937 gen(rd());
+
+static void native_wilson_ctr_setup(const benchmark::State& state) {
+  clk_cnt.clear();
+  exp_cnt.clear();
+  std::uniform_int_distribution<> distr(1, 100);
+  for (size_t i = 0; i < test_n; i++) {
+    int v = static_cast<int>(distr(gen));
+    clk_cnt.emplace_back(static_cast<float>(v));
+    v += 10;
+    exp_cnt.emplace_back(static_cast<float>(v));
+  }
+}
+
+static void native_wilson_ctr_teardown(const benchmark::State& state) {}
+
+static void BM_native_wilson_ctr(benchmark::State& state) {
+  double results = 0;
+  for (auto _ : state) {
+    for (size_t i = 0; i < test_n; i++) {
+      results += wilson_ctr(exp_cnt[i], clk_cnt[i]);
+    }
+  }
+  RUDF_DEBUG("Native _wilson_ctr result:{}", results);
+}
+BENCHMARK(BM_native_wilson_ctr)->Setup(native_wilson_ctr_setup)->Teardown(native_wilson_ctr_teardown);
+
+using simd_vector_f32 = rapidudf::simd::Vector<float>;
+static rapidudf::JitFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, simd_vector_f32>
+    g_vector_wilson_ctr_func;
+
+static void rapidudf_vector_wilson_ctr_setup(const benchmark::State& state) {
+  native_wilson_ctr_setup(state);
+  std::string source = R"(
+    simd_vector<f32> wilson_ctr(Context ctx, simd_vector<f32> exp_cnt, simd_vector<f32> clk_cnt)
+    {
+       return log10(exp_cnt) *
+         (clk_cnt / exp_cnt +  1.96 * 1.96 / (2 * exp_cnt) -
+          1.96 / (2 * exp_cnt) * sqrt(4 * exp_cnt * (1 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96 * 1.96)) /
+         (1 + 1.96 * 1.96 / exp_cnt);
+    }
+  )";
+  rapidudf::JitCompiler compiler;
+  auto result = compiler.CompileFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, simd_vector_f32>(source);
+  g_vector_wilson_ctr_func = std::move(result.value());
+}
+
+static void BM_rapidudf_evector_wilson_ctr(benchmark::State& state) {
+  double results = 0;
+  rapidudf::Context ctx;
+  for (auto _ : state) {
+    ctx.Reset();
+    auto result = g_vector_wilson_ctr_func(ctx, exp_cnt, clk_cnt);
+    RUDF_DEBUG("{}", result.Size());
+  }
+}
+BENCHMARK(BM_rapidudf_evector_wilson_ctr)->Setup(rapidudf_vector_wilson_ctr_setup);
 
 BENCHMARK_MAIN();

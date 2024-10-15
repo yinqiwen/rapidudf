@@ -54,8 +54,9 @@ class JitFunction {
  public:
   JitFunction() = default;
   template <typename T>
-  explicit JitFunction(const std::string& name, const void* f, std::shared_ptr<T> resource, const JitFunctionStat& stat)
-      : name_(name), resource_(resource), stat_(stat) {
+  explicit JitFunction(const std::string& name, const void* f, std::shared_ptr<T> resource, const JitFunctionStat& stat,
+                       bool from_cache = false)
+      : name_(name), resource_(resource), stat_(stat), is_from_cache_(from_cache) {
     f_ = reinterpret_cast<RET (*)(Args...)>(const_cast<void*>(f));
   }
   JitFunction(JitFunction&& other) { MoveFrom(std::move(other)); }
@@ -68,6 +69,7 @@ class JitFunction {
   }
   const JitFunctionStat& Stats() const { return stat_; }
   const std::string& GetName() const { return name_; }
+  bool IsFromCache() const { return is_from_cache_; }
 
   RET operator()(Args... args) {
     if constexpr (std::is_same_v<void, RET>) {
@@ -83,6 +85,7 @@ class JitFunction {
   std::shared_ptr<void> resource_;
   RET (*f_)(Args...) = nullptr;
   JitFunctionStat stat_;
+  bool is_from_cache_;
 
   void MoveFrom(JitFunction&& other) {
     name_ = std::move(other.name_);

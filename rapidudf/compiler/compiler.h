@@ -57,6 +57,7 @@ namespace rapidudf {
 namespace compiler {
 
 class CodeGen;
+class GlobalJitCompiler;
 class JitCompiler {
  public:
   struct Arg {
@@ -247,7 +248,7 @@ class JitCompiler {
   std::mutex jit_mutex_;
   JitFunctionStat stat_;
 
-  friend class JitCompilerCache;
+  friend class GlobalJitCompiler;
 };
 
 }  // namespace compiler
