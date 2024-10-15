@@ -21,14 +21,25 @@ cc_binary(
 )
 
 cc_binary(
-    name = "expr_bench",
-    srcs = ["expr_bench.cc"],
+    name = "benchmark",
+    srcs = ["benchmark.cc"],
     copts = ["-O2"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     deps = [
         "//rapidudf",
         "@com_google_benchmark//:benchmark",
-        "@exprtk",
+    ],
+)
+
+cc_test(
+    name = "dtype_test",
+    size = "small",
+    srcs = ["dtype_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf/meta:dtype",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 

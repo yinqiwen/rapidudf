@@ -57,7 +57,6 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
         name = "com_google_protobuf",
         strip_prefix = protobuf_name,
         urls = [
-            "https://mirrors.tencent.com/github.com/protocolbuffers/protobuf/archive/v{ver}.tar.gz".format(ver = protobuf_ver),
             "https://github.com/protocolbuffers/protobuf/archive/v{ver}.tar.gz".format(ver = protobuf_ver),
         ],
     )
@@ -98,7 +97,6 @@ cc_library(
         name = "com_github_google_flatbuffers",
         strip_prefix = fbs_name,
         urls = [
-            "https://mirrors.tencent.com/github.com/google/flatbuffers/archive/v{ver}.tar.gz".format(ver = fbs_ver),
             "https://github.com/google/flatbuffers/archive/v{ver}.tar.gz".format(ver = fbs_ver),
         ],
     )
@@ -168,7 +166,6 @@ cc_library(
         name = "spdlog",
         strip_prefix = spdlog_name,
         urls = [
-            "https://mirrors.tencent.com/github.com/gabime/spdlog/archive/v{ver}.tar.gz".format(ver = spdlog_ver),
             "https://github.com/gabime/spdlog/archive/v{ver}.tar.gz".format(ver = spdlog_ver),
         ],
         build_file_content = _SPDLOG_BUILD_FILE,
@@ -181,27 +178,26 @@ cc_library(
         name = "com_google_absl",
         strip_prefix = abseil_name,
         urls = [
-            "https://mirrors.tencent.com/github.com/abseil/abseil-cpp/archive/{ver}.tar.gz".format(ver = abseil_ver),
             "https://github.com/abseil/abseil-cpp/archive/refs/tags/{ver}.tar.gz".format(ver = abseil_ver),
         ],
     )
 
-    _FP16_BUILD_FILE = """
-cc_library(
-    name = "FP16",
-    hdrs = glob(["include/**/*.h"]),
-    includes = ["include"],
-    deps = ["@psimd"],
-    visibility = [ "//visibility:public" ],
-)
-"""
-    maybe(
-        new_git_repository,
-        name = "FP16",
-        remote = "https://github.com/Maratyszcza/FP16.git",
-        commit = "98b0a46bce017382a6351a19577ec43a715b6835",
-        build_file_content = _FP16_BUILD_FILE,
-    )
+    #     _FP16_BUILD_FILE = """
+    # cc_library(
+    #     name = "FP16",
+    #     hdrs = glob(["include/**/*.h"]),
+    #     includes = ["include"],
+    #     deps = ["@psimd"],
+    #     visibility = [ "//visibility:public" ],
+    # )
+    # """
+    #     maybe(
+    #         new_git_repository,
+    #         name = "FP16",
+    #         remote = "https://github.com/Maratyszcza/FP16.git",
+    #         commit = "98b0a46bce017382a6351a19577ec43a715b6835",
+    #         build_file_content = _FP16_BUILD_FILE,
+    #     )
 
     maybe(
         git_repository,
@@ -235,7 +231,7 @@ make(
         new_git_repository,
         name = "x86_simd_sort",
         remote = "https://github.com/intel/x86-simd-sort.git",
-        commit = "c61ce8f97f495cab7077774741be7a3903e71dd4",
+        commit = "d62f656ba1e7bef04a0e1ba6e908a5aa1b0ff745",
         build_file_content = _X86_SIMD_SORT_BUILD_FILE,
     )
 
@@ -287,22 +283,6 @@ cc_library(
         build_file_content = _LLVM_BUILD_FILE,
     )
 
-    _EXPRTK_BUILD_FILE = """
-cc_library(
-    name = "exprtk",
-    hdrs = [
-        "exprtk.hpp",
-    ],
-    visibility = ["//visibility:public"],
-)
-"""
-    new_git_repository(
-        name = "exprtk",
-        remote = "https://github.com/ArashPartow/exprtk.git",
-        branch = "master",
-        build_file_content = _EXPRTK_BUILD_FILE,
-    )
-
     bench_ver = kwargs.get("bench_ver", "1.8.3")
     bench_name = "benchmark-{ver}".format(ver = bench_ver)
     maybe(
@@ -314,9 +294,25 @@ cc_library(
         ],
     )
 
-    maybe(
-        git_repository,
-        name = "cpu_features",
-        remote = "https://github.com/google/cpu_features.git",
-        tag = "v0.9.0",
-    )
+#     _EXPRTK_BUILD_FILE = """
+# cc_library(
+#     name = "exprtk",
+#     hdrs = [
+#         "exprtk.hpp",
+#     ],
+#     visibility = ["//visibility:public"],
+# )
+# """
+#     new_git_repository(
+#         name = "exprtk",
+#         remote = "https://github.com/ArashPartow/exprtk.git",
+#         branch = "master",
+#         build_file_content = _EXPRTK_BUILD_FILE,
+#     )
+
+# maybe(
+#     git_repository,
+#     name = "cpu_features",
+#     remote = "https://github.com/google/cpu_features.git",
+#     tag = "v0.9.0",
+# )

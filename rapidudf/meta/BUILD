@@ -1,9 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_test")
-load(
-    "//rapidudf/copts:configure_copts.bzl",
-    "RUDF_DEFAULT_LINKOPTS",
-)
-
 package(
     default_visibility = ["//visibility:public"],
 )
@@ -92,17 +86,5 @@ cc_library(
         ":optype",
         "//rapidudf/arena",
         "//rapidudf/log",
-    ],
-)
-
-cc_test(
-    name = "dtype_test",
-    size = "small",
-    srcs = ["dtype_test.cc"],
-    linkopts = RUDF_DEFAULT_LINKOPTS,
-    linkstatic = True,
-    deps = [
-        ":dtype",
-        "@com_google_googletest//:gtest_main",
     ],
 )
