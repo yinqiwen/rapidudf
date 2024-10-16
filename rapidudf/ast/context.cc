@@ -20,6 +20,7 @@
 #include "fmt/format.h"
 
 #include "rapidudf/functions/names.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/constants.h"
 
 namespace rapidudf {
@@ -122,7 +123,8 @@ bool ParseContext::AddLocalVar(const std::string& name, DType dtype, const DynOb
   auto [iter, success] =
       GetFunctionParseContext(current_function_cursor_).local_vars.emplace(name, VarTag{dtype, name, schema});
   if (!success && iter->second.dtype.IsVoid()) {
-    iter->second = dtype;
+    iter->second.dtype = dtype;
+    iter->second.schema = schema;
     return true;
   }
   return success;

@@ -21,6 +21,7 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/functions/names.h"
 #include "rapidudf/functions/simd/vector.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/function.h"

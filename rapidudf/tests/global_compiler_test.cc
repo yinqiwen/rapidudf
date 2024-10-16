@@ -63,7 +63,7 @@ TEST(JitCompiler, expr_cache) {
 
   rc = GlobalJitCompiler::GetExpression<bool, const JsonObject&>(content, {"x"});
   ASSERT_TRUE(rc.ok());
-  f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-  ASSERT_TRUE(f.IsFromCache());
+  auto f1 = std::move(rc.value());
+  ASSERT_TRUE(f1(json));
+  ASSERT_TRUE(f1.IsFromCache());
 }

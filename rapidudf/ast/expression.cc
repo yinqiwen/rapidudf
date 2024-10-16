@@ -203,6 +203,8 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, VarTag src) {
   DType src_dtype = src.dtype;
   bool member_func_call = func_args.has_value();
   bool is_table = false;
+  const DynObjectSchema* table_schema = nullptr;
+
   if (src_dtype.IsDynObjectPtr() && nullptr != src.schema) {
     is_table = src.schema->IsTable();
     if (!member_func_call) {
@@ -229,10 +231,12 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, VarTag src) {
         field = GetFunctionName(field, arg_dtypes[0].dtype.Elem());
       }
     }
+    table_schema = src.schema;
   }
   auto field_accessor = Reflect::GetStructMember(src_dtype.PtrTo(), field);
   if (!field_accessor) {
-    return ctx.GetErrorStatus(fmt::format("Can NOT get member:{} accessor for dtype:{}", field, src_dtype));
+    return ctx.GetErrorStatus(
+        fmt::format("Can NOT get member:{} accessor for dtype:{}, var name:{}", field, src_dtype, src.name));
   }
   struct_member = field_accessor.value();
   if (!func_args.has_value()) {
@@ -250,7 +254,9 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, VarTag src) {
       return ctx.GetErrorStatus(fmt::format("Can NOT get member func:{} accessor for dtype:{}", field, src_dtype));
     }
     ctx.AddMemberFuncCall(src_dtype.PtrTo(), field, *struct_member.member_func);
-    return struct_member.member_func->return_type;
+    VarTag ret(struct_member.member_func->return_type);
+    ret.schema = table_schema;
+    return ret;
   }
 }
 absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
@@ -505,6 +511,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
         } else {
           left_var = VarTag(DType(DATA_BIT));
         }
+
         break;
       }
       case OP_LOGIC_AND:
@@ -523,6 +530,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
           }
           left_var = VarTag(DType(DATA_BIT));
         }
+
         break;
       }
       default: {
@@ -531,7 +539,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
       }
     }
   }
-  // rpn.dtype = left_var.dtype;
+
   rpn.SetDType(ctx, left_var.dtype);
   return left_var;
 }

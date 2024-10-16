@@ -23,6 +23,7 @@
 #include <vector>
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
+#include "google/protobuf/message.h"
 
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
@@ -66,6 +67,35 @@ class Table : public DynObject {
   }
 
   template <typename T>
+  absl::Status BuildFromProtobufVector(const std::vector<T>& pb_vector) {
+    std::vector<const ::google::protobuf::Message*> msg_vector;
+    msg_vector.reserve(pb_vector.size());
+    for (auto& msg : pb_vector) {
+      msg_vector.emplace_back(&msg);
+    }
+    return BuildFromProtobufVector(msg_vector);
+  }
+
+  template <typename T>
+  absl::Status BuildFromProtobufVector(const std::vector<T*>& pb_vector) {
+    std::vector<const ::google::protobuf::Message*> msg_vector;
+    msg_vector.reserve(pb_vector.size());
+    for (auto msg : pb_vector) {
+      msg_vector.emplace_back(msg);
+    }
+    return BuildFromProtobufVector(msg_vector);
+  }
+  template <typename T>
+  absl::Status BuildFromProtobufVector(const std::vector<const T*>& pb_vector) {
+    std::vector<const ::google::protobuf::Message*> msg_vector;
+    msg_vector.reserve(pb_vector.size());
+    for (auto msg : pb_vector) {
+      msg_vector.emplace_back(msg);
+    }
+    return BuildFromProtobufVector(msg_vector);
+  }
+
+  template <typename T>
   auto Get(const std::string& name) {
     if constexpr (std::is_same_v<bool, T>) {
       return DynObject::Get<Vector<Bit>>(name);
@@ -101,6 +131,14 @@ class Table : public DynObject {
   }
 
   void SetColumn(uint32_t offset, VectorData vec);
+  void SetSize(uint32_t k);
+
+  absl::Status BuildFromProtobufVector(const std::vector<const ::google::protobuf::Message*>& pb_vector);
+
+  template <typename T>
+  absl::Status SetColumnByProtobufField(const std::vector<const ::google::protobuf::Message*>& pb_vector,
+                                        const ::google::protobuf::Reflection* reflect,
+                                        const ::google::protobuf::FieldDescriptor* field);
 
   Context& ctx_;
   Vector<int32_t> indices_;
@@ -117,6 +155,12 @@ class TableSchema : public DynObjectSchema {
   typename Table::SmartPtr NewTable(Context& ctx) const;
 
   template <typename T>
+  absl::Status BuildFromProtobuf() {
+    static T msg;
+    return BuildFromProtobuf(&msg);
+  }
+
+  template <typename T>
   absl::Status AddColumn(const std::string& name) {
     if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T>) {
       return DynObjectSchema::Add(name, get_dtype<simd::Vector<StringView>>());
@@ -126,6 +170,7 @@ class TableSchema : public DynObjectSchema {
       return Add(name, get_dtype<simd::Vector<T>>());
     }
   }
+  bool ExistColumn(const std::string& name) const;
 
  private:
   TableSchema(const std::string& name, size_t reserved_size) : DynObjectSchema(name, reserved_size, Flags(true)) {}
@@ -134,6 +179,8 @@ class TableSchema : public DynObjectSchema {
     return absl::UnimplementedError("AddField");
   }
   typename DynObject::SmartPtr NewObject() const { return nullptr; }
+
+  absl::Status BuildFromProtobuf(const ::google::protobuf::Message* msg);
 };
 }  // namespace simd
 }  // namespace rapidudf

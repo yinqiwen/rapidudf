@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-#include <vector>
 #include "rapidudf/rapidudf.h"
-#include "rapidudf/types/simd/vector.h"
-#include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
 int main() {
@@ -27,7 +24,7 @@ int main() {
   std::string source = R"(
     simd_vector<f32> boost_scores(Context ctx, simd_vector<string_view> location, simd_vector<f32> score) 
     { 
-      var boost=(location=="home"?2.0_f32:0_f32);
+      auto boost=(location=="home"?2.0_f32:0_f32);
       return score*boost;
     } 
   )";
@@ -57,7 +54,7 @@ int main() {
   auto f = std::move(result.value());
   auto new_scores = f(ctx, ctx.NewSimdVector(locations), ctx.NewSimdVector(scores));
   for (size_t i = 0; i < new_scores.Size(); i++) {
-    RUDF_INFO("{}", new_scores[i]);
+    // RUDF_INFO("{}", new_scores[i]);
   }
   return 0;
 };

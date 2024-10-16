@@ -33,33 +33,39 @@ class GlobalJitCompiler {
     for (auto& name : arg_names) {
       args.emplace_back(JitCompiler::Arg{.name = name});
     }
-    return DoGetExpression<RET, Args...>(source, args);
+    return DoGetExpression<RET, Args...>(source, args, false);
   }
   template <typename RET, typename... Args>
   absl::StatusOr<JitFunction<RET, Args...>> GetDynObjExpression(const std::string& source,
-                                                                const std::vector<JitCompiler::Arg>& args) {
-    return DoGetExpression<RET, Args...>(source, args);
+                                                                const std::vector<JitCompiler::Arg>& args,
+                                                                bool recompile = false) {
+    return DoGetExpression<RET, Args...>(source, args, recompile);
   }
   template <typename RET, typename... Args>
-  static absl::StatusOr<JitFunction<RET, Args...>> GetFunction(const std::string& source) {
+  static absl::StatusOr<JitFunction<RET, Args...>> GetFunction(const std::string& source, bool recompile = false) {
     auto& cache_map = GetCache();
     auto return_type = get_dtype<RET>();
     std::vector<DType> arg_types;
     (arg_types.emplace_back(get_dtype<Args>()), ...);
+
     {
       std::lock_guard<std::mutex> guard(cache_map.mutex);
       auto found = cache_map.get(source);
       if (found) {
-        auto& cache_item = *found;
-        cache_item.latest_visit_time = std::chrono::high_resolution_clock::now();
-        for (auto& cache_func : cache_item.funcs) {
-          if (cache_func.desc.CompareSignature(return_type, arg_types)) {
-            RUDF_DEBUG("Cache hit for key:{}", source);
-            return JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_func.codegen, cache_func.stat,
-                                             true);
+        if (recompile) {
+          cache_map.erase(source);
+        } else {
+          auto& cache_item = *found;
+          cache_item.latest_visit_time = std::chrono::high_resolution_clock::now();
+          for (auto& cache_func : cache_item.funcs) {
+            if (cache_func.desc.CompareSignature(return_type, arg_types)) {
+              RUDF_DEBUG("Cache hit for key:{}", source);
+              return JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_func.codegen,
+                                               cache_func.stat, true);
+            }
           }
+          return absl::NotFoundError("No func found in cache.");
         }
-        return absl::NotFoundError("No func found in cache.");
       }
     }
     JitCompiler compiler;
@@ -128,23 +134,27 @@ class GlobalJitCompiler {
 
   template <typename RET, typename... Args>
   static absl::StatusOr<JitFunction<RET, Args...>> DoGetExpression(const std::string& source,
-                                                                   const std::vector<JitCompiler::Arg>& args) {
+                                                                   const std::vector<JitCompiler::Arg>& args,
+                                                                   bool recompile) {
     auto& cache_map = GetCache();
-
     {
       std::lock_guard<std::mutex> guard(cache_map.mutex);
       auto found = cache_map.get(source);
       if (found) {
-        auto return_type = get_dtype<RET>();
-        std::vector<DType> arg_types;
-        (arg_types.emplace_back(get_dtype<Args>()), ...);
-        auto& cache_item = *found;
-        cache_item.latest_visit_time = std::chrono::high_resolution_clock::now();
-        for (auto& cache_func : cache_item.funcs) {
-          if (cache_func.desc.CompareSignature(return_type, arg_types)) {
-            RUDF_DEBUG("Cache hit for key:{}", source);
-            return JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_func.codegen, cache_func.stat,
-                                             true);
+        if (recompile) {
+          cache_map.erase(source);
+        } else {
+          auto return_type = get_dtype<RET>();
+          std::vector<DType> arg_types;
+          (arg_types.emplace_back(get_dtype<Args>()), ...);
+          auto& cache_item = *found;
+          cache_item.latest_visit_time = std::chrono::high_resolution_clock::now();
+          for (auto& cache_func : cache_item.funcs) {
+            if (cache_func.desc.CompareSignature(return_type, arg_types)) {
+              RUDF_DEBUG("Cache hit for key:{}", source);
+              return JitFunction<RET, Args...>(cache_func.desc.name, cache_func.func, cache_func.codegen,
+                                               cache_func.stat, true);
+            }
           }
         }
       }

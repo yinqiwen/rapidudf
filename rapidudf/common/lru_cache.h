@@ -60,6 +60,21 @@ class lru_cache {
     }
   }
 
+  void erase(const key_type& key) {
+    // lookup value in the cache
+    typename map_type::iterator i = m_map.find(key);
+    if (i == m_map.end()) {
+      // value not in cache
+      return;
+    }
+
+    // return the value, but first update its place in the most
+    // recently used list
+    typename list_type::iterator j = i->second.second;
+    m_list.erase(j);
+    m_map.erase(i);
+  }
+
   std::optional<value_type> get(const key_type& key) {
     // lookup value in the cache
     typename map_type::iterator i = m_map.find(key);

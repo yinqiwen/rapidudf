@@ -211,6 +211,9 @@ class Vector {
     }
   }
   Vector<T> Resize(size_t n) const {
+    if (vec_data_.Size() == 0) {
+      return *this;
+    }
     if (n > vec_data_.Size()) {
       THROW_OUT_OF_RANGE_ERR(n, vec_data_.Size());
     }

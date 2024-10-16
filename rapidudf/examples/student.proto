@@ -1,0 +1,8 @@
+syntax = "proto3";
+package examples;
+
+message Student {
+  string name = 1;
+  int32 age = 2;
+  float score = 3;
+}

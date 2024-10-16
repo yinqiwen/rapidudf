@@ -77,6 +77,8 @@ const DynObjectSchema* DynObjectSchema::GetOrCreate(const std::string& name, Ini
   return p;
 }
 
+bool DynObjectSchema::ExistField(const std::string& name) const { return fields_.find(name) != fields_.end(); }
+
 absl::StatusOr<std::pair<DType, uint32_t>> DynObjectSchema::GetField(const std::string& name) const {
   auto found = fields_.find(name);
   if (found == fields_.end()) {

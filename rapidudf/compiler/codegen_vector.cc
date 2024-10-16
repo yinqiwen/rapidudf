@@ -143,15 +143,23 @@ absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> CodeGen::LoadNVector(D
 absl::Status CodeGen::StoreVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx) {
   auto ele_type = get_type(builder_->getContext(), dtype.Elem());
   auto vector_type = get_vector_type(builder_->getContext(), dtype);
-  auto offset_ptr = builder_->CreateInBoundsGEP(ele_type, ptr, {idx});
+
   if (val->getType()->isPointerTy()) {
+    auto offset_ptr = builder_->CreateGEP(ele_type, ptr, {idx});
     auto* inst = builder_->CreateStore(builder_->CreateLoad(vector_type, val), offset_ptr);
     ::llvm::Align align(1);
     inst->setAlignment(align);
   } else {
-    auto* inst = builder_->CreateStore(val, offset_ptr);
-    ::llvm::Align align(1);
-    inst->setAlignment(align);
+    if (ele_type->getScalarSizeInBits() == 1) {
+      auto offset_ptr =
+          builder_->CreateGEP(builder_->getInt8Ty(), ptr, {builder_->CreateUDiv(idx, builder_->getInt32(8))});
+      builder_->CreateStore(val, offset_ptr);
+    } else {
+      auto offset_ptr = builder_->CreateGEP(ele_type, ptr, {idx});
+      auto* inst = builder_->CreateStore(val, offset_ptr);
+      ::llvm::Align align(1);
+      inst->setAlignment(align);
+    }
   };
 
   return absl::OkStatus();
@@ -160,11 +168,13 @@ absl::Status CodeGen::StoreNVector(DType dtype, ::llvm::Value* val, ::llvm::Valu
                                    ::llvm::Value* n) {
   auto ele_type = get_type(builder_->getContext(), dtype.Elem());
   auto vector_type = get_vector_type(builder_->getContext(), dtype);
-  auto offset_ptr = builder_->CreateGEP(ele_type, ptr, {idx});
-  // RUDF_INFO("##storeN with {}", ele_type->getScalarSizeInBits());
+
   if (ele_type->getScalarSizeInBits() == 1) {
+    auto offset_ptr =
+        builder_->CreateGEP(builder_->getInt8Ty(), ptr, {builder_->CreateUDiv(idx, builder_->getInt32(8))});
     builder_->CreateStore(val, offset_ptr);
   } else {
+    auto offset_ptr = builder_->CreateGEP(ele_type, ptr, {idx});
     auto vector_ptr_value = builder_->CreateAlloca(vector_type);
     builder_->CreateStore(val, vector_ptr_value);
     ::llvm::MaybeAlign align(1);

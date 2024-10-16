@@ -35,6 +35,7 @@ class DynObjectSchema {
   static std::vector<std::string> ListAll();
 
   typename DynObject::SmartPtr NewObject() const;
+  bool ExistField(const std::string& name) const;
 
   template <typename T>
   absl::Status AddField(const std::string& name) {
