@@ -47,8 +47,13 @@ struct SimdTableHelper {
   */
   static simd::Table* take(simd::Table* table, uint32_t k) { return table->Take(k); }
 
+  /**
+   **   Returns table row count
+   */
+  static uint32_t count(simd::Table* table) { return table->Count(); }
+
   static void Init() {
-    RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, size, filter, take);
+    RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, size, filter, take, count);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f32", topk<float>);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f64", topk<double>);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_u32", topk<uint32_t>);
