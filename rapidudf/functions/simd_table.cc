@@ -22,7 +22,7 @@
 namespace rapidudf {
 namespace functions {
 struct SimdTableHelper {
-  static size_t size(simd::Table* table) { return table->Size(); }
+  static size_t column_count(simd::Table* table) { return table->Size(); }
 
   /**
   ** filter table by bits
@@ -53,7 +53,7 @@ struct SimdTableHelper {
   static uint32_t count(simd::Table* table) { return table->Count(); }
 
   static void Init() {
-    RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, size, filter, take, count);
+    RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, column_count, filter, take, count);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f32", topk<float>);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f64", topk<double>);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_u32", topk<uint32_t>);
