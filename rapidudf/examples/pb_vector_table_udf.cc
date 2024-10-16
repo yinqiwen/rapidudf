@@ -59,15 +59,19 @@ int main() {
   // 4.3 填充数据
   std::ignore = table->BuildFromProtobufVector(students);
 
-  // 5. 执行function
-  auto result_table = f(ctx, table.get());
-  // 5.1 获取列
-  auto result_scores = result_table->Get<float>("score").value();
-  auto result_names = result_table->Get<StringView>("name").value();
-  auto result_ages = result_table->Get<int32_t>("age").value();
+  try {
+    // 5. 执行function
+    auto result_table = f(ctx, table.get());
+    // 5.1 获取列
+    auto result_scores = result_table->Get<float>("score").value();
+    auto result_names = result_table->Get<StringView>("name").value();
+    auto result_ages = result_table->Get<int32_t>("age").value();
 
-  for (size_t i = 0; i < result_scores.Size(); i++) {
-    RUDF_INFO("name:{},score:{},age:{}", result_names[i], result_scores[i], result_ages[i]);
+    for (size_t i = 0; i < result_scores.Size(); i++) {
+      RUDF_INFO("name:{},score:{},age:{}", result_names[i], result_scores[i], result_ages[i]);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
   return 0;
 };

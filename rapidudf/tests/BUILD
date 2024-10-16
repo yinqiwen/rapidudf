@@ -46,6 +46,7 @@ cc_test(
 flatbuffer_cc_library(
     name = "test_fbs",
     srcs = ["test_fbs.fbs"],
+    gen_reflections = True,
 )
 
 proto_library(

@@ -201,7 +201,7 @@ static void rapidudf_vector_wilson_ctr_setup(const benchmark::State& state) {
   g_vector_wilson_ctr_func = std::move(result.value());
 }
 
-static void BM_rapidudf_evector_wilson_ctr(benchmark::State& state) {
+static void BM_rapidudf_vector_wilson_ctr(benchmark::State& state) {
   double results = 0;
   rapidudf::Context ctx;
   for (auto _ : state) {
@@ -210,6 +210,6 @@ static void BM_rapidudf_evector_wilson_ctr(benchmark::State& state) {
     RUDF_DEBUG("{}", result.Size());
   }
 }
-BENCHMARK(BM_rapidudf_evector_wilson_ctr)->Setup(rapidudf_vector_wilson_ctr_setup);
+BENCHMARK(BM_rapidudf_vector_wilson_ctr)->Setup(rapidudf_vector_wilson_ctr_setup);
 
 BENCHMARK_MAIN();

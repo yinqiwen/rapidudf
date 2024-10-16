@@ -139,6 +139,12 @@ absl::Status TableSchema::BuildFromProtobuf(const ::google::protobuf::Message* m
   return absl::OkStatus();
 }
 
+void Table::Deleter::operator()(Table* ptr) {
+  ptr->~Table();
+  uint8_t* bytes = reinterpret_cast<uint8_t*>(ptr);
+  delete[] bytes;
+}
+
 template <typename T>
 absl::Status Table::SetColumnByProtobufField(const std::vector<const ::google::protobuf::Message*>& pb_vector,
                                              const ::google::protobuf::Reflection* reflect,
@@ -239,13 +245,13 @@ Table* Table::Clone() {
   return t;
 }
 Vector<int32_t> Table::GetIndices() {
+  size_t count = Count();
   if (indices_.Size() == 0) {
-    auto* first_column = reinterpret_cast<VectorData*>(this + 1);
-    indices_ = functions::simd_vector_iota<int32_t>(ctx_, 0, first_column->Size());
+    indices_ = functions::simd_vector_iota<int32_t>(ctx_, 0, count);
   }
-  auto* p = ctx_.ArenaAllocate(sizeof(int32_t) * indices_.Size());
-  memcpy(p, indices_.Data(), sizeof(int32_t) * indices_.Size());
-  VectorData vdata(p, indices_.Size(), sizeof(int32_t) * indices_.Size());
+  auto* p = ctx_.ArenaAllocate(sizeof(int32_t) * count);
+  memcpy(p, indices_.Data(), sizeof(int32_t) * count);
+  VectorData vdata(p, count, sizeof(int32_t) * indices_.Size());
   vdata.SetReadonly(false);
   return Vector<int32_t>(vdata);
 }
@@ -254,9 +260,13 @@ void Table::SetColumn(uint32_t offset, VectorData vec) {
   uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
   memcpy(vec_ptr, &vec, sizeof(vec));
 }
-void Table::SetSize(uint32_t k) {}
 
 size_t Table::Size() const { return schema_->FieldCount(); }
+
+size_t Table::Count() const {
+  auto* first_column = reinterpret_cast<const VectorData*>(this + 1);
+  return first_column->Size();
+}
 
 Table* Table::Filter(Vector<Bit> bits) {
   Table* this_table = this;
@@ -336,6 +346,9 @@ Table* Table::Filter(Vector<Bit> bits) {
 }
 Table* Table::Take(uint32_t k) {
   Table* this_table = this;
+  if (k >= Count()) {
+    return this;
+  }
   Table* new_table = Clone();
   schema_->VisitField([&](const std::string& name, const DType& dtype, uint32_t offset) {
     uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this_table) + offset;

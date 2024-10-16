@@ -70,14 +70,19 @@ int main() {
   std::ignore = table->Set("gender", genders);
 
   // 5. 执行function
-  auto result_table = f(ctx, table.get());
-  auto result_scores = result_table->Get<float>("score").value();
-  auto result_names = result_table->Get<StringView>("name").value();
-  auto result_ages = result_table->Get<uint16_t>("age").value();
-  auto result_genders = result_table->Get<Bit>("gender").value();
-  for (size_t i = 0; i < result_scores.Size(); i++) {
-    RUDF_INFO("name:{},score:{},age:{},gender:{}", result_names[i], result_scores[i], result_ages[i],
-              result_genders[i] ? true : false);
+  try {
+    auto result_table = f(ctx, table.get());
+    auto result_scores = result_table->Get<float>("score").value();
+    auto result_names = result_table->Get<StringView>("name").value();
+    auto result_ages = result_table->Get<uint16_t>("age").value();
+    auto result_genders = result_table->Get<Bit>("gender").value();
+    for (size_t i = 0; i < result_scores.Size(); i++) {
+      RUDF_INFO("name:{},score:{},age:{},gender:{}", result_names[i], result_scores[i], result_ages[i],
+                result_genders[i] ? true : false);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
+
   return 0;
 };

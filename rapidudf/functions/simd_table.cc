@@ -22,20 +22,6 @@
 namespace rapidudf {
 namespace functions {
 struct SimdTableHelper {
-  //   static simd::Column** get(simd::Table* table, StringView name) {
-  //     auto result = table->Get(name);
-  //     if (!result.ok()) {
-  //       throw std::logic_error(result.status().ToString());
-  //     }
-  //     return (result.value());
-  //   }
-  //   static void add(simd::Table* table, StringView name, simd::Column* column) {
-  //     auto status = table->Add(name.str(), column);
-  //     if (!status.ok()) {
-  //       throw std::logic_error(status.ToString());
-  //     }
-  //   }
-  //   static void set(simd::Table* table, StringView name, simd::Column* column) { table->Set(name.str(), column); }
   static size_t size(simd::Table* table) { return table->Size(); }
 
   /**

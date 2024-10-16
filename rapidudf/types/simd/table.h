@@ -38,11 +38,7 @@ class TableSchema;
 class Table : public DynObject {
  private:
   struct Deleter {
-    void operator()(Table* ptr) {
-      ptr->~Table();
-      uint8_t* bytes = reinterpret_cast<uint8_t*>(ptr);
-      delete[] bytes;
-    }
+    void operator()(Table* ptr);
   };
 
  public:
@@ -111,6 +107,7 @@ class Table : public DynObject {
   Table* Topk(Vector<T> by, uint32_t k, bool descending);
   Table* Take(uint32_t k);
   size_t Size() const;
+  size_t Count() const;
 
  private:
   Table(Context& ctx, const DynObjectSchema* s) : DynObject(s), ctx_(ctx) {}
@@ -131,7 +128,6 @@ class Table : public DynObject {
   }
 
   void SetColumn(uint32_t offset, VectorData vec);
-  void SetSize(uint32_t k);
 
   absl::Status BuildFromProtobufVector(const std::vector<const ::google::protobuf::Message*>& pb_vector);
 

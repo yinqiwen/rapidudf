@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "rapidudf/meta/exception.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -52,9 +53,14 @@ int main() {
   // 5. 执行function
   rapidudf::Context ctx;
   auto f = std::move(result.value());
-  auto new_scores = f(ctx, ctx.NewSimdVector(locations), ctx.NewSimdVector(scores));
-  for (size_t i = 0; i < new_scores.Size(); i++) {
-    // RUDF_INFO("{}", new_scores[i]);
+  try {
+    auto new_scores = f(ctx, ctx.NewSimdVector(locations), ctx.NewSimdVector(scores));
+    for (size_t i = 0; i < new_scores.Size(); i++) {
+      // RUDF_INFO("{}", new_scores[i]);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
+
   return 0;
 };
