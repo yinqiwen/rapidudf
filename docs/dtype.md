@@ -16,13 +16,11 @@
 - `string_view`,  `rapidudf::StringView` in c++
 - `string`, `std::string*` in c++
 - `std_string_view`, `std::string_view` in c++
-- `scalar`, `rapidudf::Scalar*` in c++, a dynamic scalar object with variant type
+- `pointer`, `rapidudf::Pointer` in c++, a pointer wrapper object for any pointer
 
 ## Vector Types
 - `simd_vector<T>`, `rapidudf::simd_vector<T>` in c++
-- `simd_column`, a dynamic `simd_vector<T>` object with variant type
-- `simd_table`, a table with many named `simd_column`s
-
+- `simd_table`, a table with many named `simd_vector<T>`s
 
 ## STL Types
 - `vector<T>`, `std::vector<T>*` in c++

@@ -31,7 +31,7 @@
 |-----|------------     | ----- | ------ | ------------|-------| --------------------|-------------          |--------           |-------------------------|
 |!    | not             | N     | N      | N           | Y     | N                   | N                     |Y                  |N
 
-## Ternary Operators
+## Ternary Operator
 
 |Op   | Description     | Ints  | Floats | StringView  |Bool/Bit| simd_vector\<Ints\> |simd_vector\<Floats\>  |simd_vector\<Bit\> |simd_vector\<StringView\>|
 |-----|------------     | ----- | ------ | ------------|-------| --------------------|-------------          |--------           |-------------------------|
@@ -39,9 +39,13 @@
 
 Note: the first `if` value MUST be `bool` or `simd_vector<Bit>`
 
-## Brackets Operators
+## Brackets Operator
 
 |Op   | Description                  | std::vector | std::map |std::unordered_map | json|
 |-----|------------                  | ------------| ---------|------------------ | ----| 
 |[]   | get one element in an object.| Y           | Y        | Y                 | Y   |
 
+## Dot Operator
+|Op   | Description                             | Any C++ struct/class |
+|-----|------------                             | ---------------------| 
+|.    | access field or invoke member functions.| Y                    | 

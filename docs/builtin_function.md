@@ -77,7 +77,6 @@ abs(x)
 #### Supported Parameter Types:
 - `i32` `i64` `f32` `f64` 
 - `simd_vector<i32>` `simd_vector<i64>` `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -94,7 +93,6 @@ max(x,y)
 - `i8` `i16` `i32` `i64` `u8` `u16` `u32` `u64` `f32` `f64` 
 - `simd_vector<i8>` `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<f32>` `simd_vector<f64>`
 - `simd_vector<u8>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
-- `simd_column`
 
 #### Throws
 - throw `rapidudf::SizeMismatchException` when size mismatch
@@ -113,7 +111,6 @@ min(x,y)
 - `i8` `i16` `i32` `i64` `u8` `u16` `u32` `u64` `f32` `f64` 
 - `simd_vector<i8>` `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<f32>` `simd_vector<f64>`
 - `simd_vector<u8>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
-- `simd_column`
 
 #### Throws
 - throw `rapidudf::SizeMismatchException` when size mismatch
@@ -132,7 +129,6 @@ pow(x,y)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Throws
 - throw `rapidudf::SizeMismatchException` when size mismatch
@@ -151,7 +147,6 @@ ceil(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -168,7 +163,6 @@ floor(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -184,7 +178,6 @@ round(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -200,7 +193,6 @@ rint(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -216,7 +208,6 @@ trunc(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -232,7 +223,6 @@ erf(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -249,7 +239,6 @@ erfc(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -265,7 +254,6 @@ exp(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -281,7 +269,6 @@ expm1(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -297,7 +284,6 @@ exp2(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -314,7 +300,6 @@ sqrt(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -331,7 +316,6 @@ log(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -347,7 +331,6 @@ log2(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -363,7 +346,6 @@ log10(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -379,7 +361,6 @@ log1p(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -395,7 +376,6 @@ sin(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -411,7 +391,6 @@ cos(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -427,7 +406,6 @@ tan(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -444,7 +422,6 @@ asin(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -460,7 +437,6 @@ acos(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -476,7 +452,6 @@ atan(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -492,7 +467,6 @@ sinh(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -509,7 +483,6 @@ cosh(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -525,7 +498,6 @@ tanh(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -542,7 +514,6 @@ asinh(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -558,7 +529,6 @@ acosh(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -574,7 +544,6 @@ atanh(x)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -591,7 +560,6 @@ atan2(x,y)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Throws
 - throw `rapidudf::SizeMismatchException` when size mismatch
@@ -610,7 +578,6 @@ hypot(x,y)
 #### Supported Parameter Types:
 - `f32` `f64` 
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Throws
 - throw `rapidudf::SizeMismatchException` when size mismatch
@@ -631,7 +598,6 @@ Returns the sum of all
 #### Supported Parameter Types:
 - `simd_vector<i8>` `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<f32>` `simd_vector<f64>`
 - `simd_vector<u8>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -648,7 +614,6 @@ dot(x,y )
 Returns sum{x[i] * y[i]} for floating-point inputs
 #### Supported Parameter Types:
 - `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 
 #### Throws
 - throw `rapidudf::SizeMismatchException` when vector size mismatch
@@ -669,7 +634,6 @@ Returns vector with size `N` where the index i has the given value of `Start+i`
 #### Supported Parameter Types:
 - `simd_vector<i8>` `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<f32>` `simd_vector<f64>`
 - `simd_vector<u8>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
-- `simd_column`
 
 #### Examples
 ```cpp
@@ -686,7 +650,6 @@ clamp(x,y,z)
 - `i8` `i16` `i32` `i64` `u8` `u16` `u32` `u64` `f32` `f64` 
 - `simd_vector<i8>` `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<f32>` `simd_vector<f64>`
 - `simd_vector<u8>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
-- `simd_column`
 
 #### Throws
 - throw `rapidudf::SizeMismatchException` when vector size mismatch
@@ -706,7 +669,6 @@ fma(x,y,z)
 #### Supported Parameter Types:
 -  `f32` `f64` 
 -  `simd_vector<f32>` `simd_vector<f64>`
-- `simd_column`
 #### Throws
 - throw `rapidudf::SizeMismatchException` when vector size mismatch
 #### Examples
@@ -726,7 +688,6 @@ a[i] * b[i] - c[i]
 #### Supported Parameter Types:
 -  `f32` `f64` 
 -  `simd_vector<f32>` `simd_vector<f64>`
--  `simd_column`
 #### Throws
 - throw `rapidudf::SizeMismatchException` when vector size mismatch
 #### Examples
@@ -747,7 +708,6 @@ fnma(a,b,c)
 #### Supported Parameter Types:
 -  `f32` `f64` 
 -  `simd_vector<f32>` `simd_vector<f64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -767,7 +727,6 @@ fnms(a,b,c)
 #### Supported Parameter Types:
 -  `f32` `f64` 
 -  `simd_vector<f32>` `simd_vector<f64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -787,7 +746,6 @@ void
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
 -  `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -807,7 +765,6 @@ void
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
 -  `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -827,7 +784,6 @@ void
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
 -  `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -846,7 +802,6 @@ argsort(vec, descending)
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
 -  `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -865,7 +820,6 @@ argselect(vec, k, descending)
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
 -  `simd_vector<i16>` `simd_vector<i32>` `simd_vector<i64>` `simd_vector<u16>` `simd_vector<u32>` `simd_vector<u64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -885,7 +839,6 @@ sort_kv(key_vec,value_vec, descending)
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
 -  `simd_vector<i32>` `simd_vector<i64>` `simd_vector<u32>` `simd_vector<u64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -905,7 +858,6 @@ select_kv(key_vec,value_vec,k,descending)
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
 -  `simd_vector<i32>` `simd_vector<i64>` `simd_vector<u32>` `simd_vector<u64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -925,7 +877,6 @@ topk_kv(key_vec,value_vec,k,descending)
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
 -  `simd_vector<i32>` `simd_vector<i64>` `simd_vector<u32>` `simd_vector<u64>`
--  `simd_column`
 
 #### Examples
 ```cpp
@@ -978,5 +929,10 @@ auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vec
 ## flatbuffers::Vector
 - `.get(idx)`  get element by index
 - `.size()`    return container size
+
+## Vector Table
+- `.filter(simd::Vector<Bit>)`   return new table after filter
+- `.order_by(simd::Vector<T> column, bool descending)`   return new table after order_by
+- `.topk(simd::Vector<T> column, uint32_t k, bool descending)`    return new table after topk
 
 
