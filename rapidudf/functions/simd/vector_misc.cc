@@ -22,6 +22,7 @@
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/simd/vector.h"
+
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "rapidudf/functions/simd/vector_misc.cc"  // this file
 
