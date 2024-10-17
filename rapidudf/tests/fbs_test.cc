@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 #include <functional>
 #include <vector>
+#include "flatbuffers/minireflect.h"
 #include "rapidudf/rapidudf.h"
 #include "rapidudf/tests/test_fbs_generated.h"
 
@@ -47,6 +48,11 @@ TEST(JitCompiler, fbs_access_read_int) {
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   ASSERT_EQ(f(fbs_ptr), header.id);
+
+  auto* tt = test_fbs::FBSStruct::MiniReflectTypeTable();
+
+  auto s = flatbuffers::FlatBufferToString(fbb.GetBufferPointer(), tt);
+  RUDF_INFO("####offset null:{} {}", tt->values == nullptr, s);
 }
 
 TEST(JitCompiler, fbs_read_vector_string) {

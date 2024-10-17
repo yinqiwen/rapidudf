@@ -18,6 +18,9 @@
 #include <cstring>
 #include <type_traits>
 #include <vector>
+
+#include "flatbuffers/minireflect.h"
+
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
@@ -82,44 +85,26 @@ absl::Status TableSchema::BuildFromProtobuf(const ::google::protobuf::Message* m
         status = AddColumn<float>(field_desc->name());
         break;
       }
+      case ::google::protobuf::FieldDescriptor::TYPE_SINT64:
+      case ::google::protobuf::FieldDescriptor::TYPE_SFIXED64:
       case ::google::protobuf::FieldDescriptor::TYPE_INT64: {
         status = AddColumn<int64_t>(field_desc->name());
         break;
       }
+      case ::google::protobuf::FieldDescriptor::TYPE_FIXED64:
       case ::google::protobuf::FieldDescriptor::TYPE_UINT64: {
         status = AddColumn<uint64_t>(field_desc->name());
         break;
       }
+      case ::google::protobuf::FieldDescriptor::TYPE_SINT32:
+      case ::google::protobuf::FieldDescriptor::TYPE_SFIXED32:
       case ::google::protobuf::FieldDescriptor::TYPE_INT32: {
         status = AddColumn<int32_t>(field_desc->name());
         break;
       }
+      case ::google::protobuf::FieldDescriptor::TYPE_FIXED32:
       case ::google::protobuf::FieldDescriptor::TYPE_UINT32: {
         status = AddColumn<uint32_t>(field_desc->name());
-        break;
-      }
-      case ::google::protobuf::FieldDescriptor::TYPE_FIXED64: {
-        status = AddColumn<uint64_t>(field_desc->name());
-        break;
-      }
-      case ::google::protobuf::FieldDescriptor::TYPE_FIXED32: {
-        status = AddColumn<uint32_t>(field_desc->name());
-        break;
-      }
-      case ::google::protobuf::FieldDescriptor::TYPE_SFIXED64: {
-        status = AddColumn<int64_t>(field_desc->name());
-        break;
-      }
-      case ::google::protobuf::FieldDescriptor::TYPE_SFIXED32: {
-        status = AddColumn<int32_t>(field_desc->name());
-        break;
-      }
-      case ::google::protobuf::FieldDescriptor::TYPE_SINT64: {
-        status = AddColumn<int64_t>(field_desc->name());
-        break;
-      }
-      case ::google::protobuf::FieldDescriptor::TYPE_SINT32: {
-        status = AddColumn<int32_t>(field_desc->name());
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_STRING:
@@ -134,6 +119,74 @@ absl::Status TableSchema::BuildFromProtobuf(const ::google::protobuf::Message* m
     }
     if (!status.ok()) {
       return status;
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status TableSchema::BuildFromFlatbuffers(const flatbuffers::TypeTable* type_table) {
+  for (size_t i = 0; i < type_table->num_elems; i++) {
+    auto name = type_table->names[i];
+    absl::Status status;
+    if (type_table->type_codes[i].is_repeating) {
+      status = absl::UnimplementedError(fmt::format("Not supported field:{} with repeating base_type:{}", name,
+                                                    static_cast<int>(type_table->type_codes[i].base_type)));
+      break;
+    }
+    switch (type_table->type_codes[i].base_type) {
+      case flatbuffers::ET_BOOL: {
+        status = AddColumn<bool>(name);
+        break;
+      }
+      case flatbuffers::ET_CHAR: {
+        status = AddColumn<int8_t>(name);
+        break;
+      }
+      case flatbuffers::ET_UCHAR: {
+        status = AddColumn<uint8_t>(name);
+        break;
+      }
+      case flatbuffers::ET_SHORT: {
+        status = AddColumn<int16_t>(name);
+        break;
+      }
+      case flatbuffers::ET_USHORT: {
+        status = AddColumn<uint16_t>(name);
+        break;
+      }
+      case flatbuffers::ET_INT: {
+        status = AddColumn<int32_t>(name);
+        break;
+      }
+      case flatbuffers::ET_UINT: {
+        status = AddColumn<uint32_t>(name);
+        break;
+      }
+      case flatbuffers::ET_LONG: {
+        status = AddColumn<int64_t>(name);
+        break;
+      }
+      case flatbuffers::ET_ULONG: {
+        status = AddColumn<uint64_t>(name);
+        break;
+      }
+      case flatbuffers::ET_FLOAT: {
+        status = AddColumn<float>(name);
+        break;
+      }
+      case flatbuffers::ET_DOUBLE: {
+        status = AddColumn<double>(name);
+        break;
+      }
+      case flatbuffers::ET_STRING: {
+        status = AddColumn<std::string>(name);
+        break;
+      }
+      default: {
+        status = absl::UnimplementedError(fmt::format("Not supported field:{} with base_type:{}", name,
+                                                      static_cast<int>(type_table->type_codes[i].base_type)));
+        break;
+      }
     }
   }
   return absl::OkStatus();
@@ -173,7 +226,6 @@ absl::Status Table::SetColumnByProtobufField(const std::vector<const ::google::p
     }
   }
   return Set(field->name(), std::move(vec));
-  // return absl::OkStatus();
 }
 
 absl::Status Table::BuildFromProtobufVector(const std::vector<const ::google::protobuf::Message*>& pb_vector) {
@@ -182,6 +234,9 @@ absl::Status Table::BuildFromProtobufVector(const std::vector<const ::google::pr
 
   for (int i = 0; i < desc->field_count(); i++) {
     const ::google::protobuf::FieldDescriptor* field_desc = desc->field(i);
+    if (!schema_->ExistField(desc->name())) {
+      continue;
+    }
     absl::Status status;
     switch (field_desc->type()) {
       case ::google::protobuf::FieldDescriptor::TYPE_BOOL: {
@@ -226,6 +281,103 @@ absl::Status Table::BuildFromProtobufVector(const std::vector<const ::google::pr
       }
       default: {
         status = absl::UnimplementedError(fmt::format("Not supported field:{} with message type", field_desc->name()));
+        break;
+      }
+    }
+    if (!status.ok()) {
+      return status;
+    }
+  }
+  return absl::OkStatus();
+}
+template <typename T>
+absl::Status Table::SetColumnByFlatbuffersField(const std::vector<const uint8_t*>& fbs_vector, const std::string& name,
+                                                size_t idx) {
+  std::vector<T> vec;
+  vec.reserve(fbs_vector.size());
+
+  for (auto* fbs : fbs_vector) {
+    const uint8_t* ptr = reinterpret_cast<const flatbuffers::Table*>(fbs)->GetAddressOf(
+        flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(idx)));
+    if (ptr == nullptr) {
+      vec.emplace_back(T{});
+      continue;
+    }
+    if constexpr (std::is_same_v<bool, T> || std::is_same_v<uint8_t, T> || std::is_same_v<int8_t, T> ||
+                  std::is_same_v<uint16_t, T> || std::is_same_v<int16_t, T> || std::is_same_v<uint32_t, T> ||
+                  std::is_same_v<int32_t, T> || std::is_same_v<int64_t, T> || std::is_same_v<uint64_t, T> ||
+                  std::is_same_v<float, T> || std::is_same_v<double, T>) {
+      vec.emplace_back(flatbuffers::ReadScalar<T>(ptr));
+    } else if constexpr (std::is_same_v<StringView, T>) {
+      ptr += flatbuffers::ReadScalar<flatbuffers::uoffset_t>(ptr);
+      const flatbuffers::String* str = reinterpret_cast<const flatbuffers::String*>(ptr);
+      StringView s(reinterpret_cast<const char*>(str->Data()), str->size());
+      vec.emplace_back(s);
+    }
+  }
+  return Set(name, std::move(vec));
+}
+
+absl::Status Table::BuildFromFlatbuffersVector(const flatbuffers::TypeTable* type_table,
+                                               const std::vector<const uint8_t*>& fbs_vector) {
+  for (size_t i = 0; i < type_table->num_elems; i++) {
+    auto name = type_table->names[i];
+    if (!schema_->ExistField(name)) {
+      continue;
+    }
+    absl::Status status;
+    switch (type_table->type_codes[i].base_type) {
+      case flatbuffers::ET_BOOL: {
+        status = SetColumnByFlatbuffersField<bool>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_CHAR: {
+        status = SetColumnByFlatbuffersField<int8_t>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_UCHAR: {
+        status = SetColumnByFlatbuffersField<uint8_t>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_SHORT: {
+        status = SetColumnByFlatbuffersField<int16_t>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_USHORT: {
+        status = SetColumnByFlatbuffersField<uint16_t>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_INT: {
+        status = SetColumnByFlatbuffersField<int32_t>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_UINT: {
+        status = SetColumnByFlatbuffersField<uint32_t>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_LONG: {
+        status = SetColumnByFlatbuffersField<int64_t>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_ULONG: {
+        status = SetColumnByFlatbuffersField<uint64_t>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_FLOAT: {
+        status = SetColumnByFlatbuffersField<float>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_DOUBLE: {
+        status = SetColumnByFlatbuffersField<double>(fbs_vector, name, i);
+        break;
+      }
+      case flatbuffers::ET_STRING: {
+        status = SetColumnByFlatbuffersField<StringView>(fbs_vector, name, i);
+        break;
+      }
+      default: {
+        status = absl::UnimplementedError(fmt::format("Not supported field:{} with base_type:{}", name,
+                                                      static_cast<int>(type_table->type_codes[i].base_type)));
         break;
       }
     }

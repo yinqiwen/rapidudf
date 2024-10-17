@@ -1,3 +1,4 @@
+load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
@@ -61,6 +62,23 @@ cc_binary(
     srcs = ["vector_table_udf.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     deps = [
+        ":book_fbs",
+        "//rapidudf",
+    ],
+)
+
+flatbuffer_cc_library(
+    name = "book_fbs",
+    srcs = ["book.fbs"],
+    gen_reflections = True,
+)
+
+cc_binary(
+    name = "fbs_vector_table_udf",
+    srcs = ["fbs_vector_table_udf.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        ":book_fbs",
         "//rapidudf",
     ],
 )

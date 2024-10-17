@@ -92,6 +92,17 @@ class Table : public DynObject {
   }
 
   template <typename T>
+  absl::Status BuildFromFlatbuffersVector(const std::vector<const T*>& fbs_vector) {
+    auto* type_table = T::MiniReflectTypeTable();
+    std::vector<const uint8_t*> fbs_content_vector;
+    fbs_content_vector.reserve(fbs_vector.size());
+    for (auto v : fbs_vector) {
+      fbs_content_vector.emplace_back(reinterpret_cast<const uint8_t*>(v));
+    }
+    return BuildFromFlatbuffersVector(type_table, fbs_content_vector);
+  }
+
+  template <typename T>
   auto Get(const std::string& name) {
     if constexpr (std::is_same_v<bool, T>) {
       return DynObject::Get<Vector<Bit>>(name);
@@ -130,12 +141,16 @@ class Table : public DynObject {
   void SetColumn(uint32_t offset, VectorData vec);
 
   absl::Status BuildFromProtobufVector(const std::vector<const ::google::protobuf::Message*>& pb_vector);
+  absl::Status BuildFromFlatbuffersVector(const flatbuffers::TypeTable* type_table,
+                                          const std::vector<const uint8_t*>& fbs_vector);
 
   template <typename T>
   absl::Status SetColumnByProtobufField(const std::vector<const ::google::protobuf::Message*>& pb_vector,
                                         const ::google::protobuf::Reflection* reflect,
                                         const ::google::protobuf::FieldDescriptor* field);
-
+  template <typename T>
+  absl::Status SetColumnByFlatbuffersField(const std::vector<const uint8_t*>& fbs_vector, const std::string& name,
+                                           size_t idx);
   Context& ctx_;
   Vector<int32_t> indices_;
   friend class TableSchema;
@@ -154,6 +169,11 @@ class TableSchema : public DynObjectSchema {
   absl::Status BuildFromProtobuf() {
     static T msg;
     return BuildFromProtobuf(&msg);
+  }
+
+  template <typename T>
+  absl::Status BuildFromFlatbuffers() {
+    return BuildFromFlatbuffers(T::MiniReflectTypeTable());
   }
 
   template <typename T>
@@ -177,6 +197,7 @@ class TableSchema : public DynObjectSchema {
   typename DynObject::SmartPtr NewObject() const { return nullptr; }
 
   absl::Status BuildFromProtobuf(const ::google::protobuf::Message* msg);
+  absl::Status BuildFromFlatbuffers(const flatbuffers::TypeTable* type_table);
 };
 }  // namespace simd
 }  // namespace rapidudf

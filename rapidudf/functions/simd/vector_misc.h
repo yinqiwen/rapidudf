@@ -15,24 +15,23 @@
  */
 
 #pragma once
+
 #include "rapidudf/context/context.h"
-#include "rapidudf/functions/simd/vector_misc.h"
-#include "rapidudf/functions/simd/vector_sort.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/simd/vector.h"
 namespace rapidudf {
 namespace functions {
-template <typename T, OpToken opt>
-struct OperandType {
-  using operand_t = T;
-  static constexpr OpToken op = opt;
-};
-template <typename T, OpToken op>
-void simd_vector_unary_op(const T* input, T* output);
-template <typename T, OpToken op>
-void simd_vector_binary_op(const T* left, const T* right, T* output);
-template <typename T, OpToken op>
-void simd_vector_ternary_op(const T* a, const T* b, const T* c, T* output);
-
+template <typename T>
+T simd_vector_dot(simd::Vector<T> left, simd::Vector<T> right);
+template <typename T>
+simd::Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
+template <typename T>
+T simd_vector_sum(simd::Vector<T> left);
+template <typename T>
+T simd_vector_avg(simd::Vector<T> left);
+template <typename T>
+simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vector<int32_t> indices);
+template <typename T>
+simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vector<Bit> bits);
 }  // namespace functions
 }  // namespace rapidudf

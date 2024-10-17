@@ -17,9 +17,10 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
+#include <type_traits>
 
 #include "rapidudf/context/context.h"
-#include "rapidudf/functions/simd/vector.h"
+#include "rapidudf/functions/simd/vector_misc.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/simd/vector.h"
 
@@ -155,8 +156,15 @@ T simd_vector_sum(simd::Vector<T> left) {
 
 template <typename T>
 T simd_vector_dot(simd::Vector<T> left, simd::Vector<T> right) {
-  HWY_EXPORT_T(Table1, simd_vector_dot_impl<T>);
-  return HWY_DYNAMIC_DISPATCH_T(Table1)(left, right);
+  // simsimd_distance_t v;
+  // if constexpr (std::is_same_v<float, T>) {
+  //   simsimd_dot_f32(left.Data(), right.Data(), left.Size(), &v);
+  // } else if constexpr (std::is_same_v<double, T>) {
+  //   simsimd_dot_f64(left.Data(), right.Data(), left.Size(), &v);
+  // }
+  // return static_cast<T>(v);
+  HWY_EXPORT_T(Table, simd_vector_dot_impl<T>);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left, right);
 }
 
 template <typename T>

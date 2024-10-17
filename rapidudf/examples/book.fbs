@@ -1,0 +1,10 @@
+namespace examples;
+
+
+table Book {
+  title:string;
+  price:float;
+  category:uint;
+  page_count:uint;
+}
+root_type Book;
