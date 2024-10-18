@@ -322,7 +322,7 @@ HWY_INLINE void do_unary_transform(const T* input, T* output, const Func& func) 
 template <typename OPT>
 HWY_INLINE void simd_vector_unary_op_impl(const typename OPT::operand_t* input, typename OPT::operand_t* output) {
   using D = hn::ScalableTag<typename OPT::operand_t>;
-  constexpr D d;
+  //   constexpr D d;
   auto transform_func = do_simd_unary_op<D, OPT::op>;
   do_unary_transform(input, output, transform_func);
 }
