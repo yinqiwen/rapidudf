@@ -12,6 +12,7 @@ cc_library(
         "//rapidudf/arena",
         "//rapidudf/common:atomic_intrusive_list",
         "//rapidudf/log",
+        "//rapidudf/meta",
         "//rapidudf/types/simd:vector",
         "@com_google_absl//absl/container:flat_hash_set",
     ],

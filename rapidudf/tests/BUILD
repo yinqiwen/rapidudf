@@ -77,7 +77,7 @@ cc_test(
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
-        ":ast",
+        "//rapidudf/ast",
         "@com_google_googletest//:gtest_main",
     ],
 )
