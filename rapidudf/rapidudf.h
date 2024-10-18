@@ -23,6 +23,7 @@
 #include "rapidudf/reflect/macros.h"
 #include "rapidudf/types/dyn_object_impl.h"
 #include "rapidudf/types/simd/table.h"
+#include "rapidudf/version.h"
 
 namespace rapidudf {
 using JitCompiler = compiler::JitCompiler;

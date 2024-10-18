@@ -138,7 +138,7 @@ static void register_simd_vector_sort() {
 }
 
 template <typename K, typename V>
-static void register_simd_vector_key_valye_sort() {
+static void register_simd_vector_key_value_sort() {
   DType key_dtype = get_dtype<K>();
   DType value_dtype = get_dtype<V>();
   std::string func_name = GetFunctionName(OP_SORT_KV, key_dtype.ToSimdVector(), value_dtype.ToSimdVector());
@@ -178,7 +178,7 @@ static void register_simd_vector_key_valye_sort() {
 
 #define KEY_VALUE_SORT_DTYPES (uint32_t)(int32_t)(uint64_t)(int64_t)(float)(double)
 #define RUDF_SIMD_VECTOR_SORT_KV_REGISTER(r, kv) \
-  register_simd_vector_key_valye_sort<BOOST_PP_SEQ_ELEM(0, kv), BOOST_PP_SEQ_ELEM(1, kv)>();
+  register_simd_vector_key_value_sort<BOOST_PP_SEQ_ELEM(0, kv), BOOST_PP_SEQ_ELEM(1, kv)>();
 
 void init_builtin_simd_vector_funcs() {
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinThrowVectorExprEx, throw_vector_expression_ex);

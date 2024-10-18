@@ -6,6 +6,7 @@ cc_library(
     name = "rapidudf",
     hdrs = [
         "rapidudf.h",
+        "version.h",
     ],
     deps = [
         "//rapidudf/compiler",

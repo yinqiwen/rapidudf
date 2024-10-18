@@ -12,6 +12,7 @@ cc_library(
     ],
     copts = ["-O3"],
     deps = [
+        "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",

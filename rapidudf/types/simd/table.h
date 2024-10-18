@@ -34,6 +34,7 @@
 
 namespace rapidudf {
 namespace simd {
+
 class TableSchema;
 class Table : public DynObject {
  private:

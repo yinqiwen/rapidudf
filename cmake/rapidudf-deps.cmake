@@ -24,7 +24,7 @@ find_package(LLVM REQUIRED CONFIG)
 include_directories(${LLVM_INCLUDE_DIRS})
 separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_definitions(${LLVM_DEFINITIONS_LIST})
-llvm_map_components_to_libnames(llvm_libs core)
+llvm_map_components_to_libnames(llvm_libs support core target orcjit x86codegen x86asmparser)
 list(APPEND RAPIDUDF_LINK_LIBRARIES ${llvm_libs})
 
 find_package(Boost 1.51.0 MODULE
@@ -32,11 +32,12 @@ find_package(Boost 1.51.0 MODULE
     headers
   REQUIRED
 )
-# list(APPEND FOLLY_LINK_LIBRARIES ${Boost_LIBRARIES})
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS})
 
 find_package(PkgConfig)
 pkg_check_modules(x86simdsortcpp REQUIRED IMPORTED_TARGET x86simdsortcpp)
+list(APPEND RAPIDUDF_LINK_LIBRARIES PkgConfig::x86simdsortcpp)
+
 
 find_package(fmt)
 if(NOT fmt_FOUND)
@@ -51,9 +52,9 @@ list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${fmt_SOURCE_DIR}/include)
 else()
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${fmt_INCLUDE_DIRS})
 endif()
-list(APPEND RAPIDUDF_LINK_LIBRARIES fmt:fmt)
+list(APPEND RAPIDUDF_LINK_LIBRARIES fmt::fmt)
 
-find_package(spdlog )
+find_package(spdlog)
 if(NOT spdlog_FOUND)
 # set(SPDLOG_FMT_EXTERNAL ON CACHE INTERNAL "")
 set(SPDLOG_INSTALL ON CACHE INTERNAL "")
@@ -64,28 +65,25 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(spdlog)
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${spdlog_SOURCE_DIR}/include)
 else()
-# list(APPEND RAPIDUDF_LINK_LIBRARIES ${Boost_LIBRARIES})
-list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${spdlog_INCLUDE_DIRS})
+message("Found spdlog ${spdlog_INCLUDE_DIRS}")
 endif()
-list(APPEND RAPIDUDF_LINK_LIBRARIES spdlog:spdlog)
+list(APPEND RAPIDUDF_LINK_LIBRARIES spdlog::spdlog)
 
-find_package(sleef )
+find_package(sleef)
 if(NOT sleef_FOUND)
 set(SLEEF_BUILD_TESTS OFF CACHE INTERNAL "Turn off tests")
 FetchContent_Declare(
   sleef
   GIT_REPOSITORY https://mirrors.tencent.com/github.com/shibatch/sleef
   GIT_TAG        3.7
-  OVERRIDE_FIND_PACKAGE
+  FIND_PACKAGE_ARGS sleef
 )
 FetchContent_MakeAvailable(sleef)
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${sleef_BINARY_DIR}/include)
-# list(APPEND RAPIDUDF_LINK_LIBRARIES sleef:sleef)
 else()
-# list(APPEND RAPIDUDF_LINK_LIBRARIES ${sleef_LIBRARIES})
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${sleef_INCLUDE_DIRS})
 endif()
-list(APPEND RAPIDUDF_LINK_LIBRARIES sleef:sleef)
+list(APPEND RAPIDUDF_LINK_LIBRARIES sleef::sleef)
 
 find_package(absl)
 if(NOT absl_FOUND)
@@ -103,7 +101,7 @@ else()
 # list(APPEND RAPIDUDF_LINK_LIBRARIES ${absl_LIBRARIES})
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${absl_INCLUDE_DIRS})
 endif()
-list(APPEND RAPIDUDF_LINK_LIBRARIES absl::base absl::flat_hash_map absl::utility absl::strings)
+list(APPEND RAPIDUDF_LINK_LIBRARIES absl::base absl::cleanup absl::status absl::statusor absl::flat_hash_map  absl::flat_hash_set absl::utility absl::strings)
 
 find_package(hwy)
 if(NOT hwy_FOUND)
@@ -113,21 +111,18 @@ FetchContent_Declare(
   hwy
   GIT_REPOSITORY https://mirrors.tencent.com/github.com/google/highway
   GIT_TAG        1.2.0
-  FIND_PACKAGE_ARGS NAMES hwy
-  # OVERRIDE_FIND_PACKAGE
+  # FIND_PACKAGE_ARGS NAMES hwy
+  OVERRIDE_FIND_PACKAGE
 )
 # FetchContent_Populate(hwy)
 # add_subdirectory(${hwy_SOURCE_DIR} ${hwy_BINARY_DIR})
 FetchContent_MakeAvailable(hwy)
+install(TARGETS hwy EXPORT rapidudfTargets)
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${hwy_SOURCE_DIR})
-
-message("hwy_SOURCE_DIR: ${hwy_SOURCE_DIR}")
-message("hwy_BINARY_DIR: ${hwy_BINARY_DIR}")
 else()
-# target_link_libraries(rapidudf_deps INTERFACE hwy::hwy hwy::hwy_contrib)
-list(APPEND RAPIDUDF_LINK_LIBRARIES hwy::hwy hwy::hwy_contrib)
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${hwy_INCLUDE_DIRS})
 endif()
+list(APPEND RAPIDUDF_LINK_LIBRARIES hwy::hwy hwy::hwy_contrib)
 
 find_package(protobuf)
 if(NOT protobuf_FOUND)
@@ -148,8 +143,8 @@ list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${protobuf_INCLUDE_DIRS})
 endif()
 list(APPEND RAPIDUDF_LINK_LIBRARIES protobuf::libprotobuf)
 
-find_package(flatbuffers)
-if(NOT flatbuffers_FOUND)
+find_package(Flatbuffers)
+if(NOT Flatbuffers_FOUND)
 set(FLATBUFFERS_BUILD_TESTS OFF CACHE INTERNAL "Turn off tests")
 FetchContent_Declare(
     flatbuffers
@@ -158,11 +153,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(flatbuffers)
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${flatbuffers_SOURCE_DIR}/include)
-# list(APPEND RAPIDUDF_LINK_LIBRARIES flatBuffers::flatBuffers)
 else()
-list(APPEND RAPIDUDF_LINK_LIBRARIES flatBuffers::flatBuffers)
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${flatbuffers_INCLUDE_DIRS})
 endif()
+list(APPEND RAPIDUDF_LINK_LIBRARIES flatbuffers::flatbuffers)
 
 
 find_package(nlohmann_json)

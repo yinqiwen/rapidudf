@@ -23,6 +23,7 @@
 namespace rapidudf {
 enum CollectionType {
   COLLECTION_INVALID = 0,
+  COLLECTION_ARRAY,
   COLLECTION_VECTOR,
   COLLECTION_MAP,
   COLLECTION_SET,
@@ -35,7 +36,7 @@ enum CollectionType {
 };
 
 constexpr std::array<std::string_view, COLLECTION_END> kCollectionTypeStrs = {
-    "", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector"};
+    "", "array", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector"};
 enum FundamentalType {
   DATA_INVALID = 0,
   DATA_VOID,

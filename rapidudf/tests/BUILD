@@ -71,6 +71,18 @@ cc_proto_library(
 )
 
 cc_test(
+    name = "grammar_test",
+    size = "small",
+    srcs = ["grammar_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        ":ast",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "pb_test",
     size = "small",
     srcs = ["pb_test.cc"],

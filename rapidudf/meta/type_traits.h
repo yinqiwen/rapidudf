@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include <array>
 #include <functional>
 #include <tuple>
 #include <type_traits>
@@ -24,6 +25,15 @@ template <typename Test, template <typename...> class Ref>
 struct is_specialization : std::false_type {};
 template <template <typename...> class Ref, typename... Args>
 struct is_specialization<Ref<Args...>, Ref> : std::true_type {};
+
+template <typename T>
+struct is_std_array : std::false_type {};
+
+template <typename T, std::size_t N>
+struct is_std_array<std::array<T, N>> : std::true_type {};
+
+template <typename T>
+constexpr bool is_std_array_v = is_std_array<T>::value;
 
 template <typename F>
 struct FunctionTraits;

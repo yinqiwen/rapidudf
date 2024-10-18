@@ -17,8 +17,10 @@
 #include "rapidudf/meta/dtype.h"
 #include <cxxabi.h>
 #include <gtest/gtest.h>
+#include <array>
 #include <vector>
 #include "rapidudf/log/log.h"
+#include "rapidudf/types/simd/vector.h"
 
 struct TestStruct {
   int a;
@@ -96,13 +98,21 @@ TEST(DType, simple1) {
   ASSERT_TRUE(extract_types[0] == DATA_I32);
   ASSERT_TRUE(extract_types[1] == DATA_F32);
 
-  auto tuple_dtype = get_dtype<std::tuple<int, float, int64_t>>();
+  auto tuple_dtype = get_dtype<std::tuple<int, float>>();
   extract_types = tuple_dtype.ExtractTupleDtypes();
-  ASSERT_TRUE(extract_types.size() == 3);
+  ASSERT_TRUE(extract_types.size() == 2);
   ASSERT_TRUE(extract_types[0] == DATA_I32);
   ASSERT_TRUE(extract_types[1] == DATA_F32);
-  ASSERT_TRUE(extract_types[2] == DATA_I64);
+  // ASSERT_TRUE(extract_types[2] == DATA_I64);
 }
+
+TEST(DType, vector_array) {
+  auto dtype = get_dtype<simd::Vector<std::array<float, 6>>>();
+  ASSERT_TRUE(dtype.IsSimdVector());
+  ASSERT_TRUE(dtype.Elem().IsArray(6));
+  ASSERT_TRUE(dtype.Elem().Elem().IsF32());
+}
+
 namespace test {
 namespace internal {
 struct TestStruct {};

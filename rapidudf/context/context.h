@@ -25,6 +25,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
+#include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
@@ -112,7 +113,8 @@ class Context {
       simd::VectorData vdata(arena_data, data.size(), byte_size);
       vdata.SetReadonly(false);
       return simd::Vector<Bit>(vdata);
-    } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T>) {
+    } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T> ||
+                         is_std_array_v<T>) {
       return simd::Vector<T>(data);
     } else if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T>) {
       uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(StringView));

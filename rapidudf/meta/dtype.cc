@@ -169,6 +169,14 @@ DType DType::ToPtr() const {
   ret.element_types_ = element_types_;
   return ret;
 }
+DType DType::ToArray(size_t fixed_size) const {
+  DType result;
+  result.ctrl_.control_ = ctrl_.control_;
+  result.ctrl_.container_type_ = COLLECTION_ARRAY;
+  result.element_types_ = element_types_;
+  result.ctrl_.fixed_vector_size_ = fixed_size;
+  return result;
+}
 DType DType::ToVector() const {
   DType result;
   result.ctrl_.control_ = ctrl_.control_;
@@ -241,9 +249,9 @@ std::string DType::GetTypeString() const {
     } else {
       name = fmt::format("{}<{}>", collection_type, name);
     }
-  }
-  if (IsPtr()) {
+  } else if (IsPtr()) {
     name.append(1, '*');
+  } else if (IsComplexObj()) {
   }
   return name;
 }
@@ -260,8 +268,7 @@ std::string DType::ToString() const {
   if (IsCollection()) {
     collection_type = kCollectionTypeStrs[ctrl_.container_type_];
     name = fmt::format("{}<{}>", collection_type, name);
-  }
-  if (IsPtr()) {
+  } else if (IsPtr()) {
     name.append(1, '*');
   }
   return fmt::format("[{}]", name);
@@ -316,14 +323,14 @@ std::vector<DType> DType::ExtractTupleDtypes() const {
     return dtypes;
   }
   dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t1_)));
-  if (ctrl_.t2_ == 0) {
-    return dtypes;
-  }
-  dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t2_)));
-  if (ctrl_.t3_ == 0) {
-    return dtypes;
-  }
-  dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t3_)));
+  // if (ctrl_.t2_ == 0) {
+  //   return dtypes;
+  // }
+  // dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t2_)));
+  // if (ctrl_.t3_ == 0) {
+  //   return dtypes;
+  // }
+  // dtypes.emplace_back(DType(static_cast<FundamentalType>(ctrl_.t3_)));
   return dtypes;
 }
 
@@ -337,12 +344,12 @@ uint32_t DType::TupleSize() const {
   if (ctrl_.t1_ == 0) {
     return 1;
   }
-  if (ctrl_.t2_ == 0) {
-    return 2;
-  }
-  if (ctrl_.t3_ == 0) {
-    return 3;
-  }
+  // if (ctrl_.t2_ == 0) {
+  //   return 2;
+  // }
+  // if (ctrl_.t3_ == 0) {
+  //   return 3;
+  // }
   return 4;
 }
 
