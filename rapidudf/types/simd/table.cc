@@ -33,6 +33,16 @@
 namespace rapidudf {
 namespace simd {
 
+bool TableCreateOptions::IsAllowed(const std::string& field) const {
+  if (!includes.empty()) {
+    return includes.count(field) == 1;
+  }
+  if (!excludes.empty()) {
+    return excludes.count(field) == 0;
+  }
+  return true;
+}
+
 TableSchema* TableSchema::GetMutable(const std::string& name) {
   DynObjectSchema* s = DynObjectSchema::GetMutable(name);
   return reinterpret_cast<TableSchema*>(s);
@@ -67,10 +77,13 @@ typename Table::SmartPtr TableSchema::NewTable(Context& ctx) const {
   return p;
 }
 
-absl::Status TableSchema::BuildFromProtobuf(const ::google::protobuf::Message* msg) {
+absl::Status TableSchema::BuildFromProtobuf(const ::google::protobuf::Message* msg, const TableCreateOptions& opts) {
   const ::google::protobuf::Descriptor* desc = msg->GetDescriptor();
   for (int i = 0; i < desc->field_count(); i++) {
     const ::google::protobuf::FieldDescriptor* field_desc = desc->field(i);
+    if (!opts.IsAllowed(field_desc->name())) {
+      continue;
+    }
     absl::Status status;
     switch (field_desc->type()) {
       case ::google::protobuf::FieldDescriptor::TYPE_BOOL: {
@@ -113,7 +126,12 @@ absl::Status TableSchema::BuildFromProtobuf(const ::google::protobuf::Message* m
         break;
       }
       default: {
-        status = absl::UnimplementedError(fmt::format("Not supported field:{} with message type", field_desc->name()));
+        if (opts.ignore_unsupported_fields) {
+          status = absl::OkStatus();
+        } else {
+          status =
+              absl::UnimplementedError(fmt::format("Not supported field:{} with message type", field_desc->name()));
+        }
         break;
       }
     }
@@ -124,9 +142,13 @@ absl::Status TableSchema::BuildFromProtobuf(const ::google::protobuf::Message* m
   return absl::OkStatus();
 }
 
-absl::Status TableSchema::BuildFromFlatbuffers(const flatbuffers::TypeTable* type_table) {
+absl::Status TableSchema::BuildFromFlatbuffers(const flatbuffers::TypeTable* type_table,
+                                               const TableCreateOptions& opts) {
   for (size_t i = 0; i < type_table->num_elems; i++) {
     auto name = type_table->names[i];
+    if (!opts.IsAllowed(name)) {
+      continue;
+    }
     absl::Status status;
     if (type_table->type_codes[i].is_repeating) {
       status = absl::UnimplementedError(fmt::format("Not supported field:{} with repeating base_type:{}", name,
@@ -183,8 +205,12 @@ absl::Status TableSchema::BuildFromFlatbuffers(const flatbuffers::TypeTable* typ
         break;
       }
       default: {
-        status = absl::UnimplementedError(fmt::format("Not supported field:{} with base_type:{}", name,
-                                                      static_cast<int>(type_table->type_codes[i].base_type)));
+        if (opts.ignore_unsupported_fields) {
+          status = absl::OkStatus();
+        } else {
+          status = absl::UnimplementedError(fmt::format("Not supported field:{} with base_type:{}", name,
+                                                        static_cast<int>(type_table->type_codes[i].base_type)));
+        }
         break;
       }
     }
@@ -225,6 +251,7 @@ absl::Status Table::SetColumnByProtobufField(const std::vector<const ::google::p
     } else {
     }
   }
+
   return Set(field->name(), std::move(vec));
 }
 
@@ -234,7 +261,7 @@ absl::Status Table::BuildFromProtobufVector(const std::vector<const ::google::pr
 
   for (int i = 0; i < desc->field_count(); i++) {
     const ::google::protobuf::FieldDescriptor* field_desc = desc->field(i);
-    if (!schema_->ExistField(desc->name())) {
+    if (!schema_->ExistField(field_desc->name())) {
       continue;
     }
     absl::Status status;

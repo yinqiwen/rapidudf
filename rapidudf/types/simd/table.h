@@ -19,6 +19,7 @@
 #include <functional>
 #include <string>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include "absl/container/flat_hash_map.h"
@@ -157,6 +158,13 @@ class Table : public DynObject {
   friend class TableSchema;
 };
 
+struct TableCreateOptions {
+  std::unordered_set<std::string> includes;
+  std::unordered_set<std::string> excludes;
+  bool ignore_unsupported_fields = false;
+  bool IsAllowed(const std::string& field) const;
+};
+
 class TableSchema : public DynObjectSchema {
  public:
   using InitFunc = std::function<void(TableSchema* s)>;
@@ -167,14 +175,14 @@ class TableSchema : public DynObjectSchema {
   typename Table::SmartPtr NewTable(Context& ctx) const;
 
   template <typename T>
-  absl::Status BuildFromProtobuf() {
+  absl::Status BuildFromProtobuf(const TableCreateOptions& opts = {}) {
     static T msg;
-    return BuildFromProtobuf(&msg);
+    return BuildFromProtobuf(&msg, opts);
   }
 
   template <typename T>
-  absl::Status BuildFromFlatbuffers() {
-    return BuildFromFlatbuffers(T::MiniReflectTypeTable());
+  absl::Status BuildFromFlatbuffers(const TableCreateOptions& opts = {}) {
+    return BuildFromFlatbuffers(T::MiniReflectTypeTable(), opts);
   }
 
   template <typename T>
@@ -197,8 +205,8 @@ class TableSchema : public DynObjectSchema {
   }
   typename DynObject::SmartPtr NewObject() const { return nullptr; }
 
-  absl::Status BuildFromProtobuf(const ::google::protobuf::Message* msg);
-  absl::Status BuildFromFlatbuffers(const flatbuffers::TypeTable* type_table);
+  absl::Status BuildFromProtobuf(const ::google::protobuf::Message* msg, const TableCreateOptions& opts);
+  absl::Status BuildFromFlatbuffers(const flatbuffers::TypeTable* type_table, const TableCreateOptions& opts);
 };
 }  // namespace simd
 }  // namespace rapidudf
