@@ -21,9 +21,19 @@
 #include <vector>
 
 #include "rapidudf/meta/exception.h"
+#include "rapidudf/meta/optype.h"
 #include "rapidudf/types/bit.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
+namespace simd {
+template <typename T>
+class Vector;
+}
+
+namespace functions {
+template <typename T, OpToken op = OP_EQUAL>
+int simd_vector_find(simd::Vector<T> data, T v);
+}
 namespace simd {
 
 static constexpr uint32_t kVectorUnitSize = 64;
@@ -189,6 +199,13 @@ class Vector {
     }
   }
 
+  int Find(T v) { return functions::simd_vector_find<T>(*this, v); }
+  int FindNeq(T v) { return functions::simd_vector_find<T, OP_NOT_EQUAL>(*this, v); }
+  int FindGt(T v) { return functions::simd_vector_find<T, OP_GREATER>(*this, v); }
+  int FindGe(T v) { return functions::simd_vector_find<T, OP_GREATER_EQUAL>(*this, v); }
+  int FindLt(T v) { return functions::simd_vector_find<T, OP_LESS>(*this, v); }
+  int FindLe(T v) { return functions::simd_vector_find<T, OP_LESS_EQUAL>(*this, v); }
+
   auto ToStdVector() const {
     if constexpr (std::is_same_v<Bit, T>) {
       std::vector<uint8_t> bits;
@@ -224,7 +241,6 @@ class Vector {
   VectorData& GetVectorData() { return vec_data_; }
 
   void SetReadonly(bool v) { vec_data_.SetReadonly(v); }
-  // bool IsTemporary() const { return vec_data_.IsTemporary(); }
   bool IsReadonly() const { return vec_data_.IsReadonly(); }
 
  private:

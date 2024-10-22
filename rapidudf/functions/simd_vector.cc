@@ -193,6 +193,7 @@ void init_builtin_simd_vector_funcs() {
                              uint32_t, uint16_t, uint8_t, StringView, Bit)
   REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_sort, float, double, int64_t, int32_t, int16_t, uint64_t, uint32_t,
                              uint16_t);
+
   BOOST_PP_SEQ_FOR_EACH_PRODUCT(RUDF_SIMD_VECTOR_SORT_KV_REGISTER, (KEY_VALUE_SORT_DTYPES)(KEY_VALUE_SORT_DTYPES))
 
   RUDF_STL_REFLECT_HELPER(reflect::SimdVectorHelper, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,

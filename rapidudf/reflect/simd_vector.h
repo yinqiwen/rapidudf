@@ -16,9 +16,9 @@
 
 #pragma once
 #include <type_traits>
-#include "rapidudf/context/context.h"
 #include "rapidudf/reflect/struct.h"
 #include "rapidudf/types/simd/vector.h"
+#include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 namespace reflect {
@@ -27,8 +27,19 @@ struct SimdVectorHelper {
   static T get(simd::Vector<T> v, size_t i) { return v[i]; }
   static size_t size(simd::Vector<T> v) { return v.Size(); }
   static simd::Vector<T> subvector(simd::Vector<T> v, uint32_t pos, uint32_t len) { return v.SubVector(pos, len); }
-  // static simd::Column* to_column(simd::Vector<T> v, Context& ctx) { return simd::Column::FromVector(ctx, v); }
-  static void Init() { RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, subvector) }
+  static int find(simd::Vector<T> vec, T v) { return vec.Find(v); }
+  static int find_neq(simd::Vector<T> vec, T v) { return vec.FindNeq(v); }
+  static int find_gt(simd::Vector<T> vec, T v) { return vec.FindGt(v); }
+  static int find_ge(simd::Vector<T> vec, T v) { return vec.FindGe(v); }
+  static int find_lt(simd::Vector<T> vec, T v) { return vec.FindLt(v); }
+  static int find_le(simd::Vector<T> vec, T v) { return vec.FindLe(v); }
+
+  static void Init() {
+    RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, subvector);
+    if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T>) {
+      RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, find, find_neq, find_gt, find_ge, find_lt, find_le);
+    }
+  }
 };
 }  // namespace reflect
 

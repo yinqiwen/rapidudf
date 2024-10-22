@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 yinqiwen yinqiwen@gmail.com. All rights reserved.
+ * Copyright (c) 2024 qiyingwang <qiyingwang@tencent.com>. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,15 @@
  */
 
 #pragma once
-#include "rapidudf/context/context.h"
-#include "rapidudf/functions/simd/vector_misc.h"
-#include "rapidudf/functions/simd/vector_op.h"
-#include "rapidudf/functions/simd/vector_sort.h"
+
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/types/simd/vector.h"
+
 namespace rapidudf {
 namespace functions {
-
-template <typename T, OpToken op>
-void simd_vector_unary_op(const T* input, T* output);
-template <typename T, OpToken op>
-void simd_vector_binary_op(const T* left, const T* right, T* output);
-template <typename T, OpToken op>
-void simd_vector_ternary_op(const T* a, const T* b, const T* c, T* output);
-
+template <typename T, OpToken opt>
+struct OperandType {
+  using operand_t = T;
+  static constexpr OpToken op = opt;
+};
 }  // namespace functions
 }  // namespace rapidudf

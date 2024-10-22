@@ -36,42 +36,6 @@ namespace functions {
 #define REGISTER_STRING_FUNCS(func, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(REGISTER_STRING_FUNC_WITH_TYPE, func, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
-bool compare_string_view(uint32_t op, StringView left, StringView right) {
-  bool result = false;
-  switch (op) {
-    case OP_EQUAL: {
-      result = left == right;
-      break;
-    }
-    case OP_NOT_EQUAL: {
-      result = left != right;
-      break;
-    }
-    case OP_GREATER: {
-      result = left > right;
-      break;
-    }
-    case OP_GREATER_EQUAL: {
-      result = left >= right;
-      break;
-    }
-    case OP_LESS: {
-      result = left < right;
-      break;
-    }
-    case OP_LESS_EQUAL: {
-      result = left <= right;
-      break;
-    }
-    default: {
-      RUDF_CRITICAL("Unsupported string_view compare op:{}", op);
-      return false;
-    }
-  }
-  RUDF_DEBUG("cmp string:{} & {} with op:{} result:{}", left, right, op, result);
-  return result;
-}
-
 template <OpToken op>
 void compare_string_views(const StringView* left, const StringView* right, uint8_t* ret) {
   for (size_t i = 0; i < simd::kVectorUnitSize; i++) {

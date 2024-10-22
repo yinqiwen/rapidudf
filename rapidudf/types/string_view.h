@@ -234,6 +234,8 @@ struct StringView {
 //   auto vec = {"str1"_sv, "str2"_sv};
 inline StringView operator"" _sv(const char* str, size_t len) { return StringView(str, len); }
 
+bool compare_string_view(uint32_t op, StringView left, StringView right);
+
 }  // namespace rapidudf
 
 namespace fmt {

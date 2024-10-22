@@ -17,6 +17,7 @@
 #pragma once
 
 #include "rapidudf/context/context.h"
+#include "rapidudf/functions/simd/vector_op.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/simd/vector.h"
 namespace rapidudf {
@@ -33,5 +34,9 @@ template <typename T>
 simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vector<int32_t> indices);
 template <typename T>
 simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vector<Bit> bits);
+
+template <typename T, OpToken op = OP_EQUAL>
+int simd_vector_find(simd::Vector<T> data, T v);
+
 }  // namespace functions
 }  // namespace rapidudf

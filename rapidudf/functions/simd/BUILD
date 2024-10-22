@@ -3,6 +3,16 @@ package(
 )
 
 cc_library(
+    name = "vector_op",
+    hdrs = [
+        "vector_op.h",
+    ],
+    deps = [
+        "//rapidudf/meta:optype",
+    ],
+)
+
+cc_library(
     name = "vector_misc",
     srcs = [
         "vector_misc.cc",
@@ -12,6 +22,7 @@ cc_library(
     ],
     copts = ["-O3"],
     deps = [
+        ":vector_op",
         "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
@@ -58,6 +69,7 @@ cc_library(
     copts = ["-O3"],
     deps = [
         ":vector_misc",
+        ":vector_op",
         ":vector_sort",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",

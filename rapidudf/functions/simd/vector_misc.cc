@@ -23,12 +23,14 @@
 #include "rapidudf/functions/simd/vector_misc.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/simd/vector.h"
+#include "rapidudf/types/string_view.h"
 
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "rapidudf/functions/simd/vector_misc.cc"  // this file
 
 #include "hwy/foreach_target.h"  // must come before highway.h
 
+#include "hwy/contrib/algo/find-inl.h"
 #include "hwy/contrib/dot/dot-inl.h"
 #include "hwy/highway.h"
 
@@ -131,6 +133,32 @@ simd::Vector<T> simd_vector_gather_impl(Context& ctx, simd::Vector<T> data, simd
     dst[i] = base[indices[i]];
   }
   return simd::Vector<T>(result_data);
+}
+
+template <typename OPT>
+size_t simd_vector_find_impl(simd::Vector<typename OPT::operand_t> data, typename OPT::operand_t v) {
+  using D = hn::ScalableTag<typename OPT::operand_t>;
+  constexpr D d;
+  if constexpr (OPT::op == OP_EQUAL) {
+    return hn::Find(d, v, data.Data(), data.Size());
+  } else {
+    if constexpr (OPT::op == OP_GREATER_EQUAL) {
+      return hn::FindIf(d, data.Data(), data.Size(),
+                        [v](const auto d, const auto vec) HWY_ATTR { return hn::Ge(vec, hn::Set(d, v)); });
+    } else if constexpr (OPT::op == OP_GREATER) {
+      return hn::FindIf(d, data.Data(), data.Size(),
+                        [v](const auto d, const auto vec) HWY_ATTR { return hn::Gt(vec, hn::Set(d, v)); });
+    } else if constexpr (OPT::op == OP_NOT_EQUAL) {
+      return hn::FindIf(d, data.Data(), data.Size(),
+                        [v](const auto d, const auto vec) HWY_ATTR { return hn::Ne(vec, hn::Set(d, v)); });
+    } else if constexpr (OPT::op == OP_LESS_EQUAL) {
+      return hn::FindIf(d, data.Data(), data.Size(),
+                        [v](const auto d, const auto vec) HWY_ATTR { return hn::Le(vec, hn::Set(d, v)); });
+    } else if constexpr (OPT::op == OP_LESS) {
+      return hn::FindIf(d, data.Data(), data.Size(),
+                        [v](const auto d, const auto vec) HWY_ATTR { return hn::Lt(vec, hn::Set(d, v)); });
+    }
+  }
 }
 
 }  // namespace HWY_NAMESPACE
@@ -243,6 +271,26 @@ simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vec
   }
 }
 
+template <typename T, OpToken op = OP_EQUAL>
+int simd_vector_find(simd::Vector<T> data, T v) {
+  if constexpr (std::is_same_v<StringView, T>) {
+    for (size_t i = 0; i < data.Size(); i++) {
+      if (compare_string_view(op, data[i], v)) {
+        return i;
+      }
+    }
+    return -1;
+  } else {
+    using OPT = OperandType<T, op>;
+    HWY_EXPORT_T(Table, simd_vector_find_impl<OPT>);
+    size_t n = HWY_DYNAMIC_DISPATCH_T(Table)(data, v);
+    if (n == data.Size()) {
+      return -1;
+    }
+    return static_cast<int>(n);
+  }
+}
+
 #define DEFINE_SIMD_DOT_OP_TEMPLATE(r, op, ii, TYPE) \
   template TYPE simd_vector_dot(simd::Vector<TYPE> left, simd::Vector<TYPE> right);
 #define DEFINE_SIMD_DOT_OP(...) \
@@ -276,6 +324,23 @@ DEFINE_SIMD_GATHER_OP(float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_FILTER_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_FILTER_OP(float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
                       StringView, Bit, Pointer);
+
+#define DEFINE_SIMD_FIND_OP_TEMPLATE(r, op, ii, TYPE) \
+  template int simd_vector_find<TYPE, op>(simd::Vector<TYPE> data, TYPE val);
+#define DEFINE_SIMD_FIND_OP(op, ...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_FIND_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_FIND_OP(OP_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
+                    StringView);
+DEFINE_SIMD_FIND_OP(OP_GREATER_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+                    int64_t, StringView);
+DEFINE_SIMD_FIND_OP(OP_GREATER, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
+                    StringView);
+DEFINE_SIMD_FIND_OP(OP_LESS, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
+                    StringView);
+DEFINE_SIMD_FIND_OP(OP_LESS_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+                    int64_t, StringView);
+DEFINE_SIMD_FIND_OP(OP_NOT_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+                    int64_t, StringView);
 }  // namespace functions
 }  // namespace rapidudf
 #endif  // HWY_ONCE

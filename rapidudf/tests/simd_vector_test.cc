@@ -526,3 +526,51 @@ TEST(JitCompiler, wilson_ctr) {
   //   ASSERT_FLOAT_EQ(vector_wilson_ctr_result[i], normal_results[i]);
   // }
 }
+
+TEST(JitCompiler, find) {
+  std::string source = R"(
+     x.find(100)
+  )";
+
+  rapidudf::JitCompiler compiler;
+  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+  auto result = compiler.CompileExpression<int, simd_vector_f32>(source, {"x"});
+  if (!result.ok()) {
+    RUDF_ERROR("{}", result.status().ToString());
+  }
+  ASSERT_TRUE(result.ok());
+  auto f = std::move(result.value());
+
+  size_t N = 4096;
+  std::vector<float> duration;
+  for (size_t i = 0; i < N; i++) {
+    duration.emplace_back(i);
+  }
+
+  int n = f(duration);
+  ASSERT_EQ(n, 100);
+}
+
+TEST(JitCompiler, find_gt) {
+  std::string source = R"(
+     x.find_gt(100)
+  )";
+
+  rapidudf::JitCompiler compiler;
+  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+  auto result = compiler.CompileExpression<int, simd_vector_f32>(source, {"x"});
+  if (!result.ok()) {
+    RUDF_ERROR("{}", result.status().ToString());
+  }
+  ASSERT_TRUE(result.ok());
+  auto f = std::move(result.value());
+
+  size_t N = 4096;
+  std::vector<float> duration;
+  for (size_t i = 0; i < N; i++) {
+    duration.emplace_back(i);
+  }
+
+  int n = f(duration);
+  ASSERT_EQ(n, 101);
+}

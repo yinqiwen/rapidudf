@@ -4,10 +4,13 @@ package(
 
 cc_library(
     name = "string_view",
+    srcs = ["string_view.cc"],
     hdrs = [
         "string_view.h",
     ],
     deps = [
+        "//rapidudf/log",
+        "//rapidudf/meta:optype",
         "@com_github_fmtlib//:fmt",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",

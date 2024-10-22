@@ -934,5 +934,10 @@ auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vec
 - `.filter(simd::Vector<Bit>)`   return new table after filter
 - `.order_by(simd::Vector<T> column, bool descending)`   return new table after order_by
 - `.topk(simd::Vector<T> column, uint32_t k, bool descending)`    return new table after topk
-
+- `.find(T v)`    return first position for given value, return -1 when failed
+- `.find_neq(T v)`    return first value's position not equal given value, return -1 when failed
+- `.find_gt(T v)`    return first value's position greater than given value, return -1 when failed
+- `.find_ge(T v)`    return first value's position greater equal than given value, return -1 when failed
+- `.find_lt(T v)`    return first value's position less than given value, return -1 when failed
+- `.find_le(T v)`    return first value's position less equal than given value, return -1 when failed
 
