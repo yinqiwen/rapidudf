@@ -122,6 +122,9 @@ class Table : public DynObject {
   size_t Size() const;
   size_t Count() const;
 
+  template <typename T>
+  absl::Span<Table*> GroupBy(Vector<T> by);
+
  private:
   Table(Context& ctx, const DynObjectSchema* s) : DynObject(s), ctx_(ctx) {}
 
@@ -141,6 +144,8 @@ class Table : public DynObject {
   }
 
   void SetColumn(uint32_t offset, VectorData vec);
+
+  absl::StatusOr<VectorData> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
 
   absl::Status BuildFromProtobufVector(const std::vector<const ::google::protobuf::Message*>& pb_vector);
   absl::Status BuildFromFlatbuffersVector(const flatbuffers::TypeTable* type_table,

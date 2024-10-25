@@ -420,7 +420,6 @@ Table* Table::Clone() {
   uint32_t bytes = schema_->ByteSize();
   memcpy(new_table, this, bytes);
   Table* t = reinterpret_cast<Table*>(new_table);
-  absl::Status status;
   return t;
 }
 Vector<int32_t> Table::GetIndices() {
@@ -540,6 +539,81 @@ Table* Table::Take(uint32_t k) {
   return new_table;
 }
 
+absl::StatusOr<VectorData> Table::GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices) {
+  VectorData new_vec = *(reinterpret_cast<VectorData*>(vec_ptr));
+  switch (dtype.GetFundamentalType()) {
+    case DATA_BIT: {
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<Bit>*>(vec_ptr), indices).GetVectorData();
+      break;
+    }
+    case DATA_U8: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint8_t>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_U16: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint16_t>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_U32: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint32_t>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_U64: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint64_t>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_I8: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int8_t>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_I16: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int16_t>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_I32: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int32_t>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_I64: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int64_t>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_F32: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<float>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_F64: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<double>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_STRING_VIEW: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<StringView>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    case DATA_POINTER: {
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<Pointer>*>(vec_ptr), indices)
+                    .GetVectorData();
+      break;
+    }
+    default: {
+      RUDF_LOG_RETURN_FMT_ERROR("Unsupported fielddtype:{} togather", dtype);
+    }
+  }
+  return new_vec;
+}
+
 template <typename T>
 Table* Table::OrderBy(Vector<T> by, bool descending) {
   auto indices = GetIndices();
@@ -553,77 +627,11 @@ Table* Table::OrderBy(Vector<T> by, bool descending) {
       new_table->SetColumn(offset, new_vec);
       return;
     }
-    switch (dtype.GetFundamentalType()) {
-      case DATA_BIT: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<Bit>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_U8: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint8_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_U16: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint16_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_U32: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint32_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_U64: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint64_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_I8: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int8_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_I16: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int16_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_I32: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int32_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_I64: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int64_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_F32: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<float>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_F64: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<double>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_STRING_VIEW: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<StringView>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_POINTER: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<Pointer>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      default: {
-        RUDF_ERROR("Unsupported dtype:{} for column:{}", dtype, name);
-        return;
-      }
+    auto gather_result = GatherField(vec_ptr, dtype, indices);
+    if (!gather_result.ok()) {
+      return;
     }
+    new_vec = gather_result.value();
     new_table->SetColumn(offset, new_vec);
   });
   return new_table;
@@ -646,83 +654,44 @@ Table* Table::Topk(Vector<T> by, uint32_t k, bool descending) {
       new_table->SetColumn(offset, new_vec);
       return;
     }
-    switch (dtype.GetFundamentalType()) {
-      case DATA_BIT: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<Bit>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_U8: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint8_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_U16: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint16_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_U32: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint32_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_U64: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint64_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_I8: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int8_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_I16: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int16_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_I32: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int32_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_I64: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int64_t>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_F32: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<float>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_F64: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<double>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_STRING_VIEW: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<StringView>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      case DATA_POINTER: {
-        new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<Pointer>*>(vec_ptr), indices)
-                      .GetVectorData();
-        break;
-      }
-      default: {
-        RUDF_ERROR("Unsupported dtype:{} for column:{}", dtype, name);
-        return;
-      }
+    auto gather_result = GatherField(vec_ptr, dtype, indices);
+    if (!gather_result.ok()) {
+      return;
     }
+    new_vec = gather_result.value();
     new_table->SetColumn(offset, new_vec);
   });
   if (new_table->indices_.Size() > 0) {
     new_table->indices_.Resize(k);
   }
   return new_table;
+}
+
+template <typename T>
+absl::Span<Table*> Table::GroupBy(Vector<T> by) {
+  absl::flat_hash_map<T, std::vector<int32_t>> group_idxs;
+  for (size_t i = 0; i < by.Size(); i++) {
+    group_idxs[by[i]].emplace_back(static_cast<int32_t>(i));
+  }
+  Table** group_tables = reinterpret_cast<Table**>(ctx_.ArenaAllocate(sizeof(Table*) * group_idxs.size()));
+  Table* this_table = this;
+  size_t table_idx = 0;
+  for (auto& [_, indices] : group_idxs) {
+    Table* new_table = Clone();
+    schema_->VisitField([&](const std::string& name, const DType& dtype, uint32_t offset) {
+      uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this_table) + offset;
+      VectorData new_vec = *(reinterpret_cast<VectorData*>(vec_ptr));
+      auto gather_result = GatherField(vec_ptr, dtype, indices);
+      if (!gather_result.ok()) {
+        return;
+      }
+      new_vec = gather_result.value();
+      new_table->SetColumn(offset, new_vec);
+    });
+    group_tables[table_idx] = new_table;
+    table_idx++;
+  }
+  return absl::Span<Table*>(group_tables, group_idxs.size());
 }
 
 template Table* Table::OrderBy<uint32_t>(Vector<uint32_t> by, bool descending);
@@ -739,5 +708,16 @@ template Table* Table::Topk<int64_t>(Vector<int64_t> by, uint32_t k, bool descen
 template Table* Table::Topk<float>(Vector<float> by, uint32_t k, bool descending);
 template Table* Table::Topk<double>(Vector<double> by, uint32_t k, bool descending);
 
+template absl::Span<Table*> Table::GroupBy<double>(Vector<double> by);
+template absl::Span<Table*> Table::GroupBy<float>(Vector<float> by);
+template absl::Span<Table*> Table::GroupBy<uint64_t>(Vector<uint64_t> by);
+template absl::Span<Table*> Table::GroupBy<int64_t>(Vector<int64_t> by);
+template absl::Span<Table*> Table::GroupBy<uint32_t>(Vector<uint32_t> by);
+template absl::Span<Table*> Table::GroupBy<int32_t>(Vector<int32_t> by);
+template absl::Span<Table*> Table::GroupBy<uint16_t>(Vector<uint16_t> by);
+template absl::Span<Table*> Table::GroupBy<int16_t>(Vector<int16_t> by);
+template absl::Span<Table*> Table::GroupBy<uint8_t>(Vector<uint8_t> by);
+template absl::Span<Table*> Table::GroupBy<int8_t>(Vector<int8_t> by);
+template absl::Span<Table*> Table::GroupBy<StringView>(Vector<StringView> by);
 }  // namespace simd
 }  // namespace rapidudf

@@ -38,7 +38,7 @@ RUDF_STRUCT_MEMBER_METHODS(TestStruct, test_funcx)
 TEST(JitCompiler, exception) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
+  JitCompiler compiler({.optimize_level = 0, .print_asm = true});
 
   std::string content = R"(
       test_user_func()

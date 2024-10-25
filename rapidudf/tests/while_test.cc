@@ -19,7 +19,7 @@
 
 using namespace rapidudf;
 TEST(JitCompiler, while0) {
-  JitCompiler compiler;
+  JitCompiler compiler({.optimize_level = 0, .print_asm = true});
   std::string content = R"(
     int test_func(int x, int y){ 
       while(x > 0){

@@ -52,6 +52,11 @@ struct SimdTableHelper {
    */
   static uint32_t count(simd::Table* table) { return table->Count(); }
 
+  template <typename T>
+  static absl::Span<simd::Table*> group_by(simd::Table* table, simd::Vector<T> by) {
+    return table->GroupBy(by);
+  }
+
   static void Init() {
     RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, column_count, filter, take, count);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f32", topk<float>);
@@ -67,6 +72,18 @@ struct SimdTableHelper {
     RUDF_STRUCT_HELPER_METHOD_BIND("order_by_i32", order_by<int32_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("order_by_u64", order_by<uint64_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("order_by_i64", order_by<int64_t>);
+
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_f32", group_by<float>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_f64", group_by<double>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u8", group_by<uint32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i8", group_by<int32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u16", group_by<uint32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i26", group_by<int32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u32", group_by<uint32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i32", group_by<int32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u64", group_by<uint64_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i64", group_by<int64_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_string_view", group_by<StringView>);
   }
 };
 void init_builtin_simd_table_funcs() { SimdTableHelper::Init(); }
