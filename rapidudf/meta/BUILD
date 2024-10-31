@@ -8,6 +8,7 @@ cc_library(
         "exception.h",
     ],
     deps = [
+        "//rapidudf/log",
         "@com_github_fmtlib//:fmt",
     ],
 )

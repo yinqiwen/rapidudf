@@ -33,11 +33,18 @@ struct SimdVectorHelper {
   static int find_ge(simd::Vector<T> vec, T v) { return vec.FindGe(v); }
   static int find_lt(simd::Vector<T> vec, T v) { return vec.FindLt(v); }
   static int find_le(simd::Vector<T> vec, T v) { return vec.FindLe(v); }
+  static T reduce_sum(simd::Vector<T> vec) { return vec.ReduceSum(); }
+  static T reduce_avg(simd::Vector<T> vec) { return vec.ReduceAvg(); }
+  static T reduce_max(simd::Vector<T> vec) { return vec.ReduceMax(); }
+  static T reduce_min(simd::Vector<T> vec) { return vec.ReduceMin(); }
 
   static void Init() {
     RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, subvector);
     if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T>) {
       RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, find, find_neq, find_gt, find_ge, find_lt, find_le);
+    }
+    if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
+      RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, reduce_sum, reduce_avg, reduce_max, reduce_min);
     }
   }
 };

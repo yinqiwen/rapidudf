@@ -134,6 +134,10 @@ static HWY_INLINE auto do_simd_unary_op([[maybe_unused]] D d, V lv) {
     return hn::Log1p(d, lv);
   } else if constexpr (op == OP_CEIL) {
     return hn::Ceil(lv);
+  } else if constexpr (op == OP_APPROX_RECIP) {
+    return hn::ApproximateReciprocal(lv);
+  } else if constexpr (op == OP_APPROX_RECIP_SQRT) {
+    return hn::ApproximateReciprocalSqrt(lv);
   } else if constexpr (op == OP_COSH) {
     if constexpr (std::is_same_v<hn::TFromV<V>, float>) {
 #if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
@@ -375,7 +379,8 @@ DEFINE_SIMD_UNARY_OP(OP_RINT, float, double);
 DEFINE_SIMD_UNARY_OP(OP_TRUNC, float, double);
 DEFINE_SIMD_UNARY_OP(OP_ERF, float, double);
 DEFINE_SIMD_UNARY_OP(OP_ERFC, float, double);
-// DEFINE_SIMD_UNARY_OP(OP_ABS, float, double, int64_t, int32_t, int16_t, int8_t);
+DEFINE_SIMD_UNARY_OP(OP_APPROX_RECIP, float, double);
+DEFINE_SIMD_UNARY_OP(OP_APPROX_RECIP_SQRT, float, double);
 
 }  // namespace functions
 }  // namespace rapidudf

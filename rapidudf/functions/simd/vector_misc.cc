@@ -17,6 +17,7 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
+#include <limits>
 #include <type_traits>
 
 #include "rapidudf/context/context.h"
@@ -80,8 +81,53 @@ T simd_vector_sum_impl(simd::Vector<T> left) {
 }
 
 template <typename T>
+T simd_vector_reduce_max_impl(simd::Vector<T> left) {
+  T max_val = std::numeric_limits<T>::max();
+  const hn::ScalableTag<T> d;
+  constexpr auto lanes = hn::Lanes(d);
+  size_t i = 0;
+  for (; (i + lanes) < left.Size(); i += lanes) {
+    auto lv = hn::LoadU(d, left.Data() + i);
+    auto max_v = hn::ReduceMax(d, lv);
+    if (max_v > max_val) {
+      max_val = max_v;
+    }
+  }
+  if (i < left.Size()) {
+    for (; i < left.Size(); i++) {
+      if (left[i] > max_val) {
+        max_val = left[i];
+      }
+    }
+  }
+  return max_val;
+}
+
+template <typename T>
+T simd_vector_reduce_min_impl(simd::Vector<T> left) {
+  T min_val = std::numeric_limits<T>::min();
+  const hn::ScalableTag<T> d;
+  constexpr auto lanes = hn::Lanes(d);
+  size_t i = 0;
+  for (; (i + lanes) < left.Size(); i += lanes) {
+    auto lv = hn::LoadU(d, left.Data() + i);
+    auto min_v = hn::ReduceMin(d, lv);
+    if (min_v < min_val) {
+      min_val = min_v;
+    }
+  }
+  if (i < left.Size()) {
+    for (; i < left.Size(); i++) {
+      if (left[i] < min_val) {
+        min_val = left[i];
+      }
+    }
+  }
+  return min_val;
+}
+
+template <typename T>
 HWY_INLINE simd::Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t n) {
-  // auto result_data = arena_new_vector<T>(n);
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   auto result_data = ctx.NewSimdVector<T>(lanes, n, true);
@@ -291,6 +337,17 @@ int simd_vector_find(simd::Vector<T> data, T v) {
   }
 }
 
+template <typename T>
+T simd_vector_reduce_max(simd::Vector<T> left) {
+  HWY_EXPORT_T(Table, simd_vector_reduce_max_impl<T>);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left);
+}
+template <typename T>
+T simd_vector_reduce_min(simd::Vector<T> left) {
+  HWY_EXPORT_T(Table, simd_vector_reduce_min_impl<T>);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left);
+}
+
 #define DEFINE_SIMD_DOT_OP_TEMPLATE(r, op, ii, TYPE) \
   template TYPE simd_vector_dot(simd::Vector<TYPE> left, simd::Vector<TYPE> right);
 #define DEFINE_SIMD_DOT_OP(...) \
@@ -309,7 +366,14 @@ DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t);
 #define DEFINE_SIMD_SUM_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_SUM_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
-DEFINE_SIMD_SUM_OP(float, double, uint64_t, int64_t, uint32_t, int32_t);
+DEFINE_SIMD_SUM_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
+
+#define DEFINE_SIMD_REDUCE_MAX_MIN_OP_TEMPLATE(r, op, ii, TYPE) \
+  template TYPE simd_vector_reduce_max(simd::Vector<TYPE> vec); \
+  template TYPE simd_vector_reduce_min(simd::Vector<TYPE> vec);
+#define DEFINE_SIMD_REDUCE_MAX_MIN_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_REDUCE_MAX_MIN_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_REDUCE_MAX_MIN_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 
 #define DEFINE_SIMD_GATHER_OP_TEMPLATE(r, op, ii, TYPE) \
   template simd::Vector<TYPE> simd_vector_gather(Context& ctx, simd::Vector<TYPE> data, simd::Vector<int32_t> indices);

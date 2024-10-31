@@ -574,3 +574,29 @@ TEST(JitCompiler, find_gt) {
   int n = f(duration);
   ASSERT_EQ(n, 101);
 }
+
+TEST(JitCompiler, example) {
+  std::string source = R"(
+     x*y + sin(z)
+  )";
+
+  rapidudf::JitCompiler compiler({.print_asm = true});
+  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+  auto result =
+      compiler.CompileExpression<simd_vector_f32, Context&, simd_vector_f32, simd_vector_f32, simd_vector_f32>(
+          source, {"_", "x", "y", "z"});
+  if (!result.ok()) {
+    RUDF_ERROR("{}", result.status().ToString());
+  }
+  ASSERT_TRUE(result.ok());
+  // auto f = std::move(result.value());
+
+  // size_t N = 4096;
+  // std::vector<float> duration;
+  // for (size_t i = 0; i < N; i++) {
+  //   duration.emplace_back(i);
+  // }
+
+  // int n = f(duration);
+  // ASSERT_EQ(n, 101);
+}

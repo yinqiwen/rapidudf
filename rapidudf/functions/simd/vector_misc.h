@@ -31,6 +31,11 @@ T simd_vector_sum(simd::Vector<T> left);
 template <typename T>
 T simd_vector_avg(simd::Vector<T> left);
 template <typename T>
+T simd_vector_reduce_max(simd::Vector<T> left);
+template <typename T>
+T simd_vector_reduce_min(simd::Vector<T> left);
+
+template <typename T>
 simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vector<int32_t> indices);
 template <typename T>
 simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vector<Bit> bits);

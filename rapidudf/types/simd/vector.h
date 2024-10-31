@@ -33,7 +33,15 @@ class Vector;
 namespace functions {
 template <typename T, OpToken op = OP_EQUAL>
 int simd_vector_find(simd::Vector<T> data, T v);
-}
+template <typename T>
+T simd_vector_sum(simd::Vector<T> left);
+template <typename T>
+T simd_vector_avg(simd::Vector<T> left);
+template <typename T>
+T simd_vector_reduce_max(simd::Vector<T> left);
+template <typename T>
+T simd_vector_reduce_min(simd::Vector<T> left);
+}  // namespace functions
 namespace simd {
 
 static constexpr uint32_t kVectorUnitSize = 64;
@@ -205,6 +213,11 @@ class Vector {
   int FindGe(T v) { return functions::simd_vector_find<T, OP_GREATER_EQUAL>(*this, v); }
   int FindLt(T v) { return functions::simd_vector_find<T, OP_LESS>(*this, v); }
   int FindLe(T v) { return functions::simd_vector_find<T, OP_LESS_EQUAL>(*this, v); }
+
+  T ReduceSum() { return functions::simd_vector_sum(*this); }
+  T ReduceAvg() { return functions::simd_vector_avg(*this); }
+  T ReduceMax() { return functions::simd_vector_reduce_max(*this); }
+  T ReduceMin() { return functions::simd_vector_reduce_min(*this); }
 
   auto ToStdVector() const {
     if constexpr (std::is_same_v<Bit, T>) {

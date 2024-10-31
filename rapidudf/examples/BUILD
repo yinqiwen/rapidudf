@@ -82,3 +82,15 @@ cc_binary(
         "//rapidudf",
     ],
 )
+
+cc_binary(
+    name = "expression_benchmark",
+    srcs = ["expression_benchmark.cc"],
+    copts = [
+        "-O3",
+    ],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        "//rapidudf",
+    ],
+)

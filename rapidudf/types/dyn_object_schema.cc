@@ -17,10 +17,13 @@
 #include <memory>
 #include <mutex>
 #include <utility>
+#include "rapidudf/common/allign.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/types/dyn_object.h"
 
 namespace rapidudf {
+
+static constexpr uint32_t kDynObjHeaderAllign = 16;
 
 using GlobalDynObjectSchemaTable =
     std::pair<std::mutex, absl::flat_hash_map<std::string, std::unique_ptr<DynObjectSchema>>>;
@@ -51,17 +54,14 @@ std::vector<std::string> DynObjectSchema::ListAll() {
   return names;
 }
 
-DynObjectSchema::DynObjectSchema(const std::string& name, size_t reserved_size, Flags flags)
-    : name_(name), flags_(flags) {
-  allocated_offset_ = reserved_size;
+DynObjectSchema::DynObjectSchema(const std::string& name, Options opts) : name_(name), opts_(opts) {
+  allocated_offset_ = opts_.object_header_byte_size;
 }
 
-const DynObjectSchema* DynObjectSchema::GetOrCreate(const std::string& name, InitFunc&& init, size_t reserved_size) {
-  if (reserved_size == 0) {
-    reserved_size = sizeof(DynObject);
-    if (reserved_size < 16) {
-      reserved_size = 16;
-    }
+const DynObjectSchema* DynObjectSchema::GetOrCreate(const std::string& name, InitFunc&& init, Options opts) {
+  if (opts.object_header_byte_size == 0) {
+    opts.object_header_byte_size = sizeof(DynObject);
+    opts.object_header_byte_size = align_to<size_t>(opts.object_header_byte_size, 16);
   }
   auto& [table_mutex, table] = get_schema_table();
   std::lock_guard<std::mutex> guard(table_mutex);
@@ -69,8 +69,8 @@ const DynObjectSchema* DynObjectSchema::GetOrCreate(const std::string& name, Ini
   if (found != table.end()) {
     return found->second.get();
   }
-  Flags flags;
-  std::unique_ptr<DynObjectSchema> schema(new DynObjectSchema(name, reserved_size, flags));
+
+  std::unique_ptr<DynObjectSchema> schema(new DynObjectSchema(name, opts));
   DynObjectSchema* p = schema.get();
   init(p);
   table.emplace(name, std::move(schema));
