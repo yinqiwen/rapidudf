@@ -19,6 +19,7 @@
 #include <stdexcept>
 #include <string>
 #include "fmt/format.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
@@ -54,9 +55,10 @@ class VectorExpressionException : public UDFRuntimeException {
 };
 }  // namespace rapidudf
 
-#define THROW_LOGIC_ERR(msg)                                                        \
-  do {                                                                              \
-    throw std::logic_error(fmt::format("{}:{} error:{}", __FILE__, __LINE__, msg)); \
+#define THROW_LOGIC_ERR(...)                          \
+  do {                                                \
+    RUDF_ERROR(__VA_ARGS__);                          \
+    throw std::logic_error(fmt::format(__VA_ARGS__)); \
   } while (0)
 
 #define THROW_NULL_POINTER_ERR(msg)                                                               \

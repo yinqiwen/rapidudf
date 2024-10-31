@@ -18,3 +18,10 @@ cc_library(
         "AtomicIntrusiveLinkedList.h",
     ],
 )
+
+cc_library(
+    name = "allign",
+    hdrs = [
+        "allign.h",
+    ],
+)

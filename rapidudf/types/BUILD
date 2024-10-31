@@ -44,6 +44,7 @@ cc_library(
     ],
     deps = [
         ":dyn_object",
+        "//rapidudf/common:allign",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
         "@com_google_absl//absl/container:flat_hash_map",

@@ -38,7 +38,7 @@ TEST(JitCompiler, fbs_access_read_int) {
   using VEC = flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>;
   rapidudf::try_register_fbs_vector_member_funcs<VEC>();
 
-  JitCompiler compiler;
+  JitCompiler compiler({.print_asm = true});
   std::string content = R"(
     int test_func(test_fbs::FBSStruct x){
       return x.id();

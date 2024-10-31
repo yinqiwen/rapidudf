@@ -40,6 +40,7 @@
 #include "llvm/Transforms/Scalar/BDCE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/MergedLoadStoreMotion.h"
+#include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Scalar/PartiallyInlineLibCalls.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
@@ -129,7 +130,8 @@ CodeGen::CodeGen(const Options& opts) : opts_(opts), label_cursor_(0) {
   func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
   func_pass_manager_->addPass(::llvm::InstCombinePass());
   func_pass_manager_->addPass(::llvm::ReassociatePass());
-  func_pass_manager_->addPass(::llvm::GVNPass());
+  // func_pass_manager_->addPass(::llvm::GVNPass());
+  func_pass_manager_->addPass(llvm::NewGVNPass());
   func_pass_manager_->addPass(::llvm::SimplifyCFGPass());
   func_pass_manager_->addPass(::llvm::PartiallyInlineLibCallsPass());
   func_pass_manager_->addPass(::llvm::MergedLoadStoreMotionPass());

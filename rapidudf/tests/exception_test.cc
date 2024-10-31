@@ -77,7 +77,7 @@ TEST(JitCompiler, rethrow_exception) {
 TEST(JitCompiler, member_func_exception) {
   spdlog::set_level(spdlog::level::debug);
   std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
+  JitCompiler compiler({.print_asm = true});
   std::string content = R"(
     void test_func(TestStruct x){
       x.test_funcx();

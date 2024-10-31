@@ -19,6 +19,7 @@
 #include <vector>
 #include "rapidudf/context/context.h"
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/types/string_view.h"
 
 static size_t test_n = 4099;
 static const double pi = 3.14159265358979323846264338327950288419716939937510;
@@ -196,5 +197,72 @@ static void BM_rapidudf_vector_wilson_ctr(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_rapidudf_vector_wilson_ctr)->Setup(rapidudf_vector_wilson_ctr_setup);
+
+struct Order {
+  int amount = 0;
+};
+RUDF_STRUCT_FIELDS(Order, amount)
+static rapidudf::JitFunction<int, Order&> g_order_rule_func;
+
+static void rapidudf_order_rule_setup(const benchmark::State& state) {
+  std::string source = R"(
+    int rule_func(Order order)
+    {
+      if (order.amount < 100) {
+        return 0;
+      } elif (order.amount >= 100 && order.amount < 500) {
+        return 100;
+      } elif (order.amount >= 500 && order.amount < 1000) {
+        return 500;
+      } else {
+        return 1000;
+      }
+    }
+  )";
+  rapidudf::JitCompiler compiler;
+  auto result = compiler.CompileFunction<int, Order&>(source);
+  g_order_rule_func = std::move(result.value());
+}
+
+static void BM_rapidudf_order_rule(benchmark::State& state) {
+  int i = 100;
+  size_t total = 0;
+  for (auto _ : state) {
+    Order order;
+    order.amount = i + 100;
+    auto result = g_order_rule_func(order);
+    total += result;
+    i++;
+  }
+  RUDF_DEBUG("{}", total);
+}
+
+static int __attribute__((noinline)) native_order_rule(int amount) {
+  if (amount < 100) {
+    return 0;
+  } else if (amount >= 100 && amount < 500) {
+    return 100;
+  } else if (amount >= 500 && amount < 1000) {
+    return 500;
+  } else {
+    return 1000;
+  }
+}
+
+static void BM_native_order_rule(benchmark::State& state) {
+  int i = 100;
+  size_t total = 0;
+  for (auto _ : state) {
+    Order order;
+    order.amount = i + 100;
+    auto result = native_order_rule(order.amount);
+    total += result;
+    i++;
+  }
+  RUDF_DEBUG("{}", total);
+}
+
+BENCHMARK(BM_rapidudf_order_rule)->Setup(rapidudf_order_rule_setup);
+BENCHMARK(BM_native_order_rule);
 
 BENCHMARK_MAIN();

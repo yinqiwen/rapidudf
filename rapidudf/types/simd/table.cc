@@ -25,6 +25,7 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/dtype_enums.h"
+#include "rapidudf/meta/exception.h"
 #include "rapidudf/types/dyn_object_impl.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/simd/vector.h"
@@ -53,15 +54,16 @@ const TableSchema* TableSchema::Get(const std::string& name) { return GetMutable
 bool TableSchema::ExistColumn(const std::string& name) const { return DynObjectSchema::ExistField(name); }
 
 const TableSchema* TableSchema::GetOrCreate(const std::string& name, InitFunc&& init) {
+  Options opts;
+  opts.object_header_byte_size = sizeof(Table);
+  opts.is_table = true;
   const DynObjectSchema* s = DynObjectSchema::GetOrCreate(
       name,
       [&](DynObjectSchema* s) {
         TableSchema* table_schema = reinterpret_cast<TableSchema*>(s);
         init(table_schema);
-        Flags flags(true);
-        table_schema->SetFlags(flags);
       },
-      sizeof(Table));
+      opts);
   return reinterpret_cast<const TableSchema*>(s);
 }
 
@@ -668,9 +670,9 @@ Table* Table::Topk(Vector<T> by, uint32_t k, bool descending) {
 }
 
 template <typename T>
-absl::Span<Table*> Table::GroupBy(Vector<T> by) {
+absl::Span<Table*> Table::GroupBy(const T* by, size_t n) {
   absl::flat_hash_map<T, std::vector<int32_t>> group_idxs;
-  for (size_t i = 0; i < by.Size(); i++) {
+  for (size_t i = 0; i < n; i++) {
     group_idxs[by[i]].emplace_back(static_cast<int32_t>(i));
   }
   Table** group_tables = reinterpret_cast<Table**>(ctx_.ArenaAllocate(sizeof(Table*) * group_idxs.size()));
@@ -692,6 +694,63 @@ absl::Span<Table*> Table::GroupBy(Vector<T> by) {
     table_idx++;
   }
   return absl::Span<Table*>(group_tables, group_idxs.size());
+}
+
+template <typename T>
+absl::Span<Table*> Table::GroupBy(Vector<T> by) {
+  if (by.Size() != Count()) {
+    THROW_LOGIC_ERR("Invalid group_by column with size:{}, while table row size:{}", by.Size(), Count());
+  }
+  return GroupBy(by.Data(), by.Size());
+}
+
+absl::Span<Table*> Table::GroupBy(StringView column) {
+  auto result = schema_->GetField(column);
+  if (!result.ok()) {
+    THROW_LOGIC_ERR("No column:{} found.", column);
+  }
+  auto [dtype, offset] = result.value();
+  size_t row_size = Count();
+  uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
+  VectorData vec_data = *(reinterpret_cast<VectorData*>(p));
+  switch (dtype.GetFundamentalType()) {
+    case DATA_F64: {
+      return GroupBy(reinterpret_cast<const double*>(vec_data.Data()), row_size);
+    }
+    case DATA_F32: {
+      return GroupBy(reinterpret_cast<const float*>(vec_data.Data()), row_size);
+    }
+    case DATA_U64: {
+      return GroupBy(reinterpret_cast<const uint64_t*>(vec_data.Data()), row_size);
+    }
+    case DATA_I64: {
+      return GroupBy(reinterpret_cast<const int64_t*>(vec_data.Data()), row_size);
+    }
+    case DATA_U32: {
+      return GroupBy(reinterpret_cast<const uint32_t*>(vec_data.Data()), row_size);
+    }
+    case DATA_I32: {
+      return GroupBy(reinterpret_cast<const int32_t*>(vec_data.Data()), row_size);
+    }
+    case DATA_U16: {
+      return GroupBy(reinterpret_cast<const uint16_t*>(vec_data.Data()), row_size);
+    }
+    case DATA_I16: {
+      return GroupBy(reinterpret_cast<const int16_t*>(vec_data.Data()), row_size);
+    }
+    case DATA_U8: {
+      return GroupBy(reinterpret_cast<const uint8_t*>(vec_data.Data()), row_size);
+    }
+    case DATA_I8: {
+      return GroupBy(reinterpret_cast<const int8_t*>(vec_data.Data()), row_size);
+    }
+    case DATA_STRING_VIEW: {
+      return GroupBy(reinterpret_cast<const StringView*>(vec_data.Data()), row_size);
+    }
+    default: {
+      THROW_LOGIC_ERR("Invalid column:{} with dtype:{} to group_by.", column, dtype);
+    }
+  }
 }
 
 template Table* Table::OrderBy<uint32_t>(Vector<uint32_t> by, bool descending);

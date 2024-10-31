@@ -210,9 +210,7 @@ auto func_arg_func = [](auto& ctx) {
 };
 
 auto const constant_number_def = bp::lexeme[bp::double_ > -('_' > Symbols::kNumberSymbols)];
-// const auto dynamic_param_access_def = identifier > *('[' > (bp::quoted_string | bp::uint_) > ']');
 auto const var_declare_def = ("auto" > identifier)[var_declare_func];
-
 auto const var_ref_def = identifier[var_ref_func];
 auto const array_def = ('[' > (expression % ',') > ']')[array_func];
 auto const operand_def =

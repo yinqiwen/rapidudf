@@ -320,3 +320,30 @@ TEST(JitCompiler, table_take) {
     RUDF_INFO("{} {} {}", new_id_column[i], new_city_column[i], new_score_column[i]);
   }
 }
+
+TEST(JitCompiler, group_by) {
+  auto schema = simd::TableSchema::GetOrCreate("test_group_by_table", [&](simd::TableSchema* s) {
+    std::ignore = s->AddColumn<int>("id");
+    std::ignore = s->AddColumn<StringView>("city");
+    std::ignore = s->AddColumn<double>("score");
+  });
+
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<std::string> city;
+  std::vector<int> ids;
+  std::vector<double> scores;
+  for (size_t i = 0; i < N; i++) {
+    ids.emplace_back(i + 10);
+    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
+    scores.emplace_back(1.1 + i);
+  }
+  Context ctx;
+  auto table = schema->NewTable(ctx);
+  std::ignore = table->Set("id", ids);
+  std::ignore = table->Set("city", city);
+  std::ignore = table->Set("score", scores);
+
+  auto table_group = table->GroupBy("city");
+  ASSERT_EQ(table_group.size(), 4);
+}

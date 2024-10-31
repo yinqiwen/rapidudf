@@ -44,7 +44,7 @@ class Table : public DynObject {
   };
 
  public:
-  typedef std::unique_ptr<Table, Deleter> SmartPtr;
+  using SmartPtr = std::unique_ptr<Table, Deleter>;
 
  public:
   template <typename T>
@@ -124,6 +124,7 @@ class Table : public DynObject {
 
   template <typename T>
   absl::Span<Table*> GroupBy(Vector<T> by);
+  absl::Span<Table*> GroupBy(StringView column);
 
  private:
   Table(Context& ctx, const DynObjectSchema* s) : DynObject(s), ctx_(ctx) {}
@@ -142,6 +143,9 @@ class Table : public DynObject {
     std::ignore = ctx_.New<std::vector<T>>(std::move(v));
     return DynObject::DoSet(name, std::move(vec));
   }
+
+  template <typename T>
+  absl::Span<Table*> GroupBy(const T* by, size_t n);
 
   void SetColumn(uint32_t offset, VectorData vec);
 
@@ -203,7 +207,7 @@ class TableSchema : public DynObjectSchema {
   bool ExistColumn(const std::string& name) const;
 
  private:
-  TableSchema(const std::string& name, size_t reserved_size) : DynObjectSchema(name, reserved_size, Flags(true)) {}
+  TableSchema(const std::string& name, Options opts) : DynObjectSchema(name, opts) {}
   template <typename T>
   absl::Status AddField(const std::string& name) {
     return absl::UnimplementedError("AddField");

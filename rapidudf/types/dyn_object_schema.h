@@ -17,7 +17,6 @@
 #pragma once
 #include <functional>
 #include <map>
-#include <memory>
 #include <string>
 #include <vector>
 #include "absl/container/flat_hash_map.h"
@@ -28,8 +27,19 @@
 namespace rapidudf {
 class DynObjectSchema {
  public:
+  struct Options {
+    size_t object_header_byte_size;
+    size_t object_body_byte_size;
+    bool is_table;
+    Options() {
+      object_header_byte_size = 0;
+      object_body_byte_size = 0;
+      is_table = false;
+    }
+  };
+
   using InitFunc = std::function<void(DynObjectSchema* s)>;
-  static const DynObjectSchema* GetOrCreate(const std::string& name, InitFunc&& init, size_t reserved_size = 0);
+  static const DynObjectSchema* GetOrCreate(const std::string& name, InitFunc&& init, Options opts = Options());
   static const DynObjectSchema* Get(const std::string& name);
   static DynObjectSchema* GetMutable(const std::string& name);
   static std::vector<std::string> ListAll();
@@ -46,20 +56,15 @@ class DynObjectSchema {
 
   uint32_t ByteSize() const { return allocated_offset_; }
 
-  bool IsTable() const { return flags_.is_table; }
+  bool IsTable() const { return opts_.is_table; }
 
   void VisitField(std::function<void(const std::string&, const DType&, uint32_t)>&& f) const;
 
   size_t FieldCount() const { return fields_.size(); }
 
  protected:
-  struct Flags {
-    uint64_t is_table : 1;
-    uint64_t reserved : 63;
-    Flags(bool table = false) { is_table = table ? 1 : 0; }
-  };
-  DynObjectSchema(const std::string& name, size_t reserved_size, Flags flags);
-  void SetFlags(Flags flags) { flags_ = flags; }
+  DynObjectSchema(const std::string& name, Options opts);
+  // void SetFlags(Flags flags) { flags_ = flags; }
 
   absl::Status Add(const std::string& name, DType dtype);
 
@@ -70,7 +75,7 @@ class DynObjectSchema {
 
   using FieldTable = absl::flat_hash_map<std::string, Field>;
   std::string name_;
-  Flags flags_;
+  Options opts_;
   FieldTable fields_;
   uint32_t allocated_offset_ = 0;
 };

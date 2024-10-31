@@ -32,7 +32,6 @@ struct TestStruct {
   TestInternal* internal_ptr = nullptr;
   std::vector<int> vec;
 };
-
 RUDF_STRUCT_FIELDS(TestStruct, internal, internal_ptr, a, vec)
 
 TEST(JitCompiler, struct_access) {
@@ -41,7 +40,7 @@ TEST(JitCompiler, struct_access) {
   t.a = 101;
   t.internal.a = 102;
   rapidudf::compiler::Options opt;
-  opt.optimize_level = 0;
+  opt.optimize_level = 2;
   JitCompiler compiler(opt);
   std::string source = "x.internal.a";
   auto rc = compiler.CompileExpression<int, const TestStruct&>(source, {"x"});
