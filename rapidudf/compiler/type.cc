@@ -20,7 +20,7 @@
 
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
-#include "rapidudf/types/simd/vector.h"
+#include "rapidudf/vector/vector.h"
 
 namespace rapidudf {
 namespace compiler {

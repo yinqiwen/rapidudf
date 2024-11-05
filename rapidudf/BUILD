@@ -12,6 +12,6 @@ cc_library(
         "//rapidudf/compiler",
         "//rapidudf/reflect",
         "//rapidudf/types:dyn_object_impl",
-        "//rapidudf/types/simd:table",
+        "//rapidudf/vector:table",
     ],
 )

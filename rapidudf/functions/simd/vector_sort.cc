@@ -21,7 +21,7 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/function.h"
-#include "rapidudf/types/simd/vector.h"
+#include "rapidudf/vector/vector.h"
 #include "x86simdsort.h"
 
 namespace rapidudf {

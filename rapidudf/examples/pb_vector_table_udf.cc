@@ -22,7 +22,7 @@ using namespace rapidudf;
 int main() {
   // 1. 创建table schema
   auto schema = simd::TableSchema::GetOrCreate(
-      "Student", [](simd::TableSchema* s) { std::ignore = s->BuildFromProtobuf<examples::Student>(); });
+      "Student", [](simd::TableSchema* s) { std::ignore = s->AddColumns<examples::Student>(); });
 
   // 2. UDF string
   std::string source = R"(
@@ -30,7 +30,8 @@ int main() {
     { 
        auto filtered = x.filter(x.score >90 && x.age<10);
        // 降序排列
-       return filtered.topk(filtered.score,10, true); 
+      return filtered.topk(filtered.score,10, true); 
+      // return filtered;
     } 
   )";
 
@@ -57,7 +58,7 @@ int main() {
   rapidudf::Context ctx;
   auto table = schema->NewTable(ctx);
   // 4.3 填充数据
-  std::ignore = table->BuildFromProtobufVector(students);
+  std::ignore = table->AddRows(students);
 
   try {
     // 5. 执行function

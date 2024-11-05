@@ -19,7 +19,7 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/functions/simd/vector_op.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/types/simd/vector.h"
+#include "rapidudf/vector/vector.h"
 namespace rapidudf {
 namespace functions {
 template <typename T>

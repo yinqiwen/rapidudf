@@ -23,9 +23,9 @@
 #include "rapidudf/meta/function.h"
 #include "rapidudf/rapidudf.h"
 #include "rapidudf/types/pointer.h"
-#include "rapidudf/types/simd/table.h"
-#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
+#include "rapidudf/vector/table.h"
+#include "rapidudf/vector/vector.h"
 
 using namespace rapidudf;
 

@@ -15,7 +15,6 @@
  */
 #include "rapidudf/ast/expression.h"
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -203,6 +202,8 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, VarTag src) {
   DType src_dtype = src.dtype;
   bool member_func_call = func_args.has_value();
   bool is_table = false;
+
+  dyn_obj_schema = src.schema;
   const DynObjectSchema* table_schema = nullptr;
 
   if (src_dtype.IsDynObjectPtr() && nullptr != src.schema) {
@@ -214,8 +215,15 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, VarTag src) {
       }
       auto [field_dtype, field_offset] = result.value();
       struct_member.member_field_offset = field_offset;
-      struct_member.field_name = field;
+      struct_member.name = field;
       struct_member.member_field_dtype = field_dtype;
+      if (dyn_obj_schema != nullptr && is_table) {
+        auto member_func = GetFunctionName(functions::kTableGetColumnFunc, field_dtype.Elem());
+        auto field_accessor = Reflect::GetStructMember(src_dtype.PtrTo(), member_func);
+        if (field_accessor.has_value() && field_accessor->HasMemberFunc()) {
+          ctx.AddMemberFuncCall(src_dtype.PtrTo(), member_func, *(field_accessor->member_func));
+        }
+      }
       return field_dtype;
     } else {
     }
@@ -248,6 +256,7 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, VarTag src) {
         !field_dtype.IsStdStringView() && !field_dtype.IsStringView() && !field_dtype.IsAbslSpan()) {
       field_dtype = field_dtype.ToPtr();
     }
+
     return field_dtype;
   } else {
     if (!struct_member.HasMemberFunc()) {

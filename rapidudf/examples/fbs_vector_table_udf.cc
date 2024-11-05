@@ -16,13 +16,14 @@
 
 #include <vector>
 #include "rapidudf/examples/book_generated.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
 int main() {
   // 1. 创建table schema
   auto schema = simd::TableSchema::GetOrCreate(
-      "Book", [](simd::TableSchema* s) { std::ignore = s->BuildFromFlatbuffers<examples::Book>(); });
+      "Book", [](simd::TableSchema* s) { std::ignore = s->AddColumns<examples::Book>(); });
 
   // 2. UDF string
   std::string source = R"(
@@ -63,7 +64,7 @@ int main() {
   rapidudf::Context ctx;
   auto table = schema->NewTable(ctx);
   // 4.3 填充数据
-  std::ignore = table->BuildFromFlatbuffersVector(books);
+  std::ignore = table->AddRows(books);
 
   try {
     // 5. 执行function
@@ -80,6 +81,7 @@ int main() {
     }
   } catch (rapidudf::UDFRuntimeException& ex) {
     // handle exception
+    RUDF_ERROR("{}", ex.what());
   }
   return 0;
 };

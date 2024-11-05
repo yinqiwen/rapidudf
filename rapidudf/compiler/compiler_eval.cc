@@ -30,7 +30,7 @@
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/operand.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/types/simd/vector.h"
+#include "rapidudf/vector/vector.h"
 
 namespace rapidudf {
 namespace compiler {

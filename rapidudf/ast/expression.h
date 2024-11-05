@@ -98,6 +98,7 @@ struct FieldAccess {
   uint32_t position = 0;
 
   StructMember struct_member;
+  const DynObjectSchema* dyn_obj_schema = nullptr;
   absl::StatusOr<VarTag> Validate(ParseContext& ctx, VarTag src);
 };
 using DynamicParamAccess = std::variant<std::string, uint32_t, VarRef>;

@@ -650,6 +650,11 @@ absl::StatusOr<ValuePtr> CodeGen::CallFunction(const std::string& name, const st
       return_val_type = GetType(ret_type_ptr_to).value();
       return_type = return_type.PtrTo();
     }
+  } else if (return_type.IsSimdVector()) {
+    return_val_type = GetType(return_type).value();
+    auto* vector_ptr = builder_->CreateAlloca(return_val_type);
+    builder_->CreateStore(result, vector_ptr);
+    result = vector_ptr;
   }
   return NewValue(return_type, result, return_val_type);
 }

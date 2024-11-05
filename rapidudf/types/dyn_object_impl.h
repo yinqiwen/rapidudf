@@ -51,16 +51,19 @@ absl::Status DynObject::DoSet(const std::string& name, T&& v) {
 }
 
 template <typename T>
-absl::StatusOr<T> DynObject::Get(const std::string& name) const {
+absl::StatusOr<T> DynObject::Get(const std::string& name, uint32_t* offset) const {
   auto result = schema_->GetField(name);
   if (!result.ok()) {
     return result.status();
   }
-  auto [dtype, offset] = result.value();
+  auto [dtype, field_offset] = result.value();
   if (get_dtype<T>() != dtype) {
     RUDF_RETURN_FMT_ERROR("[DynObject::Get]mismatch dtype:{} for field:{} with dtype:{}", get_dtype<T>(), name, dtype);
   }
-  const uint8_t* p = reinterpret_cast<const uint8_t*>(this) + offset;
+  const uint8_t* p = reinterpret_cast<const uint8_t*>(this) + field_offset;
+  if (offset != nullptr) {
+    *offset = field_offset;
+  }
   return *(reinterpret_cast<const T*>(p));
 }
 }  // namespace rapidudf

@@ -17,13 +17,21 @@ cc_library(
 
 cc_library(
     name = "table",
-    srcs = ["table.cc"],
+    srcs = [
+        "row.cc",
+        "table.cc",
+        "table_schema.cc",
+    ],
     hdrs = [
+        "column.h",
+        "row.h",
         "table.h",
+        "table_schema.h",
     ],
     deps = [
         "//rapidudf/context",
         "//rapidudf/functions/simd:vector",
+        "//rapidudf/reflect",
         "//rapidudf/types:dyn_object_impl",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/container:flat_hash_map",

@@ -16,7 +16,9 @@
 
 #include "rapidudf/compiler/codegen.h"
 #include "rapidudf/compiler/compiler.h"
+#include "rapidudf/functions/names.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/function.h"
 
 namespace rapidudf {
 namespace compiler {
@@ -79,6 +81,14 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(ValuePtr obj, const ast::FieldAcce
     }
     uint32_t field_offset = accessor.member_field_offset;
     auto field_dtype = *accessor.member_field_dtype;
+    if (obj->GetDType().IsDynObjectPtr() && field.dyn_obj_schema != nullptr && field.dyn_obj_schema->IsTable()) {
+      std::string member_func_name = GetMemberFuncName(
+          obj->GetDType().PtrTo(), GetFunctionName(functions::kTableGetColumnFunc, field_dtype.Elem()));
+      std::vector<ValuePtr> arg_values;
+      arg_values.emplace_back(obj);
+      arg_values.emplace_back(codegen_->NewU32(field_offset));
+      return codegen_->CallFunction(member_func_name, arg_values);
+    }
     return codegen_->GetStructField(obj, field_dtype, field_offset);
   }
 }

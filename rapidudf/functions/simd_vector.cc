@@ -27,8 +27,8 @@
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/reflect/simd_vector.h"
-#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
+#include "rapidudf/vector/vector.h"
 
 namespace rapidudf {
 namespace functions {

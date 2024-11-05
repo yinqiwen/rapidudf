@@ -33,7 +33,7 @@ cc_library(
         "//rapidudf/meta:function",
         "//rapidudf/meta:optype",
         "//rapidudf/reflect",
-        "//rapidudf/types/simd:table",
+        "//rapidudf/vector:table",
         "@sleef",
     ],
 )

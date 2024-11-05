@@ -21,10 +21,15 @@
 #include <vector>
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
+#include "flatbuffers/minireflect.h"
+#include "google/protobuf/message.h"
+
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/reflect/struct.h"
 #include "rapidudf/types/dyn_object.h"
 
 namespace rapidudf {
+
 class DynObjectSchema {
  public:
   struct Options {
@@ -39,16 +44,17 @@ class DynObjectSchema {
   };
 
   using InitFunc = std::function<void(DynObjectSchema* s)>;
+  using NewFunc = std::function<DynObjectSchema*(const std::string& name, Options opts)>;
   static const DynObjectSchema* GetOrCreate(const std::string& name, InitFunc&& init, Options opts = Options());
   static const DynObjectSchema* Get(const std::string& name);
   static DynObjectSchema* GetMutable(const std::string& name);
   static std::vector<std::string> ListAll();
 
   typename DynObject::SmartPtr NewObject() const;
-  bool ExistField(const std::string& name) const;
+  bool ExistField(const std::string& name, const DType& dtype) const;
 
   template <typename T>
-  absl::Status AddField(const std::string& name) {
+  absl::StatusOr<reflect::Field> AddField(const std::string& name) {
     return Add(name, get_dtype<T>());
   }
 
@@ -62,18 +68,15 @@ class DynObjectSchema {
 
   size_t FieldCount() const { return fields_.size(); }
 
+  virtual ~DynObjectSchema() = default;
+
  protected:
+  static const DynObjectSchema* GetOrCreate(const std::string& name, InitFunc&& init, NewFunc&& new_f, Options opts);
   DynObjectSchema(const std::string& name, Options opts);
-  // void SetFlags(Flags flags) { flags_ = flags; }
 
-  absl::Status Add(const std::string& name, DType dtype);
+  absl::StatusOr<reflect::Field> Add(const std::string& name, DType dtype);
 
-  struct Field {
-    DType dtype;
-    uint32_t bytes_offset = 0;
-  };
-
-  using FieldTable = absl::flat_hash_map<std::string, Field>;
+  using FieldTable = absl::flat_hash_map<std::string, reflect::Field>;
   std::string name_;
   Options opts_;
   FieldTable fields_;

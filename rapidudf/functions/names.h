@@ -26,14 +26,11 @@ static constexpr std::string_view kBuiltinCastStdStrViewToStringView = "rapidudf
 static constexpr std::string_view kBuiltinJsonMemberGet = "rapidudf_json_member_get";
 static constexpr std::string_view kBuiltinJsonArrayGet = "rapidudf_json_array_get";
 static constexpr std::string_view kBuiltinJsonExtract = "rapidudf_json_extract";
-// static constexpr std::string_view kBuiltinJsonCmpString = "rapidudf_json_cmp_string";
-// static constexpr std::string_view kBuiltinJsonCmpInt = "rapidudf_json_cmp_int";
-// static constexpr std::string_view kBuiltinJsonCmpFloat = "rapidudf_json_cmp_float";
-// static constexpr std::string_view kBuiltinJsonCmpBool = "rapidudf_json_cmp_bool";
-// static constexpr std::string_view kBuiltinJsonCmpJson = "rapidudf_json_cmp_json";
 
 static constexpr std::string_view kBuiltinNewSimdVector = "rapidudf_new_simd_vector";
 static constexpr std::string_view kBuiltinThrowVectorExprEx = "rapidudf_throw_vector_expr_error";
+
+static constexpr std::string_view kTableGetColumnFunc = "get_column";
 
 }  // namespace functions
 }  // namespace rapidudf

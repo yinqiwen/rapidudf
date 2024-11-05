@@ -28,6 +28,15 @@
 #include "rapidudf/reflect/reflect.h"
 
 namespace rapidudf {
+namespace reflect {
+struct Field {
+  DType dtype;
+  uint32_t bytes_offset = 0;
+};
+}  // namespace reflect
+}  // namespace rapidudf
+
+namespace rapidudf {
 
 template <typename T>
 class StructAccess {

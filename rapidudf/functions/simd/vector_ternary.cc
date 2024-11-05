@@ -20,7 +20,7 @@
 
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/types/simd/vector.h"
+#include "rapidudf/vector/vector.h"
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "rapidudf/functions/simd/vector_ternary.cc"  // this file
 

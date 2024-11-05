@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "rapidudf/reflect/reflect.h"
+#include <memory>
 #include <vector>
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
@@ -26,39 +27,62 @@ static GlobalStructMemberIndex& get_global_reflect_index() {
   return index;
 }
 
+const StructMember* StructMembers::Get(const std::string& name) const {
+  auto iter = member_map.find(name);
+  if (iter == member_map.end()) {
+    return {};
+  }
+  return iter->second.get();
+}
+
+const std::vector<const StructMember*>* Reflect::GetStructMembers(DType dtype) {
+  auto found = get_global_reflect_index().find(dtype.Control());
+  if (found == get_global_reflect_index().end()) {
+    return nullptr;
+  }
+  return &found->second.members;
+}
+
 std::optional<StructMember> Reflect::GetStructMember(DType dtype, const std::string& name) {
   auto found = get_global_reflect_index().find(dtype.Control());
   if (found == get_global_reflect_index().end()) {
     return {};
   }
-  auto iter = found->second.find(name);
-  if (iter == found->second.end()) {
+  const StructMember* member = found->second.Get(name);
+  if (member == nullptr) {
     return {};
   }
-  return iter->second;
+  return *member;
 }
 bool Reflect::AddStructField(DType obj_dtype, const std::string& name, DType field_dtype, uint32_t field_offset) {
-  auto [iter, success] =
-      get_global_reflect_index()[obj_dtype.Control()].emplace(name, StructMember(name, field_dtype, field_offset));
+  auto member = std::make_shared<StructMember>(name, field_dtype, field_offset);
+  StructMembers& members = get_global_reflect_index()[obj_dtype.Control()];
+  auto [iter, success] = members.member_map.emplace(name, member);
   if (!success) {
-    StructMember& entry = iter->second;
+    StructMember& entry = *(iter->second);
     if (!entry.member_field_dtype.has_value()) {
       entry.member_field_dtype = field_dtype;
       entry.member_field_offset = field_offset;
-      entry.field_name = name;
+      entry.name = name;
       return true;
     }
+  } else {
+    members.members.emplace_back(member.get());
   }
   return success;
 }
 bool Reflect::AddStructMethodAccessor(DType dtype, const std::string& name, const FunctionDesc& f) {
-  auto [iter, success] = get_global_reflect_index()[dtype.Control()].emplace(name, StructMember(f));
+  auto member = std::make_shared<StructMember>(f);
+  StructMembers& members = get_global_reflect_index()[dtype.Control()];
+  auto [iter, success] = members.member_map.emplace(name, member);
   if (!success) {
-    StructMember& entry = iter->second;
+    StructMember& entry = *(iter->second);
     if (!entry.member_func.has_value()) {
       entry.member_func = f;
       return true;
     }
+  } else {
+    members.members.emplace_back(member.get());
   }
   return success;
 }

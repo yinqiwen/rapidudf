@@ -16,9 +16,12 @@
 #include <stdexcept>
 #include <tuple>
 
+#include "rapidudf/functions/names.h"
+#include "rapidudf/meta/dtype_enums.h"
+#include "rapidudf/meta/function.h"
 #include "rapidudf/reflect/struct.h"
-#include "rapidudf/types/simd/table.h"
-#include "rapidudf/types/simd/vector.h"
+#include "rapidudf/vector/table.h"
+#include "rapidudf/vector/vector.h"
 namespace rapidudf {
 namespace functions {
 struct SimdTableHelper {
@@ -57,6 +60,11 @@ struct SimdTableHelper {
     return table->GroupBy(by);
   }
 
+  template <typename T>
+  static simd::Vector<T> get_column(simd::Table* table, uint32_t offset) {
+    return simd::Vector<T>(table->GetColumnByOffset(offset));
+  }
+
   static void Init() {
     RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, column_count, filter, take, count);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f32", topk<float>);
@@ -84,6 +92,18 @@ struct SimdTableHelper {
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u64", group_by<uint64_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i64", group_by<int64_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_string_view", group_by<StringView>);
+
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_F32), get_column<float>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_F64), get_column<double>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U8), get_column<uint32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I8), get_column<int32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U16), get_column<uint32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I16), get_column<int32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U32), get_column<uint32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I32), get_column<int32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U64), get_column<uint64_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I64), get_column<int64_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_STRING_VIEW), get_column<StringView>);
   }
 };
 void init_builtin_simd_table_funcs() { SimdTableHelper::Init(); }

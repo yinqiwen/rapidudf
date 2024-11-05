@@ -59,10 +59,17 @@ DynObjectSchema::DynObjectSchema(const std::string& name, Options opts) : name_(
 }
 
 const DynObjectSchema* DynObjectSchema::GetOrCreate(const std::string& name, InitFunc&& init, Options opts) {
+  return GetOrCreate(
+      name, std::move(init), [](const std::string& name, Options opts) { return new DynObjectSchema(name, opts); },
+      opts);
+}
+
+const DynObjectSchema* DynObjectSchema::GetOrCreate(const std::string& name, InitFunc&& init, NewFunc&& new_f,
+                                                    Options opts) {
   if (opts.object_header_byte_size == 0) {
     opts.object_header_byte_size = sizeof(DynObject);
-    opts.object_header_byte_size = align_to<size_t>(opts.object_header_byte_size, 16);
   }
+  opts.object_header_byte_size = align_to<size_t>(opts.object_header_byte_size, 16);
   auto& [table_mutex, table] = get_schema_table();
   std::lock_guard<std::mutex> guard(table_mutex);
   auto found = table.find(name);
@@ -70,14 +77,20 @@ const DynObjectSchema* DynObjectSchema::GetOrCreate(const std::string& name, Ini
     return found->second.get();
   }
 
-  std::unique_ptr<DynObjectSchema> schema(new DynObjectSchema(name, opts));
+  std::unique_ptr<DynObjectSchema> schema(new_f(name, opts));
   DynObjectSchema* p = schema.get();
   init(p);
   table.emplace(name, std::move(schema));
   return p;
 }
 
-bool DynObjectSchema::ExistField(const std::string& name) const { return fields_.find(name) != fields_.end(); }
+bool DynObjectSchema::ExistField(const std::string& name, const DType& dtype) const {
+  auto found = fields_.find(name);
+  if (found == fields_.end()) {
+    return false;
+  }
+  return found->second.dtype == dtype;
+}
 
 absl::StatusOr<std::pair<DType, uint32_t>> DynObjectSchema::GetField(const std::string& name) const {
   auto found = fields_.find(name);
@@ -86,14 +99,14 @@ absl::StatusOr<std::pair<DType, uint32_t>> DynObjectSchema::GetField(const std::
   }
   return std::make_pair(found->second.dtype, found->second.bytes_offset);
 }
-absl::Status DynObjectSchema::Add(const std::string& name, DType dtype) {
+absl::StatusOr<reflect::Field> DynObjectSchema::Add(const std::string& name, DType dtype) {
   if (dtype.IsPrimitive() || dtype.IsSimdVector()) {
     // allowed dtype
     uint32_t byte_size = dtype.ByteSize();
     if (byte_size < 8) {
       byte_size = 8;
     }
-    Field field;
+    reflect::Field field;
     field.bytes_offset = allocated_offset_;
     field.dtype = dtype;
 
@@ -102,7 +115,7 @@ absl::Status DynObjectSchema::Add(const std::string& name, DType dtype) {
       RUDF_RETURN_FMT_ERROR("Duplicate field name:{} to add into DynObject:{}", name, name_);
     }
     allocated_offset_ += byte_size;
-    return absl::OkStatus();
+    return field;
   } else {
     RUDF_RETURN_FMT_ERROR("Unsupported dtype:{}", dtype);
   }

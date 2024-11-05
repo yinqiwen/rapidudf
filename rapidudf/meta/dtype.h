@@ -43,8 +43,8 @@
 #include "rapidudf/types/dyn_object.h"
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/pointer.h"
-#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
+#include "rapidudf/vector/vector.h"
 
 namespace rapidudf {
 

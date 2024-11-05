@@ -47,8 +47,11 @@ cc_library(
         "//rapidudf/common:allign",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
+        "//rapidudf/reflect",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 

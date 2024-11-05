@@ -17,11 +17,12 @@
 #pragma once
 #include <type_traits>
 #include "rapidudf/reflect/struct.h"
-#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
+#include "rapidudf/vector/vector.h"
 
 namespace rapidudf {
 namespace reflect {
+
 template <typename T>
 struct SimdVectorHelper {
   static T get(simd::Vector<T> v, size_t i) { return v[i]; }

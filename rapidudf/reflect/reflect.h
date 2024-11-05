@@ -16,14 +16,13 @@
 
 #pragma once
 #include <functional>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 #include <vector>
 #include "absl/status/statusor.h"
-// #include "rapidudf/codegen/code_generator.h"
-#include "rapidudf/meta/function.h"
-// #include "rapidudf/codegen/value.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
@@ -31,27 +30,45 @@ template <uint64_t SOURCE, uint32_t LINE, uint64_t HASH, typename T>
 struct ReflectRegisterHelper {};
 
 struct StructMember {
+  std::string name;
   std::optional<FunctionDesc> member_func;
   std::optional<DType> member_field_dtype;
-  std::string field_name;
+
   uint32_t member_field_offset = 0;
   StructMember() = default;
-  explicit StructMember(const std::string& name, DType dtype, uint32_t offset) {
-    field_name = name;
+  explicit StructMember(const std::string& field_name, DType dtype, uint32_t offset) {
+    name = field_name;
     member_field_dtype = dtype;
     member_field_offset = offset;
   }
-  explicit StructMember(const FunctionDesc& f) { member_func = f; }
+  explicit StructMember(const FunctionDesc& f) {
+    member_func = f;
+    name = member_func->name;
+  }
 
   bool HasField() const { return member_field_dtype.has_value(); }
   bool HasMemberFunc() const { return member_func.has_value(); }
 };
-using StructMemberMap = std::unordered_map<std::string, StructMember>;
-using GlobalStructMemberIndex = std::unordered_map<uint64_t, StructMemberMap>;
+using StructMemberPtr = std::shared_ptr<StructMember>;
+using StructMemberMap = std::unordered_map<std::string, StructMemberPtr>;
+struct StructMembers {
+  std::vector<const StructMember*> members;
+  StructMemberMap member_map;
+  const StructMember* Get(const std::string& name) const;
+};
+
+using GlobalStructMemberIndex = std::unordered_map<uint64_t, StructMembers>;
 
 class Reflect {
  public:
   static std::optional<StructMember> GetStructMember(DType dtype, const std::string& name);
+
+  template <typename T>
+  static const std::vector<const StructMember*>* GetStructMembers() {
+    DType obj_dtype = get_dtype<T>();
+    return GetStructMembers(obj_dtype);
+  }
+  static const std::vector<const StructMember*>* GetStructMembers(DType dtype);
 
   static bool AddStructField(DType obj_dtype, const std::string& name, DType field_dtype, uint32_t field_offset);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 yinqiwen yinqiwen@gmail.com. All rights reserved.
+ * Copyright (c) 2024 qiyingwang <qiyingwang@tencent.com>. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#pragma once
-#include "rapidudf/context/context.h"
+#include "rapidudf/vector/row.h"
+#include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/functions/simd/vector_misc.h"
-#include "rapidudf/functions/simd/vector_op.h"
-#include "rapidudf/functions/simd/vector_sort.h"
-#include "rapidudf/meta/optype.h"
-#include "rapidudf/vector/vector.h"
 namespace rapidudf {
-namespace functions {
+namespace simd {
+void Rows::Filter(Vector<Bit> bits) { pointers_ = functions::simd_vector_filter(ctx_, pointers_, bits); }
 
-template <typename T, OpToken op>
-void simd_vector_unary_op(const T* input, T* output);
-template <typename T, OpToken op>
-void simd_vector_binary_op(const T* left, const T* right, T* output);
-template <typename T, OpToken op>
-void simd_vector_ternary_op(const T* a, const T* b, const T* c, T* output);
-
-}  // namespace functions
+void Rows::Truncate(size_t k) {
+  if (pointers_.Size() > k) {
+    pointers_.Resize(k);
+  }
+}
+void Rows::Gather(Vector<int32_t> indices) { pointers_ = functions::simd_vector_gather(ctx_, pointers_, indices); }
+}  // namespace simd
 }  // namespace rapidudf

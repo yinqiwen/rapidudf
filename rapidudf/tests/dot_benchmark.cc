@@ -23,7 +23,7 @@
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
-#include "rapidudf/types/simd/vector.h"
+#include "rapidudf/vector/vector.h"
 
 static std::random_device rd;
 static std::mt19937 gen(rd());

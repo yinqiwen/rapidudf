@@ -27,8 +27,8 @@
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/pointer.h"
-#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
+#include "rapidudf/vector/vector.h"
 
 namespace rapidudf {
 
@@ -149,18 +149,14 @@ class Context {
     auto* pp = p.release();
     auto f = [pp] { delete pp; };
     cleanups_.insertHead(new CleanupFuncWrapper(std::move(f)));
-    // cleanups_.emplace_back(std::move(f));
   }
 
-  // template <typename T>
-  // bool IsTemporary(simd::Vector<T> data) {
-  //   bool is_temporary = data.IsTemporary();
-  //   if (!is_temporary) {
-  //     return false;
-  //   }
-  //   const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data.Data());
-  //   return allocated_arena_ptrs_.count(ptr) > 0;
-  // }
+  template <typename T, typename D>
+  void Own(T* p, D d) {
+    auto f = [p, d] { d(p); };
+    cleanups_.insertHead(new CleanupFuncWrapper(std::move(f)));
+  }
+
   void SetHasNan(bool v = true) { has_nan_ = v; }
   bool HasNan() const { return has_nan_; }
 

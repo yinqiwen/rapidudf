@@ -41,7 +41,7 @@ class DynObject {
   absl::Status Set(const std::string& name, const char* sv) { return DoSet(name, StringView(sv)); }
 
   template <typename T>
-  absl::StatusOr<T> Get(const std::string& name) const;
+  absl::StatusOr<T> Get(const std::string& name, uint32_t* offset = nullptr) const;
 
  protected:
   DynObject(const DynObjectSchema* s) : schema_(s) {}

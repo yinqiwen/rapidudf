@@ -23,7 +23,6 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/functions/simd/vector_misc.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/types/simd/vector.h"
 #include "rapidudf/types/string_view.h"
 
 #undef HWY_TARGET_INCLUDE

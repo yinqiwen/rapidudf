@@ -20,7 +20,7 @@
 #include <array>
 #include <vector>
 #include "rapidudf/log/log.h"
-#include "rapidudf/types/simd/vector.h"
+#include "rapidudf/vector/vector.h"
 
 struct TestStruct {
   int a;
