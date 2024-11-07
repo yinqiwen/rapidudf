@@ -51,6 +51,14 @@ uint32_t Table::GetIdxByOffset(uint32_t offset) {
   uint32_t idx = (offset - header_size) / sizeof(VectorData);
   return idx;
 }
+absl::StatusOr<uint32_t> Table::GetColumnOffset(const std::string& name) {
+  auto result = schema_->GetField(name);
+  if (!result.ok()) {
+    return result.status();
+  }
+  auto [_, field_offset] = result.value();
+  return field_offset;
+}
 
 template <typename T>
 absl::Status Table::LoadColumn(const Vector<Pointer>& objs, const reflect::Column& column) {
@@ -690,6 +698,32 @@ absl::Span<Table*> Table::GroupBy(StringView column) {
       THROW_LOGIC_ERR("Invalid column:{} with dtype:{} to group_by.", column, dtype);
     }
   }
+}
+
+absl::Status Table::UnloadColumn(const std::string& name) {
+  auto offset_result = GetColumnOffset(name);
+  if (!offset_result.ok()) {
+    return offset_result.status();
+  }
+  uint32_t offset = offset_result.value();
+  uint32_t idx = GetIdxByOffset(offset);
+  auto* column = GetTableSchema()->GetColumnByIdx(idx);
+  if (column == nullptr || column->schema == nullptr) {
+    RUDF_LOG_RETURN_FMT_ERROR("Invalid column:{} to unload", name);
+  }
+  VectorData empty;
+  SetColumn(offset_result.value(), empty);
+  return absl::OkStatus();
+}
+absl::Status Table::UnloadAllColumns() {
+  for (auto& column : GetTableSchema()->columns_) {
+    if (column.schema != nullptr) {
+      uint32_t offset = column.field.bytes_offset;
+      VectorData empty;
+      SetColumn(offset, empty);
+    }
+  }
+  return absl::OkStatus();
 }
 
 template Table* Table::OrderBy<uint32_t>(Vector<uint32_t> by, bool descending);

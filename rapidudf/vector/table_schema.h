@@ -106,6 +106,8 @@ class TableSchema : public DynObjectSchema {
   TableCreateOptions table_opts_;
   std::vector<RowSchemaPtr> row_schemas_;
   std::vector<reflect::Column> columns_;
+
+  friend class Table;
 };
 }  // namespace simd
 }  // namespace rapidudf

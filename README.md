@@ -257,10 +257,12 @@ int main() {
 };
 ```
 
-### Dynamic Vector Table Based on Protobuf/Flatbuffers
+### Dynamic Vector Table Based on Protobuf/Flatbuffers/Struct
 **RapidUDF** can also create a table from Protobuf/Flatbuffers, avoiding the tedious process of creating a TableSchema. Building table instances can be done directly from arrays of Protobuf objects such as `std::vector<T>, std::vector<const T*>, std::vector<T*>`.
 
-Here is an example of creating a vector table based on Protobuf; examples based on flatbuffers can be found in [fbs_vector_table_udf](rapidudf/examples/fbs_vector_table_udf.cc):
+Here is an example of creating a vector table based on Protobuf;  
+Examples based on flatbuffers can be found in [fbs_vector_table_udf](rapidudf/examples/fbs_vector_table_udf.cc);    
+Examples based on struct can be found in [struct_vector_table_udf](rapidudf/examples/struct_vector_table_udf.cc);    
 ```cpp
 #include "rapidudf/examples/student.pb.h"
 #include "rapidudf/rapidudf.h"
@@ -269,7 +271,7 @@ using namespace rapidudf;
 int main() {
   // 1. Create table schema
   auto schema = simd::TableSchema::GetOrCreate(
-      "Student", [](simd::TableSchema* s) { std::ignore = s->BuildFromProtobuf<examples::Student>(); });
+      "Student", [](simd::TableSchema* s) { std::ignore = s->AddColumns<examples::Student>(); });
 
   // 2. UDF string
   std::string source = R"(
@@ -302,7 +304,7 @@ int main() {
   // 4.2 Create table instance and populate data
   rapidudf::Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->BuildFromProtobufVector(students);
+  std::ignore = table->AddRows(students);
 
   // 5. Execute function
   auto result_table = f(ctx, table.get());
@@ -417,7 +419,7 @@ BM_rapidudf_vector_wilson_ctr       6661 ns         6659 ns       105270
 
 ## Dependencies
 
-- [LLVM 17/18/19](https://llvm.org/)
+- [LLVM](https://llvm.org/)
 - [highway](https://github.com/google/highway)
 - [x86-simd-sort](https://github.com/intel/x86-simd-sort)
 - [sleef](https://github.com/shibatch/sleef)

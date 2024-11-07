@@ -237,9 +237,11 @@ int main() {
 };
 ```
 
-### 基于Protobuf/Flatbuffers的动态Vector Table
+### 基于Protobuf/Flatbuffers/Struct的动态Vector Table
 **RapidUDF**也可以从Protobuf/Flatbuffers创建table，避免繁琐的`TableSchema`创建过程；构建table实例也可以从Protobuf数组`std::vector<T>` `std::vector<const T*>` `std::vector<T*>` 直接构建；   
-以下是基于Protobuf构建vector table样例， 基于flatbuffers的样例可参考[fbs_vector_table_udf](rapidudf/examples/fbs_vector_table_udf.cc)
+以下是基于Protobuf构建vector table样例; 
+基于flatbuffers的样例可参考[fbs_vector_table_udf](rapidudf/examples/fbs_vector_table_udf.cc)   
+基于struct的样例可参考[struct_vector_table_udf](rapidudf/examples/struct_vector_table_udf.cc)   
 ```cpp
 #include "rapidudf/examples/student.pb.h"
 #include "rapidudf/rapidudf.h"

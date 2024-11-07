@@ -66,6 +66,15 @@ class Table : public DynObject {
 
   VectorData GetColumnByOffset(uint32_t offset);
 
+  /**
+  ** Unload loaded column(defined by protobuf/flatbuffers/struct)
+  */
+  absl::Status UnloadColumn(const std::string& name);
+  /**
+   ** Unload all loaded column(defined by protobuf/flatbuffers/struct)
+   */
+  absl::Status UnloadAllColumns();
+
   template <typename T>
   absl::Status AddRows(const std::vector<const T*>& rows) {
     if (rows.empty()) {
@@ -111,6 +120,10 @@ class Table : public DynObject {
   template <typename T>
   Table* Topk(Vector<T> by, uint32_t k, bool descending);
   Table* Take(uint32_t k);
+  template <typename T>
+  absl::Span<Table*> GroupBy(Vector<T> by);
+  absl::Span<Table*> GroupBy(StringView column);
+
   /**
   ** return column count
   */
@@ -119,10 +132,6 @@ class Table : public DynObject {
    ** return row count
    */
   size_t Count() const;
-
-  template <typename T>
-  absl::Span<Table*> GroupBy(Vector<T> by);
-  absl::Span<Table*> GroupBy(StringView column);
 
  private:
   Table(Context& ctx, const DynObjectSchema* s) : DynObject(s), ctx_(ctx) {}
@@ -133,6 +142,8 @@ class Table : public DynObject {
   const TableSchema* GetTableSchema() const { return reinterpret_cast<const TableSchema*>(schema_); }
 
   absl::Status AddRows(std::vector<const uint8_t*>&& rows, const RowSchema& schema);
+
+  absl::StatusOr<uint32_t> GetColumnOffset(const std::string& name);
 
   template <typename T>
   absl::StatusOr<Vector<T>> GetColumn(const std::string& name) {

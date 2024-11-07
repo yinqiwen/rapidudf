@@ -287,14 +287,22 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
       continue;
     }
 
+    bool valid_dtype = false;
     absl::Status status;
     if (!member_dtype.IsFundamental() || !member_dtype.IsPrimitive()) {
-      if (!member_dtype.IsString()) {
-        if (table_opts_.ignore_unsupported_fields) {
-          continue;
-        }
-        RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", name, member_dtype);
+      if (member_dtype.IsString() || member_dtype.IsStringPtr()) {
+        valid_dtype = true;
+      } else {
+        valid_dtype = false;
       }
+    } else {
+      valid_dtype = true;
+    }
+    if (!valid_dtype) {
+      if (table_opts_.ignore_unsupported_fields) {
+        continue;
+      }
+      RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", name, member_dtype);
     }
 
     switch (member_dtype.GetFundamentalType()) {
@@ -348,7 +356,7 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
         if (table_opts_.ignore_unsupported_fields) {
           continue;
         } else {
-          status = absl::UnimplementedError(fmt::format("Not supported field:{} with dtype:{}", name, member_dtype));
+          RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", name, member_dtype);
         }
         break;
       }
