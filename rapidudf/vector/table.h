@@ -16,20 +16,16 @@
 
 #pragma once
 
-#include <functional>
 #include <string>
 #include <type_traits>
-#include <unordered_set>
 #include <utility>
 #include <vector>
-#include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 #include "google/protobuf/message.h"
 
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
-#include "rapidudf/reflect/reflect.h"
 #include "rapidudf/types/dyn_object.h"
 #include "rapidudf/types/dyn_object_schema.h"
 #include "rapidudf/types/pointer.h"
@@ -115,7 +111,13 @@ class Table : public DynObject {
   template <typename T>
   Table* Topk(Vector<T> by, uint32_t k, bool descending);
   Table* Take(uint32_t k);
+  /**
+  ** return column count
+  */
   size_t Size() const;
+  /**
+   ** return row count
+   */
   size_t Count() const;
 
   template <typename T>

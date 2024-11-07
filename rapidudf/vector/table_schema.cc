@@ -16,6 +16,7 @@
 #include "rapidudf/vector/table_schema.h"
 #include <memory>
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype_enums.h"
 namespace rapidudf {
 namespace simd {
 bool TableCreateOptions::IsAllowed(const std::string& field) const {
@@ -271,21 +272,31 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
   for (size_t i = 0; i < members->size(); i++) {
     auto* member = members->at(i);
     auto name = member->name;
+    DType member_dtype;
+
     if (!member->HasField()) {
-      continue;
+      if (member->member_func->arg_types.size() == 1 && member->member_func->arg_types[0] == dtype.ToPtr()) {
+        member_dtype = member->member_func->return_type;
+      } else {
+        continue;
+      }
+    } else {
+      member_dtype = (*member->member_field_dtype).Elem();
     }
     if (!table_opts_.IsAllowed(name)) {
       continue;
     }
-    DType member_dtype = *member->member_field_dtype;
+
     absl::Status status;
     if (!member_dtype.IsFundamental() || !member_dtype.IsPrimitive()) {
-      if (table_opts_.ignore_unsupported_fields) {
-        continue;
+      if (!member_dtype.IsString()) {
+        if (table_opts_.ignore_unsupported_fields) {
+          continue;
+        }
+        RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", name, member_dtype);
       }
-      status = absl::UnimplementedError(fmt::format("Not supported field:{} with dtype:{}", name, member_dtype));
-      break;
     }
+
     switch (member_dtype.GetFundamentalType()) {
       case DATA_I8: {
         status = AddColumn<int8_t>(name, schema.get(), i);
@@ -327,6 +338,8 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
         status = AddColumn<double>(name, schema.get(), i);
         break;
       }
+      case DATA_STRING:
+      case DATA_STD_STRING_VIEW:
       case DATA_STRING_VIEW: {
         status = AddColumn<std::string>(name, schema.get(), i);
         break;
@@ -340,13 +353,14 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
         break;
       }
     }
+
     if (!status.ok()) {
       return status;
     }
     valid_column++;
   }
   if (valid_column == 0) {
-    RUDF_LOG_RETURN_FMT_ERROR("No valid column found in struct:{}", dtype);
+    RUDF_LOG_RETURN_FMT_ERROR("No valid column found in struct:{} with members:{}", dtype, members->size());
   }
   row_schemas_.emplace_back(std::move(schema));
   return absl::OkStatus();

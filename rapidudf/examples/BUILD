@@ -84,6 +84,15 @@ cc_binary(
 )
 
 cc_binary(
+    name = "struct_vector_table_udf",
+    srcs = ["struct_vector_table_udf.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        "//rapidudf",
+    ],
+)
+
+cc_binary(
     name = "expression_benchmark",
     srcs = ["expression_benchmark.cc"],
     copts = [

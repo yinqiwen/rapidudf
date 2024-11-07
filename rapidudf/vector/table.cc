@@ -18,6 +18,7 @@
 #include <cstring>
 #include <memory>
 #include <numeric>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -172,16 +173,85 @@ template <typename T>
 absl::Status Table::LoadStructColumn(const Vector<Pointer>& struct_vector, const reflect::Column& column) {
   std::vector<T> vec;
   vec.reserve(struct_vector.Size());
-
-  for (auto obj : struct_vector) {
-    const T* ptr = reinterpret_cast<const T*>(obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
-    if constexpr (std::is_same_v<bool, T> || std::is_same_v<uint8_t, T> || std::is_same_v<int8_t, T> ||
-                  std::is_same_v<uint16_t, T> || std::is_same_v<int16_t, T> || std::is_same_v<uint32_t, T> ||
-                  std::is_same_v<int32_t, T> || std::is_same_v<int64_t, T> || std::is_same_v<uint64_t, T> ||
-                  std::is_same_v<float, T> || std::is_same_v<double, T> || std::is_same_v<StringView, T>) {
-      vec.emplace_back(*ptr);
+  DType expect_dtype = get_dtype<T>();
+  DType actual_dtype;
+  if (column.GetStructField()->HasField()) {
+    actual_dtype = *(column.GetStructField()->member_field_dtype);
+  } else {
+    actual_dtype = (column.GetStructField()->member_func->return_type);
+  }
+  if (column.GetStructField()->HasField()) {
+    for (auto obj : struct_vector) {
+      if constexpr (std::is_same_v<bool, T> || std::is_same_v<uint8_t, T> || std::is_same_v<int8_t, T> ||
+                    std::is_same_v<uint16_t, T> || std::is_same_v<int16_t, T> || std::is_same_v<uint32_t, T> ||
+                    std::is_same_v<int32_t, T> || std::is_same_v<int64_t, T> || std::is_same_v<uint64_t, T> ||
+                    std::is_same_v<float, T> || std::is_same_v<double, T>) {
+        if (expect_dtype == actual_dtype) {
+          const T* ptr =
+              reinterpret_cast<const T*>(obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
+          vec.emplace_back(*ptr);
+        } else {
+          RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
+                                    actual_dtype);
+        }
+      } else if constexpr (std::is_same_v<StringView, T>) {
+        if (expect_dtype == actual_dtype) {
+          const T* ptr =
+              reinterpret_cast<const T*>(obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
+          vec.emplace_back(*ptr);
+        } else if (actual_dtype.IsString()) {
+          const std::string* ptr = reinterpret_cast<const std::string*>(obj.As<const uint8_t>() +
+                                                                        column.GetStructField()->member_field_offset);
+          vec.emplace_back(StringView(*ptr));
+        } else if (actual_dtype.IsStdStringView()) {
+          const std::string_view* ptr = reinterpret_cast<const std::string_view*>(
+              obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
+          vec.emplace_back(StringView(*ptr));
+        } else {
+          RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
+                                    actual_dtype);
+        }
+      } else {
+        RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype, actual_dtype);
+      }
+    }
+  } else {
+    for (auto obj : struct_vector) {
+      if constexpr (std::is_same_v<bool, T> || std::is_same_v<uint8_t, T> || std::is_same_v<int8_t, T> ||
+                    std::is_same_v<uint16_t, T> || std::is_same_v<int16_t, T> || std::is_same_v<uint32_t, T> ||
+                    std::is_same_v<int32_t, T> || std::is_same_v<int64_t, T> || std::is_same_v<uint64_t, T> ||
+                    std::is_same_v<float, T> || std::is_same_v<double, T>) {
+        if (expect_dtype == actual_dtype) {
+          using func_t = T (*)(void*);
+          func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
+          vec.emplace_back(f(obj.As<uint8_t>()));
+        } else {
+          RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
+                                    actual_dtype);
+        }
+      } else if constexpr (std::is_same_v<StringView, T>) {
+        if (expect_dtype == actual_dtype) {
+          using func_t = T (*)(void*);
+          func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
+          vec.emplace_back(f(obj.As<uint8_t>()));
+        } else if (actual_dtype.IsStringPtr()) {
+          using func_t = const std::string& (*)(void*);
+          func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
+          vec.emplace_back(StringView(f(obj.As<uint8_t>())));
+        } else if (actual_dtype.IsStdStringView()) {
+          using func_t = std::string_view (*)(void*);
+          func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
+          vec.emplace_back(StringView(f(obj.As<uint8_t>())));
+        } else {
+          RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
+                                    actual_dtype);
+        }
+      } else {
+        RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype, actual_dtype);
+      }
     }
   }
+
   return Set(column.name, std::move(vec));
 }
 
