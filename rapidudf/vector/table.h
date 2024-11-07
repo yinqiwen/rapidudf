@@ -145,6 +145,11 @@ class Table : public DynObject {
 
   absl::StatusOr<uint32_t> GetColumnOffset(const std::string& name);
 
+  bool IsColumnLoaded(uint32_t offset);
+  uint8_t* GetColumnMemory(uint32_t offset, const DType& dtype);
+  size_t GetColumnMemorySize(const DType& dtype);
+  void SetColumnSize(const reflect::Column& column, void* p);
+
   template <typename T>
   absl::StatusOr<Vector<T>> GetColumn(const std::string& name) {
     uint32_t offset = 0;
