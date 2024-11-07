@@ -16,20 +16,27 @@
 
 #pragma once
 #include <functional>
+#include <memory>
 #include <vector>
-#include "google/protobuf/arena.h"
+#include "rapidudf/arena/leveldb_arena.h"
 namespace rapidudf {
 class Arena {
  public:
   using CleanupFunc = std::function<void()>;
-  uint8_t* Allocate(size_t n) { return google::protobuf::Arena::CreateArray<uint8_t>(&arena_, n); }
+  Arena() { arena_ = std::make_unique<leveldb::Arena>(); }
+  uint8_t* Allocate(size_t n) {
+    //  return google::protobuf::Arena::CreateArray<uint8_t>(&arena_, n);
+    return reinterpret_cast<uint8_t*>(arena_->AllocateAligned(n));
+  }
   void Reset() {
-    arena_.Reset();
+    arena_ = std::make_unique<leveldb::Arena>();
     for (auto& f : cleanups_) {
       f();
     }
     cleanups_.clear();
   }
+
+  size_t MemoryUsage() const { return arena_->MemoryUsage(); }
 
   template <typename T>
   void Own(std::unique_ptr<T>&& p) {
@@ -39,7 +46,8 @@ class Arena {
   }
 
  private:
-  google::protobuf::Arena arena_;
+  // google::protobuf::Arena arena_;
+  std::unique_ptr<leveldb::Arena> arena_;
   std::vector<CleanupFunc> cleanups_;
 };
 }  // namespace rapidudf
