@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -34,6 +32,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Use.h"
+#include "llvm/IR/Value.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 

@@ -84,7 +84,6 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::RPN& rpn) {
         },
         node);
     if (!result.ok()) {
-      RUDF_ERROR("#####error:{}", result.ToString());
       return result;
     }
   }
