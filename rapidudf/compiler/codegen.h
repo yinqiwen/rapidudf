@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <string>
 #include <string_view>
@@ -125,6 +126,7 @@ class CodeGen {
   absl::Status StoreVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx);
   absl::Status StoreNVector(DType dtype, ::llvm::Value* val, ::llvm::Value* ptr, ::llvm::Value* idx, ::llvm::Value* n);
   void Store(::llvm::Value* val, ::llvm::Value* ptr);
+  ::llvm::Value* Load(::llvm::Type* typ, ::llvm::Value* ptr);
 
   absl::StatusOr<ValuePtr> CastTo(ValuePtr val, DType dst_dtype);
   absl::StatusOr<::llvm::Value*> CastTo(::llvm::Value* val, DType src_dtype, DType dst_dtype);

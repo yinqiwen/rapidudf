@@ -22,8 +22,10 @@
 
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/vector/vector.h"
 
 using namespace rapidudf;
 
@@ -589,14 +591,53 @@ TEST(JitCompiler, example) {
     RUDF_ERROR("{}", result.status().ToString());
   }
   ASSERT_TRUE(result.ok());
-  // auto f = std::move(result.value());
+}
 
-  // size_t N = 4096;
-  // std::vector<float> duration;
-  // for (size_t i = 0; i < N; i++) {
-  //   duration.emplace_back(i);
-  // }
+struct TestParams {
+  int boost = 2;
+};
 
-  // int n = f(duration);
-  // ASSERT_EQ(n, 101);
+static int test_vector_func_unit(int p, TestParams* params) { return p + 100 + params->boost; }
+
+static void test_vector_func(const int* p, TestParams** params, int* output) {
+  for (int i = 0; i < simd::kVectorUnitSize; i++) {
+    output[i] = test_vector_func_unit(p[i], params[i]);
+  }
+}
+
+RUDF_VECTOR_FUNC_REGISTER(test_vector_func)
+
+TEST(JitCompiler, user_vector_func) {
+  auto* desc = FunctionFactory::GetFunction("test_vector_func");
+  ASSERT_TRUE(desc != nullptr);
+  ASSERT_TRUE(desc->is_vector_func);
+
+  std::string source = R"(
+     x*test_vector_func(y,params)
+  )";
+
+  rapidudf::JitCompiler compiler({.print_asm = true});
+  using simd_vector_i32 = rapidudf::simd::Vector<int>;
+  auto result = compiler.CompileExpression<simd_vector_i32, Context&, simd_vector_i32, simd_vector_i32, TestParams&>(
+      source, {"_", "x", "y", "params"});
+  if (!result.ok()) {
+    RUDF_ERROR("{}", result.status().ToString());
+  }
+  ASSERT_TRUE(result.ok());
+  auto f = std::move(result.value());
+  Context ctx;
+
+  std::vector<int> test_x = {1, 2, 3, 4, 5};
+  std::vector<int> test_y = {1, 2, 3, 4, 5};
+  std::vector<int> test_z(5);
+  TestParams params;
+  for (size_t i = 0; i < test_x.size(); i++) {
+    test_z[i] = test_x[i] * test_vector_func_unit(test_y[i], &params);
+  }
+  auto z = f(ctx, test_x, test_y, params);
+  ASSERT_EQ(z.Size(), test_x.size());
+
+  for (size_t i = 0; i < test_x.size(); i++) {
+    ASSERT_EQ(z[i], test_z[i]);
+  }
 }

@@ -172,11 +172,13 @@ class JitCompiler {
     ValuePtr val;
     OpToken op = OP_INVALID;
     DType op_compute_dtype;
+    ast::FuncInvocation func_invocation;
     ::llvm::Value* op_temp_val = nullptr;
     ::llvm::Value* constant_vector_val = nullptr;
     ::llvm::Value* constant_vector_val_ptr = nullptr;
     explicit RPNEvalNode(OpToken v) : op(v) {}
     explicit RPNEvalNode(ValuePtr v) : val(v) {}
+    explicit RPNEvalNode(const ast::FuncInvocation& f) : func_invocation(f) {}
   };
 
   void NewCodegen();

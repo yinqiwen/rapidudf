@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <tuple>
 #include <utility>
 #include <vector>
 #include "llvm/IR/Value.h"
+#include "rapidudf/ast/expression.h"
 #include "rapidudf/compiler/codegen.h"
 #include "rapidudf/compiler/compiler.h"
 #include "rapidudf/compiler/type.h"
@@ -58,6 +60,13 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::RPN& rpn) {
             val_result = BuildIR(arg);
           } else if constexpr (std::is_same_v<T, ast::Array>) {
             val_result = BuildIR(arg);
+          } else if constexpr (std::is_same_v<T, ast::FuncInvocation>) {
+            ast::FuncInvocation invocation = arg;
+            eval_nodes.emplace_back(invocation);
+            if (invocation.func->is_vector_func) {
+              is_vector_expr = true;
+            }
+            return absl::OkStatus();
           } else {
             OpToken op = arg;
             eval_nodes.emplace_back(op);
@@ -75,6 +84,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::RPN& rpn) {
         },
         node);
     if (!result.ok()) {
+      RUDF_ERROR("#####error:{}", result.ToString());
       return result;
     }
   }
@@ -116,6 +126,23 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(DType dtype, const std::vector<RPN
       } else {
         RUDF_LOG_RETURN_FMT_ERROR("Unsupported op:{}", op);
       }
+      if (!result.ok()) {
+        return result.status();
+      }
+      operands.emplace_back(result.value());
+    } else if (node.func_invocation.Valid()) {
+      uint32_t operand_count = node.func_invocation.func->GetOperandCount();
+      if (operand_count > operands.size()) {
+        RUDF_LOG_RETURN_FMT_ERROR("Invalid rpn state while func:{} need {} operands, only {} given",
+                                  node.func_invocation.func->name, operand_count, operands.size());
+      }
+      std::vector<ValuePtr> args;
+      for (uint32_t i = 0; i < operand_count; i++) {
+        args.emplace_back(operands.back());
+        operands.pop_back();
+      }
+      std::reverse(args.begin(), args.end());
+      auto result = codegen_->CallFunction(node.func_invocation.func->name, args);
       if (!result.ok()) {
         return result.status();
       }
@@ -182,6 +209,30 @@ absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode
       } else {
         return result.status();
       }
+    } else if (node.func_invocation.Valid()) {
+      uint32_t operand_count = node.func_invocation.func->GetOperandCount();
+      std::vector<::llvm::Value*> arg_vals;
+
+      for (int j = 0; j < operand_count; j++) {
+        arg_vals.emplace_back(operands.back().first);
+        operands.pop_back();
+      }
+      std::reverse(arg_vals.begin(), arg_vals.end());
+      arg_vals.emplace_back(node.op_temp_val);
+      std::vector<ValuePtr> args;
+      for (size_t i = 0; i < arg_vals.size(); i++) {
+        args.emplace_back(codegen_->NewValue(node.func_invocation.func->arg_types[i], arg_vals[i]));
+      }
+      auto result = codegen_->CallFunction(node.func_invocation.func->name, args);
+      if (!result.ok()) {
+        return result.status();
+      }
+      auto* vtype = get_vector_type(codegen_->GetContext(), node.func_invocation.func->LastArg().PtrTo());
+      if (vtype == nullptr) {
+        RUDF_LOG_RETURN_FMT_ERROR("Get NULL vector type for {}", node.func_invocation.func->LastArg());
+      }
+      auto* tmp_val = codegen_->Load(vtype, node.op_temp_val);
+      operands.emplace_back(std::make_pair(node.op_temp_val, tmp_val));
     } else {
       auto value = node.val;
       ::llvm::Value* load_value_ptr = nullptr;
@@ -329,11 +380,14 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
         node.op_compute_dtype = dtype.Elem();
         if (is_compare_op(op)) {
           node.op_temp_val = codegen_->NewVectorVar(DATA_BIT);
-
         } else {
           node.op_temp_val = codegen_->NewVectorVar(dtype);
         }
-
+      } else if (node.func_invocation.Valid()) {
+        DType result_dtype = node.func_invocation.func->LastArg().PtrTo();
+        node.op_temp_val = codegen_->NewVectorVar(result_dtype);
+        std::vector<size_t> idxs;
+        operands.emplace_back(std::make_pair(result_dtype, idxs));
       } else {
         auto value = node.val;
         operands.emplace_back(std::make_pair(value->GetDType(), std::vector<size_t>{i}));
@@ -362,9 +416,13 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
         }
       }
     }
+
     for (size_t i = 0; i < nodes.size(); i++) {
       auto& node = nodes[i];
       if (node.op != OP_INVALID) {
+        continue;
+      }
+      if (node.func_invocation.Valid()) {
         continue;
       }
       auto value = node.val;

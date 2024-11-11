@@ -20,6 +20,7 @@
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
 
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 
@@ -43,12 +44,15 @@ struct FunctionDesc {
   std::vector<DType> arg_types;
   void* func = nullptr;
   int context_arg_idx = -1;
+  bool is_vector_func = false;
 
   void Init();
   bool ValidateArgs(const std::vector<DType>& ts) const;
   bool CompareSignature(DType rtype, const std::vector<DType>& args_types) const;
 
   bool PassArgByValue(size_t i) const;
+  const DType& LastArg() const;
+  uint32_t GetOperandCount() const;
 };
 
 template <typename T>
@@ -72,6 +76,17 @@ class FunctionFactory {
 
   static bool Register(FunctionDesc&& desc);
   static const FunctionDesc* GetFunction(const std::string& name);
+
+  template <typename... Args>
+  static absl::Status RegisterVectorFunction(std::string_view name, void (*f)(Args...)) {
+    FunctionDesc desc;
+    desc.name = std::string(name);
+    desc.func = reinterpret_cast<void*>(f);
+    desc.return_type = DType(DATA_VOID);
+    (desc.arg_types.emplace_back(get_function_arg_dtype<Args>()), ...);
+    return RegisterVectorFunction(std::move(desc));
+  }
+  static absl::Status RegisterVectorFunction(FunctionDesc&& desc);
 };
 
 template <typename SAFE_WRAPPER = void>
@@ -94,6 +109,18 @@ class FuncRegister {
     FunctionFactory::Register(std::move(desc));
   }
 };
+
+class VectorFuncRegister {
+ public:
+  template <typename... Args>
+  VectorFuncRegister(std::string_view name, void (*f)(Args...)) {
+    auto status = FunctionFactory::RegisterVectorFunction(name, f);
+    if (!status.ok()) {
+      RUDF_CRITICAL("Invalid func:{} with reason:{}", name, status.ToString());
+    }
+  }
+};
+
 std::string GetMemberFuncName(DType dtype, const std::string& member);
 std::string GetFunctionName(OpToken op, DType dtype);
 std::string GetFunctionName(OpToken op, DType dtype0, DType dtype1);
@@ -280,8 +307,14 @@ struct FunctionWrapper<SOURCE, LINE, HASH, R (T::*)(Args...) const> {
 #define RUDF_FUNC_REGISTER(f) \
   static ::rapidudf::FuncRegister<void> BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f);
 
+#define RUDF_VECTOR_FUNC_REGISTER(f) \
+  static ::rapidudf::VectorFuncRegister BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(BOOST_PP_STRINGIZE(f), f);
+
 #define RUDF_FUNC_REGISTER_WITH_NAME(NAME, f) \
   static ::rapidudf::FuncRegister BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f);
+
+#define RUDF_VECTOR_FUNC_REGISTER_WITH_NAME(NAME, f) \
+  static ::rapidudf::VectorFuncRegister BOOST_PP_CAT(rudf_reg_funcs_, __COUNTER__)(NAME, f);
 
 #define RUDF_FUNC_REGISTER_WITH_HASH_AND_NAME(hash, NAME, f)                                  \
   static ::rapidudf::FuncRegister<                                                            \

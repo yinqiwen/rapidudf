@@ -71,6 +71,8 @@ void RPN::Print() {
             info.append(arg.ToString());
           } else if constexpr (std::is_same_v<T, Array>) {
             info.append("array");
+          } else if constexpr (std::is_same_v<T, FuncInvocation>) {
+            info.append("func");
           } else {
             info.append(fmt::format("{}", arg));
           }
@@ -96,9 +98,9 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v, RP
           result = arg.Validate(ctx);
           rpn.nodes.emplace_back(arg);
         } else if constexpr (std::is_same_v<T, VarAccessor>) {
-          bool as_builtin_op = false;
-          result = arg.Validate(ctx, rpn, as_builtin_op);
-          if (!as_builtin_op) {
+          bool as_rpn_node = false;
+          result = arg.Validate(ctx, rpn, as_rpn_node);
+          if (!as_rpn_node) {
             rpn.nodes.emplace_back(arg);
           }
         } else if constexpr (std::is_same_v<T, BinaryExprPtr> || std::is_same_v<T, UnaryExprPtr>) {
@@ -357,6 +359,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
     rpn.nodes.emplace_back(op);
     bool can_binary_op = true;
     std::string implicit_func_call;
+
     do {
       if (left_var.dtype == right_result->dtype) {
         can_binary_op = true;
@@ -640,8 +643,8 @@ absl::StatusOr<VarTag> SelectExpr::Validate(ParseContext& ctx, RPN& rpn) {
   }
 }
 
-absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& as_builtin_op) {
-  as_builtin_op = false;
+absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& as_rpn_node) {
+  as_rpn_node = false;
   ctx.SetPosition(position);
   if (access_args.has_value()) {
     auto result = ctx.IsVarExist(name, false);
@@ -746,46 +749,63 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
     var_dtype.name.clear();
     return var_dtype;
   } else if (func_args.has_value()) {
+    const FunctionDesc* func_desc = nullptr;
     DType compute_dtype;
     bool has_simd_vector = false;
     builtin_op = functions::get_buitin_func_op(name);
     int operand_count = get_operand_count(builtin_op);
+    bool use_current_rpn = false;
+    bool need_compute_dtype = false;
+
+    if (builtin_op == OP_INVALID) {
+      auto result = ctx.CheckFuncExist(name);
+      if (!result.ok()) {
+        return result.status();
+      }
+      func_desc = result.value();
+      if (func_desc->is_vector_func) {
+        use_current_rpn = true;
+      }
+    }
+
+    if (operand_count > 0) {
+      use_current_rpn = true;
+      need_compute_dtype = true;
+    }
+
     DType first_number_dtype;
-    auto validate_result = func_args->Validate(ctx, operand_count > 0 ? &rpn : nullptr);
+    auto validate_result = func_args->Validate(ctx, use_current_rpn ? &rpn : nullptr);
     if (!validate_result.ok()) {
       return validate_result.status();
     }
 
+    // prcess args
     std::vector<VarTag> arg_tag_dtypes = validate_result.value();
     std::vector<DType> arg_dtypes;
     for (auto arg_dtype : arg_tag_dtypes) {
-      if (!has_simd_vector && arg_dtype.dtype > compute_dtype) {
+      if (!has_simd_vector && need_compute_dtype && arg_dtype.dtype > compute_dtype) {
         compute_dtype = arg_dtype.dtype;
       }
       if (arg_dtype.dtype.IsSimdVector()) {
         has_simd_vector = true;
-        compute_dtype = arg_dtype.dtype;
+        if (need_compute_dtype) {
+          compute_dtype = arg_dtype.dtype;
+        }
       }
       if (arg_dtype.dtype.IsNumber() && first_number_dtype.IsInvalid()) {
         first_number_dtype = arg_dtype.dtype;
       }
       arg_dtypes.emplace_back(arg_dtype.dtype);
     }
+
     if (builtin_op != OP_INVALID) {
       if (!functions::has_vector_buitin_func(builtin_op, compute_dtype) && has_simd_vector && operand_count > 0) {
         rpn.nodes.emplace_back(builtin_op);
-        as_builtin_op = true;
+        as_rpn_node = true;
         DType ret_dtype = compute_dtype;
         rpn.SetDType(ctx, ret_dtype);
         return ret_dtype;
       }
-      // if (operand_count > 0) {
-      //   rpn.nodes.emplace_back(builtin_op);
-      //   as_builtin_op = true;
-      //   DType ret_dtype = compute_dtype;
-      //   rpn.SetDType(ctx, ret_dtype);
-      //   return ret_dtype;
-      // }
 
       if (name == kOpTokenStrs[OP_IOTA]) {
         name = GetFunctionName(OP_IOTA, first_number_dtype);
@@ -798,34 +818,45 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
         name = GetFunctionName(builtin_op, compute_dtype);
       }
     }
-    auto result = ctx.CheckFuncExist(name);
-    if (!result.ok()) {
-      return result.status();
+    if (func_desc == nullptr) {
+      auto result = ctx.CheckFuncExist(name);
+      if (!result.ok()) {
+        return result.status();
+      }
+      func_desc = result.value();
     }
-    auto* desc = result.value();
+
     if (operand_count > 0) {
       rpn.nodes.emplace_back(builtin_op);
-      as_builtin_op = true;
+      as_rpn_node = true;
       DType ret_dtype = compute_dtype;
       rpn.SetDType(ctx, ret_dtype);
       return ret_dtype;
     }
 
-    if (desc->context_arg_idx >= 0) {
-      if (ctx.GetFuncContextArgIdx() >= 0 && arg_dtypes.size() == desc->arg_types.size() - 1) {
+    // normal func
+    if (func_desc->context_arg_idx >= 0) {
+      if (ctx.GetFuncContextArgIdx() >= 0 && arg_dtypes.size() == func_desc->arg_types.size() - 1) {
         DType ctx_ptr_dtype = DType(DATA_CONTEXT).ToPtr();
-        arg_dtypes.insert(arg_dtypes.begin() + desc->context_arg_idx, ctx_ptr_dtype);
+        arg_dtypes.insert(arg_dtypes.begin() + func_desc->context_arg_idx, ctx_ptr_dtype);
       }
     }
-    if (!desc->ValidateArgs(arg_dtypes)) {
-      if (desc->context_arg_idx >= 0 && ctx.GetFuncContextArgIdx() < 0) {
+    if (!func_desc->ValidateArgs(arg_dtypes)) {
+      if (func_desc->context_arg_idx >= 0 && ctx.GetFuncContextArgIdx() < 0) {
         return ctx.GetErrorStatus(
             fmt::format("Function:{} need `rapidudf::Context` arg, missing in expression/udf args.", name));
       }
       return ctx.GetErrorStatus(fmt::format("Invalid func call:{} args with invalid args", name));
     }
 
-    return desc->return_type;
+    if (use_current_rpn) {  // vector func
+      rpn.nodes.emplace_back(FuncInvocation(func_desc));
+      DType ret_dtype = func_desc->LastArg().PtrTo().ToSimdVector();
+      rpn.SetDType(ctx, ret_dtype);
+      as_rpn_node = true;
+      return ret_dtype;
+    }
+    return func_desc->return_type;
   } else {
     auto result = ctx.IsVarExist(name, false);
     if (!result.ok()) {

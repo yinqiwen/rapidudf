@@ -25,6 +25,7 @@
 
 #include "rapidudf/ast/context.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/reflect/reflect.h"
 
@@ -49,6 +50,12 @@ struct ConstantNumber {
   std::string ToString() const;
 };
 
+struct FuncInvocation {
+  const FunctionDesc* func = nullptr;
+  explicit FuncInvocation(const FunctionDesc* f = nullptr) : func(f) {}
+  bool Valid() const { return func != nullptr; }
+};
+
 struct BinaryExpr;
 struct UnaryExpr;
 struct SelectExpr;
@@ -61,7 +68,7 @@ using UnaryExprPtr = std::shared_ptr<UnaryExpr>;
 using SelectExprPtr = std::shared_ptr<SelectExpr>;
 using SelectRPNNodePtr = std::shared_ptr<SelectRPNNode>;
 
-using RPNNode = std::variant<OpToken, bool, ConstantNumber, std::string, VarDefine, Array, VarAccessor>;
+using RPNNode = std::variant<OpToken, bool, ConstantNumber, std::string, VarDefine, Array, VarAccessor, FuncInvocation>;
 
 struct RPN {
   std::vector<RPNNode> nodes;
@@ -113,7 +120,7 @@ struct VarAccessor {
   std::vector<std::string> access_func_names;
   uint32_t position = 0;
 
-  absl::StatusOr<VarTag> Validate(ParseContext& ctx, RPN& rpn, bool& as_builtin_op);
+  absl::StatusOr<VarTag> Validate(ParseContext& ctx, RPN& rpn, bool& as_rpn_node);
 };
 
 // struct SelectRPNNode {

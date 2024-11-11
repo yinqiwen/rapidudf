@@ -605,7 +605,8 @@ absl::StatusOr<ValuePtr> CodeGen::CallFunction(const std::string& name, const st
   }
 
   if (arg_values.size() != found_func_desc.arg_types.size()) {
-    RUDF_LOG_RETURN_FMT_ERROR("Expect {} args, while {} given", found_func_desc.arg_types.size(), arg_values.size());
+    RUDF_LOG_RETURN_FMT_ERROR("Func：{} expect {} args, while {} given", name, found_func_desc.arg_types.size(),
+                              arg_values.size());
   }
 
   std::vector<::llvm::Value*> arg_vals(arg_values.size());
@@ -660,6 +661,8 @@ absl::StatusOr<ValuePtr> CodeGen::CallFunction(const std::string& name, const st
 }
 
 void CodeGen::Store(::llvm::Value* val, ::llvm::Value* ptr) { builder_->CreateStore(val, ptr); }
+
+::llvm::Value* CodeGen::Load(::llvm::Type* typ, ::llvm::Value* ptr) { return builder_->CreateLoad(typ, ptr); }
 
 }  // namespace compiler
 }  // namespace rapidudf

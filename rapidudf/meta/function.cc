@@ -15,6 +15,7 @@
  */
 #include "rapidudf/meta/function.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
@@ -53,37 +54,6 @@ std::string GetFunctionName(OpToken op, DType dtype) { return GetFunctionName(kO
 std::string GetFunctionName(OpToken op, DType dtype0, DType dtype1) {
   return GetFunctionName(kOpTokenStrs[op], dtype0, dtype1);
 }
-// std::string GetFunctionName(OpToken op, DType a, DType b) { return GetFunctionName(kOpTokenStrs[op], a, b); }
-// std::string GetFunctionName(OpToken op, DType a, DType b, DType c) {
-//   return GetFunctionName(kOpTokenStrs[op], a, b, c);
-// }
-// std::string GetFunctionName(OpToken op, const std::vector<DType>& arg_dtypes) {
-//   switch (op) {
-//     case OP_SORT:
-//     case OP_SELECT:
-//     case OP_TOPK:
-//     case OP_IOTA:
-//     case OP_ARG_SORT:
-//     case OP_ARG_SELECT:
-//     case OP_FILTER:
-//     case OP_GATHER: {
-//       if (arg_dtypes.size() > 0) {
-//         return GetFunctionName(op, arg_dtypes[0]);
-//       }
-//     }
-//     case OP_SORT_KV:
-//     case OP_SELECT_KV:
-//     case OP_TOPK_KV: {
-//       if (arg_dtypes.size() > 1) {
-//         return GetFunctionName(op, arg_dtypes[0], arg_dtypes[1]);
-//       }
-//     }
-//     default: {
-//       break;
-//     }
-//   }
-//   return GetFunctionName(kOpTokenStrs[op], arg_dtypes);
-// }
 
 void FunctionDesc::Init() {
   for (size_t i = 0; i < arg_types.size(); i++) {
@@ -96,6 +66,18 @@ void FunctionDesc::Init() {
     }
   }
 }
+uint32_t FunctionDesc::GetOperandCount() const {
+  uint32_t n = arg_types.size();
+  if (context_arg_idx >= 0) {
+    n--;
+  }
+  if (is_vector_func) {
+    n--;
+  }
+  return n;
+}
+
+const DType& FunctionDesc::LastArg() const { return arg_types[arg_types.size() - 1]; }
 bool FunctionDesc::PassArgByValue(size_t argno) const {
   if (argno >= arg_types.size()) {
     return false;
@@ -123,12 +105,32 @@ bool FunctionDesc::PassArgByValue(size_t argno) const {
 }
 
 bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
-  if (arg_types.size() != ts.size()) {
+  size_t verify_arg_size = arg_types.size();
+  if (is_vector_func) {
+    verify_arg_size--;
+  }
+  if (ts.size() != verify_arg_size) {
+    RUDF_ERROR("Func:{} expect {} args, while only {} args given", verify_arg_size, ts.size());
     return false;
   }
-  for (size_t i = 0; i < ts.size(); i++) {
-    if (!ts[i].CanCastTo(arg_types[i])) {
-      return false;
+  for (size_t i = 0; i < verify_arg_size; i++) {
+    if (is_vector_func) {
+      if (ts[i].IsSimdVector()) {
+        if (ts[i].Elem() != arg_types[i].PtrTo()) {
+          RUDF_ERROR("Func:{} arg[{}] dtype:{}, while given arg value dtype:{}", name, i, arg_types[i], ts[i]);
+          return false;
+        }
+      } else {
+        if (!ts[i].CanCastTo(arg_types[i].PtrTo())) {
+          RUDF_ERROR("Func:{} arg[{}] dtype:{}, while given arg value dtype:{}", name, i, arg_types[i], ts[i]);
+          return false;
+        }
+      }
+    } else {
+      if (!ts[i].CanCastTo(arg_types[i])) {
+        RUDF_ERROR("Func:{} arg[{}] dtype:{}, while given arg value dtype:{}", name, i, arg_types[i], ts[i]);
+        return false;
+      }
     }
   }
   return true;
@@ -161,6 +163,29 @@ bool FunctionFactory::Register(FunctionDesc&& desc) {
   // RUDF_DEBUG("Registe function:{}", desc.name);
   return g_regs->emplace(desc.name, desc).second;
 }
+absl::Status FunctionFactory::RegisterVectorFunction(FunctionDesc&& desc) {
+  if (desc.arg_types.size() < 2) {
+    RUDF_LOG_RETURN_FMT_ERROR("Vector function MUST have more than 2 args, while func:{} has {} args", desc.name,
+                              desc.arg_types.size());
+  }
+  // const DType& first_arg_dtype = desc.arg_types[0];
+  // const DType& last_arg_dtype = desc.arg_types[desc.arg_types.size() - 1];
+  // if (first_arg_dtype != last_arg_dtype) {
+  //   RUDF_LOG_RETURN_FMT_ERROR("Vector function:{}'s first and last arg have different type:{}/{}", desc.name,
+  //                             first_arg_dtype, last_arg_dtype);
+  // }
+  for (auto& arg_dtype : desc.arg_types) {
+    if (!arg_dtype.IsPtr()) {
+      RUDF_LOG_RETURN_FMT_ERROR("Vector function:{}'s  arg is not all pointer", desc.name);
+    }
+  }
+  desc.is_vector_func = true;
+  if (!Register(std::move(desc))) {
+    RUDF_LOG_RETURN_FMT_ERROR("Vector function:{} register faield.", desc.name);
+  }
+  return absl::OkStatus();
+}
+
 const FunctionDesc* FunctionFactory::GetFunction(const std::string& name) {
   if (!g_regs) {
     return nullptr;
