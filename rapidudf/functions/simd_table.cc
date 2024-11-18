@@ -20,6 +20,7 @@
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/reflect/struct.h"
+#include "rapidudf/types/string_view.h"
 #include "rapidudf/vector/table.h"
 #include "rapidudf/vector/vector.h"
 namespace rapidudf {
@@ -38,6 +39,10 @@ struct SimdTableHelper {
   static simd::Table* order_by(simd::Table* table, simd::Vector<T> by, bool descending) {
     return table->OrderBy(by, descending);
   }
+  static simd::Table* order_by_column(simd::Table* table, StringView by, bool descending) {
+    return table->OrderBy(by, descending);
+  }
+
   /**
   **   Sort & Returns the first k rows as a list of Row.
   */
@@ -48,7 +53,12 @@ struct SimdTableHelper {
   /**
   **   Returns the first num rows as a list of Row.
   */
-  static simd::Table* take(simd::Table* table, uint32_t k) { return table->Take(k); }
+  static simd::Table* head(simd::Table* table, uint32_t k) { return table->Head(k); }
+
+  /**
+   **   Returns the first num rows as a list of Row.
+   */
+  static simd::Table* tail(simd::Table* table, uint32_t k) { return table->Tail(k); }
 
   /**
    **   Returns table row count
@@ -66,7 +76,7 @@ struct SimdTableHelper {
   }
 
   static void Init() {
-    RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, column_count, filter, take, count);
+    RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, column_count, filter, head, tail, count);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f32", topk<float>);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f64", topk<double>);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_u32", topk<uint32_t>);
@@ -80,6 +90,7 @@ struct SimdTableHelper {
     RUDF_STRUCT_HELPER_METHOD_BIND("order_by_i32", order_by<int32_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("order_by_u64", order_by<uint64_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("order_by_i64", order_by<int64_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("order_by", order_by_column);
 
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_f32", group_by<float>);
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_f64", group_by<double>);

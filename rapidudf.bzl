@@ -85,8 +85,8 @@ cc_library(
 
     new_git_repository(
         name = "boost_parser",
-        remote = "https://github.com/tzlaine/parser.git",
-        commit = "d774edc0e638a4e5bdfb5d4f22f8a01a6f6f7983",
+        remote = "https://github.com/boostorg/parser.git",
+        commit = "bb0fb885b8f996545cdc5eac67aab8c9bb6a2ce3",
         build_file_content = _BOOST_PARSER_BUILD_FILE,
     )
 
@@ -181,23 +181,6 @@ cc_library(
             "https://github.com/abseil/abseil-cpp/archive/refs/tags/{ver}.tar.gz".format(ver = abseil_ver),
         ],
     )
-
-    #     _FP16_BUILD_FILE = """
-    # cc_library(
-    #     name = "FP16",
-    #     hdrs = glob(["include/**/*.h"]),
-    #     includes = ["include"],
-    #     deps = ["@psimd"],
-    #     visibility = [ "//visibility:public" ],
-    # )
-    # """
-    #     maybe(
-    #         new_git_repository,
-    #         name = "FP16",
-    #         remote = "https://github.com/Maratyszcza/FP16.git",
-    #         commit = "98b0a46bce017382a6351a19577ec43a715b6835",
-    #         build_file_content = _FP16_BUILD_FILE,
-    #     )
 
     maybe(
         git_repository,

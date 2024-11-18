@@ -40,6 +40,22 @@
 namespace rapidudf {
 namespace simd {
 
+static std::vector<int32_t> get_indices(size_t n) {
+  static constexpr uint32_t kDefaultIndiceCount = 10000;
+  static std::vector<int32_t> default_indices;
+  if (default_indices.empty()) {
+    default_indices.resize(kDefaultIndiceCount);
+    std::iota(default_indices.begin(), default_indices.end(), 0);
+  }
+  std::vector<int32_t> indices(n);
+  if (n <= kDefaultIndiceCount) {
+    memcpy(&indices[0], &default_indices[0], sizeof(int32_t) * n);
+  } else {
+    std::iota(indices.begin(), indices.end(), 0);
+  }
+  return indices;
+}
+
 void Table::Deleter::operator()(Table* ptr) const {
   ptr->~Table();
   uint8_t* bytes = reinterpret_cast<uint8_t*>(ptr);
@@ -320,9 +336,9 @@ Table* Table::Clone() {
 std::vector<int32_t> Table::GetIndices() {
   size_t count = Count();
   if (indices_.size() < count) {
-    // indices_ = functions::simd_vector_iota<int32_t>(ctx_, 0, count);
-    indices_.resize(count);
-    std::iota(indices_.begin(), indices_.end(), 0);
+    // indices_.resize(count);
+    // std::iota(indices_.begin(), indices_.end(), 0);
+    indices_ = get_indices(count);
   } else if (indices_.size() > count) {
     indices_.resize(count);
   }
@@ -553,11 +569,11 @@ Table* Table::Filter(Vector<Bit> bits) {
   // RUDF_INFO("######Filter:{}", new_table->Count());
   return new_table;
 }
-Table* Table::Take(uint32_t k) {
-  Table* this_table = this;
+Table* Table::Head(uint32_t k) {
   if (k >= Count()) {
     return this;
   }
+  Table* this_table = this;
   Table* new_table = Clone();
   for (auto& rows : new_table->rows_) {
     rows.Truncate(k);
@@ -574,6 +590,17 @@ Table* Table::Take(uint32_t k) {
     }
     new_table->SetColumn(offset, new_vec);
   });
+  return new_table;
+}
+Table* Table::Tail(uint32_t k) {
+  if (k >= Count()) {
+    return this;
+  }
+  Table* new_table = Clone();
+  new_table->UnloadAllColumns();
+  for (auto& rows : new_table->rows_) {
+    rows.Truncate(Count() - k, k);
+  }
   return new_table;
 }
 
@@ -670,6 +697,39 @@ Table* Table::SubTable(std::vector<int32_t>& indices) {
   return new_table;
 }
 
+Table* Table::OrderBy(StringView column, bool descending) {
+  auto result = schema_->GetField(column);
+  if (!result.ok()) {
+    THROW_LOGIC_ERR("No column:{} found.", column);
+  }
+  auto [dtype, offset] = result.value();
+  uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
+  VectorData vec_data = *(reinterpret_cast<VectorData*>(p));
+  switch (dtype.GetFundamentalType()) {
+    case DATA_F64: {
+      return OrderBy(Vector<double>(vec_data), descending);
+    }
+    case DATA_F32: {
+      return OrderBy(Vector<float>(vec_data), descending);
+    }
+    case DATA_U64: {
+      return OrderBy(Vector<uint64_t>(vec_data), descending);
+    }
+    case DATA_I64: {
+      return OrderBy(Vector<int64_t>(vec_data), descending);
+    }
+    case DATA_U32: {
+      return OrderBy(Vector<uint32_t>(vec_data), descending);
+    }
+    case DATA_I32: {
+      return OrderBy(Vector<int32_t>(vec_data), descending);
+    }
+    default: {
+      THROW_LOGIC_ERR("Invalid column:{} with dtype:{} to order_by.", column, dtype);
+    }
+  }
+}
+
 template <typename T>
 absl::Span<Table*> Table::GroupBy(const T* by, size_t n) {
   absl::flat_hash_map<T, std::vector<int32_t>> group_idxs;
@@ -759,7 +819,7 @@ absl::Status Table::UnloadColumn(const std::string& name) {
   vdata->SetSize(0);  // clear size for reuse
   return absl::OkStatus();
 }
-absl::Status Table::UnloadAllColumns() {
+void Table::UnloadAllColumns() {
   for (auto& column : GetTableSchema()->columns_) {
     if (column.schema != nullptr) {
       uint32_t offset = column.field.bytes_offset;
@@ -768,7 +828,6 @@ absl::Status Table::UnloadAllColumns() {
       vdata->SetSize(0);  // clear size for reuse
     }
   }
-  return absl::OkStatus();
 }
 
 template Table* Table::OrderBy<uint32_t>(Vector<uint32_t> by, bool descending);

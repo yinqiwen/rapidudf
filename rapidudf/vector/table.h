@@ -73,7 +73,7 @@ class Table : public DynObject {
   /**
    ** Unload all loaded column(defined by protobuf/flatbuffers/struct)
    */
-  absl::Status UnloadAllColumns();
+  void UnloadAllColumns();
 
   template <typename T>
   absl::Status AddRows(const std::vector<const T*>& rows) {
@@ -115,11 +115,13 @@ class Table : public DynObject {
   }
 
   Table* Filter(Vector<Bit> bits);
+  Table* OrderBy(StringView column, bool descending);
   template <typename T>
   Table* OrderBy(Vector<T> by, bool descending);
   template <typename T>
   Table* Topk(Vector<T> by, uint32_t k, bool descending);
-  Table* Take(uint32_t k);
+  Table* Head(uint32_t k);
+  Table* Tail(uint32_t k);
   template <typename T>
   absl::Span<Table*> GroupBy(Vector<T> by);
   absl::Span<Table*> GroupBy(StringView column);

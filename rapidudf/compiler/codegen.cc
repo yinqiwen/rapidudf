@@ -605,7 +605,7 @@ absl::StatusOr<ValuePtr> CodeGen::CallFunction(const std::string& name, const st
   }
 
   if (arg_values.size() != found_func_desc.arg_types.size()) {
-    RUDF_LOG_RETURN_FMT_ERROR("Func：{} expect {} args, while {} given", name, found_func_desc.arg_types.size(),
+    RUDF_LOG_RETURN_FMT_ERROR("Func:{} expect {} args, while {} given", name, found_func_desc.arg_types.size(),
                               arg_values.size());
   }
 

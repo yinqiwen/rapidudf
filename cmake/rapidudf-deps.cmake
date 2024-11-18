@@ -24,7 +24,7 @@ find_package(fmt)
 if(NOT fmt_FOUND)
 FetchContent_Declare(
   fmt
-  GIT_REPOSITORY https://mirrors.tencent.com/github.com/fmtlib/fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt
   GIT_TAG        e69e5f977d458f2650bb346dadf2ad30c5320281
   OVERRIDE_FIND_PACKAGE
 ) 
@@ -41,7 +41,7 @@ if(NOT spdlog_FOUND)
 set(SPDLOG_INSTALL ON CACHE INTERNAL "")
 FetchContent_Declare(
   spdlog
-  GIT_REPOSITORY https://mirrors.tencent.com/github.com/gabime/spdlog
+  GIT_REPOSITORY https://github.com/gabime/spdlog
   GIT_TAG        v1.14.1)
 FetchContent_MakeAvailable(spdlog)
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${spdlog_SOURCE_DIR}/include)
@@ -55,7 +55,7 @@ if(NOT sleef_FOUND)
 set(SLEEF_BUILD_TESTS OFF CACHE INTERNAL "Turn off tests")
 FetchContent_Declare(
   sleef
-  GIT_REPOSITORY https://mirrors.tencent.com/github.com/shibatch/sleef
+  GIT_REPOSITORY https://github.com/shibatch/sleef
   GIT_TAG        3.7
   FIND_PACKAGE_ARGS sleef
 )
@@ -72,7 +72,7 @@ set(ABSL_PROPAGATE_CXX_STD ON CACHE INTERNAL "")
 set(ABSL_ENABLE_INSTALL ON CACHE INTERNAL "")
 FetchContent_Declare(
   absl
-  GIT_REPOSITORY https://mirrors.tencent.com/github.com/abseil/abseil-cpp
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp
   GIT_TAG        20240722.0
   OVERRIDE_FIND_PACKAGE
 )
@@ -90,7 +90,7 @@ set(HWY_ENABLE_EXAMPLES OFF CACHE INTERNAL "Turn off eamples")
 set(HWY_ENABLE_TESTS OFF CACHE INTERNAL "Turn off tests")
 FetchContent_Declare(
   hwy
-  GIT_REPOSITORY https://mirrors.tencent.com/github.com/google/highway
+  GIT_REPOSITORY https://github.com/google/highway
   GIT_TAG        1.2.0
   # FIND_PACKAGE_ARGS NAMES hwy
   OVERRIDE_FIND_PACKAGE
@@ -112,7 +112,7 @@ set(protobuf_BUILD_EXAMPLES OFF CACHE INTERNAL "Turn off tests")
 set(protobuf_BUILD_SHARED_LIBS OFF CACHE INTERNAL "Turn off tests")
 FetchContent_Declare(
   protobuf
-  GIT_REPOSITORY https://mirrors.tencent.com/github.com/protocolbuffers/protobuf
+  GIT_REPOSITORY https://github.com/protocolbuffers/protobuf
   GIT_TAG        v3.19.2
   SOURCE_SUBDIR  cmake
   OVERRIDE_FIND_PACKAGE
@@ -129,7 +129,7 @@ if(NOT Flatbuffers_FOUND)
 set(FLATBUFFERS_BUILD_TESTS OFF CACHE INTERNAL "Turn off tests")
 FetchContent_Declare(
     flatbuffers
-    GIT_REPOSITORY https://mirrors.tencent.com/github.com/google/flatbuffers.git
+    GIT_REPOSITORY https://github.com/google/flatbuffers.git
     GIT_TAG        v2.0.5 # 选择合适的版本
 )
 FetchContent_MakeAvailable(flatbuffers)
@@ -145,7 +145,7 @@ if(NOT nlohmann_json_FOUND)
 set(JSON_Install ON CACHE INTERNAL "Turn on install")
 FetchContent_Declare(
   nlohmann_json
-  GIT_REPOSITORY https://mirrors.tencent.com/github.com/nlohmann/json
+  GIT_REPOSITORY https://github.com/nlohmann/json
   GIT_TAG        v3.11.3
   OVERRIDE_FIND_PACKAGE
 )
@@ -157,8 +157,8 @@ endif()
 
 FetchContent_Declare(
   boost_parser
-  GIT_REPOSITORY https://mirrors.tencent.com/github.com/tzlaine/parser
-  GIT_TAG        4cea9c03d6baf8165a21162e66be4f99ec85b529)
+  GIT_REPOSITORY https://github.com/boostorg/parser
+  GIT_TAG        bb0fb885b8f996545cdc5eac67aab8c9bb6a2ce3)
 FetchContent_Populate(boost_parser)
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${boost_parser_SOURCE_DIR}/include)
 

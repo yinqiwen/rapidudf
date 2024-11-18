@@ -249,7 +249,8 @@ std::string DType::GetTypeString() const {
     } else {
       name = fmt::format("{}<{}>", collection_type, name);
     }
-  } else if (IsPtr()) {
+  }
+  if (IsPtr()) {
     name.append(1, '*');
   } else if (IsComplexObj()) {
   }
@@ -268,7 +269,8 @@ std::string DType::ToString() const {
   if (IsCollection()) {
     collection_type = kCollectionTypeStrs[ctrl_.container_type_];
     name = fmt::format("{}<{}>", collection_type, name);
-  } else if (IsPtr()) {
+  }
+  if (IsPtr()) {
     name.append(1, '*');
   }
   return fmt::format("[{}]", name);

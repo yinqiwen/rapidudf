@@ -25,6 +25,16 @@ void Rows::Truncate(size_t k) {
     pointers_.Resize(k);
   }
 }
+void Rows::Truncate(size_t pos, size_t k) {
+  if (pos >= pointers_.Size()) {
+    return;
+  }
+  if ((pos + k) > pointers_.Size()) {
+    k = pointers_.Size() - pos;
+  }
+  pointers_ = pointers_.SubVector(pos, k);
+}
+
 void Rows::Gather(Vector<int32_t> indices) { pointers_ = functions::simd_vector_gather(ctx_, pointers_, indices); }
 }  // namespace simd
 }  // namespace rapidudf

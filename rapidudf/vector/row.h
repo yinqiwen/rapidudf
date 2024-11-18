@@ -61,6 +61,7 @@ class Rows {
 
   void Filter(Vector<Bit> bits);
   void Truncate(size_t k);
+  void Truncate(size_t pos, size_t k);
   void Gather(Vector<int32_t> indices);
 
  private:

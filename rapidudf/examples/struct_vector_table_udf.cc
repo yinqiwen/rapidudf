@@ -43,8 +43,7 @@ int main() {
     { 
        auto filtered = x.filter(x.score >90 && x.age<10);
        // 降序排列
-      return filtered.topk(filtered.score,10, true); 
-      // return filtered;
+       return filtered.topk(filtered.score,10, true); 
     } 
   )";
 

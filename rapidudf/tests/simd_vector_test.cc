@@ -628,7 +628,7 @@ TEST(JitCompiler, user_vector_func) {
   Context ctx;
 
   std::vector<int> test_x = {1, 2, 3, 4, 5};
-  std::vector<int> test_y = {1, 2, 3, 4, 5};
+  std::vector<int> test_y = {10, 20, 30, 40, 50};
   std::vector<int> test_z(5);
   TestParams params;
   for (size_t i = 0; i < test_x.size(); i++) {

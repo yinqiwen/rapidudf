@@ -49,6 +49,8 @@ class Context {
 
   uint8_t* ArenaAllocate(size_t n);
 
+  size_t ArenaMemoryUsage() const { return arena_->MemoryUsage(); }
+
   template <typename T, typename... Args>
   T* New(Args&&... args) {
     auto tmp = std::make_unique<T>(std::forward<Args>(args)...);
