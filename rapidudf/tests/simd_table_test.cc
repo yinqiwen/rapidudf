@@ -296,7 +296,7 @@ TEST(JitCompiler, table_take) {
 
   std::string expr = R"(
       table<test_take_table> test_func(table<test_take_table> x){
-      return x.take(5);
+      return x.head(5);
     }
   )";
 

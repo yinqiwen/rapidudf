@@ -88,6 +88,7 @@ class Table : public DynObject {
     RowSchema row_schema = GetRowSchema(rows[0]);
     return AddRows(std::move(objs), row_schema);
   }
+
   template <typename T>
   absl::Status AddRows(const std::vector<T>& rows) {
     if (rows.empty()) {

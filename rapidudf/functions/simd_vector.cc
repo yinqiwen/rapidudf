@@ -232,6 +232,7 @@ void init_builtin_simd_vector_funcs() {
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_HYPOT, float, double)
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_ATAN2, float, double)
   REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_POW, float, double)
+  REGISTER_SIMD_VECTOR_BINARY_FUNCS(OP_ABS_DIFF, float, double, int64_t, int32_t, int16_t, int8_t)
 
   REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_CLAMP, float, double, uint64_t, int64_t, uint32_t, int32_t)
   REGISTER_SIMD_VECTOR_TERNARY_FUNCS(OP_FMA, float, double, uint64_t, int64_t, uint32_t, int32_t)

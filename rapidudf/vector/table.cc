@@ -346,11 +346,17 @@ std::vector<int32_t> Table::GetIndices() {
 }
 void Table::SetIndices(std::vector<int32_t>&& indices) { indices_ = std::move(indices); }
 
-absl::Status Table::AddRows(std::vector<const uint8_t*>&& rows, const RowSchema& schema) {
+absl::Status Table::AddRows(std::vector<const uint8_t*>&& row_objs, const RowSchema& schema) {
   if (!GetTableSchema()->ExistRow(schema)) {
     RUDF_RETURN_FMT_ERROR("Unsupported schema to add rows");
   }
-  rows_.emplace_back(Rows(ctx_, std::move(rows), schema));
+  for (auto& rows : rows_) {
+    if (rows.GetSchema() == schema) {
+      rows.Append(row_objs);
+      return absl::OkStatus();
+    }
+  }
+  rows_.emplace_back(Rows(ctx_, std::move(row_objs), schema));
   return absl::OkStatus();
 }
 
@@ -496,7 +502,6 @@ Table* Table::Filter(Vector<Bit> bits) {
       return;
     }
 
-    // return;
     VectorData new_vec;
     switch (dtype.GetFundamentalType()) {
       case DATA_BIT: {
@@ -566,7 +571,6 @@ Table* Table::Filter(Vector<Bit> bits) {
     }
     new_table->SetColumn(offset, new_vec);
   });
-  // RUDF_INFO("######Filter:{}", new_table->Count());
   return new_table;
 }
 Table* Table::Head(uint32_t k) {

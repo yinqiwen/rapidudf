@@ -53,6 +53,8 @@ template <class D, OpToken op, typename V = hn::VFromD<D>>
 HWY_INLINE auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
   if constexpr (op == OP_HYPOT) {
     return hn::Hypot(d, lv, rv);
+  } else if constexpr (op == OP_ABS_DIFF) {
+    return hn::AbsDiff(lv, rv);
   } else if constexpr (op == OP_ATAN2) {
     return hn::Atan2(d, lv, rv);
   } else if constexpr (op == OP_MULTIPLY) {
@@ -139,6 +141,7 @@ void simd_vector_binary_op(const T* left, const T* right, T* output) {
 DEFINE_SIMD_BINARY_OP(OP_HYPOT, float, double);
 DEFINE_SIMD_BINARY_OP(OP_ATAN2, float, double);
 DEFINE_SIMD_BINARY_OP(OP_POW, float, double);
+DEFINE_SIMD_BINARY_OP(OP_ABS_DIFF, float, double, int64_t, int32_t, int16_t, int8_t);
 // DEFINE_SIMD_BINARY_OP(OP_MULTIPLY, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,
 //                       int8_t);
 // DEFINE_SIMD_BINARY_OP(OP_DIVIDE, float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t,

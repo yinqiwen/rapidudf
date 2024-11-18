@@ -54,6 +54,8 @@ class Rows {
       : ctx_(ctx), objs_(std::move(objs)), schema_(s) {
     pointers_ = ctx.NewSimdVector(objs_);
   }
+  void Append(const std::vector<const uint8_t*>& objs) { objs_.insert(objs_.end(), objs.begin(), objs.end()); }
+
   const RowSchema& GetSchema() const { return schema_; }
   const Vector<Pointer>& GetRowPtrs() const { return pointers_; }
 

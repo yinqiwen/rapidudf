@@ -20,6 +20,7 @@
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <cmath>
 
+#include <cstdlib>
 #include <unordered_set>
 
 #include "rapidudf/meta/dtype.h"
@@ -319,7 +320,18 @@ static void register_fma() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_FMA, dtype);
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
-  // register_builtin_function_op(func_name, OP_FMA);
+}
+
+template <typename T>
+static T scalar_abs_diff(T a, T b) {
+  return std::abs(a - b);
+}
+template <typename T>
+static void register_abs_diff() {
+  T (*abs_f)(T, T) = &scalar_abs_diff;
+  DType dtype = get_dtype<T>();
+  std::string func_name = GetFunctionName(OP_ABS_DIFF, dtype);
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), abs_f);
 }
 
 template <typename T>
@@ -371,6 +383,7 @@ static void register_clamp() {
 
 void init_builtin_math_funcs() {
   REGISTER_MATH_FUNCS(register_abs, float, double, long double, int64_t, int32_t)
+  REGISTER_MATH_FUNCS(register_abs_diff, float, double, long double, int64_t, int32_t)
   REGISTER_MATH_FUNCS(register_max, float, double, long double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
                       uint16_t, uint8_t)
   REGISTER_MATH_FUNCS(register_min, float, double, long double, int64_t, int32_t, int16_t, int8_t, uint64_t, uint32_t,
