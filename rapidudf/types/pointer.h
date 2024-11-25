@@ -29,6 +29,8 @@ class Pointer {
     return reinterpret_cast<T*>(ptr_val_);
   }
 
+  bool IsNull() const { return ptr_val_ == 0; }
+
  private:
   uintptr_t ptr_val_;
 };

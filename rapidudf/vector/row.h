@@ -37,7 +37,7 @@ struct RowSchema {
 
   explicit RowSchema(const ::google::protobuf::Descriptor* desc) { pb_desc = desc; }
   explicit RowSchema(const flatbuffers::TypeTable* fbs) { fbs_table = fbs; }
-  explicit RowSchema(DType dtype) {
+  explicit RowSchema(const DType& dtype) {
     struct_dtype = dtype;
     struct_members = Reflect::GetStructMembers(dtype);
   }
@@ -54,7 +54,8 @@ class Rows {
       : ctx_(ctx), objs_(std::move(objs)), schema_(s) {
     pointers_ = ctx.NewSimdVector(objs_);
   }
-  void Append(const std::vector<const uint8_t*>& objs) { objs_.insert(objs_.end(), objs.begin(), objs.end()); }
+  absl::Status Insert(size_t pos, const uint8_t* ptr);
+  void Append(const std::vector<const uint8_t*>& objs);
 
   const RowSchema& GetSchema() const { return schema_; }
   const Vector<Pointer>& GetRowPtrs() const { return pointers_; }

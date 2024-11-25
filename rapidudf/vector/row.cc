@@ -36,5 +36,16 @@ void Rows::Truncate(size_t pos, size_t k) {
 }
 
 void Rows::Gather(Vector<int32_t> indices) { pointers_ = functions::simd_vector_gather(ctx_, pointers_, indices); }
+void Rows::Append(const std::vector<const uint8_t*>& objs) {
+  objs_.insert(objs_.end(), objs.begin(), objs.end());
+  pointers_ = ctx_.NewSimdVector(objs_);
+}
+absl::Status Rows::Insert(size_t pos, const uint8_t* ptr) {
+  if (pos > objs_.size()) {
+    return absl::OutOfRangeError("too large pos to insert");
+  }
+  objs_.insert(objs_.begin() + pos, ptr);
+  return absl::OkStatus();
+}
 }  // namespace simd
 }  // namespace rapidudf

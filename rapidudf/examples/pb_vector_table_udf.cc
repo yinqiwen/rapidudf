@@ -16,6 +16,7 @@
 
 #include <vector>
 #include "rapidudf/examples/student.pb.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -58,6 +59,7 @@ int main() {
   rapidudf::Context ctx;
   auto table = schema->NewTable(ctx);
   // 4.3 填充数据
+
   std::ignore = table->AddRows(students);
 
   try {

@@ -44,6 +44,9 @@ class Table : public DynObject {
     void operator()(Table* ptr) const;
   };
 
+  using PartialRows = std::pair<const RowSchema*, std::vector<const uint8_t*>>;
+  using PartialRow = std::pair<const RowSchema*, const uint8_t*>;
+
  public:
   using SmartPtr = std::unique_ptr<Table, Deleter>;
 
@@ -75,32 +78,20 @@ class Table : public DynObject {
    */
   void UnloadAllColumns();
 
-  template <typename T>
-  absl::Status AddRows(const std::vector<const T*>& rows) {
-    if (rows.empty()) {
-      RUDF_LOG_RETURN_FMT_ERROR("Empty rows to add");
-    }
-    std::vector<const uint8_t*> objs;
-    objs.reserve(rows.size());
-    for (auto v : rows) {
-      objs.emplace_back(reinterpret_cast<const uint8_t*>(v));
-    }
-    RowSchema row_schema = GetRowSchema(rows[0]);
-    return AddRows(std::move(objs), row_schema);
-  }
+  template <typename... T>
+  absl::Status AddRows(const std::vector<T>&... rows) {
+    std::vector<absl::StatusOr<PartialRows>> add_results;
+    std::vector<PartialRows> add_rows;
+    add_results.emplace_back((GetPartialRows(rows), ...));
 
-  template <typename T>
-  absl::Status AddRows(const std::vector<T>& rows) {
-    if (rows.empty()) {
-      RUDF_LOG_RETURN_FMT_ERROR("Empty rows to add");
+    for (auto& result : add_results) {
+      if (!result.ok()) {
+        return result.status();
+      }
+      add_rows.emplace_back(std::move(result.value()));
     }
-    std::vector<const uint8_t*> objs;
-    objs.reserve(rows.size());
-    for (auto& v : rows) {
-      objs.emplace_back(reinterpret_cast<const uint8_t*>(&v));
-    }
-    RowSchema row_schema = GetRowSchema(&rows[0]);
-    return AddRows(std::move(objs), row_schema);
+
+    return DoAddRows(std::move(add_rows));
   }
 
   template <template <class, class> class Map, template <class> class Vec, class V>
@@ -113,6 +104,26 @@ class Table : public DynObject {
     }
     std::ignore = ctx_.New<Map<std::string, Vec<V>>>(std::move(values));
     return absl::OkStatus();
+  }
+
+  template <typename... T>
+  absl::Status InsertRow(size_t pos, const T*... row) {
+    std::vector<absl::StatusOr<PartialRow>> add_results;
+    add_results.emplace_back((GetPartialRow(row), ...));
+    std::vector<PartialRow> insert_row;
+    for (auto& result : add_results) {
+      if (!result.ok()) {
+        return result.status();
+      }
+      insert_row.emplace_back(std::move(result.value()));
+    }
+    return InsertRow(pos, insert_row);
+  }
+
+  template <typename... T>
+  absl::Status AppendRow(const T*... row) {
+    size_t pos = Count();
+    return InsertRow(pos, row...);
   }
 
   Table* Filter(Vector<Bit> bits);
@@ -137,14 +148,16 @@ class Table : public DynObject {
   size_t Count() const;
 
  private:
-  Table(Context& ctx, const DynObjectSchema* s) : DynObject(s), ctx_(ctx) {}
+  Table(Context& ctx, const DynObjectSchema* s);
   Table* Clone();
   std::vector<int32_t> GetIndices();
   void SetIndices(std::vector<int32_t>&& indices);
 
   const TableSchema* GetTableSchema() const { return reinterpret_cast<const TableSchema*>(schema_); }
 
-  absl::Status AddRows(std::vector<const uint8_t*>&& rows, const RowSchema& schema);
+  absl::Status DoAddRows(std::vector<PartialRows>&& rows);
+  absl::Status DoAddRows(std::vector<const uint8_t*>&& rows, const RowSchema& schema);
+  absl::Status InsertRow(size_t pos, const std::vector<PartialRow>& row);
 
   absl::StatusOr<uint32_t> GetColumnOffset(const std::string& name);
 
@@ -165,6 +178,60 @@ class Table : public DynObject {
       return Vector<T>(GetColumnByOffset(offset));
     }
     return vec;
+  }
+
+  template <typename T>
+  const RowSchema* GetRowSchema() {
+    if constexpr (std::is_base_of_v<::google::protobuf::Message, T>) {
+      static T msg;
+      const ::google::protobuf::Descriptor* desc = msg.GetDescriptor();
+
+      return GetRowSchema(RowSchema(desc));
+    } else if constexpr (std::is_base_of_v<::flatbuffers::Table, T>) {
+      auto* type_table = T::MiniReflectTypeTable();
+      return GetRowSchema(RowSchema(type_table));
+    } else {
+      return GetRowSchema(RowSchema(get_dtype<T>()));
+    }
+  }
+  template <typename T>
+  absl::StatusOr<PartialRows> GetPartialRows(const std::vector<T>& rows) {
+    if (rows.empty()) {
+      RUDF_LOG_RETURN_FMT_ERROR("Empty rows to add");
+    }
+    PartialRows pratial_rows;
+    pratial_rows.second.reserve(rows.size());
+    for (auto& v : rows) {
+      if constexpr (std::is_pointer_v<T>) {
+        pratial_rows.second.emplace_back(reinterpret_cast<const uint8_t*>(v));
+      } else {
+        pratial_rows.second.emplace_back(reinterpret_cast<const uint8_t*>(&v));
+      }
+    }
+    const RowSchema* schema = nullptr;
+    if constexpr (std::is_pointer_v<T>) {
+      schema = GetRowSchema<std::decay_t<std::remove_pointer_t<T>>>();
+    } else {
+      schema = GetRowSchema<T>();
+    }
+
+    if (schema == nullptr) {
+      RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
+    }
+    pratial_rows.first = schema;
+    return pratial_rows;
+  }
+
+  template <typename T>
+  absl::StatusOr<PartialRow> GetPartialRow(const T* row) {
+    PartialRow partial_row;
+    const RowSchema* schema = GetRowSchema<T>();
+    if (schema == nullptr) {
+      RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
+    }
+    partial_row.second = reinterpret_cast<const uint8_t*>(row);
+    partial_row.first = schema;
+    return partial_row;
   }
 
   template <typename T>
@@ -213,6 +280,8 @@ class Table : public DynObject {
   absl::Status LoadColumn(const Vector<Pointer>& objs, const reflect::Column& column);
 
   absl::Status LoadColumn(const Rows& rows, const reflect::Column& column);
+
+  const RowSchema* GetRowSchema(const RowSchema& schema);
 
   Context& ctx_;
   std::vector<int32_t> indices_;

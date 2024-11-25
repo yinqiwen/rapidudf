@@ -56,6 +56,12 @@ static std::vector<int32_t> get_indices(size_t n) {
   return indices;
 }
 
+Table::Table(Context& ctx, const DynObjectSchema* s) : DynObject(s), ctx_(ctx) {
+  for (auto& s : GetTableSchema()->row_schemas_) {
+    rows_.emplace_back(Rows(ctx, {}, *s));
+  }
+}
+
 void Table::Deleter::operator()(Table* ptr) const {
   ptr->~Table();
   uint8_t* bytes = reinterpret_cast<uint8_t*>(ptr);
@@ -159,55 +165,57 @@ absl::Status Table::LoadColumn(const Rows& rows, const reflect::Column& column) 
 
 template <typename T>
 absl::Status Table::LoadProtobufColumn(const Vector<Pointer>& pb_vector, const reflect::Column& column) {
-  // std::vector<T> vec;
-  // vec.reserve(pb_vector.Size());
   T* vec = reinterpret_cast<T*>(GetColumnMemory(column.field.bytes_offset, get_dtype<T>()));
-  const ::google::protobuf::Message* first_msg = pb_vector[0].As<const ::google::protobuf::Message>();
-  const ::google::protobuf::Reflection* reflect = first_msg->GetReflection();
   const ::google::protobuf::FieldDescriptor* field_desc = column.GetProtobufField();
   for (size_t i = 0; i < pb_vector.Size(); i++) {
     auto obj = pb_vector[i];
-    const ::google::protobuf::Message* msg = obj.As<const ::google::protobuf::Message>();
-    if constexpr (std::is_same_v<bool, T>) {
-      vec[i] = (reflect->GetBool(*msg, field_desc));
-    } else if constexpr (std::is_same_v<int32_t, T>) {
-      vec[i] = (reflect->GetInt32(*msg, field_desc));
-    } else if constexpr (std::is_same_v<int64_t, T>) {
-      vec[i] = (reflect->GetInt64(*msg, field_desc));
-    } else if constexpr (std::is_same_v<uint32_t, T>) {
-      vec[i] = (reflect->GetUInt32(*msg, field_desc));
-    } else if constexpr (std::is_same_v<uint64_t, T>) {
-      vec[i] = (reflect->GetUInt64(*msg, field_desc));
-    } else if constexpr (std::is_same_v<float, T>) {
-      vec[i] = (reflect->GetFloat(*msg, field_desc));
-    } else if constexpr (std::is_same_v<double, T>) {
-      vec[i] = (reflect->GetDouble(*msg, field_desc));
-    } else if constexpr (std::is_same_v<StringView, T>) {
-      static std::string empty;
-      const std::string& ref = reflect->GetStringReference(*msg, field_desc, &empty);
-      if (!ref.empty()) {
-        vec[i] = (StringView(ref));
+    if (!obj.IsNull()) {
+      const ::google::protobuf::Message* msg = obj.As<const ::google::protobuf::Message>();
+      const ::google::protobuf::Reflection* reflect = msg->GetReflection();
+      if constexpr (std::is_same_v<bool, T>) {
+        vec[i] = (reflect->GetBool(*msg, field_desc));
+      } else if constexpr (std::is_same_v<int32_t, T>) {
+        vec[i] = (reflect->GetInt32(*msg, field_desc));
+      } else if constexpr (std::is_same_v<int64_t, T>) {
+        vec[i] = (reflect->GetInt64(*msg, field_desc));
+      } else if constexpr (std::is_same_v<uint32_t, T>) {
+        vec[i] = (reflect->GetUInt32(*msg, field_desc));
+      } else if constexpr (std::is_same_v<uint64_t, T>) {
+        vec[i] = (reflect->GetUInt64(*msg, field_desc));
+      } else if constexpr (std::is_same_v<float, T>) {
+        vec[i] = (reflect->GetFloat(*msg, field_desc));
+      } else if constexpr (std::is_same_v<double, T>) {
+        vec[i] = (reflect->GetDouble(*msg, field_desc));
+      } else if constexpr (std::is_same_v<StringView, T>) {
+        static std::string empty;
+        const std::string& ref = reflect->GetStringReference(*msg, field_desc, &empty);
+        if (!ref.empty()) {
+          vec[i] = (StringView(ref));
+        } else {
+          vec[i] = (StringView());
+        }
       } else {
-        vec[i] = (StringView());
+        RUDF_LOG_RETURN_FMT_ERROR("Unsupported pb field with type:{}/{}", msg->GetTypeName(),
+                                  field_desc->cpp_type_name());
       }
     } else {
-      RUDF_LOG_RETURN_FMT_ERROR("Unsupported pb field with type:{}/{}", msg->GetTypeName(),
-                                field_desc->cpp_type_name());
+      vec[i] = (T{});
     }
   }
-  // return Set(column.name, std::move(vec));
+
   SetColumnSize(column, vec);
   return absl::OkStatus();
 }
 template <typename T>
 absl::Status Table::LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, const reflect::Column& column) {
-  // std::vector<T> vec;
-  // vec.reserve(fbs_vector.Size());
   T* vec = reinterpret_cast<T*>(GetColumnMemory(column.field.bytes_offset, get_dtype<T>()));
   for (size_t i = 0; i < fbs_vector.Size(); i++) {
     auto fbs = fbs_vector[i];
-    const uint8_t* ptr = fbs.As<const flatbuffers::Table>()->GetAddressOf(
-        flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(column.field_idx)));
+    const uint8_t* ptr = nullptr;
+    if (!fbs.IsNull()) {
+      ptr = fbs.As<const flatbuffers::Table>()->GetAddressOf(
+          flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(column.field_idx)));
+    }
     if (ptr == nullptr) {
       vec[i] = (T{});
       continue;
@@ -224,15 +232,13 @@ absl::Status Table::LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, con
       vec[i] = (s);
     }
   }
-  // return Set(column.name, std::move(vec));
+
   SetColumnSize(column, vec);
   return absl::OkStatus();
 }
 
 template <typename T>
 absl::Status Table::LoadStructColumn(const Vector<Pointer>& struct_vector, const reflect::Column& column) {
-  // std::vector<T> vec;
-  // vec.reserve(struct_vector.Size());
   DType expect_dtype = get_dtype<T>();
   DType actual_dtype;
   T* vec = reinterpret_cast<T*>(GetColumnMemory(column.field.bytes_offset, expect_dtype));
@@ -249,29 +255,38 @@ absl::Status Table::LoadStructColumn(const Vector<Pointer>& struct_vector, const
                     std::is_same_v<int32_t, T> || std::is_same_v<int64_t, T> || std::is_same_v<uint64_t, T> ||
                     std::is_same_v<float, T> || std::is_same_v<double, T>) {
         if (expect_dtype == actual_dtype) {
-          const T* ptr =
-              reinterpret_cast<const T*>(obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
-          vec[i] = (*ptr);
+          if (!obj.IsNull()) {
+            const T* ptr =
+                reinterpret_cast<const T*>(obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
+            vec[i] = (*ptr);
+          } else {
+            vec[i] = (T{});
+          }
+
         } else {
           RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
                                     actual_dtype);
         }
       } else if constexpr (std::is_same_v<StringView, T>) {
-        if (expect_dtype == actual_dtype) {
-          const T* ptr =
-              reinterpret_cast<const T*>(obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
-          vec[i] = (*ptr);
-        } else if (actual_dtype.IsString()) {
-          const std::string* ptr = reinterpret_cast<const std::string*>(obj.As<const uint8_t>() +
-                                                                        column.GetStructField()->member_field_offset);
-          vec[i] = (StringView(*ptr));
-        } else if (actual_dtype.IsStdStringView()) {
-          const std::string_view* ptr = reinterpret_cast<const std::string_view*>(
-              obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
-          vec[i] = (StringView(*ptr));
+        if (!obj.IsNull()) {
+          if (expect_dtype == actual_dtype) {
+            const T* ptr =
+                reinterpret_cast<const T*>(obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
+            vec[i] = (*ptr);
+          } else if (actual_dtype.IsString()) {
+            const std::string* ptr = reinterpret_cast<const std::string*>(obj.As<const uint8_t>() +
+                                                                          column.GetStructField()->member_field_offset);
+            vec[i] = (StringView(*ptr));
+          } else if (actual_dtype.IsStdStringView()) {
+            const std::string_view* ptr = reinterpret_cast<const std::string_view*>(
+                obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
+            vec[i] = (StringView(*ptr));
+          } else {
+            RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
+                                      actual_dtype);
+          }
         } else {
-          RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
-                                    actual_dtype);
+          vec[i] = (T{});
         }
       } else {
         RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype, actual_dtype);
@@ -280,42 +295,46 @@ absl::Status Table::LoadStructColumn(const Vector<Pointer>& struct_vector, const
   } else {
     for (size_t i = 0; i < struct_vector.Size(); i++) {
       auto obj = struct_vector[i];
-      if constexpr (std::is_same_v<bool, T> || std::is_same_v<uint8_t, T> || std::is_same_v<int8_t, T> ||
-                    std::is_same_v<uint16_t, T> || std::is_same_v<int16_t, T> || std::is_same_v<uint32_t, T> ||
-                    std::is_same_v<int32_t, T> || std::is_same_v<int64_t, T> || std::is_same_v<uint64_t, T> ||
-                    std::is_same_v<float, T> || std::is_same_v<double, T>) {
-        if (expect_dtype == actual_dtype) {
-          using func_t = T (*)(void*);
-          func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
-          vec[i] = (f(obj.As<uint8_t>()));
-        } else {
-          RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
-                                    actual_dtype);
-        }
-      } else if constexpr (std::is_same_v<StringView, T>) {
-        if (expect_dtype == actual_dtype) {
-          using func_t = T (*)(void*);
-          func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
-          vec[i] = (f(obj.As<uint8_t>()));
-        } else if (actual_dtype.IsStringPtr()) {
-          using func_t = const std::string& (*)(void*);
-          func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
-          vec[i] = (StringView(f(obj.As<uint8_t>())));
-        } else if (actual_dtype.IsStdStringView()) {
-          using func_t = std::string_view (*)(void*);
-          func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
-          vec[i] = (StringView(f(obj.As<uint8_t>())));
+      if (!obj.IsNull()) {
+        if constexpr (std::is_same_v<bool, T> || std::is_same_v<uint8_t, T> || std::is_same_v<int8_t, T> ||
+                      std::is_same_v<uint16_t, T> || std::is_same_v<int16_t, T> || std::is_same_v<uint32_t, T> ||
+                      std::is_same_v<int32_t, T> || std::is_same_v<int64_t, T> || std::is_same_v<uint64_t, T> ||
+                      std::is_same_v<float, T> || std::is_same_v<double, T>) {
+          if (expect_dtype == actual_dtype) {
+            using func_t = T (*)(void*);
+            func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
+            vec[i] = (f(obj.As<uint8_t>()));
+          } else {
+            RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
+                                      actual_dtype);
+          }
+        } else if constexpr (std::is_same_v<StringView, T>) {
+          if (expect_dtype == actual_dtype) {
+            using func_t = T (*)(void*);
+            func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
+            vec[i] = (f(obj.As<uint8_t>()));
+          } else if (actual_dtype.IsStringPtr()) {
+            using func_t = const std::string& (*)(void*);
+            func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
+            vec[i] = (StringView(f(obj.As<uint8_t>())));
+          } else if (actual_dtype.IsStdStringView()) {
+            using func_t = std::string_view (*)(void*);
+            func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
+            vec[i] = (StringView(f(obj.As<uint8_t>())));
+          } else {
+            RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
+                                      actual_dtype);
+          }
         } else {
           RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
                                     actual_dtype);
         }
       } else {
-        RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype, actual_dtype);
+        vec[i] = (T{});
       }
     }
   }
 
-  // return Set(column.name, std::move(vec));
   SetColumnSize(column, vec);
   return absl::OkStatus();
 }
@@ -346,7 +365,35 @@ std::vector<int32_t> Table::GetIndices() {
 }
 void Table::SetIndices(std::vector<int32_t>&& indices) { indices_ = std::move(indices); }
 
-absl::Status Table::AddRows(std::vector<const uint8_t*>&& row_objs, const RowSchema& schema) {
+absl::Status Table::DoAddRows(std::vector<PartialRows>&& rows) {
+  if (rows.size() != GetTableSchema()->row_schemas_.size()) {
+    RUDF_RETURN_FMT_ERROR("Expected {} column set, but {} given", GetTableSchema()->row_schemas_.size(), rows.size());
+  }
+  size_t row_count = 0;
+  for (auto& [schema, columns] : rows) {
+    if (row_count == 0) {
+      row_count = columns.size();
+    } else {
+      if (row_count != columns.size()) {
+        RUDF_RETURN_FMT_ERROR("Mismatch rows size {}/{}", row_count, columns.size());
+      }
+    }
+    bool appened = false;
+    for (auto& rows : rows_) {
+      if (rows.GetSchema() == *schema) {
+        rows.Append(columns);
+        appened = true;
+        break;
+      }
+    }
+    if (!appened) {
+      RUDF_RETURN_FMT_ERROR("Missing schema to add rows");
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Table::DoAddRows(std::vector<const uint8_t*>&& row_objs, const RowSchema& schema) {
   if (!GetTableSchema()->ExistRow(schema)) {
     RUDF_RETURN_FMT_ERROR("Unsupported schema to add rows");
   }
@@ -357,6 +404,28 @@ absl::Status Table::AddRows(std::vector<const uint8_t*>&& row_objs, const RowSch
     }
   }
   rows_.emplace_back(Rows(ctx_, std::move(row_objs), schema));
+  return absl::OkStatus();
+}
+absl::Status Table::InsertRow(size_t pos, const std::vector<PartialRow>& row) {
+  if (row.size() != GetTableSchema()->row_schemas_.size()) {
+    RUDF_RETURN_FMT_ERROR("Expected {} partial rows, but {} given", GetTableSchema()->row_schemas_.size(), row.size());
+  }
+  for (auto& [schema, partial_row] : row) {
+    bool inserted = false;
+    for (auto& rows : rows_) {
+      if (rows.GetSchema() == *schema) {
+        auto status = rows.Insert(pos, partial_row);
+        if (!status.ok()) {
+          return status;
+        }
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) {
+      RUDF_RETURN_FMT_ERROR("Missing schema to insert row");
+    }
+  }
   return absl::OkStatus();
 }
 
@@ -832,6 +901,15 @@ void Table::UnloadAllColumns() {
       vdata->SetSize(0);  // clear size for reuse
     }
   }
+}
+
+const RowSchema* Table::GetRowSchema(const RowSchema& schema) {
+  for (auto& s : GetTableSchema()->row_schemas_) {
+    if (*s == schema) {
+      return s.get();
+    }
+  }
+  return nullptr;
 }
 
 template Table* Table::OrderBy<uint32_t>(Vector<uint32_t> by, bool descending);
