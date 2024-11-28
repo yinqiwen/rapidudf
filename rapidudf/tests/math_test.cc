@@ -18,6 +18,7 @@
 #include <cmath>
 #include <functional>
 #include <vector>
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -64,4 +65,16 @@ TEST(JitCompiler, complex_math) {
 
   double v = a * std::exp(2.2 / 3.3 * t) + c;
   ASSERT_DOUBLE_EQ(f(a, t, c), v);
+}
+
+TEST(JitCompiler, random) {
+  JitCompiler compiler;
+  std::string content = "random(now_s())";
+
+  auto rc1 = compiler.CompileExpression<uint64_t, uint64_t>(content, {"x"});
+  ASSERT_TRUE(rc1.ok());
+  auto f1 = std::move(rc1.value());
+  RUDF_INFO("{}", f1(1));
+  RUDF_INFO("{}", f1(2));
+  RUDF_INFO("{}", f1(3));
 }

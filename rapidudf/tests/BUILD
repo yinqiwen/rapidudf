@@ -83,9 +83,9 @@ cc_test(
 )
 
 cc_test(
-    name = "pb_test",
+    name = "ffi_pb_test",
     size = "small",
-    srcs = ["pb_test.cc"],
+    srcs = ["ffi_pb_test.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
@@ -108,9 +108,9 @@ cc_test(
 )
 
 cc_test(
-    name = "fbs_test",
+    name = "ffi_fbs_test",
     size = "small",
-    srcs = ["fbs_test.cc"],
+    srcs = ["ffi_fbs_test.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
@@ -217,9 +217,9 @@ cc_test(
 )
 
 cc_test(
-    name = "stl_test",
+    name = "ffi_stl_test",
     size = "small",
-    srcs = ["stl_test.cc"],
+    srcs = ["ffi_stl_test.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
@@ -241,9 +241,21 @@ cc_test(
 )
 
 cc_test(
-    name = "struct_test",
+    name = "ffi_struct_test",
     size = "small",
-    srcs = ["struct_test.cc"],
+    srcs = ["ffi_struct_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "ffi_func_test",
+    size = "small",
+    srcs = ["ffi_func_test.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [

@@ -33,6 +33,7 @@ extern void init_builtin_math_funcs();
 extern void init_builtin_json_funcs();
 extern void init_builtin_simd_vector_funcs();
 extern void init_builtin_simd_table_funcs();
+extern void init_builtin_time_funcs();
 
 static std::once_flag g_init_builtin_flag;
 void init_builtin() {
@@ -49,6 +50,7 @@ void init_builtin() {
     init_builtin_json_funcs();
     init_builtin_simd_vector_funcs();
     init_builtin_simd_table_funcs();
+    init_builtin_time_funcs();
   });
 }
 

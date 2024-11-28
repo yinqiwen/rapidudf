@@ -21,6 +21,7 @@ cc_library(
         "stl_sets.cc",
         "stl_vector.cc",
         "strings.cc",
+        "time.cc",
     ],
     hdrs = [
         "functions.h",

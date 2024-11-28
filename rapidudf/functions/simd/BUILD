@@ -34,6 +34,7 @@ cc_library(
         "@com_google_highway//:dot",
         "@com_google_highway//:hwy",
         "@com_google_highway//:math",
+        "@com_google_highway//:random",
     ],
 )
 

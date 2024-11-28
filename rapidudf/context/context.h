@@ -22,7 +22,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
 #include "rapidudf/meta/type_traits.h"
@@ -39,10 +39,13 @@ struct CleanupFuncWrapper {
   ::rapiduf::folly::AtomicIntrusiveLinkedListHook<CleanupFuncWrapper> _hook;
   using List = ::rapiduf::folly::AtomicIntrusiveLinkedList<CleanupFuncWrapper, &CleanupFuncWrapper::_hook>;
 };
+template <typename T>
+using PtrValidateFunc = std::function<bool(T*)>;
 class Context {
  public:
   static constexpr uint32_t kByteLanes = 32;  // 256bit
   using CleanupFunc = std::function<void()>;
+
   Context(Arena* arena = nullptr);
 
   void Reset();
@@ -56,6 +59,23 @@ class Context {
     auto tmp = std::make_unique<T>(std::forward<Args>(args)...);
     T* p = tmp.get();
     Own(std::move(tmp));
+    return p;
+  }
+
+  template <typename T, typename... Args>
+  T* GetPtr(const PtrValidateFunc<T>&& validate, Args&&... args) {
+    uint32_t tid = GetTypeId<T>();
+    auto found = ptrs_.find(tid);
+    if (found != ptrs_.end()) {
+      T* p = reinterpret_cast<T*>(found->second);
+      if (!validate || validate(p)) {
+        return p;
+      }
+    }
+    auto tmp = std::make_unique<T>(std::forward<Args>(args)...);
+    T* p = tmp.get();
+    Own(std::move(tmp));
+    ptrs_[tid] = p;
     return p;
   }
 
@@ -165,12 +185,19 @@ class Context {
   ~Context();
 
  private:
+  static uint32_t NextTypeId();
+  template <typename T>
+  static uint32_t GetTypeId() {
+    static uint32_t id = NextTypeId();
+    return id;
+  }
   Arena& GetArena();
 
   std::unique_ptr<Arena> own_arena_;
   Arena* arena_ = nullptr;
-  // absl::flat_hash_set<const uint8_t*> allocated_arena_ptrs_;
-  // std::vector<CleanupFunc> cleanups_;
+  using PtrMap = absl::flat_hash_map<uint32_t, void*>;
+  PtrMap ptrs_;
+
   CleanupFuncWrapper::List cleanups_;
   bool has_nan_ = false;
 };

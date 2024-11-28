@@ -23,6 +23,12 @@ Context::Context(Arena* arena) : arena_(arena) {
     arena_ = own_arena_.get();
   }
 }
+
+uint32_t Context::NextTypeId() {
+  static std::atomic<uint32_t> type_id_seed = {98765};
+  return type_id_seed.fetch_add(1);
+}
+
 Context::~Context() { Reset(); }
 Arena& Context::GetArena() { return *arena_; }
 uint8_t* Context::ArenaAllocate(size_t n) {
