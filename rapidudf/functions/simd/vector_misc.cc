@@ -344,7 +344,7 @@ simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vec
   }
 }
 
-template <typename T, OpToken op = OP_EQUAL>
+template <typename T, OpToken op>
 int simd_vector_find(simd::Vector<T> data, T v) {
   if constexpr (std::is_same_v<StringView, T>) {
     for (size_t i = 0; i < data.Size(); i++) {

@@ -31,7 +31,7 @@ class Vector;
 }
 
 namespace functions {
-template <typename T, OpToken op = OP_EQUAL>
+template <typename T, OpToken op>
 int simd_vector_find(simd::Vector<T> data, T v);
 template <typename T>
 T simd_vector_sum(simd::Vector<T> left);
@@ -225,7 +225,7 @@ class Vector {
     }
   }
 
-  int Find(T v) { return functions::simd_vector_find<T>(*this, v); }
+  int Find(T v) { return functions::simd_vector_find<T, OP_EQUAL>(*this, v); }
   int FindNeq(T v) { return functions::simd_vector_find<T, OP_NOT_EQUAL>(*this, v); }
   int FindGt(T v) { return functions::simd_vector_find<T, OP_GREATER>(*this, v); }
   int FindGe(T v) { return functions::simd_vector_find<T, OP_GREATER_EQUAL>(*this, v); }
