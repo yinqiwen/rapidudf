@@ -39,7 +39,7 @@ static void throw_vector_expression_ex(int line, StringView src_line, StringView
 
 template <typename T>
 static simd::Vector<T> new_simd_vector(Context& ctx, uint32_t n) {
-  simd::VectorData vdata = ctx.NewSimdVector<T>(32, n);
+  simd::VectorData vdata = ctx.NewSimdVector<T>(n);
   return simd::Vector<T>(vdata);
 }
 template <typename T>

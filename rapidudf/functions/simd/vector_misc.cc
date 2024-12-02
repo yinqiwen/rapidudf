@@ -131,7 +131,7 @@ template <typename T>
 HWY_INLINE simd::Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t n) {
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
-  auto result_data = ctx.NewSimdVector<T>(lanes, n, true);
+  auto result_data = ctx.NewSimdVector<T>(n, lanes * sizeof(T));
   uint8_t* arena_data = result_data.template MutableData<uint8_t>();
   size_t i = 0;
   for (; i < n; i += lanes) {
@@ -151,7 +151,7 @@ simd::Vector<T> simd_vector_gather_impl(Context& ctx, simd::Vector<T> data, simd
   constexpr size_t N = hn::Lanes(d);
   constexpr hn::CappedTag<int32_t, N> indice_d;
   size_t dst_size = indices.Size();
-  simd::VectorData result_data = ctx.NewSimdVector<T>(N, dst_size, true);
+  simd::VectorData result_data = ctx.NewSimdVector<T>(dst_size, N * sizeof(T));
   result_data.SetReadonly(false);
   T* dst = result_data.MutableData<T>();
   const int32_t* indice_data = indices.Data();

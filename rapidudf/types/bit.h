@@ -54,4 +54,14 @@ inline size_t get_arena_element_size(size_t n, size_t lanes) {
 inline uint64_t bits64_set(uint64_t bits, uint8_t i) { return bits |= (1ULL << i); }
 inline uint64_t bits64_clear(uint64_t bits, uint8_t i) { return bits &= ~(1ULL << i); }
 
+inline void bits_set(uint64_t* bits, size_t k, bool v) {
+  size_t idx = k / 64;
+  size_t cursor = k % 64;
+  if (v) {
+    bits[idx] = bits64_set(bits[idx], cursor);
+  } else {
+    bits[idx] = bits64_clear(bits[idx], cursor);
+  }
+}
+
 }  // namespace rapidudf

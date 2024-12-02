@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -26,6 +27,7 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/exception.h"
 #include "rapidudf/types/dyn_object.h"
 #include "rapidudf/types/dyn_object_schema.h"
 #include "rapidudf/types/pointer.h"
@@ -34,6 +36,14 @@
 #include "rapidudf/vector/row.h"
 #include "rapidudf/vector/vector.h"
 namespace rapidudf {
+
+namespace exec {
+template <class R, class... Args>
+absl::StatusOr<R> eval_function(const std::string& source, Args... args);
+
+template <class R, class... Args>
+absl::StatusOr<R> eval_expression(const std::string& source, const std::vector<std::string>& arg_names, Args... args);
+}  // namespace exec
 
 namespace simd {
 
@@ -126,6 +136,23 @@ class Table : public DynObject {
     return InsertRow(pos, row...);
   }
 
+  template <typename T>
+  const T* GetRow(size_t idx) {
+    const RowSchema* schema = GetRowSchema<T>();
+    if (schema == nullptr) {
+      THROW_LOGIC_ERR("Invalid row object type to get schema");
+    }
+    int row_idx = GetRowIdx(*schema);
+    if (row_idx < 0) {
+      THROW_LOGIC_ERR("No row found for schema");
+    }
+    size_t count = Count();
+    if (idx >= count) {
+      THROW_LOGIC_ERR("GetRow outofbound with idx:{} size:{}", idx, count);
+    }
+    return rows_[row_idx].GetRowPtrs()[idx].As<T>();
+  }
+  std::pair<Table*, Table*> Split(Vector<Bit> bits);
   Table* Filter(Vector<Bit> bits);
   Table* OrderBy(StringView column, bool descending);
   template <typename T>
@@ -138,6 +165,55 @@ class Table : public DynObject {
   absl::Span<Table*> GroupBy(Vector<T> by);
   absl::Span<Table*> GroupBy(StringView column);
 
+  Vector<Bit> Dedup(StringView column, uint32_t k);
+  template <typename T, bool restart = true>
+  inline Vector<Bit> Select(std::function<int(const T*, size_t)>&& select, Vector<Bit>* mask = nullptr) {
+    const RowSchema* schema = GetRowSchema<T>();
+    if (schema == nullptr) {
+      THROW_LOGIC_ERR("Invalid row object type to get schema");
+    }
+    int row_idx = GetRowIdx(*schema);
+    if (row_idx < 0) {
+      THROW_LOGIC_ERR("No row found for schema");
+    }
+    size_t count = Count();
+    Vector<Bit> select_mask;
+    size_t non_skip_start = 0;
+    if (mask != nullptr) {
+      select_mask = *mask;
+      for (size_t i = 0; i < count; i++) {
+        if (select_mask[i]) {
+          non_skip_start = i;
+          break;
+        }
+      }
+    } else {
+      select_mask = ctx_.NewSimdVector<Bit>(count);
+      memset(select_mask.GetVectorData().MutableData<uint8_t>(), 0, select_mask.BytesCapacity());
+    }
+
+    for (size_t i = non_skip_start; i < count; i++) {
+      if (select_mask[i]) {
+        continue;
+      }
+      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
+      int rc = select(row, i);
+      if (rc == 1) {
+        // skip[i] = true;
+        select_mask.Set(i, Bit(true));
+        if constexpr (restart) {
+          if (i == non_skip_start) {
+            non_skip_start++;
+          }
+          i = non_skip_start;  // restart
+        }
+      } else if (rc == -1) {
+        break;
+      }
+    }
+    return select_mask;
+  }
+
   /**
   ** return column count
   */
@@ -146,6 +222,16 @@ class Table : public DynObject {
    ** return row count
    */
   size_t Count() const;
+
+  template <class R, class... Args>
+  absl::StatusOr<R> EvalFunction(const std::string& source, Args... args) {
+    return exec::eval_function<R, Args...>(source, args...);
+  }
+
+  template <class R, class... Args>
+  absl::StatusOr<R> EvalExpression(const std::string& source, const std::vector<std::string>& arg_names, Args... args) {
+    return exec::eval_expression<R, Args...>(source, arg_names, args...);
+  }
 
  private:
   Table(Context& ctx, const DynObjectSchema* s);
@@ -282,6 +368,10 @@ class Table : public DynObject {
   absl::Status LoadColumn(const Rows& rows, const reflect::Column& column);
 
   const RowSchema* GetRowSchema(const RowSchema& schema);
+  int GetRowIdx(const RowSchema& schema);
+
+  template <typename T>
+  Vector<Bit> Dedup(const T* data, size_t n, size_t k);
 
   Context& ctx_;
   std::vector<int32_t> indices_;

@@ -96,9 +96,9 @@ cc_test(
 )
 
 cc_test(
-    name = "global_compiler_test",
+    name = "eval_engine_test",
     size = "small",
-    srcs = ["global_compiler_test.cc"],
+    srcs = ["eval_engine_test.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [

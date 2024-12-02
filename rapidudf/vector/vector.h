@@ -184,6 +184,24 @@ class Vector {
       return Data()[idx];
     }
   }
+  void Set(size_t idx, T v) {
+    if (idx >= Size()) {
+      throw std::logic_error(fmt::format("Can NOT set at pos:{}", idx));
+    }
+    if constexpr (std::is_same_v<Bit, T>) {
+      size_t byte_idx = idx / 8;
+      size_t bit_cursor = idx % 8;
+      uint8_t* bits = vec_data_.MutableData<uint8_t>();
+      if (v) {
+        bits[byte_idx] = bit_set(bits[byte_idx], bit_cursor);
+      } else {
+        bits[byte_idx] = bit_clear(bits[byte_idx], bit_cursor);
+      }
+    } else {
+      vec_data_.MutableData<T>()[idx] = v;
+    }
+  }
+
   Vector<T> SubVector(uint32_t pos, uint32_t len) {
     if (pos + len > Size()) {
       THROW_OUT_OF_RANGE_ERR((pos + len), Size());

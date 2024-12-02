@@ -25,6 +25,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
+#include "rapidudf/common/allign.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
@@ -80,15 +81,23 @@ class Context {
   }
 
   template <typename T>
-  simd::VectorData NewSimdVector(size_t lanes, size_t n, bool temporary = false) {
+  simd::VectorData NewSimdVector(size_t n, size_t min_byte_size = 0) {
     using number_t = typename simd::InternalType<T>::internal_type;
-    size_t element_size = get_arena_element_size(n, lanes);
-    uint32_t byte_size = sizeof(number_t) * element_size;
+    uint32_t byte_size = 0;
+    if constexpr (std::is_same_v<Bit, T> || std::is_same_v<bool, T>) {
+      byte_size = n / 8;
+      if (n % 8 > 0) {
+        byte_size++;
+      }
+    } else {
+      byte_size = sizeof(number_t) * n;
+    }
+    byte_size = align_to<uint32_t>(byte_size, 8);
+    if (min_byte_size > 0 && byte_size < min_byte_size) {
+      byte_size = min_byte_size;
+    }
     uint8_t* arena_data = ArenaAllocate(byte_size);
     simd::VectorData vec(arena_data, n, byte_size);
-    if (temporary) {
-      vec.SetTemporary(true);
-    }
     vec.SetReadonly(false);
     return vec;
   }

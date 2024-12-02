@@ -10,6 +10,7 @@ cc_library(
     ],
     deps = [
         "//rapidudf/compiler",
+        "//rapidudf/exec:eval_engine",
         "//rapidudf/reflect",
         "//rapidudf/types:dyn_object_impl",
         "//rapidudf/vector:table",

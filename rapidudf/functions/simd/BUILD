@@ -60,11 +60,13 @@ cc_library(
 cc_library(
     name = "vector",
     srcs = [
+        "bits.cc",
         "vector_binary.cc",
         "vector_ternary.cc",
         "vector_unary.cc",
     ],
     hdrs = [
+        "bits.h",
         "vector.h",
     ],
     copts = ["-O3"],
