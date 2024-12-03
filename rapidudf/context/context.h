@@ -15,6 +15,8 @@
  */
 
 #pragma once
+
+#include <fmt/core.h>
 #include <functional>
 #include <memory>
 #include <string>
@@ -23,6 +25,8 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "fmt/format.h"
+
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
 #include "rapidudf/common/allign.h"
@@ -186,6 +190,17 @@ class Context {
   void Own(T* p, D d) {
     auto f = [p, d] { d(p); };
     cleanups_.insertHead(new CleanupFuncWrapper(std::move(f)));
+  }
+
+  template <typename... T>
+  std::string_view NewString(fmt::format_string<T...> fmt, T&&... args) {
+    size_t n = fmt::formatted_size(fmt, args...);
+    if (n == 0) {
+      return "";
+    }
+    char* data = reinterpret_cast<char*>(ArenaAllocate(n));
+    fmt::format_to(data, fmt, args...);
+    return std::string_view(data, n);
   }
 
   void SetHasNan(bool v = true) { has_nan_ = v; }

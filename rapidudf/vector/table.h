@@ -199,7 +199,6 @@ class Table : public DynObject {
       T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
       int rc = select(row, i);
       if (rc == 1) {
-        // skip[i] = true;
         select_mask.Set(i, Bit(true));
         if constexpr (restart) {
           if (i == non_skip_start) {
