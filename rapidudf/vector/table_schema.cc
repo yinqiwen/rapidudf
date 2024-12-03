@@ -183,7 +183,12 @@ absl::Status TableSchema::AddColumns(const flatbuffers::TypeTable* type_table) {
       continue;
     }
     absl::Status status;
+#if FLATBUFFERS_VERSION_MAJOR == 1
+    if (type_table->type_codes[i].is_vector) {
+#else
     if (type_table->type_codes[i].is_repeating) {
+#endif
+
       if (table_opts_.ignore_unsupported_fields) {
         continue;
       }

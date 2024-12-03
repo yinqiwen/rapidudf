@@ -24,7 +24,7 @@ namespace rapidudf {
 
 template <typename T>
 struct FBSVectorHelper {
-  static typename T::value_type Get(const T* fbs_vec, uint32_t i) {
+  static typename T::return_type Get(const T* fbs_vec, uint32_t i) {
     if (nullptr == fbs_vec) {
       THROW_NULL_POINTER_ERR("null fbs vector");
     }
