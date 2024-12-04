@@ -373,6 +373,5 @@ TEST(JitCompiler, dedup) {
 
   auto after_dedup = table->Filter(table->Dedup("city", 2));
 
-  ctx.NewString("aaa{}", 1);
   ASSERT_EQ(after_dedup->Count(), 8);
 }

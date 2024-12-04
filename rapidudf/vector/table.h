@@ -47,6 +47,23 @@ absl::StatusOr<R> eval_expression(const std::string& source, const std::vector<s
 
 namespace simd {
 
+enum class FilterStatusCode {
+  kSkip,
+  kSelect,
+  kExit,
+};
+
+class FilterStatus {
+ public:
+  explicit FilterStatus(FilterStatusCode code, int reset_cursor = -1) : code_(code), reset_cursor_(reset_cursor) {}
+  FilterStatusCode Code() const { return code_; }
+  int ResetCursor() const { return reset_cursor_; }
+
+ private:
+  FilterStatusCode code_;
+  int reset_cursor_ = -1;
+};
+
 class TableSchema;
 class Table : public DynObject {
  private:
@@ -166,8 +183,9 @@ class Table : public DynObject {
   absl::Span<Table*> GroupBy(StringView column);
 
   Vector<Bit> Dedup(StringView column, uint32_t k);
-  template <typename T, bool restart = true>
-  inline Vector<Bit> Select(std::function<int(const T*, size_t)>&& select, Vector<Bit>* mask = nullptr) {
+
+  template <typename T>
+  void Foreach(std::function<void(const T*)>&& f) {
     const RowSchema* schema = GetRowSchema<T>();
     if (schema == nullptr) {
       THROW_LOGIC_ERR("Invalid row object type to get schema");
@@ -177,40 +195,107 @@ class Table : public DynObject {
       THROW_LOGIC_ERR("No row found for schema");
     }
     size_t count = Count();
-    Vector<Bit> select_mask;
-    size_t non_skip_start = 0;
-    if (mask != nullptr) {
-      select_mask = *mask;
-      for (size_t i = 0; i < count; i++) {
-        if (select_mask[i]) {
-          non_skip_start = i;
-          break;
+
+    for (size_t i = 0; i < count; i++) {
+      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
+      f(row);
+    }
+  }
+
+  template <typename T, typename R>
+  Table* Map(const std::string& new_table_schema, std::function<const R*(const T*)>&& f) {
+    const RowSchema* schema = GetRowSchema<T>();
+    if (schema == nullptr) {
+      THROW_LOGIC_ERR("Invalid row object type to get schema");
+    }
+    int row_idx = GetRowIdx(*schema);
+    if (row_idx < 0) {
+      THROW_LOGIC_ERR("No row found for schema");
+    }
+    size_t count = Count();
+    Table* new_table = nullptr;
+    std::vector<const R*> rows;
+    rows.reserve(count);
+    for (size_t i = 0; i < count; i++) {
+      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
+      const R* r = f(row);
+      rows.emplace_back(r);
+    }
+    auto status = new_table->AddRows(rows);
+    if (!status.ok()) {
+    }
+    return new_table;
+  }
+
+  template <typename T>
+  Vector<Bit> Filter(std::function<bool(const T*)>&& f) {
+    const RowSchema* schema = GetRowSchema<T>();
+    if (schema == nullptr) {
+      THROW_LOGIC_ERR("Invalid row object type to get schema");
+    }
+    int row_idx = GetRowIdx(*schema);
+    if (row_idx < 0) {
+      THROW_LOGIC_ERR("No row found for schema");
+    }
+    size_t count = Count();
+    Vector<Bit> filter_mask = ctx_.NewSimdVector<Bit>(count);
+    memset(filter_mask.GetVectorData().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
+    for (size_t i = 0; i < count; i++) {
+      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
+      if (f(row)) {
+        filter_mask.Set(i, Bit(true));
+      }
+    }
+    return filter_mask;
+  }
+
+  template <typename T>
+  inline std::pair<Table*, Vector<Bit>> Filter(std::function<FilterStatus(const T*)>&& select,
+                                               Vector<Bit>* iter_mask = nullptr) {
+    const RowSchema* schema = GetRowSchema<T>();
+    if (schema == nullptr) {
+      THROW_LOGIC_ERR("Invalid row object type to get schema");
+    }
+    int row_idx = GetRowIdx(*schema);
+    if (row_idx < 0) {
+      THROW_LOGIC_ERR("No row found for schema");
+    }
+    size_t count = Count();
+    Vector<Bit> select_mask = ctx_.NewSimdVector<Bit>(count);
+    memset(select_mask.GetVectorData().MutableData<uint8_t>(), 0, select_mask.BytesCapacity());
+    std::vector<int32_t> select_indices;
+    select_indices.reserve(count);
+    for (size_t i = 0; i < count; i++) {
+      if (iter_mask != nullptr) {
+        if (!(*iter_mask)[i]) {
+          continue;
         }
       }
-    } else {
-      select_mask = ctx_.NewSimdVector<Bit>(count);
-      memset(select_mask.GetVectorData().MutableData<uint8_t>(), 0, select_mask.BytesCapacity());
-    }
-
-    for (size_t i = non_skip_start; i < count; i++) {
       if (select_mask[i]) {
         continue;
       }
       T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
-      int rc = select(row, i);
-      if (rc == 1) {
-        select_mask.Set(i, Bit(true));
-        if constexpr (restart) {
-          if (i == non_skip_start) {
-            non_skip_start++;
-          }
-          i = non_skip_start;  // restart
+      FilterStatus rc = select(row, i);
+      switch (rc.Code()) {
+        case FilterStatusCode::kExit: {
+          goto end_loop;
         }
-      } else if (rc == -1) {
-        break;
+        case FilterStatusCode::kSelect: {
+          select_mask.Set(i, Bit(true));
+          select_indices.emplace_back(i);
+          if (rc.ResetCursor() >= 0) {
+            i = static_cast<size_t>(rc.ResetCursor());
+          }
+          break;
+        }
+        default: {
+          break;
+        }
       }
     }
-    return select_mask;
+  end_loop:
+    auto* sub_table = SubTable(select_indices);
+    return std::make_pair(sub_table, select_mask);
   }
 
   /**
