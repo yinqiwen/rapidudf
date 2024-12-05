@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 yinqiwen yinqiwen@gmail.com. All rights reserved.
+ * Copyright (c) 2024 qiyingwang <qiyingwang@tencent.com>. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,16 @@
  */
 
 #pragma once
-#include "rapidudf/compiler/compiler.h"
-#include "rapidudf/compiler/options.h"
 #include "rapidudf/context/context.h"
-#include "rapidudf/exec/eval_engine.h"
-#include "rapidudf/log/log.h"
-#include "rapidudf/reflect/macros.h"
-#include "rapidudf/types/dyn_object_impl.h"
-#include "rapidudf/vector/table.h"
-#include "rapidudf/vector/table_schema.h"
-#include "rapidudf/version.h"
+#include "rapidudf/functions/simd/vector_op.h"
+#include "rapidudf/meta/optype.h"
+#include "rapidudf/vector/vector.h"
 
 namespace rapidudf {
-using JitCompiler = compiler::JitCompiler;
-// using JitCompilerCache = llvm::JitCompilerCache;
-
-template <typename RET, typename... Args>
-using JitFunction = compiler::JitFunction<RET, Args...>;
-
-using Options = compiler::Options;
-
+namespace functions {
+void simd_vector_bits_not(simd::Vector<Bit> src, simd::Vector<Bit> dst);
+void simd_vector_bits_and(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst);
+void simd_vector_bits_or(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst);
+void simd_vector_bits_xor(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst);
+}  // namespace functions
 }  // namespace rapidudf

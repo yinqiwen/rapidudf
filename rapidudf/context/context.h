@@ -15,6 +15,8 @@
  */
 
 #pragma once
+
+#include <fmt/core.h>
 #include <functional>
 #include <memory>
 #include <string>
@@ -22,9 +24,12 @@
 #include <type_traits>
 #include <vector>
 
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
+#include "fmt/format.h"
+
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
+#include "rapidudf/common/allign.h"
 #include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
@@ -39,10 +44,12 @@ struct CleanupFuncWrapper {
   ::rapiduf::folly::AtomicIntrusiveLinkedListHook<CleanupFuncWrapper> _hook;
   using List = ::rapiduf::folly::AtomicIntrusiveLinkedList<CleanupFuncWrapper, &CleanupFuncWrapper::_hook>;
 };
+template <typename T>
+using PtrValidateFunc = std::function<bool(T*)>;
 class Context {
  public:
-  static constexpr uint32_t kByteLanes = 32;  // 256bit
   using CleanupFunc = std::function<void()>;
+
   Context(Arena* arena = nullptr);
 
   void Reset();
@@ -59,16 +66,41 @@ class Context {
     return p;
   }
 
+  template <typename T, typename... Args>
+  T* GetPtr(const PtrValidateFunc<T>&& validate, Args&&... args) {
+    uint32_t tid = GetTypeId<T>();
+    auto found = ptrs_.find(tid);
+    if (found != ptrs_.end()) {
+      T* p = reinterpret_cast<T*>(found->second);
+      if (!validate || validate(p)) {
+        return p;
+      }
+    }
+    auto tmp = std::make_unique<T>(std::forward<Args>(args)...);
+    T* p = tmp.get();
+    Own(std::move(tmp));
+    ptrs_[tid] = p;
+    return p;
+  }
+
   template <typename T>
-  simd::VectorData NewSimdVector(size_t lanes, size_t n, bool temporary = false) {
+  simd::VectorData NewSimdVector(size_t n, size_t min_byte_size = 0) {
     using number_t = typename simd::InternalType<T>::internal_type;
-    size_t element_size = get_arena_element_size(n, lanes);
-    uint32_t byte_size = sizeof(number_t) * element_size;
+    uint32_t byte_size = 0;
+    if constexpr (std::is_same_v<Bit, T> || std::is_same_v<bool, T>) {
+      byte_size = n / 8;
+      if (n % 8 > 0) {
+        byte_size++;
+      }
+    } else {
+      byte_size = sizeof(number_t) * n;
+    }
+    byte_size = align_to<uint32_t>(byte_size, 8);
+    if (min_byte_size > 0 && byte_size < min_byte_size) {
+      byte_size = min_byte_size;
+    }
     uint8_t* arena_data = ArenaAllocate(byte_size);
     simd::VectorData vec(arena_data, n, byte_size);
-    if (temporary) {
-      vec.SetTemporary(true);
-    }
     vec.SetReadonly(false);
     return vec;
   }
@@ -159,18 +191,36 @@ class Context {
     cleanups_.insertHead(new CleanupFuncWrapper(std::move(f)));
   }
 
+  template <typename... T>
+  std::string_view NewString(fmt::format_string<T...> fmt, T&&... args) {
+    size_t n = fmt::formatted_size(fmt, args...);
+    if (n == 0) {
+      return "";
+    }
+    char* data = reinterpret_cast<char*>(ArenaAllocate(n));
+    fmt::format_to(data, fmt, args...);
+    return std::string_view(data, n);
+  }
+
   void SetHasNan(bool v = true) { has_nan_ = v; }
   bool HasNan() const { return has_nan_; }
 
   ~Context();
 
  private:
+  static uint32_t NextTypeId();
+  template <typename T>
+  static uint32_t GetTypeId() {
+    static uint32_t id = NextTypeId();
+    return id;
+  }
   Arena& GetArena();
 
   std::unique_ptr<Arena> own_arena_;
   Arena* arena_ = nullptr;
-  // absl::flat_hash_set<const uint8_t*> allocated_arena_ptrs_;
-  // std::vector<CleanupFunc> cleanups_;
+  using PtrMap = absl::flat_hash_map<uint32_t, void*>;
+  PtrMap ptrs_;
+
   CleanupFuncWrapper::List cleanups_;
   bool has_nan_ = false;
 };

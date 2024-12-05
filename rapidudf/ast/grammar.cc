@@ -58,7 +58,8 @@ const auto comment_def = "//" > *(bp::char_ - bp::eol) > (bp::eol);
 
 bp::rule<struct identifier, std::string> identifier = "identifier";
 const auto lead_char = bp::char_('a', 'z') | bp::char_('A', 'Z') | bp::char_('_');
-const auto follow_char = bp::char_('a', 'z') | bp::char_('A', 'Z') | bp::char_('_') | bp::char_('0', '9');
+const auto follow_char =
+    bp::char_('a', 'z') | bp::char_('A', 'Z') | bp::char_('_') | bp::char_('0', '9') | bp::char_(':');
 const auto identifier_def = (lead_char > *follow_char)[identifier_func];
 BOOST_PARSER_DEFINE_RULES(identifier);
 

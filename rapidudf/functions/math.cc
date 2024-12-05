@@ -21,8 +21,10 @@
 #include <cmath>
 
 #include <cstdlib>
+#include <type_traits>
 #include <unordered_set>
 
+#include "rapidudf/functions/simd/vector_misc.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
@@ -379,6 +381,17 @@ static void register_clamp() {
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
 }
 
+template <typename T>
+static void register_random() {
+  T (*f)(uint64_t) = functions::random<T>;
+  DType dtype = get_dtype<T>();
+  std::string func_name = "random";
+  if constexpr (std::is_same_v<double, T>) {
+    func_name = "random_f";
+  }
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), f);
+}
+
 // bool is_builtin_function(std::string_view name) { return get_builtin_math_funcs().count(name) == 1; }
 
 void init_builtin_math_funcs() {
@@ -425,6 +438,8 @@ void init_builtin_math_funcs() {
   REGISTER_MATH_FUNCS(register_fms, float, double, long double)
   REGISTER_MATH_FUNCS(register_fnma, float, double, long double)
   REGISTER_MATH_FUNCS(register_fnms, float, double, long double)
+
+  REGISTER_MATH_FUNCS(register_random, double, uint64_t)
 }
 }  // namespace functions
 }  // namespace rapidudf

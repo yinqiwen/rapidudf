@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "rapidudf/exec/eval_engine.h"
 #include <gtest/gtest.h>
 #include "absl/strings/str_join.h"
 #include "rapidudf/rapidudf.h"
@@ -31,17 +32,16 @@ TEST(JitCompiler, func_cache) {
       return x["key"] == 123;
     }
   )";
-  auto rc = GlobalJitCompiler::GetFunction<bool, const JsonObject&>(content);
+  auto rc = exec::eval_function<bool, const JsonObject&>(content, json);
   ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-  ASSERT_FALSE(f.IsFromCache());
+  ASSERT_TRUE(rc.value());
+  // auto f = std::move(rc.value());
+  // ASSERT_TRUE(f(json));
+  // ASSERT_FALSE(f.IsFromCache());
 
-  rc = GlobalJitCompiler::GetFunction<bool, const JsonObject&>(content);
+  rc = exec::eval_function<bool, const JsonObject&>(content, json);
   ASSERT_TRUE(rc.ok());
-  f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-  ASSERT_TRUE(f.IsFromCache());
+  ASSERT_TRUE(rc.value());
 }
 
 TEST(JitCompiler, expr_cache) {
@@ -54,18 +54,13 @@ TEST(JitCompiler, expr_cache) {
   std::string content = R"(
     x["key"] == 123
   )";
-  auto rc = GlobalJitCompiler::GetExpression<bool, const JsonObject&>(content, {"x"});
+  auto rc = exec::eval_expression<bool, const JsonObject&>(content, {"x"}, json);
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
   ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-  ASSERT_FALSE(f.IsFromCache());
+  ASSERT_TRUE(rc.value());
 
-  rc = GlobalJitCompiler::GetExpression<bool, const JsonObject&>(content, {"x"});
   ASSERT_TRUE(rc.ok());
-  auto f1 = std::move(rc.value());
-  ASSERT_TRUE(f1(json));
-  ASSERT_TRUE(f1.IsFromCache());
+  ASSERT_TRUE(rc.value());
 }

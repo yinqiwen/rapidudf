@@ -43,5 +43,11 @@ simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vec
 template <typename T, OpToken op = OP_EQUAL>
 int simd_vector_find(simd::Vector<T> data, T v);
 
+template <typename T>
+void simd_vector_random(Context& ctx, uint64_t seed, T* output);
+
+template <typename T>
+T random(uint64_t seed);
+
 }  // namespace functions
 }  // namespace rapidudf

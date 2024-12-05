@@ -36,10 +36,10 @@
 #include "rapidudf/types/dyn_object_schema.h"
 
 namespace rapidudf {
+
 namespace compiler {
 
 class CodeGen;
-class GlobalJitCompiler;
 class JitCompiler {
  public:
   struct Arg {
@@ -164,6 +164,11 @@ class JitCompiler {
     return CompileDynObjExpression<RET, Args...>(source, args);
   }
 
+  absl::StatusOr<void*> GetFunctionPtr(const std::string& name);
+  std::shared_ptr<CodeGen> GetCodeGen() { return codegen_; }
+  const JitFunctionStat& GetStat() const { return stat_; }
+  const std::vector<ast::Function>& GetParsedAST() const { return parsed_ast_funcs_; }
+
  private:
   struct RPNEvalNode {
     ValuePtr val;
@@ -188,8 +193,6 @@ class JitCompiler {
   absl::StatusOr<std::string> VerifyFunctionSignature(DType rtype, const std::vector<DType>& args_types);
   absl::StatusOr<std::string> VerifyFunctionSignature(const std::string& name, DType rtype,
                                                       const std::vector<DType>& args_types);
-
-  absl::StatusOr<void*> GetFunctionPtr(const std::string& name);
 
   absl::Status ThrowVectorExprError(const std::string& msg);
 
@@ -231,8 +234,6 @@ class JitCompiler {
   std::shared_ptr<CodeGen> codegen_;
   std::mutex jit_mutex_;
   JitFunctionStat stat_;
-
-  friend class GlobalJitCompiler;
 };
 
 }  // namespace compiler

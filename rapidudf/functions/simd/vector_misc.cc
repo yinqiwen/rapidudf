@@ -17,6 +17,7 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
+#include <cstring>
 #include <limits>
 #include <type_traits>
 
@@ -32,6 +33,7 @@
 
 #include "hwy/contrib/algo/find-inl.h"
 #include "hwy/contrib/dot/dot-inl.h"
+#include "hwy/contrib/random/random-inl.h"
 #include "hwy/highway.h"
 
 HWY_BEFORE_NAMESPACE();
@@ -129,7 +131,7 @@ template <typename T>
 HWY_INLINE simd::Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t n) {
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
-  auto result_data = ctx.NewSimdVector<T>(lanes, n, true);
+  auto result_data = ctx.NewSimdVector<T>(n, lanes * sizeof(T));
   uint8_t* arena_data = result_data.template MutableData<uint8_t>();
   size_t i = 0;
   for (; i < n; i += lanes) {
@@ -149,7 +151,7 @@ simd::Vector<T> simd_vector_gather_impl(Context& ctx, simd::Vector<T> data, simd
   constexpr size_t N = hn::Lanes(d);
   constexpr hn::CappedTag<int32_t, N> indice_d;
   size_t dst_size = indices.Size();
-  simd::VectorData result_data = ctx.NewSimdVector<T>(N, dst_size, true);
+  simd::VectorData result_data = ctx.NewSimdVector<T>(dst_size, N * sizeof(T));
   result_data.SetReadonly(false);
   T* dst = result_data.MutableData<T>();
   const int32_t* indice_data = indices.Data();
@@ -203,6 +205,32 @@ size_t simd_vector_find_impl(simd::Vector<typename OPT::operand_t> data, typenam
       return hn::FindIf(d, data.Data(), data.Size(),
                         [v](const auto d, const auto vec) HWY_ATTR { return hn::Lt(vec, hn::Set(d, v)); });
     }
+  }
+}
+
+template <typename T>
+void simd_vector_random_impl(Context& ctx, uint64_t seed, T* output) {
+  hn::VectorXoshiro* rand = ctx.GetPtr<hn::VectorXoshiro>({}, seed);
+  if constexpr (std::is_same_v<double, T>) {
+    auto result = rand->Uniform(simd::kVectorUnitSize);
+    memcpy(output, result.data(), result.size() * sizeof(T));
+  } else if constexpr (std::is_same_v<uint64_t, T>) {
+    auto result = (*rand)(simd::kVectorUnitSize);
+    memcpy(output, result.data(), result.size() * sizeof(T));
+  } else {
+    static_assert(sizeof(T) == -1, "Invalid random");
+  }
+}
+
+template <typename T>
+T random_impl(uint64_t seed) {
+  hn::internal::Xoshiro rand(seed);
+  if constexpr (std::is_same_v<double, T>) {
+    return rand.Uniform();
+  } else if constexpr (std::is_same_v<uint64_t, T>) {
+    return rand();
+  } else {
+    static_assert(sizeof(T) == -1, "Invalid random");
   }
 }
 
@@ -316,7 +344,7 @@ simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vec
   }
 }
 
-template <typename T, OpToken op = OP_EQUAL>
+template <typename T, OpToken op>
 int simd_vector_find(simd::Vector<T> data, T v) {
   if constexpr (std::is_same_v<StringView, T>) {
     for (size_t i = 0; i < data.Size(); i++) {
@@ -345,6 +373,18 @@ template <typename T>
 T simd_vector_reduce_min(simd::Vector<T> left) {
   HWY_EXPORT_T(Table, simd_vector_reduce_min_impl<T>);
   return HWY_DYNAMIC_DISPATCH_T(Table)(left);
+}
+
+template <typename T>
+void simd_vector_random(Context& ctx, uint64_t seed, T* output) {
+  HWY_EXPORT_T(Table, simd_vector_random_impl<T>);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(ctx, seed, output);
+}
+
+template <typename T>
+T random(uint64_t seed) {
+  HWY_EXPORT_T(Table, random_impl<T>);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(seed);
 }
 
 #define DEFINE_SIMD_DOT_OP_TEMPLATE(r, op, ii, TYPE) \
@@ -404,6 +444,18 @@ DEFINE_SIMD_FIND_OP(OP_LESS_EQUAL, float, double, uint8_t, int8_t, uint16_t, int
                     int64_t, StringView);
 DEFINE_SIMD_FIND_OP(OP_NOT_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
                     int64_t, StringView);
+
+#define DEFINE_SIMD_RANDOM_OP_TEMPLATE(r, op, ii, TYPE) \
+  template void simd_vector_random(Context& ctx, uint64_t seed, TYPE* output);
+#define DEFINE_SIMD_RANDOM_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_RANDOM_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_RANDOM_OP(uint64_t, double);
+
+#define DEFINE_RANDOM_OP_TEMPLATE(r, op, ii, TYPE) template TYPE random(uint64_t seed);
+#define DEFINE_RANDOM_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_RANDOM_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_RANDOM_OP(uint64_t, double);
+
 }  // namespace functions
 }  // namespace rapidudf
 #endif  // HWY_ONCE

@@ -10,6 +10,7 @@ cc_library(
     ],
     deps = [
         "//rapidudf/arena",
+        "//rapidudf/common:allign",
         "//rapidudf/common:atomic_intrusive_list",
         "//rapidudf/log",
         "//rapidudf/meta",

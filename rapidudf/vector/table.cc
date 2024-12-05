@@ -22,14 +22,17 @@
 #include <type_traits>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "flatbuffers/minireflect.h"
 
 #include "rapidudf/common/allign.h"
+#include "rapidudf/functions/simd/bits.h"
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/meta/exception.h"
+#include "rapidudf/types/bit.h"
 #include "rapidudf/types/dyn_object_impl.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
@@ -352,6 +355,24 @@ Table* Table::Clone() {
   ctx_.Own(t, d);
   return t;
 }
+Table* Table::NewTableBySchema(const std::string& name) {
+  auto* table_schema = TableSchema::Get(name);
+  if (table_schema == nullptr) {
+    return nullptr;
+  }
+  uint8_t* bytes = new uint8_t[table_schema->ByteSize()];
+  memset(bytes, 0, table_schema->ByteSize());
+  try {
+    new (bytes) Table(ctx_, table_schema);
+  } catch (...) {
+    throw;
+  }
+  Table* t = reinterpret_cast<Table*>(bytes);
+  Deleter d;
+  ctx_.Own(t, d);
+  return t;
+}
+
 std::vector<int32_t> Table::GetIndices() {
   size_t count = Count();
   if (indices_.size() < count) {
@@ -642,6 +663,14 @@ Table* Table::Filter(Vector<Bit> bits) {
   });
   return new_table;
 }
+std::pair<Table*, Table*> Table::Split(Vector<Bit> bits) {
+  Vector<Bit> other = ctx_.NewSimdVector<Bit>(bits.Size());
+  functions::simd_vector_bits_not(bits, other);
+  Table* first = Filter(bits);
+  Table* second = Filter(other);
+  return {first, second};
+}
+
 Table* Table::Head(uint32_t k) {
   if (k >= Count()) {
     return this;
@@ -876,6 +905,87 @@ absl::Span<Table*> Table::GroupBy(StringView column) {
   }
 }
 
+template <typename T>
+Vector<Bit> Table::Dedup(const T* data, size_t n, size_t k) {
+  using DedupMap = absl::flat_hash_map<T, uint32_t>;
+  DedupMap dedup_map;
+  dedup_map.reserve(n);
+  size_t bits_n = n / 64;
+  if (n % 64 > 0) {
+    bits_n++;
+  }
+  uint64_t* bits = reinterpret_cast<uint64_t*>(ctx_.ArenaAllocate(sizeof(uint64_t) * bits_n));
+
+  for (size_t i = 0; i < n; i++) {
+    size_t exist_n = dedup_map[data[i]]++;
+    bits_set(bits, i, exist_n < k);
+  }
+  VectorData vdata(bits, n, sizeof(uint64_t) * bits_n);
+  return Vector<Bit>(vdata);
+}
+
+Vector<Bit> Table::Dedup(StringView column, uint32_t k) {
+  auto result = schema_->GetField(column);
+  if (!result.ok()) {
+    THROW_LOGIC_ERR("No column:{} found.", column);
+  }
+  auto [dtype, offset] = result.value();
+  size_t row_size = Count();
+  uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
+  VectorData vec_data = *(reinterpret_cast<VectorData*>(p));
+  Vector<Bit> bits;
+  switch (dtype.GetFundamentalType()) {
+    case DATA_F64: {
+      bits = Dedup(reinterpret_cast<const double*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_F32: {
+      bits = Dedup(reinterpret_cast<const float*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_U64: {
+      bits = Dedup(reinterpret_cast<const uint64_t*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_I64: {
+      bits = Dedup(reinterpret_cast<const int64_t*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_U32: {
+      bits = Dedup(reinterpret_cast<const uint32_t*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_I32: {
+      bits = Dedup(reinterpret_cast<const int32_t*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_U16: {
+      bits = Dedup(reinterpret_cast<const uint16_t*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_I16: {
+      bits = Dedup(reinterpret_cast<const int16_t*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_U8: {
+      bits = Dedup(reinterpret_cast<const uint8_t*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_I8: {
+      bits = Dedup(reinterpret_cast<const int8_t*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    case DATA_STRING_VIEW: {
+      bits = Dedup(reinterpret_cast<const StringView*>(vec_data.Data()), row_size, k);
+      break;
+    }
+    default: {
+      THROW_LOGIC_ERR("Invalid column:{} with dtype:{} to dedup.", column, dtype);
+    }
+  }
+  return bits;
+}
+
 absl::Status Table::UnloadColumn(const std::string& name) {
   auto offset_result = GetColumnOffset(name);
   if (!offset_result.ok()) {
@@ -910,6 +1020,14 @@ const RowSchema* Table::GetRowSchema(const RowSchema& schema) {
     }
   }
   return nullptr;
+}
+int Table::GetRowIdx(const RowSchema& schema) {
+  for (size_t i = 0; i < rows_.size(); i++) {
+    if (rows_[i].GetSchema() == schema) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
 }
 
 template Table* Table::OrderBy<uint32_t>(Vector<uint32_t> by, bool descending);
