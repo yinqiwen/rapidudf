@@ -17,6 +17,7 @@
 #pragma once
 
 #include <functional>
+#include <iterator>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -185,50 +186,100 @@ class Table : public DynObject {
   Vector<Bit> Dedup(StringView column, uint32_t k);
 
   template <typename T>
-  void Foreach(std::function<void(const T*)>&& f) {
+  absl::Status Foreach(std::function<void(const T*)>&& f, Vector<Bit>* mask = nullptr) {
     const RowSchema* schema = GetRowSchema<T>();
     if (schema == nullptr) {
-      THROW_LOGIC_ERR("Invalid row object type to get schema");
+      RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
     }
     int row_idx = GetRowIdx(*schema);
     if (row_idx < 0) {
-      THROW_LOGIC_ERR("No row found for schema");
+      RUDF_LOG_RETURN_FMT_ERROR("No row found for schema");
     }
     size_t count = Count();
-
+    if (mask != nullptr) {
+      if (mask->Size() != count) {
+        RUDF_LOG_RETURN_FMT_ERROR("mask size:{} mismatch table row count:{}", mask->Size(), count);
+      }
+    }
     for (size_t i = 0; i < count; i++) {
+      if (mask != nullptr) {
+        if (!(*mask)[i]) {
+          continue;
+        }
+      }
       T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
       f(row);
     }
+    return absl::OkStatus();
   }
 
   template <typename T, typename R>
-  Table* Map(const std::string& new_table_schema, std::function<const R*(const T*)>&& f) {
+  absl::StatusOr<Table*> Map(const std::string& new_table_schema,
+                             std::function<const R*(Context&, const T*, size_t)>&& f) {
     const RowSchema* schema = GetRowSchema<T>();
     if (schema == nullptr) {
-      THROW_LOGIC_ERR("Invalid row object type to get schema");
+      RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
     }
     int row_idx = GetRowIdx(*schema);
     if (row_idx < 0) {
-      THROW_LOGIC_ERR("No row found for schema");
+      RUDF_LOG_RETURN_FMT_ERROR("No row found for schema");
     }
     size_t count = Count();
-    Table* new_table = nullptr;
+    Table* new_table = NewTableBySchema(new_table_schema);
+    if (new_table == nullptr) {
+      RUDF_LOG_RETURN_FMT_ERROR("Can NOT create table by schema:{}", new_table_schema);
+    }
     std::vector<const R*> rows;
     rows.reserve(count);
     for (size_t i = 0; i < count; i++) {
       T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
-      const R* r = f(row);
-      rows.emplace_back(r);
+      const R* r = f(ctx_, row, i);
+      if (r != nullptr) {
+        rows.emplace_back(r);
+      }
     }
     auto status = new_table->AddRows(rows);
     if (!status.ok()) {
+      return status;
+    }
+    return new_table;
+  }
+  template <typename T, typename R>
+  absl::StatusOr<Table*> FlatMap(const std::string& new_table_schema,
+                                 std::function<std::vector<const R*>(Context&, const T*, size_t)>&& f) {
+    const RowSchema* schema = GetRowSchema<T>();
+    if (schema == nullptr) {
+      RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
+    }
+    int row_idx = GetRowIdx(*schema);
+    if (row_idx < 0) {
+      RUDF_LOG_RETURN_FMT_ERROR("No row found for schema");
+    }
+    size_t count = Count();
+    Table* new_table = NewTableBySchema(new_table_schema);
+    if (new_table == nullptr) {
+      RUDF_LOG_RETURN_FMT_ERROR("Can NOT create table by schema:{}", new_table_schema);
+    }
+    std::vector<const R*> rows;
+    rows.reserve(count);
+    for (size_t i = 0; i < count; i++) {
+      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
+      auto iter = f(ctx_, row, i);
+      for (const R* r : iter) {
+        if (r != nullptr) {
+          rows.emplace_back(r);
+        }
+      }
+    }
+    auto status = new_table->AddRows(rows);
+    if (!status.ok()) {
+      return status;
     }
     return new_table;
   }
 
   template <typename T>
-  Vector<Bit> Filter(std::function<bool(const T*)>&& f) {
+  Vector<Bit> Filter(std::function<bool(const T*, size_t)>&& f) {
     const RowSchema* schema = GetRowSchema<T>();
     if (schema == nullptr) {
       THROW_LOGIC_ERR("Invalid row object type to get schema");
@@ -242,7 +293,7 @@ class Table : public DynObject {
     memset(filter_mask.GetVectorData().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
     for (size_t i = 0; i < count; i++) {
       T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
-      if (f(row)) {
+      if (f(row, i)) {
         filter_mask.Set(i, Bit(true));
       }
     }
@@ -250,11 +301,11 @@ class Table : public DynObject {
   }
 
   template <typename T>
-  inline std::pair<Table*, Vector<Bit>> Filter(std::function<FilterStatus(const T*)>&& select,
+  inline std::pair<Table*, Vector<Bit>> Filter(std::function<FilterStatus(const T*, size_t)>&& select,
                                                Vector<Bit>* iter_mask = nullptr) {
     const RowSchema* schema = GetRowSchema<T>();
     if (schema == nullptr) {
-      THROW_LOGIC_ERR("Invalid row object type to get schema");
+      THROW_LOGIC_ERR("Invalid row object type to get schema for filter");
     }
     int row_idx = GetRowIdx(*schema);
     if (row_idx < 0) {
@@ -319,6 +370,7 @@ class Table : public DynObject {
 
  private:
   Table(Context& ctx, const DynObjectSchema* s);
+  Table* NewTableBySchema(const std::string& schema);
   Table* Clone();
   std::vector<int32_t> GetIndices();
   void SetIndices(std::vector<int32_t>&& indices);

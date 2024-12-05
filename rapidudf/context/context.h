@@ -48,7 +48,6 @@ template <typename T>
 using PtrValidateFunc = std::function<bool(T*)>;
 class Context {
  public:
-  static constexpr uint32_t kByteLanes = 32;  // 256bit
   using CleanupFunc = std::function<void()>;
 
   Context(Arena* arena = nullptr);

@@ -375,3 +375,109 @@ TEST(JitCompiler, dedup) {
 
   ASSERT_EQ(after_dedup->Count(), 8);
 }
+
+struct FilterStruct {
+  std::string city;
+  int id;
+  double score;
+};
+RUDF_STRUCT_FIELDS(FilterStruct, city, id, score)
+
+TEST(JitCompiler, filter) {
+  auto schema = simd::TableSchema::GetOrCreate(
+      "test_filter_table1", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
+
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<FilterStruct> items;
+  for (size_t i = 0; i < N; i++) {
+    FilterStruct item;
+    item.city = candidate_citys[i % candidate_citys.size()];
+    item.id = i + 10;
+    item.score = 1.1 + i;
+    items.emplace_back(item);
+  }
+  Context ctx;
+  auto table = schema->NewTable(ctx);
+  std::ignore = table->AddRows(items);
+
+  auto [filter_table, filter_bits] =
+      table->Filter<FilterStruct>([](const FilterStruct* item, size_t i) -> simd::FilterStatus {
+        if (item->city == "bj") {
+          return simd::FilterStatus{simd::FilterStatusCode::kSelect};
+        }
+        return simd::FilterStatus{simd::FilterStatusCode::kSkip};
+      });
+  ASSERT_EQ(filter_table->Count(), 25);
+}
+struct TransformStruct {
+  std::string city;
+  int id;
+  double score;
+};
+RUDF_STRUCT_FIELDS(TransformStruct, city, id, score)
+TEST(JitCompiler, map) {
+  auto tranform_schema = simd::TableSchema::GetOrCreate(
+      "test_map_transform", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
+  auto schema = simd::TableSchema::GetOrCreate(
+      "test_filter_table1", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
+
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<FilterStruct> items;
+  for (size_t i = 0; i < N; i++) {
+    FilterStruct item;
+    item.city = candidate_citys[i % candidate_citys.size()];
+    item.id = i + 10;
+    item.score = 1.1 + i;
+    items.emplace_back(item);
+  }
+  Context ctx;
+  auto table = schema->NewTable(ctx);
+  std::ignore = table->AddRows(items);
+
+  auto transform_table_result = table->Map<FilterStruct, TransformStruct>(
+      "test_map_transform", [](Context& ctx, const FilterStruct* s, size_t i) -> const TransformStruct* {
+        if (i == 50) {
+          return nullptr;
+        }
+        auto p = ctx.New<TransformStruct>();
+        return p;
+      });
+  ASSERT_TRUE(transform_table_result.value());
+  auto transform_table = transform_table_result.value();
+  ASSERT_EQ(transform_table->Count(), N - 1);
+}
+
+TEST(JitCompiler, flat_map) {
+  auto tranform_schema = simd::TableSchema::GetOrCreate(
+      "test_map_transform", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
+  auto schema = simd::TableSchema::GetOrCreate(
+      "test_filter_table1", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
+
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<FilterStruct> items;
+  for (size_t i = 0; i < N; i++) {
+    FilterStruct item;
+    item.city = candidate_citys[i % candidate_citys.size()];
+    item.id = i + 10;
+    item.score = 1.1 + i;
+    items.emplace_back(item);
+  }
+  Context ctx;
+  auto table = schema->NewTable(ctx);
+  std::ignore = table->AddRows(items);
+
+  auto transform_table_result = table->FlatMap<FilterStruct, TransformStruct>(
+      "test_map_transform", [](Context& ctx, const FilterStruct* s, size_t i) {
+        std::vector<const TransformStruct*> vec;
+        for (int i = 0; i < 3; i++) {
+          vec.emplace_back(ctx.New<TransformStruct>());
+        }
+        return vec;
+      });
+  ASSERT_TRUE(transform_table_result.value());
+  auto transform_table = transform_table_result.value();
+  ASSERT_EQ(transform_table->Count(), N * 3);
+}

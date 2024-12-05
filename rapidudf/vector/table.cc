@@ -355,6 +355,24 @@ Table* Table::Clone() {
   ctx_.Own(t, d);
   return t;
 }
+Table* Table::NewTableBySchema(const std::string& name) {
+  auto* table_schema = TableSchema::Get(name);
+  if (table_schema == nullptr) {
+    return nullptr;
+  }
+  uint8_t* bytes = new uint8_t[table_schema->ByteSize()];
+  memset(bytes, 0, table_schema->ByteSize());
+  try {
+    new (bytes) Table(ctx_, table_schema);
+  } catch (...) {
+    throw;
+  }
+  Table* t = reinterpret_cast<Table*>(bytes);
+  Deleter d;
+  ctx_.Own(t, d);
+  return t;
+}
+
 std::vector<int32_t> Table::GetIndices() {
   size_t count = Count();
   if (indices_.size() < count) {
