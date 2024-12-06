@@ -1,18 +1,18 @@
-/*
- * Copyright (c) 2024 yinqiwen yinqiwen@gmail.com. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// /*
+//  * Copyright (c) 2024 yinqiwen yinqiwen@gmail.com. All rights reserved.
+//  *
+//  * Licensed under the Apache License, Version 2.0 (the "License");
+//  * you may not use this file except in compliance with the License.
+//  * You may obtain a copy of the License at
+//  *
+//  *     http://www.apache.org/licenses/LICENSE-2.0
+//  *
+//  * Unless required by applicable law or agreed to in writing, software
+//  * distributed under the License is distributed on an "AS IS" BASIS,
+//  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  * See the License for the specific language governing permissions and
+//  * limitations under the License.
+//  */
 
 #include <gtest/gtest.h>
 #include <tuple>
@@ -29,76 +29,84 @@
 
 using namespace rapidudf;
 
+struct SimpleStruct {
+  std::string sv;
+  float fv;
+  int iv;
+  bool bv;
+};
+RUDF_STRUCT_FIELDS(SimpleStruct, sv, fv, iv, bv)
+
 TEST(JitCompiler, table_simple) {
-  auto schema = simd::TableSchema::GetOrCreate("mytable", [](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<StringView>("sv");
-    std::ignore = s->AddColumn<float>("fv");
-    std::ignore = s->AddColumn<int>("iv");
-    std::ignore = s->AddColumn<bool>("bv");
-  });
+  auto schema = simd::TableSchema::GetOrCreate(
+      "mytable", [](simd::TableSchema* s) { std::ignore = s->AddColumns<SimpleStruct>(); });
   Context ctx;
-  auto obj = schema->NewTable(ctx);
-  std::vector<float> fv{1, 2, 3.1, 5.6};
-  std::vector<int> iv{10, 20, 30, 540};
-  std::vector<std::string> sv{"a0", "a1", "a2", "a3"};
-  std::vector<bool> bv{false, true, false, true, false};
-  std::ignore = obj->Set("fv", fv);
-  std::ignore = obj->Set("iv", iv);
-  std::ignore = obj->Set("sv", sv);
-  std::ignore = obj->Set("bv", bv);
+  auto table = schema->NewTable(ctx);
+  std::vector<SimpleStruct> objs;
+  objs.emplace_back(SimpleStruct{"a0", 1, 10, false});
+  objs.emplace_back(SimpleStruct{"a1", 2, 20, true});
+  objs.emplace_back(SimpleStruct{"a2", 3.1, 30, false});
+  objs.emplace_back(SimpleStruct{"a3", 5.6, 40, true});
 
-  auto fv_result = obj->Get<float>("fv");
+  auto status = table->AddRows(objs);
+  ASSERT_TRUE(status.ok());
+
+  auto fv_result = table->Get<float>("fv");
   ASSERT_TRUE(fv_result.ok());
-  ASSERT_EQ(fv_result.value().Size(), fv.size());
-  for (size_t i = 0; i < fv.size(); i++) {
-    ASSERT_FLOAT_EQ(fv_result.value()[i], fv[i]);
+  ASSERT_EQ(fv_result.value().Size(), objs.size());
+  for (size_t i = 0; i < objs.size(); i++) {
+    ASSERT_FLOAT_EQ(fv_result.value()[i], objs[i].fv);
   }
 
-  auto sv_result = obj->Get<StringView>("sv");
+  auto sv_result = table->Get<StringView>("sv");
   ASSERT_TRUE(sv_result.ok());
-  ASSERT_EQ(sv_result.value().Size(), sv.size());
-  ASSERT_TRUE(sv_result.value().IsReadonly());
-  for (size_t i = 0; i < sv.size(); i++) {
-    ASSERT_EQ(sv_result.value()[i], StringView(sv[i]));
+  ASSERT_EQ(sv_result.value().Size(), objs.size());
+  // ASSERT_TRUE(sv_result.value().IsReadonly());
+  for (size_t i = 0; i < objs.size(); i++) {
+    ASSERT_EQ(sv_result.value()[i], StringView(objs[i].sv));
   }
 
-  auto bv_result = obj->Get<bool>("bv");
+  auto bv_result = table->Get<bool>("bv");
   ASSERT_TRUE(bv_result.ok());
-  ASSERT_EQ(bv_result.value().Size(), bv.size());
-  for (size_t i = 0; i < bv.size(); i++) {
-    ASSERT_EQ(bv_result.value()[i], bv[i]);
+  ASSERT_EQ(bv_result.value().Size(), objs.size());
+  for (size_t i = 0; i < objs.size(); i++) {
+    ASSERT_EQ(bv_result.value()[i], Bit(objs[i].bv));
   }
 }
 
+struct ComplexStruct {
+  double Click;
+  double Like;
+  double Join;
+  double Inter;
+  double TimeV1;
+  double PostComment;
+  double PositiveCommentV1;
+  double ExpoTimeV1;
+};
+RUDF_STRUCT_FIELDS(ComplexStruct, Click, Like, Join, Inter, TimeV1, PostComment, PositiveCommentV1, ExpoTimeV1)
+
 TEST(JitCompiler, table_func1) {
-  std::unordered_map<std::string, std::vector<double>> table_data;
-  table_data["Click"] = {1, 2, 3, 5};
-  table_data["Like"] = {1, 2, 3, 5};
-  table_data["Join"] = {1, 2, 3, 5};
-  table_data["Inter"] = {1, 2, 3, 5};
-  table_data["TimeV1"] = {1, 2, 3, 5};
-  table_data["PostComment"] = {1, 2, 3, 5};
-  table_data["PositiveCommentV1"] = {1, 2, 3, 5};
-  table_data["ExpoTimeV1"] = {1, 2, 3, 5};
+  auto schema = simd::TableSchema::GetOrCreate(
+      "score_table", [](simd::TableSchema* s) { std::ignore = s->AddColumns<ComplexStruct>(); });
 
-  std::unordered_map<std::string, std::vector<double>> table_data_clone = table_data;
+  std::vector<ComplexStruct> objs;
+  objs.emplace_back(ComplexStruct{1, 1, 1, 1, 1, 1, 1, 1});
+  objs.emplace_back(ComplexStruct{2, 2, 2, 2, 2, 2, 2, 2});
+  objs.emplace_back(ComplexStruct{3, 3, 3, 3, 3, 3, 3, 3});
+  objs.emplace_back(ComplexStruct{5, 5, 5, 5, 5, 5, 5, 5});
 
-  auto schema = simd::TableSchema::GetOrCreate("score_table", [&](simd::TableSchema* s) {
-    for (auto& [name, _] : table_data) {
-      std::ignore = s->AddColumn<double>(name);
-    }
-  });
   Context ctx;
   auto table = schema->NewTable(ctx);
-  auto _ = table->AddMap(std::move(table_data));
-  // auto _ = table.AddMap(std::move(table_data));
+  auto status = table->AddRows(objs);
+  ASSERT_TRUE(status.ok());
 
   std::string multiple_pow =
       "(Click^10.0)*((Like+0.000082)^4.7)*(Inter^3.5)*((Join+0.000024)^5.5)*(TimeV1^7.0)*((PostComment+0.000024)^3.5)*("
       "(PositiveCommentV1+0.0038)^1.0)*(ExpoTimeV1^1.5)";
 
   std::string content = R"(
-    (table.Click^10.0)*((table.Like+0.000082)^4.7)*(table.Inter^3.5)*((table.Join+0.000024)^5.5)*(table.TimeV1^7.0)*((table.PostComment+0.000024)^3.5)*((table.PositiveCommentV1+0.0038)^1.0)*(table.ExpoTimeV1^1.5)
+(table.Click^10.0)*((table.Like+0.000082)^4.7)*(table.Inter^3.5)*((table.Join+0.000024)^5.5)*(table.TimeV1^7.0)*((table.PostComment+0.000024)^3.5)*((table.PositiveCommentV1+0.0038)^1.0)*(table.ExpoTimeV1^1.5)
   )";
 
   JitCompiler compiler;
@@ -108,37 +116,35 @@ TEST(JitCompiler, table_func1) {
   auto f = std::move(rc.value());
   auto column = f(ctx, *table);
   //   simd::Vector<double> result = column->ToVector<double>().value();
-  for (size_t i = 0; i < column.Size(); i++) {
-    double actual =
-        std::pow(table_data_clone["Click"][i], 10.0) * std::pow(table_data_clone["Like"][i] + 0.000082, 4.7) *
-        std::pow(table_data_clone["Inter"][i], 3.5) * std::pow(table_data_clone["Join"][i] + 0.000024, 5.5) *
-        std::pow(table_data_clone["TimeV1"][i], 7.0) * std::pow(table_data_clone["PostComment"][i] + 0.000024, 3.5) *
-        std::pow(table_data_clone["PositiveCommentV1"][i] + 0.0038, 1.0) *
-        std::pow(table_data_clone["ExpoTimeV1"][i], 1.5);
+  for (size_t i = 0; i < objs.size(); i++) {
+    double actual = std::pow(objs[i].Click, 10.0) * std::pow(objs[i].Like + 0.000082, 4.7) *
+                    std::pow(objs[i].Inter, 3.5) * std::pow(objs[i].Join + 0.000024, 5.5) *
+                    std::pow(objs[i].TimeV1, 7.0) * std::pow(objs[i].PostComment + 0.000024, 3.5) *
+                    std::pow(objs[i].PositiveCommentV1 + 0.0038, 1.0) * std::pow(objs[i].ExpoTimeV1, 1.5);
     ASSERT_DOUBLE_EQ(actual, column[i]);
   }
 }
 
+struct TestFilterStruct {
+  int id;
+  std::string city;
+};
+RUDF_STRUCT_FIELDS(TestFilterStruct, id, city)
+
 TEST(JitCompiler, table_filter) {
-  auto schema = simd::TableSchema::GetOrCreate("test_filter_table", [&](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<int>("id");
-    std::ignore = s->AddColumn<StringView>("city");
-  });
+  auto schema = simd::TableSchema::GetOrCreate(
+      "test_filter_table", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestFilterStruct>(); });
 
   Context ctx;
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
-  std::vector<std::string> city;
-  std::vector<int> ids;
+  std::vector<TestFilterStruct> objs;
+
   for (size_t i = 0; i < N; i++) {
-    ids.emplace_back(i + 10);
-    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
+    objs.emplace_back(TestFilterStruct{(static_cast<int>(i) + 10), candidate_citys[i % candidate_citys.size()]});
   }
-
   auto table = schema->NewTable(ctx);
-
-  std::ignore = table->Set("id", std::move(ids));
-  std::ignore = table->Set("city", std::move(city));
+  std::ignore = table->AddRows(objs);
 
   std::string expr = R"(
     table.filter(table.city=="sz")
@@ -156,7 +162,7 @@ TEST(JitCompiler, table_filter) {
   auto new_city_column = new_table->Get<StringView>("city").value();
 
   int expect_id = 10;
-  for (size_t i = 0; i < ids.size(); i++) {
+  for (size_t i = 0; i < new_id_column.Size(); i++) {
     ASSERT_EQ(new_id_column[i], expect_id);
     ASSERT_EQ(new_city_column[i], "sz");
     expect_id += 4;
@@ -165,44 +171,30 @@ TEST(JitCompiler, table_filter) {
 struct TestUser {
   int id;
   double score;
+  std::string city;
+  int repeate = 0;
 };
-
+RUDF_STRUCT_FIELDS(TestUser, id, score, city, repeate)
 TEST(JitCompiler, table_order_by) {
-  auto schema = simd::TableSchema::GetOrCreate("table_order_by_table", [&](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<int>("id");
-    std::ignore = s->AddColumn<StringView>("city");
-    std::ignore = s->AddColumn<double>("score");
-    std::ignore = s->AddColumn<Pointer>("user");
-  });
+  auto schema = simd::TableSchema::GetOrCreate("TestUser",
+                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
-  std::vector<std::string> city;
-  std::vector<int> ids;
-  std::vector<double> scores;
-  std::vector<TestUser> users;
-
+  std::vector<TestUser> objs;
   for (size_t i = 0; i < N; i++) {
-    ids.emplace_back(i + 10);
-    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
-    scores.emplace_back(1.1 + i);
-    TestUser user;
-    user.id = ids[ids.size() - 1];
-    user.score = scores[scores.size() - 1];
-    users.emplace_back(user);
+    objs.emplace_back(TestUser{static_cast<int>(i + 10), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
   }
 
   Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->Set("id", std::move(ids));
-  std::ignore = table->Set("city", std::move(city));
-  std::ignore = table->Set("score", std::move(scores));
-  std::ignore = table->Set("user", users);
+  std::ignore = table->AddRows(objs);
+
   std::string expr = R"(
     table.order_by(table.score, true)
   )";
   JitCompiler compiler;
-  auto rc = compiler.CompileDynObjExpression<simd::Table*, simd::Table*>(expr, {{"table", "table_order_by_table"}});
+  auto rc = compiler.CompileDynObjExpression<simd::Table*, simd::Table*>(expr, {{"table", "TestUser"}});
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
@@ -213,46 +205,35 @@ TEST(JitCompiler, table_order_by) {
   auto new_id_column = new_table->Get<int>("id").value();
   auto new_city_column = new_table->Get<StringView>("city").value();
   auto new_score_column = new_table->Get<double>("score").value();
-  auto new_user_column = new_table->Get<Pointer>("user").value();
   ASSERT_EQ(N, new_city_column.Size());
   ASSERT_EQ(new_id_column.Size(), new_city_column.Size());
 
   for (size_t i = 0; i < N; i++) {
-    RUDF_INFO("{} {} {}", new_id_column[i], new_city_column[i], new_score_column[i]);
-    ASSERT_EQ(new_id_column[i], new_user_column[i].As<TestUser>()->id);
-    ASSERT_DOUBLE_EQ(new_score_column[i], new_user_column[i].As<TestUser>()->score);
+    ASSERT_EQ(new_id_column[i], new_table->GetRow<TestUser>(i)->id);
+    ASSERT_DOUBLE_EQ(new_score_column[i], new_table->GetRow<TestUser>(i)->score);
   }
 }
 
 TEST(JitCompiler, table_topk) {
-  auto schema = simd::TableSchema::GetOrCreate("test_topk_table", [&](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<int>("id");
-    std::ignore = s->AddColumn<StringView>("city");
-    std::ignore = s->AddColumn<double>("score");
-  });
+  auto schema = simd::TableSchema::GetOrCreate("TestUser",
+                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
-  std::vector<std::string> city;
-  std::vector<int> ids;
-  std::vector<double> scores;
+  std::vector<TestUser> objs;
   for (size_t i = 0; i < N; i++) {
-    ids.emplace_back(i + 10);
-    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
-    scores.emplace_back(1.1 + i);
+    objs.emplace_back(TestUser{static_cast<int>(i + 10), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
   }
 
   Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->Set("id", std::move(ids));
-  std::ignore = table->Set("city", std::move(city));
-  std::ignore = table->Set("score", std::move(scores));
+  std::ignore = table->AddRows(objs);
 
   std::string expr = R"(
     table.topk(table.score,5,true)
   )";
   JitCompiler compiler;
-  auto rc = compiler.CompileDynObjExpression<simd::Table*, simd::Table*>(expr, {{"table", "test_topk_table"}});
+  auto rc = compiler.CompileDynObjExpression<simd::Table*, simd::Table*>(expr, {{"table", "TestUser"}});
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
@@ -272,30 +253,22 @@ TEST(JitCompiler, table_topk) {
 }
 
 TEST(JitCompiler, table_take) {
-  auto schema = simd::TableSchema::GetOrCreate("test_take_table", [&](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<int>("id");
-    std::ignore = s->AddColumn<StringView>("city");
-    std::ignore = s->AddColumn<double>("score");
-  });
+  auto schema = simd::TableSchema::GetOrCreate("TestUser",
+                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
-  std::vector<std::string> city;
-  std::vector<int> ids;
-  std::vector<double> scores;
+  std::vector<TestUser> objs;
   for (size_t i = 0; i < N; i++) {
-    ids.emplace_back(i + 10);
-    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
-    scores.emplace_back(1.1 + i);
+    objs.emplace_back(TestUser{static_cast<int>(i + 10), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
   }
+
   Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->Set("id", ids);
-  std::ignore = table->Set("city", city);
-  std::ignore = table->Set("score", scores);
+  std::ignore = table->AddRows(objs);
 
   std::string expr = R"(
-      table<test_take_table> test_func(table<test_take_table> x){
+      table<TestUser> test_func(table<TestUser> x){
       return x.head(5);
     }
   )";
@@ -312,6 +285,7 @@ TEST(JitCompiler, table_take) {
   auto new_city_column = new_table->Get<StringView>("city").value();
   auto new_score_column = new_table->Get<double>("score").value();
 
+  ASSERT_EQ(5, new_table->Count());
   ASSERT_EQ(5, new_id_column.Size());
   ASSERT_EQ(5, new_city_column.Size());
   ASSERT_EQ(5, new_score_column.Size());
@@ -322,54 +296,38 @@ TEST(JitCompiler, table_take) {
 }
 
 TEST(JitCompiler, group_by) {
-  auto schema = simd::TableSchema::GetOrCreate("test_group_by_table", [&](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<int>("id");
-    std::ignore = s->AddColumn<StringView>("city");
-    std::ignore = s->AddColumn<double>("score");
-  });
+  auto schema = simd::TableSchema::GetOrCreate("TestUser",
+                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
-  std::vector<std::string> city;
-  std::vector<int> ids;
-  std::vector<double> scores;
+  std::vector<TestUser> objs;
   for (size_t i = 0; i < N; i++) {
-    ids.emplace_back(i + 10);
-    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
-    scores.emplace_back(1.1 + i);
+    objs.emplace_back(TestUser{static_cast<int>(i + 10), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
   }
+
   Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->Set("id", ids);
-  std::ignore = table->Set("city", city);
-  std::ignore = table->Set("score", scores);
+  std::ignore = table->AddRows(objs);
 
   auto table_group = table->GroupBy("city");
   ASSERT_EQ(table_group.size(), 4);
 }
 
 TEST(JitCompiler, dedup) {
-  auto schema = simd::TableSchema::GetOrCreate("test_dedup_table", [&](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<int>("id");
-    std::ignore = s->AddColumn<StringView>("city");
-    std::ignore = s->AddColumn<double>("score");
-  });
+  auto schema = simd::TableSchema::GetOrCreate("TestUser",
+                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
-  std::vector<std::string> city;
-  std::vector<int> ids;
-  std::vector<double> scores;
+  std::vector<TestUser> objs;
   for (size_t i = 0; i < N; i++) {
-    ids.emplace_back(i + 10);
-    city.emplace_back(candidate_citys[i % candidate_citys.size()]);
-    scores.emplace_back(1.1 + i);
+    objs.emplace_back(TestUser{static_cast<int>(i + 10), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
   }
+
   Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->Set("id", ids);
-  std::ignore = table->Set("city", city);
-  std::ignore = table->Set("score", scores);
+  std::ignore = table->AddRows(objs);
 
   auto after_dedup = table->Filter(table->Dedup("city", 2));
 
@@ -480,4 +438,63 @@ TEST(JitCompiler, flat_map) {
   ASSERT_TRUE(transform_table_result.value());
   auto transform_table = transform_table_result.value();
   ASSERT_EQ(transform_table->Count(), N * 3);
+}
+
+TEST(JitCompiler, distinct) {
+  auto schema = simd::TableSchema::GetOrCreate("TestUser",
+                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<TestUser> objs1, objs2;
+  for (size_t i = 0; i < N; i++) {
+    objs1.emplace_back(TestUser{static_cast<int>(i + 10), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
+    objs2.emplace_back(
+        TestUser{static_cast<int>(i + 10 + N / 2), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
+  }
+
+  Context ctx;
+  auto table1 = schema->NewTable(ctx);
+  auto table2 = schema->NewTable(ctx);
+  std::ignore = table1->AddRows(objs1);
+  std::ignore = table1->AddRows(objs2);
+  auto table3 = table1->Concat(table2);
+  ASSERT_EQ(table3->Count(), 2 * N);
+
+  absl::Status s = table3->Distinct("id");
+  ASSERT_TRUE(s.ok());
+  ASSERT_EQ(table3->Count(), 150);
+}
+
+TEST(JitCompiler, distinct_merge) {
+  auto schema = simd::TableSchema::GetOrCreate("TestUser",
+                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<TestUser> objs1, objs2;
+  for (size_t i = 0; i < N; i++) {
+    objs1.emplace_back(TestUser{static_cast<int>(i + 10), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
+    objs2.emplace_back(
+        TestUser{static_cast<int>(i + 10 + N / 2), 1.1 + i, candidate_citys[i % candidate_citys.size()]});
+  }
+
+  Context ctx;
+  auto table1 = schema->NewTable(ctx);
+  auto table2 = schema->NewTable(ctx);
+  std::ignore = table1->AddRows(objs1);
+  std::ignore = table2->AddRows(objs2);
+  auto table3 = table1->Concat(table2);
+  ASSERT_EQ(table3->Count(), 2 * N);
+
+  absl::Status s = table3->Distinct<TestUser>(
+      std::vector<StringView>{"id"}, [](Context& ctx, TestUser* current, const TestUser* duplicate) -> TestUser* {
+        current->repeate++;
+        return current;
+      });
+  ASSERT_TRUE(s.ok());
+  ASSERT_EQ(table3->Count(), 150);
+  for (size_t i = 0; i < table3->Count(); i++) {
+    RUDF_INFO("[{}] id:{},repeat:{}]", i, table3->GetRow<TestUser>(i)->id, table3->GetRow<TestUser>(i)->repeate);
+  }
 }

@@ -51,26 +51,28 @@ using RowSchemaPtr = std::unique_ptr<RowSchema>;
 class Rows {
  public:
   explicit Rows(Context& ctx, std::vector<const uint8_t*>&& objs, const RowSchema& s)
-      : ctx_(ctx), objs_(std::move(objs)), schema_(s) {
-    pointers_ = ctx.NewSimdVector(objs_);
-  }
+      : ctx_(ctx), objs_(std::move(objs)), schema_(s) {}
   absl::Status Insert(size_t pos, const uint8_t* ptr);
   void Append(const std::vector<const uint8_t*>& objs);
 
   const RowSchema& GetSchema() const { return schema_; }
-  const Vector<Pointer>& GetRowPtrs() const { return pointers_; }
+  Vector<Pointer> GetRowPtrs() const;
+  const std::vector<const uint8_t*> GetRawRowPtrs() const { return objs_; }
 
-  size_t RowCount() const { return pointers_.Size(); }
+  size_t RowCount() const { return objs_.size(); }
 
   void Filter(Vector<Bit> bits);
   void Truncate(size_t k);
   void Truncate(size_t pos, size_t k);
   void Gather(Vector<int32_t> indices);
 
+  void Reset(std::vector<const uint8_t*>&& objs);
+
  private:
+  void SetPointers(Vector<Pointer> ptrs);
+
   Context& ctx_;
   std::vector<const uint8_t*> objs_;
-  Vector<Pointer> pointers_;
   RowSchema schema_;
 };
 using RowsPtr = std::unique_ptr<Rows>;

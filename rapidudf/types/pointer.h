@@ -25,7 +25,7 @@ class Pointer {
     ptr_val_ = reinterpret_cast<uintptr_t>(p);
   }
   template <typename T>
-  T* As() {
+  T* As() const {
     return reinterpret_cast<T*>(ptr_val_);
   }
 

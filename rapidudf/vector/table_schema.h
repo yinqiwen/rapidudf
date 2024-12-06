@@ -43,6 +43,7 @@ namespace simd {
 struct TableCreateOptions {
   std::unordered_set<std::string> includes;
   std::unordered_set<std::string> excludes;
+
   bool ignore_unsupported_fields = false;
   bool IsAllowed(const std::string& field) const;
 };
@@ -68,10 +69,10 @@ class TableSchema : public DynObjectSchema {
     }
   }
 
-  template <typename T>
-  absl::Status AddColumn(const std::string& name) {
-    return AddColumn<T>(name, nullptr, 0);
-  }
+  // template <typename T>
+  // absl::Status AddColumn(const std::string& name) {
+  //   return AddColumn<T>(name, nullptr, 0);
+  // }
   bool ExistColumn(const std::string& name, const DType& dtype) const;
   bool ExistRow(const RowSchema& row) const;
 

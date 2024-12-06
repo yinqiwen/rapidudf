@@ -172,24 +172,26 @@ table类也提供一些类Spark DataFrame的操作，如：
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
+struct Student {
+  std::string name;
+  uint16_t age = 0;
+  float score = 0;
+  bool gender = false;
+};
+RUDF_STRUCT_FIELDS(Student, name, age, score, gender)
 int main() {
   // 1. 创建table schema
-  auto schema = simd::TableSchema::GetOrCreate("Student", [](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<StringView>("name");
-    std::ignore = s->AddColumn<uint16_t>("age");
-    std::ignore = s->AddColumn<float>("score");
-    std::ignore = s->AddColumn<Bit>("gender");
-  });
+  auto schema =
+      simd::TableSchema::GetOrCreate("Student", [](simd::TableSchema* s) { std::ignore = s->AddColumns<Student>(); });
 
-  // 2. UDF string, table<TABLE_NAME> 泛型格式中TABLE_NAME需要为之前创建的table schema name
-  // table 支持 filter/order_by/topk/take等操作
+  // 2. UDF string
   std::string source = R"(
-    table<Student> select_students(Context ctx, table<Student> x) 
-    { 
+    table<Student> select_students(Context ctx, table<Student> x)
+    {
        auto filtered = x.filter(x.score >90 && x.age<10);
-       // 按score降序排列取top10
-       return filtered.topk(filtered.score,10,true); 
-    } 
+       // 降序排列
+       return filtered.topk(filtered.score,10, true);
+    }
   )";
 
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
@@ -203,36 +205,34 @@ int main() {
   auto f = std::move(result.value());
 
   // 4.1 测试数据， 需要将原始数据转成列式数据
-  std::vector<float> scores;
-  std::vector<std::string> names;
-  std::vector<uint16_t> ages;
-  std::vector<bool> genders;
-
+  std::vector<Student> students;
   for (size_t i = 0; i < 128; i++) {
     float score = (i + 1) % 150;
-    scores.emplace_back(score);
-    names.emplace_back("test_" + std::to_string(i));
-    ages.emplace_back(i % 5 + 8);
-    genders.emplace_back(i % 2 == 0 ? true : false);
+    uint16_t age = i % 5 + 8;
+    bool gender = i % 2 == 0;
+    students.emplace_back(Student{"test_" + std::to_string(i), age, score, gender});
   }
-  // 4.2创建table实例
+  // 4.2 创建table实例
   rapidudf::Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->Set("score", scores);
-  std::ignore = table->Set("name", names);
-  std::ignore = table->Set("age", ages);
-  std::ignore = table->Set("gender", genders);
+  // 4.3 填充数据
+  std::ignore = table->AddRows(students);
 
   // 5. 执行function
-  auto result_table = f(ctx, table.get());
-  auto result_scores = result_table->Get<float>("score").value();
-  auto result_names = result_table->Get<StringView>("name").value();
-  auto result_ages = result_table->Get<uint16_t>("age").value();
-  auto result_genders = result_table->Get<Bit>("gender").value();
-  for (size_t i = 0; i < result_scores.Size(); i++) {
-    RUDF_INFO("name:{},score:{},age:{},gender:{}", result_names[i], result_scores[i], result_ages[i],
-              result_genders[i] ? true : false);
+  try {
+    auto result_table = f(ctx, table.get());
+    auto result_scores = result_table->Get<float>("score").value();
+    auto result_names = result_table->Get<StringView>("name").value();
+    auto result_ages = result_table->Get<uint16_t>("age").value();
+    auto result_genders = result_table->Get<Bit>("gender").value();
+    for (size_t i = 0; i < result_scores.Size(); i++) {
+      RUDF_INFO("name:{},score:{},age:{},gender:{}", result_names[i], result_scores[i], result_ages[i],
+                result_genders[i] ? true : false);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
+
   return 0;
 };
 ```

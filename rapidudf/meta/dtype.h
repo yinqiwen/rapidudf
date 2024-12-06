@@ -119,6 +119,9 @@ class DType {
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
   bool CanCastTo(DType other) const;
 
+  size_t Hash(const uint8_t* data) const;
+  bool Equal(const uint8_t* left, const uint8_t* right) const;
+
   DType Key() const;
   DType Elem() const;
   DType PtrTo() const;

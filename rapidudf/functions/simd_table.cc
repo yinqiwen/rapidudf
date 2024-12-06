@@ -65,6 +65,11 @@ struct SimdTableHelper {
    */
   static uint32_t count(simd::Table* table) { return table->Count(); }
 
+  /**
+   **   Returns the first num rows as a list of Row.
+   */
+  static simd::Table* concat(simd::Table* table, simd::Table* other) { return table->Concat(other); }
+
   template <typename T>
   static absl::Span<simd::Table*> group_by(simd::Table* table, simd::Vector<T> by) {
     return table->GroupBy(by);
@@ -76,7 +81,7 @@ struct SimdTableHelper {
   }
 
   static void Init() {
-    RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, column_count, filter, head, tail, count);
+    RUDF_STRUCT_HELPER_METHODS_BIND(SimdTableHelper, column_count, filter, head, tail, count, concat);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f32", topk<float>);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_f64", topk<double>);
     RUDF_STRUCT_HELPER_METHOD_BIND("topk_u32", topk<uint32_t>);

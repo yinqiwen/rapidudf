@@ -192,14 +192,17 @@ The table class also provides operations similar to Spark DataFrame, such as:
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
+struct Student {
+  std::string name;
+  uint16_t age = 0;
+  float score = 0;
+  bool gender = false;
+};
+RUDF_STRUCT_FIELDS(Student, name, age, score, gender)
 int main() {
   // 1. Create table schema
-  auto schema = simd::TableSchema::GetOrCreate("Student", [](simd::TableSchema* s) {
-    std::ignore = s->AddColumn<StringView>("name");
-    std::ignore = s->AddColumn<uint16_t>("age");
-    std::ignore = s->AddColumn<float>("score");
-    std::ignore = s->AddColumn<Bit>("gender");
-  });
+  auto schema =
+      simd::TableSchema::GetOrCreate("Student", [](simd::TableSchema* s) { std::ignore = s->AddColumns<Student>(); });
 
   // 2. UDF string, table<TABLE_NAME> generic format where TABLE_NAME must match the previously created table schema name
   // table supports filter/order_by/topk/take, etc. operations
@@ -223,25 +226,17 @@ int main() {
   auto f = std::move(result.value());
 
   // 4.1 Test data, need to convert raw data into columnar data
-  std::vector<float> scores;
-  std::vector<std::string> names;
-  std::vector<uint16_t> ages;
-  std::vector<bool> genders;
-
+  std::vector<Student> students;
   for (size_t i = 0; i < 128; i++) {
     float score = (i + 1) % 150;
-    scores.emplace_back(score);
-    names.emplace_back("test_" + std::to_string(i));
-    ages.emplace_back(i % 5 + 8);
-    genders.emplace_back(i % 2 == 0 ? true : false);
+    uint16_t age = i % 5 + 8;
+    bool gender = i % 2 == 0;
+    students.emplace_back(Student{"test_" + std::to_string(i), age, score, gender});
   }
   // 4.2 Create table instance
   rapidudf::Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->Set("score", scores);
-  std::ignore = table->Set("name", names);
-  std::ignore = table->Set("age", ages);
-  std::ignore = table->Set("gender", genders);
+  std::ignore = table->AddRows(students);
 
   // 5. Execute function
   auto result_table = f(ctx, table.get());

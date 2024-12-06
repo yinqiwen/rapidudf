@@ -20,6 +20,7 @@
 #include <numeric>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -112,6 +113,7 @@ void Table::SetColumnSize(const reflect::Column& column, void* p) {
   if (vdata->Data() == p) {
     vdata->SetSize(Count());
   }
+  vdata->SetReadonly(false);
 }
 
 template <typename T>
@@ -159,6 +161,9 @@ absl::Status Table::LoadColumn(const Rows& rows, const reflect::Column& column) 
     }
     case DATA_STRING_VIEW: {
       return LoadColumn<StringView>(rows.GetRowPtrs(), column);
+    }
+    case DATA_BIT: {
+      return LoadColumn<bool>(rows.GetRowPtrs(), column);
     }
     default: {
       RUDF_LOG_RETURN_FMT_ERROR("Unsupported column:{} with dtype:{}", column.name, column.field.dtype);
@@ -261,11 +266,18 @@ absl::Status Table::LoadStructColumn(const Vector<Pointer>& struct_vector, const
           if (!obj.IsNull()) {
             const T* ptr =
                 reinterpret_cast<const T*>(obj.As<const uint8_t>() + column.GetStructField()->member_field_offset);
-            vec[i] = (*ptr);
+            if constexpr (std::is_same_v<bool, T>) {
+              bits_set(reinterpret_cast<uint8_t*>(vec), i, *ptr);
+            } else {
+              vec[i] = (*ptr);
+            }
           } else {
-            vec[i] = (T{});
+            if constexpr (std::is_same_v<bool, T>) {
+              bits_set(reinterpret_cast<uint8_t*>(vec), i, false);
+            } else {
+              vec[i] = (T{});
+            }
           }
-
         } else {
           RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
                                     actual_dtype);
@@ -306,7 +318,11 @@ absl::Status Table::LoadStructColumn(const Vector<Pointer>& struct_vector, const
           if (expect_dtype == actual_dtype) {
             using func_t = T (*)(void*);
             func_t f = reinterpret_cast<func_t>(column.GetStructField()->member_func->func);
-            vec[i] = (f(obj.As<uint8_t>()));
+            if constexpr (std::is_same_v<bool, T>) {
+              bits_set(reinterpret_cast<uint8_t*>(vec), i, f(obj.As<uint8_t>()));
+            } else {
+              vec[i] = (f(obj.As<uint8_t>()));
+            }
           } else {
             RUDF_LOG_RETURN_FMT_ERROR("Unexpected state with column dtype:{}, field dtype:{}", expect_dtype,
                                       actual_dtype);
@@ -472,6 +488,7 @@ VectorData Table::GetColumnByOffset(uint32_t offset) {
     if (column == nullptr) {
       THROW_LOGIC_ERR("No rows found for column:{}", column->name);
     }
+
     auto status = LoadColumn(*rows, *column);
     if (!status.ok()) {
       THROW_LOGIC_ERR("Load column:{} error:{}", column->name, status.ToString());
@@ -578,20 +595,16 @@ bool Table::IsColumnLoaded(uint32_t offset) {
   return vdata->Size() > 0;
 }
 
-Table* Table::Filter(Vector<Bit> bits) {
-  Table* this_table = this;
-  Table* new_table = Clone();
-
-  for (auto& rows : new_table->rows_) {
+void Table::DoFilter(Vector<Bit> bits) {
+  for (auto& rows : rows_) {
     rows.Filter(bits);
   }
   schema_->VisitField([&](const std::string& name, const DType& dtype, uint32_t offset) {
-    uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this_table) + offset;
+    uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
     if (!IsColumnLoaded(offset)) {
       // lazy load column
       return;
     }
-
     VectorData new_vec;
     switch (dtype.GetFundamentalType()) {
       case DATA_BIT: {
@@ -659,8 +672,13 @@ Table* Table::Filter(Vector<Bit> bits) {
         return;
       }
     }
-    new_table->SetColumn(offset, new_vec);
+    SetColumn(offset, new_vec);
   });
+}
+
+Table* Table::Filter(Vector<Bit> bits) {
+  Table* new_table = Clone();
+  new_table->DoFilter(bits);
   return new_table;
 }
 std::pair<Table*, Table*> Table::Split(Vector<Bit> bits) {
@@ -848,6 +866,20 @@ absl::Span<Table*> Table::GroupBy(const T* by, size_t n) {
   return absl::Span<Table*>(group_tables, group_idxs.size());
 }
 
+VectorData Table::GetColumnVectorData(StringView column) {
+  auto result = schema_->GetField(column);
+  if (!result.ok()) {
+    THROW_LOGIC_ERR("No column:{} found.", column);
+  }
+  auto [dtype, offset] = result.value();
+  uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
+  VectorData vec_data = *(reinterpret_cast<VectorData*>(p));
+  if (vec_data.Data() == nullptr) {
+    return GetColumnByOffset(offset);
+  }
+  return vec_data;
+}
+
 template <typename T>
 absl::Span<Table*> Table::GroupBy(Vector<T> by) {
   if (by.Size() != Count()) {
@@ -863,8 +895,7 @@ absl::Span<Table*> Table::GroupBy(StringView column) {
   }
   auto [dtype, offset] = result.value();
   size_t row_size = Count();
-  uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
-  VectorData vec_data = *(reinterpret_cast<VectorData*>(p));
+  VectorData vec_data = GetColumnByOffset(offset);
   switch (dtype.GetFundamentalType()) {
     case DATA_F64: {
       return GroupBy(reinterpret_cast<const double*>(vec_data.Data()), row_size);
@@ -931,8 +962,7 @@ Vector<Bit> Table::Dedup(StringView column, uint32_t k) {
   }
   auto [dtype, offset] = result.value();
   size_t row_size = Count();
-  uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
-  VectorData vec_data = *(reinterpret_cast<VectorData*>(p));
+  VectorData vec_data = GetColumnByOffset(offset);
   Vector<Bit> bits;
   switch (dtype.GetFundamentalType()) {
     case DATA_F64: {
@@ -986,6 +1016,57 @@ Vector<Bit> Table::Dedup(StringView column, uint32_t k) {
   return bits;
 }
 
+absl::Status Table::Distinct(absl::Span<const StringView> columns) {
+  Vector<Bit> select;
+  for (auto column : columns) {
+    Vector<Bit> mask = Dedup(column, 1);
+    if (select.Size() == 0) {
+      select = mask;
+    } else {
+      functions::simd_vector_bits_and(select, mask, select);
+    }
+  }
+  DoFilter(select);
+  return absl::OkStatus();
+}
+
+typename Table::DistinctIndiceTable Table::DistinctByColumns(absl::Span<const StringView> columns) {
+  size_t count = Count();
+  std::vector<DType> key_dtypes;
+  std::vector<VectorData> key_vecs;
+  for (auto column : columns) {
+    auto result = schema_->GetField(column);
+    if (!result.ok()) {
+      THROW_LOGIC_ERR("No column:{} found.", column);
+    }
+    auto [dtype, offset] = result.value();
+    VectorData vec_data = GetColumnByOffset(offset);
+    key_dtypes.emplace_back(dtype.Elem());
+    key_vecs.emplace_back(vec_data);
+  }
+  DistinctIndiceTable indice_table;
+  using DistinctTable = absl::flat_hash_map<DistinctKey, int32_t, DistinctKeyHash, DistinctKeyCompare>;
+  DistinctTable distinc_table;
+  distinc_table.reserve(count);
+
+  for (size_t i = 0; i < count; i++) {
+    DistinctKey key;
+    for (size_t j = 0; j < key_dtypes.size(); j++) {
+      key.emplace_back(
+          std::make_pair(&key_dtypes[j], key_vecs[j].ReadableData<uint8_t>() + key_dtypes[j].ByteSize() * i));
+    }
+
+    auto [iter, success] = distinc_table.emplace(std::move(key), static_cast<int32_t>(i));
+    if (success) {
+      indice_table.emplace(static_cast<int32_t>(i), std::vector<int32_t>{});
+    } else {
+      indice_table[iter->second].emplace_back(static_cast<int32_t>(i));
+    }
+  }
+
+  return indice_table;
+}
+
 absl::Status Table::UnloadColumn(const std::string& name) {
   auto offset_result = GetColumnOffset(name);
   if (!offset_result.ok()) {
@@ -1028,6 +1109,23 @@ int Table::GetRowIdx(const RowSchema& schema) {
     }
   }
   return -1;
+}
+
+Table* Table::Concat(Table* other) {
+  if (GetTableSchema() != other->GetTableSchema()) {
+    THROW_LOGIC_ERR("Can NOT merge table:{} to {}", other->GetTableSchema()->Name(), GetTableSchema()->Name());
+  }
+  Table* new_table = Clone();
+  new_table->UnloadAllColumns();
+  for (size_t i = 0; i < new_table->rows_.size(); i++) {
+    for (size_t j = 0; j < other->rows_.size(); j++) {
+      if (new_table->rows_[i].GetSchema() == other->rows_[j].GetSchema()) {
+        new_table->rows_[i].Append(other->rows_[j].GetRawRowPtrs());
+        break;
+      }
+    }
+  }
+  return new_table;
 }
 
 template Table* Table::OrderBy<uint32_t>(Vector<uint32_t> by, bool descending);

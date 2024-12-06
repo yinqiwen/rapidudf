@@ -17,6 +17,7 @@
 #include <memory>
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype_enums.h"
+#include "rapidudf/types/bit.h"
 namespace rapidudf {
 namespace simd {
 bool TableCreateOptions::IsAllowed(const std::string& field) const {
@@ -355,6 +356,10 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
       case DATA_STD_STRING_VIEW:
       case DATA_STRING_VIEW: {
         status = AddColumn<std::string>(name, schema.get(), i);
+        break;
+      }
+      case DATA_BIT: {
+        status = AddColumn<bool>(name, schema.get(), i);
         break;
       }
       default: {

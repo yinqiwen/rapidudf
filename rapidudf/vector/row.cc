@@ -14,32 +14,44 @@
  * limitations under the License.
  */
 #include "rapidudf/vector/row.h"
+#include <cstring>
+#include <vector>
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/functions/simd/vector_misc.h"
+#include "rapidudf/types/pointer.h"
+#include "rapidudf/vector/vector.h"
 namespace rapidudf {
 namespace simd {
-void Rows::Filter(Vector<Bit> bits) { pointers_ = functions::simd_vector_filter(ctx_, pointers_, bits); }
+void Rows::SetPointers(Vector<Pointer> new_pointers) {
+  objs_.resize(new_pointers.Size());
+  memcpy(&objs_[0], new_pointers.GetVectorData().ReadableData<Pointer>(), new_pointers.Size() * sizeof(const uint8_t*));
+}
+void Rows::Reset(std::vector<const uint8_t*>&& objs) { objs_ = std::move(objs); }
+void Rows::Filter(Vector<Bit> bits) {
+  auto new_pointers = functions::simd_vector_filter(ctx_, GetRowPtrs(), bits);
+  SetPointers(new_pointers);
+}
 
 void Rows::Truncate(size_t k) {
-  if (pointers_.Size() > k) {
-    pointers_.Resize(k);
+  if (objs_.size() > k) {
+    objs_.resize(k);
   }
 }
 void Rows::Truncate(size_t pos, size_t k) {
-  if (pos >= pointers_.Size()) {
+  if (pos >= objs_.size()) {
     return;
   }
-  if ((pos + k) > pointers_.Size()) {
-    k = pointers_.Size() - pos;
+  if ((pos + k) > objs_.size()) {
+    k = objs_.size() - pos;
   }
-  pointers_ = pointers_.SubVector(pos, k);
+  objs_ = std::vector<const uint8_t*>(objs_.begin() + pos, objs_.begin() + pos + k);
 }
 
-void Rows::Gather(Vector<int32_t> indices) { pointers_ = functions::simd_vector_gather(ctx_, pointers_, indices); }
-void Rows::Append(const std::vector<const uint8_t*>& objs) {
-  objs_.insert(objs_.end(), objs.begin(), objs.end());
-  pointers_ = ctx_.NewSimdVector(objs_);
+void Rows::Gather(Vector<int32_t> indices) {
+  auto new_pointers = functions::simd_vector_gather(ctx_, GetRowPtrs(), indices);
+  SetPointers(new_pointers);
 }
+void Rows::Append(const std::vector<const uint8_t*>& objs) { objs_.insert(objs_.end(), objs.begin(), objs.end()); }
 absl::Status Rows::Insert(size_t pos, const uint8_t* ptr) {
   if (pos > objs_.size()) {
     return absl::OutOfRangeError("too large pos to insert");
@@ -47,5 +59,10 @@ absl::Status Rows::Insert(size_t pos, const uint8_t* ptr) {
   objs_.insert(objs_.begin() + pos, ptr);
   return absl::OkStatus();
 }
+Vector<Pointer> Rows::GetRowPtrs() const {
+  VectorData vdata(objs_.data(), objs_.size());
+  return Vector<Pointer>(vdata);
+}
+
 }  // namespace simd
 }  // namespace rapidudf

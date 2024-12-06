@@ -64,4 +64,14 @@ inline void bits_set(uint64_t* bits, size_t k, bool v) {
   }
 }
 
+inline void bits_set(uint8_t* bits, size_t k, bool v) {
+  size_t idx = k / 8;
+  size_t cursor = k % 8;
+  if (v) {
+    bits[idx] = bit_set(bits[idx], cursor);
+  } else {
+    bits[idx] = bit_clear(bits[idx], cursor);
+  }
+}
+
 }  // namespace rapidudf

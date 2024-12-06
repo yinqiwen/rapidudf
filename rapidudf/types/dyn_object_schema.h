@@ -68,6 +68,8 @@ class DynObjectSchema {
 
   size_t FieldCount() const { return fields_.size(); }
 
+  const std::string& Name() const { return name_; }
+
   virtual ~DynObjectSchema() = default;
 
  protected:

@@ -174,6 +174,7 @@ struct StringView {
   operator std::string_view() && = delete;
   explicit operator std::string_view() const& { return std::string_view(data(), size()); }
   absl::string_view get_absl_string_view() const { return absl::string_view(data(), size()); }
+  std::string_view get_string_view() const { return std::string_view(data(), size()); }
 
   const char* begin() && = delete;
   const char* begin() const& { return data(); }

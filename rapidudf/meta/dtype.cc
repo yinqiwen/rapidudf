@@ -395,6 +395,82 @@ uint32_t DType::ByteSize() const {
   }
 }
 
+bool DType::Equal(const uint8_t* left, const uint8_t* right) const {
+  switch (ctrl_.t0_) {
+    case DATA_U8:
+    case DATA_I8: {
+      return *left == *right;
+    }
+    case DATA_U16:
+    case DATA_I16: {
+      return *(reinterpret_cast<const uint16_t*>(left)) == *(reinterpret_cast<const uint16_t*>(right));
+    }
+    case DATA_U32:
+    case DATA_I32: {
+      return *(reinterpret_cast<const uint32_t*>(left)) == *(reinterpret_cast<const uint32_t*>(right));
+    }
+    case DATA_F32: {
+      return *(reinterpret_cast<const float*>(left)) == *(reinterpret_cast<const float*>(right));
+    }
+    case DATA_F64: {
+      return *(reinterpret_cast<const double*>(left)) == *(reinterpret_cast<const double*>(right));
+    }
+    case DATA_U64:
+    case DATA_I64: {
+      return *(reinterpret_cast<const uint64_t*>(left)) == *(reinterpret_cast<const uint64_t*>(right));
+    }
+    case DATA_STD_STRING_VIEW: {
+      return *(reinterpret_cast<const std::string_view*>(left)) == *(reinterpret_cast<const std::string_view*>(right));
+    }
+    case DATA_STRING_VIEW: {
+      return *(reinterpret_cast<const StringView*>(left)) == *(reinterpret_cast<const StringView*>(right));
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
+size_t DType::Hash(const uint8_t* data) const {
+  switch (ctrl_.t0_) {
+    case DATA_U8:
+    case DATA_I8: {
+      return *data;
+    }
+    case DATA_U16:
+    case DATA_I16: {
+      return *(reinterpret_cast<const uint16_t*>(data));
+    }
+    case DATA_U32:
+    case DATA_I32: {
+      return *(reinterpret_cast<const uint32_t*>(data));
+    }
+    case DATA_F32: {
+      return *(reinterpret_cast<const float*>(data));
+    }
+    case DATA_F64: {
+      return *(reinterpret_cast<const double*>(data));
+    }
+    case DATA_U64:
+    case DATA_I64: {
+      return *(reinterpret_cast<const uint64_t*>(data));
+    }
+    case DATA_STD_STRING_VIEW: {
+      const std::string_view* p = reinterpret_cast<const std::string_view*>(data);
+      absl::Hash<std::string_view> h;
+      return h(*p);
+    }
+    case DATA_STRING_VIEW: {
+      const StringView* p = reinterpret_cast<const StringView*>(data);
+      absl::Hash<std::string_view> h;
+      return h(p->get_string_view());
+    }
+    default: {
+      return 0;
+    }
+  }
+}
+
 template <typename T>
 uint64_t cast_to(DType dtype, uint64_t val) {
   T result;

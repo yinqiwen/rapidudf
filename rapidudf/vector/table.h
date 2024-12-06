@@ -22,6 +22,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
 #include "google/protobuf/message.h"
 
@@ -74,6 +75,7 @@ class Table : public DynObject {
 
   using PartialRows = std::pair<const RowSchema*, std::vector<const uint8_t*>>;
   using PartialRow = std::pair<const RowSchema*, const uint8_t*>;
+  using DistinctIndiceTable = absl::flat_hash_map<int32_t, std::vector<int32_t>>;
 
  public:
   using SmartPtr = std::unique_ptr<Table, Deleter>;
@@ -81,14 +83,14 @@ class Table : public DynObject {
  public:
   static uint32_t GetIdxByOffset(uint32_t offset);
 
-  template <typename T>
-  absl::Status Set(const std::string& name, T&& v) {
-    return DoSet(name, std::forward<T>(v));
-  }
+  // template <typename T>
+  // absl::Status Set(const std::string& name, T&& v) {
+  //   return DoSet(name, std::forward<T>(v));
+  // }
 
   template <typename T>
   auto Get(const std::string& name) {
-    if constexpr (std::is_same_v<bool, T>) {
+    if constexpr (std::is_same_v<bool, T> || std::is_same_v<Bit, T>) {
       return GetColumn<Bit>(name);
     } else {
       return GetColumn<T>(name);
@@ -122,17 +124,17 @@ class Table : public DynObject {
     return DoAddRows(std::move(add_rows));
   }
 
-  template <template <class, class> class Map, template <class> class Vec, class V>
-  absl::Status AddMap(Map<std::string, Vec<V>>&& values) {
-    for (auto& [name, v] : values) {
-      auto status = DoSet(name, std::move(v));
-      if (!status.ok()) {
-        return status;
-      }
-    }
-    std::ignore = ctx_.New<Map<std::string, Vec<V>>>(std::move(values));
-    return absl::OkStatus();
-  }
+  // template <template <class, class> class Map, template <class> class Vec, class V>
+  // absl::Status AddMap(Map<std::string, Vec<V>>&& values) {
+  //   for (auto& [name, v] : values) {
+  //     auto status = DoSet(name, std::move(v));
+  //     if (!status.ok()) {
+  //       return status;
+  //     }
+  //   }
+  //   std::ignore = ctx_.New<Map<std::string, Vec<V>>>(std::move(values));
+  //   return absl::OkStatus();
+  // }
 
   template <typename... T>
   absl::Status InsertRow(size_t pos, const T*... row) {
@@ -349,6 +351,45 @@ class Table : public DynObject {
     return std::make_pair(sub_table, select_mask);
   }
 
+  Table* Concat(Table* other);
+  Table* Concat(Table::SmartPtr& ptr) { return Concat(ptr.get()); }
+
+  absl::Status Distinct(absl::Span<const StringView> columns);
+  absl::Status Distinct(const std::vector<StringView>& columns) {
+    return Distinct(absl::Span<const StringView>(columns));
+  }
+  absl::Status Distinct(StringView column) {
+    std::vector<StringView> columns{column};
+    return Distinct(absl::Span<StringView>{columns});
+  }
+  template <typename T>
+  absl::Status Distinct(absl::Span<const StringView> columns, std::function<T*(Context&, T*, const T*)>&& merge) {
+    const RowSchema* schema = GetRowSchema<T>();
+    if (schema == nullptr) {
+      THROW_LOGIC_ERR("Invalid row object type to get schema for filter");
+    }
+    int row_idx = GetRowIdx(*schema);
+    if (row_idx < 0) {
+      THROW_LOGIC_ERR("No row found for schema");
+    }
+    std::vector<const uint8_t*> distinct_objs;
+    DistinctIndiceTable indice_table = DistinctByColumns(columns);
+
+    for (auto& [indice, duplicate_indices] : indice_table) {
+      Pointer select_pointer = rows_[row_idx].GetRowPtrs()[indice];
+      T* select_obj = select_pointer.As<T>();
+      for (auto duplicate_indice : duplicate_indices) {
+        Pointer duplicate_pointer = rows_[row_idx].GetRowPtrs()[duplicate_indice];
+        const T* duplicate_obj = duplicate_pointer.As<T>();
+        select_obj = merge(ctx_, select_obj, duplicate_obj);
+      }
+      distinct_objs.emplace_back(reinterpret_cast<const uint8_t*>(select_obj));
+    }
+    rows_[row_idx].Reset(std::move(distinct_objs));
+    UnloadAllColumns();
+    return absl::OkStatus();
+  }
+
   /**
   ** return column count
   */
@@ -369,6 +410,27 @@ class Table : public DynObject {
   }
 
  private:
+  using DistinctKey = std::vector<std::pair<const DType*, const uint8_t*>>;
+  struct DistinctKeyHash {
+    std::size_t operator()(const DistinctKey& ks) const {
+      size_t h = ks[0].first->Hash(ks[0].second);
+      for (size_t i = 1; i < ks.size(); i++) {
+        h = h ^ (ks[i].first->Hash(ks[i].second));
+      }
+      return h;
+    }
+  };
+  struct DistinctKeyCompare {
+    bool operator()(const DistinctKey& left, const DistinctKey& right) const {
+      for (size_t i = 0; i < left.size(); i++) {
+        if (!left[i].first->Equal(left[i].second, right[i].second)) {
+          return false;
+        }
+      }
+      return true;
+    }
+  };
+
   Table(Context& ctx, const DynObjectSchema* s);
   Table* NewTableBySchema(const std::string& schema);
   Table* Clone();
@@ -401,13 +463,13 @@ class Table : public DynObject {
     }
     return vec;
   }
+  VectorData GetColumnVectorData(StringView name);
 
   template <typename T>
   const RowSchema* GetRowSchema() {
     if constexpr (std::is_base_of_v<::google::protobuf::Message, T>) {
       static T msg;
       const ::google::protobuf::Descriptor* desc = msg.GetDescriptor();
-
       return GetRowSchema(RowSchema(desc));
     } else if constexpr (std::is_base_of_v<::flatbuffers::Table, T>) {
       auto* type_table = T::MiniReflectTypeTable();
@@ -469,18 +531,18 @@ class Table : public DynObject {
     }
   }
 
-  template <typename T>
-  absl::Status DoSet(const std::string& name, const std::vector<T>& v) {
-    auto vec = ctx_.NewSimdVector(v);
-    return DynObject::DoSet(name, std::move(vec));
-  }
-  template <typename T>
-  absl::Status DoSet(const std::string& name, std::vector<T>&& v) {
-    auto vec = ctx_.NewSimdVector(v);
-    std::ignore = ctx_.New<std::vector<T>>(std::move(v));
+  // template <typename T>
+  // absl::Status DoSet(const std::string& name, const std::vector<T>& v) {
+  //   auto vec = ctx_.NewSimdVector(v);
+  //   return DynObject::DoSet(name, std::move(vec));
+  // }
+  // template <typename T>
+  // absl::Status DoSet(const std::string& name, std::vector<T>&& v) {
+  //   auto vec = ctx_.NewSimdVector(v);
+  //   std::ignore = ctx_.New<std::vector<T>>(std::move(v));
 
-    return DynObject::DoSet(name, std::move(vec));
-  }
+  //   return DynObject::DoSet(name, std::move(vec));
+  // }
 
   template <typename T>
   absl::Span<Table*> GroupBy(const T* by, size_t n);
@@ -508,6 +570,14 @@ class Table : public DynObject {
 
   template <typename T>
   Vector<Bit> Dedup(const T* data, size_t n, size_t k);
+
+  template <typename T>
+  absl::Status Set(const std::string& name, T&& v) {
+    return DynObject::Set(name, std::forward<T>(v));
+  }
+
+  DistinctIndiceTable DistinctByColumns(absl::Span<const StringView> columns);
+  void DoFilter(Vector<Bit> bits);
 
   Context& ctx_;
   std::vector<int32_t> indices_;
