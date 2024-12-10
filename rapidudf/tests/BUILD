@@ -42,6 +42,17 @@ cc_binary(
     ],
 )
 
+cc_binary(
+    name = "string_benchmark",
+    srcs = ["string_benchmark.cc"],
+    copts = ["-O2"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    deps = [
+        "//rapidudf",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
 cc_test(
     name = "dtype_test",
     size = "small",

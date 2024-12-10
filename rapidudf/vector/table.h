@@ -83,11 +83,6 @@ class Table : public DynObject {
  public:
   static uint32_t GetIdxByOffset(uint32_t offset);
 
-  // template <typename T>
-  // absl::Status Set(const std::string& name, T&& v) {
-  //   return DoSet(name, std::forward<T>(v));
-  // }
-
   template <typename T>
   auto Get(const std::string& name) {
     if constexpr (std::is_same_v<bool, T> || std::is_same_v<Bit, T>) {
@@ -123,18 +118,6 @@ class Table : public DynObject {
 
     return DoAddRows(std::move(add_rows));
   }
-
-  // template <template <class, class> class Map, template <class> class Vec, class V>
-  // absl::Status AddMap(Map<std::string, Vec<V>>&& values) {
-  //   for (auto& [name, v] : values) {
-  //     auto status = DoSet(name, std::move(v));
-  //     if (!status.ok()) {
-  //       return status;
-  //     }
-  //   }
-  //   std::ignore = ctx_.New<Map<std::string, Vec<V>>>(std::move(values));
-  //   return absl::OkStatus();
-  // }
 
   template <typename... T>
   absl::Status InsertRow(size_t pos, const T*... row) {

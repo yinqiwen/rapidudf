@@ -13,6 +13,21 @@ cc_library(
 )
 
 cc_library(
+    name = "string",
+    srcs = [
+        "string.cc",
+    ],
+    hdrs = [
+        "string.h",
+    ],
+    copts = ["-O3"],
+    deps = [
+        "//rapidudf/types",
+        "@com_google_highway//:hwy",
+    ],
+)
+
+cc_library(
     name = "vector_misc",
     srcs = [
         "vector_misc.cc",
@@ -71,6 +86,7 @@ cc_library(
     ],
     copts = ["-O3"],
     deps = [
+        ":string",
         ":vector_misc",
         ":vector_op",
         ":vector_sort",

@@ -17,6 +17,8 @@
 #include <gtest/gtest.h>
 #include <vector>
 
+#include "rapidudf/functions/simd/string.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
@@ -47,4 +49,12 @@ TEST(JitCompiler, string_starts_with) {
   auto f = std::move(rc.value());
   ASSERT_EQ(f("hello"), true);
   ASSERT_EQ(f("he"), false);
+}
+
+TEST(JitCompiler, split_by_char) {
+  std::string str = "abc,cde,eed,,";
+  auto ss = functions::simd_string_split_by_char(str, ',');
+
+  ASSERT_EQ(ss.size(), 3);
+  ASSERT_EQ(ss[1], "cde");
 }
