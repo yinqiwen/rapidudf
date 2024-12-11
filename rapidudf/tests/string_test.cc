@@ -58,3 +58,17 @@ TEST(JitCompiler, split_by_char) {
   ASSERT_EQ(ss.size(), 3);
   ASSERT_EQ(ss[1], "cde");
 }
+
+TEST(JitCompiler, find_by_str) {
+  std::string str = "abc,cde,eed,,";
+  auto pos = functions::simd_string_find_string(str, "cde");
+
+  ASSERT_EQ(pos, 4);
+}
+
+TEST(JitCompiler, find_by_ch) {
+  std::string str = "abc,cde,eed,,";
+  auto pos = functions::simd_string_find_char(str, ',');
+
+  ASSERT_EQ(pos, 3);
+}

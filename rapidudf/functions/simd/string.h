@@ -22,6 +22,7 @@ namespace rapidudf {
 namespace functions {
 
 int simd_string_find_char(std::string_view s, char ch);
+int simd_string_find_string(std::string_view s, std::string_view part);
 
 std::vector<std::string_view> simd_string_split_by_char(std::string_view s, char ch);
 
