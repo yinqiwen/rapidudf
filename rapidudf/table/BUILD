@@ -3,19 +3,6 @@ package(
 )
 
 cc_library(
-    name = "vector",
-    hdrs = [
-        "vector.h",
-    ],
-    deps = [
-        "//rapidudf/arena",
-        "//rapidudf/meta:exception",
-        "//rapidudf/meta:optype",
-        "//rapidudf/types",
-    ],
-)
-
-cc_library(
     name = "table",
     srcs = [
         "row.cc",

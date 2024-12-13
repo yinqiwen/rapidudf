@@ -39,7 +39,7 @@ TEST(JitCompiler, vector_ternary) {
   Context ctx;
   std::string content = "x>3?1:0";
   std::vector<int> cond_var = {1, 2, 1, 2, 4, 1, 4, 5, 6};
-  auto rc = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>>(content, {"_", "x"});
+  auto rc = compiler.CompileExpression<Vector<int>, Context&, Vector<int>>(content, {"_", "x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto result = f(ctx, cond_var);

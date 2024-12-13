@@ -18,26 +18,26 @@
 #include <type_traits>
 #include "rapidudf/reflect/struct.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
 namespace reflect {
 
 template <typename T>
 struct SimdVectorHelper {
-  static T get(simd::Vector<T> v, size_t i) { return v[i]; }
-  static size_t size(simd::Vector<T> v) { return v.Size(); }
-  static simd::Vector<T> subvector(simd::Vector<T> v, uint32_t pos, uint32_t len) { return v.SubVector(pos, len); }
-  static int find(simd::Vector<T> vec, T v) { return vec.Find(v); }
-  static int find_neq(simd::Vector<T> vec, T v) { return vec.FindNeq(v); }
-  static int find_gt(simd::Vector<T> vec, T v) { return vec.FindGt(v); }
-  static int find_ge(simd::Vector<T> vec, T v) { return vec.FindGe(v); }
-  static int find_lt(simd::Vector<T> vec, T v) { return vec.FindLt(v); }
-  static int find_le(simd::Vector<T> vec, T v) { return vec.FindLe(v); }
-  static T reduce_sum(simd::Vector<T> vec) { return vec.ReduceSum(); }
-  static T reduce_avg(simd::Vector<T> vec) { return vec.ReduceAvg(); }
-  static T reduce_max(simd::Vector<T> vec) { return vec.ReduceMax(); }
-  static T reduce_min(simd::Vector<T> vec) { return vec.ReduceMin(); }
+  static T get(Vector<T> v, size_t i) { return v[i]; }
+  static size_t size(Vector<T> v) { return v.Size(); }
+  static Vector<T> subvector(Vector<T> v, uint32_t pos, uint32_t len) { return v.SubVector(pos, len); }
+  static int find(Vector<T> vec, T v) { return vec.Find(v); }
+  static int find_neq(Vector<T> vec, T v) { return vec.FindNeq(v); }
+  static int find_gt(Vector<T> vec, T v) { return vec.FindGt(v); }
+  static int find_ge(Vector<T> vec, T v) { return vec.FindGe(v); }
+  static int find_lt(Vector<T> vec, T v) { return vec.FindLt(v); }
+  static int find_le(Vector<T> vec, T v) { return vec.FindLe(v); }
+  static T reduce_sum(Vector<T> vec) { return vec.ReduceSum(); }
+  static T reduce_avg(Vector<T> vec) { return vec.ReduceAvg(); }
+  static T reduce_max(Vector<T> vec) { return vec.ReduceMax(); }
+  static T reduce_min(Vector<T> vec) { return vec.ReduceMin(); }
 
   static void Init() {
     RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, subvector);

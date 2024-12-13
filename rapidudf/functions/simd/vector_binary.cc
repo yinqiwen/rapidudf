@@ -20,7 +20,7 @@
 
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "rapidudf/functions/simd/vector_binary.cc"  // this file
 
@@ -99,8 +99,8 @@ HWY_INLINE void do_binary_transform(const T* left, const T* right, T* output, co
   using D = hn::ScalableTag<T>;
   constexpr D d;
   constexpr size_t N = hn::Lanes(d);
-  static_assert(simd::kVectorUnitSize % N == 0, "Invalid lanes");
-  for (size_t idx = 0; idx < simd::kVectorUnitSize; idx += N) {
+  static_assert(kVectorUnitSize % N == 0, "Invalid lanes");
+  for (size_t idx = 0; idx < kVectorUnitSize; idx += N) {
     const hn::Vec<D> v1 = hn::LoadU(d, left + idx);
     const hn::Vec<D> v2 = hn::LoadU(d, right + idx);
     hn::StoreU(func(d, v1, v2), d, output + idx);

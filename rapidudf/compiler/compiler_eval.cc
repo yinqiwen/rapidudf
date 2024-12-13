@@ -32,7 +32,7 @@
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/operand.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
 namespace compiler {
@@ -449,7 +449,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
     ::llvm::Value* output_ptr = output_val->GetStructPtrValue().value();
 
     auto vector_loop_limit_size =
-        codegen_->BinaryOp(OP_MINUS, vector_size_val, codegen_->NewI32(simd::kVectorUnitSize)).value();
+        codegen_->BinaryOp(OP_MINUS, vector_size_val, codegen_->NewI32(kVectorUnitSize)).value();
     auto cursor = codegen_->NewI32Var();
     auto loop = codegen_->NewLoop();
     auto cond = codegen_->BinaryOp(OP_LESS_EQUAL, cursor, vector_loop_limit_size).value();
@@ -458,7 +458,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
     if (!status.ok()) {
       return status;
     }
-    status = cursor->Inc(simd::kVectorUnitSize);
+    status = cursor->Inc(kVectorUnitSize);
     if (!status.ok()) {
       return status;
     }

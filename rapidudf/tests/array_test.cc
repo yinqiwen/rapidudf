@@ -53,8 +53,8 @@ TEST(JitCompiler, array_simple) {
     }
   )";
 
-  auto result1 = compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&,
-                                          rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source1);
+  auto result1 = compiler.CompileFunction<rapidudf::Vector<double>, rapidudf::Context&, rapidudf::Vector<double>,
+                                          rapidudf::Vector<double>>(source1);
   if (!result1.ok()) {
     RUDF_ERROR("###{}", result1.status().ToString());
   }
@@ -71,7 +71,7 @@ TEST(JitCompiler, array_simple) {
 
 TEST(JitCompiler, vector_cmp) {
   std::vector<int> vec{1, 2, 3};
-  simd::Vector<int> simd_vec(vec);
+  Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
@@ -79,7 +79,7 @@ TEST(JitCompiler, vector_cmp) {
       return 5+x;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<Vector<int>, Context&, Vector<int>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;

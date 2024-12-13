@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "rapidudf/vector/table.h"
+#include "rapidudf/table/table.h"
 #include <cstring>
 #include <memory>
 #include <numeric>
@@ -33,17 +33,16 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/meta/exception.h"
+#include "rapidudf/table/row.h"
+#include "rapidudf/table/table_schema.h"
 #include "rapidudf/types/bit.h"
 #include "rapidudf/types/dyn_object_impl.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/row.h"
-#include "rapidudf/vector/table_schema.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
-namespace simd {
-
+namespace table {
 static std::vector<int32_t> get_indices(size_t n) {
   static constexpr uint32_t kDefaultIndiceCount = 10000;
   static std::vector<int32_t> default_indices;
@@ -74,7 +73,7 @@ void Table::Deleter::operator()(Table* ptr) const {
 
 uint32_t Table::GetIdxByOffset(uint32_t offset) {
   size_t header_size = align_to<size_t>(sizeof(Table), 16);
-  uint32_t idx = (offset - header_size) / sizeof(VectorData);
+  uint32_t idx = (offset - header_size) / sizeof(VectorBuf);
   return idx;
 }
 absl::StatusOr<uint32_t> Table::GetColumnOffset(const std::string& name) {
@@ -95,21 +94,21 @@ size_t Table::GetColumnMemorySize(const DType& dtype) {
 }
 uint8_t* Table::GetColumnMemory(uint32_t offset, const DType& dtype) {
   uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
-  VectorData* vdata = (reinterpret_cast<VectorData*>(vec_ptr));
+  VectorBuf* vdata = (reinterpret_cast<VectorBuf*>(vec_ptr));
   size_t request_memory_size = GetColumnMemorySize(dtype);
   if (vdata->BytesCapacity() >= request_memory_size) {
     // reuse
     return vdata->MutableData<uint8_t>();
   } else {
     uint8_t* p = ctx_.ArenaAllocate(request_memory_size);
-    VectorData alloc(p, 0, request_memory_size);
+    VectorBuf alloc(p, 0, request_memory_size);
     *vdata = alloc;
     return p;
   }
 }
-void Table::SetColumnSize(const reflect::Column& column, void* p) {
+void Table::SetColumnSize(const Column& column, void* p) {
   uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + column.field.bytes_offset;
-  VectorData* vdata = (reinterpret_cast<VectorData*>(vec_ptr));
+  VectorBuf* vdata = (reinterpret_cast<VectorBuf*>(vec_ptr));
   if (vdata->Data() == p) {
     vdata->SetSize(Count());
   }
@@ -117,7 +116,7 @@ void Table::SetColumnSize(const reflect::Column& column, void* p) {
 }
 
 template <typename T>
-absl::Status Table::LoadColumn(const Vector<Pointer>& objs, const reflect::Column& column) {
+absl::Status Table::LoadColumn(const Vector<Pointer>& objs, const Column& column) {
   if (column.schema->pb_desc != nullptr) {
     return LoadProtobufColumn<T>(objs, column);
   } else if (column.schema->fbs_table != nullptr) {
@@ -127,7 +126,7 @@ absl::Status Table::LoadColumn(const Vector<Pointer>& objs, const reflect::Colum
   }
 }
 
-absl::Status Table::LoadColumn(const Rows& rows, const reflect::Column& column) {
+absl::Status Table::LoadColumn(const Rows& rows, const Column& column) {
   switch (column.field.dtype.Elem().GetFundamentalType()) {
     case DATA_F32: {
       return LoadColumn<float>(rows.GetRowPtrs(), column);
@@ -172,7 +171,7 @@ absl::Status Table::LoadColumn(const Rows& rows, const reflect::Column& column) 
 }
 
 template <typename T>
-absl::Status Table::LoadProtobufColumn(const Vector<Pointer>& pb_vector, const reflect::Column& column) {
+absl::Status Table::LoadProtobufColumn(const Vector<Pointer>& pb_vector, const Column& column) {
   T* vec = reinterpret_cast<T*>(GetColumnMemory(column.field.bytes_offset, get_dtype<T>()));
   const ::google::protobuf::FieldDescriptor* field_desc = column.GetProtobufField();
   for (size_t i = 0; i < pb_vector.Size(); i++) {
@@ -215,7 +214,7 @@ absl::Status Table::LoadProtobufColumn(const Vector<Pointer>& pb_vector, const r
   return absl::OkStatus();
 }
 template <typename T>
-absl::Status Table::LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, const reflect::Column& column) {
+absl::Status Table::LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, const Column& column) {
   T* vec = reinterpret_cast<T*>(GetColumnMemory(column.field.bytes_offset, get_dtype<T>()));
   for (size_t i = 0; i < fbs_vector.Size(); i++) {
     auto fbs = fbs_vector[i];
@@ -246,7 +245,7 @@ absl::Status Table::LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, con
 }
 
 template <typename T>
-absl::Status Table::LoadStructColumn(const Vector<Pointer>& struct_vector, const reflect::Column& column) {
+absl::Status Table::LoadStructColumn(const Vector<Pointer>& struct_vector, const Column& column) {
   DType expect_dtype = get_dtype<T>();
   DType actual_dtype;
   T* vec = reinterpret_cast<T*>(GetColumnMemory(column.field.bytes_offset, expect_dtype));
@@ -466,9 +465,9 @@ absl::Status Table::InsertRow(size_t pos, const std::vector<PartialRow>& row) {
   return absl::OkStatus();
 }
 
-VectorData Table::GetColumnByOffset(uint32_t offset) {
+VectorBuf Table::GetColumnByOffset(uint32_t offset) {
   const uint8_t* p = reinterpret_cast<const uint8_t*>(this) + offset;
-  VectorData vdata = *(reinterpret_cast<const VectorData*>(p));
+  VectorBuf vdata = *(reinterpret_cast<const VectorBuf*>(p));
 
   if (vdata.Size() == 0) {
     // lazy load
@@ -493,83 +492,81 @@ VectorData Table::GetColumnByOffset(uint32_t offset) {
     if (!status.ok()) {
       THROW_LOGIC_ERR("Load column:{} error:{}", column->name, status.ToString());
     }
-    vdata = *(reinterpret_cast<const VectorData*>(p));
+    vdata = *(reinterpret_cast<const VectorBuf*>(p));
   }
 
   return vdata;
 }
 
-void Table::SetColumn(uint32_t offset, VectorData vec) {
+void Table::SetColumn(uint32_t offset, VectorBuf vec) {
   uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
-  *(reinterpret_cast<VectorData*>(vec_ptr)) = vec;
+  *(reinterpret_cast<VectorBuf*>(vec_ptr)) = vec;
 }
 
-absl::StatusOr<VectorData> Table::GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices) {
-  VectorData new_vec = *(reinterpret_cast<VectorData*>(vec_ptr));
+absl::StatusOr<VectorBuf> Table::GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices) {
+  VectorBuf new_vec = *(reinterpret_cast<VectorBuf*>(vec_ptr));
   switch (dtype.GetFundamentalType()) {
     case DATA_BIT: {
-      new_vec =
-          functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<Bit>*>(vec_ptr), indices).GetVectorData();
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<Bit>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_U8: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint8_t>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<uint8_t>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_U16: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint16_t>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<uint16_t>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_U32: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint32_t>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<uint32_t>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_U64: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<uint64_t>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<uint64_t>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_I8: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int8_t>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<int8_t>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_I16: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int16_t>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<int16_t>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_I32: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int32_t>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<int32_t>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_I64: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<int64_t>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<int64_t>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_F32: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<float>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<float>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_F64: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<double>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<double>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_STRING_VIEW: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<StringView>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<StringView>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     case DATA_POINTER: {
-      new_vec = functions::simd_vector_gather(ctx_, *reinterpret_cast<simd::Vector<Pointer>*>(vec_ptr), indices)
-                    .GetVectorData();
+      new_vec =
+          functions::simd_vector_gather(ctx_, *reinterpret_cast<Vector<Pointer>*>(vec_ptr), indices).GetVectorBuf();
       break;
     }
     default: {
@@ -585,13 +582,13 @@ size_t Table::Count() const {
   if (rows_.size() > 0) {
     return rows_[0].RowCount();
   }
-  auto* first_column = reinterpret_cast<const VectorData*>(this + 1);
+  auto* first_column = reinterpret_cast<const VectorBuf*>(this + 1);
   return first_column->Size();
 }
 
 bool Table::IsColumnLoaded(uint32_t offset) {
   uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
-  VectorData* vdata = (reinterpret_cast<VectorData*>(vec_ptr));
+  VectorBuf* vdata = (reinterpret_cast<VectorBuf*>(vec_ptr));
   return vdata->Size() > 0;
 }
 
@@ -605,66 +602,62 @@ void Table::DoFilter(Vector<Bit> bits) {
       // lazy load column
       return;
     }
-    VectorData new_vec;
+    VectorBuf new_vec;
     switch (dtype.GetFundamentalType()) {
       case DATA_BIT: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<Bit>*>(vec_ptr), bits).GetVectorData();
+        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<Bit>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_U8: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<uint8_t>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec =
+            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<uint8_t>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_U16: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<uint16_t>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec =
+            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<uint16_t>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_U32: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<uint32_t>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec =
+            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<uint32_t>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_U64: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<uint64_t>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec =
+            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<uint64_t>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_I8: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<int8_t>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<int8_t>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_I16: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<int16_t>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec =
+            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<int16_t>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_I32: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<int32_t>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec =
+            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<int32_t>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_I64: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<int64_t>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec =
+            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<int64_t>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_F32: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<float>*>(vec_ptr), bits).GetVectorData();
+        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<float>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_F64: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<double>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<double>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       case DATA_STRING_VIEW: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<simd::Vector<StringView>*>(vec_ptr), bits)
-                      .GetVectorData();
+        new_vec =
+            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<StringView>*>(vec_ptr), bits).GetVectorBuf();
         break;
       }
       default: {
@@ -682,7 +675,7 @@ Table* Table::Filter(Vector<Bit> bits) {
   return new_table;
 }
 std::pair<Table*, Table*> Table::Split(Vector<Bit> bits) {
-  Vector<Bit> other = ctx_.NewSimdVector<Bit>(bits.Size());
+  Vector<Bit> other = ctx_.NewVectorBuf<Bit>(bits.Size());
   functions::simd_vector_bits_not(bits, other);
   Table* first = Filter(bits);
   Table* second = Filter(other);
@@ -704,7 +697,7 @@ Table* Table::Head(uint32_t k) {
       // lazy load column
       return;
     }
-    VectorData new_vec = *(reinterpret_cast<VectorData*>(vec_ptr));
+    VectorBuf new_vec = *(reinterpret_cast<VectorBuf*>(vec_ptr));
     if (k < new_vec.Size()) {
       new_vec.SetSize(k);
     }
@@ -741,8 +734,8 @@ Table* Table::OrderBy(Vector<T> by, bool descending) {
       // lazy load column
       return;
     }
-    VectorData new_vec = *(reinterpret_cast<VectorData*>(vec_ptr));
-    if (new_vec.Data() == by.GetVectorData().Data()) {
+    VectorBuf new_vec = *(reinterpret_cast<VectorBuf*>(vec_ptr));
+    if (new_vec.Data() == by.GetVectorBuf().Data()) {
       new_table->SetColumn(offset, new_vec);
       return;
     }
@@ -772,13 +765,13 @@ Table* Table::Topk(Vector<T> by, uint32_t k, bool descending) {
   }
   schema_->VisitField([&](const std::string& name, const DType& dtype, uint32_t offset) {
     uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this_table) + offset;
-    VectorData vdata = *(reinterpret_cast<VectorData*>(vec_ptr));
+    VectorBuf vdata = *(reinterpret_cast<VectorBuf*>(vec_ptr));
     if (vdata.Data() == nullptr) {
       // lazy load column
       return;
     }
-    VectorData new_vec = *(reinterpret_cast<VectorData*>(vec_ptr));
-    if (new_vec.Data() == by.GetVectorData().Data()) {
+    VectorBuf new_vec = *(reinterpret_cast<VectorBuf*>(vec_ptr));
+    if (new_vec.Data() == by.GetVectorBuf().Data()) {
       new_vec.SetSize(k);
       new_table->SetColumn(offset, new_vec);
       return;
@@ -806,7 +799,7 @@ Table* Table::SubTable(std::vector<int32_t>& indices) {
       // lazy load column
       return;
     }
-    VectorData new_vec = *(reinterpret_cast<VectorData*>(vec_ptr));
+    VectorBuf new_vec = *(reinterpret_cast<VectorBuf*>(vec_ptr));
     auto gather_result = GatherField(vec_ptr, dtype, indices);
     if (!gather_result.ok()) {
       return;
@@ -824,7 +817,7 @@ Table* Table::OrderBy(StringView column, bool descending) {
   }
   auto [dtype, offset] = result.value();
   uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
-  VectorData vec_data = *(reinterpret_cast<VectorData*>(p));
+  VectorBuf vec_data = *(reinterpret_cast<VectorBuf*>(p));
   switch (dtype.GetFundamentalType()) {
     case DATA_F64: {
       return OrderBy(Vector<double>(vec_data), descending);
@@ -866,14 +859,14 @@ absl::Span<Table*> Table::GroupBy(const T* by, size_t n) {
   return absl::Span<Table*>(group_tables, group_idxs.size());
 }
 
-VectorData Table::GetColumnVectorData(StringView column) {
+VectorBuf Table::GetColumnVectorBuf(StringView column) {
   auto result = schema_->GetField(column);
   if (!result.ok()) {
     THROW_LOGIC_ERR("No column:{} found.", column);
   }
   auto [dtype, offset] = result.value();
   uint8_t* p = reinterpret_cast<uint8_t*>(this) + offset;
-  VectorData vec_data = *(reinterpret_cast<VectorData*>(p));
+  VectorBuf vec_data = *(reinterpret_cast<VectorBuf*>(p));
   if (vec_data.Data() == nullptr) {
     return GetColumnByOffset(offset);
   }
@@ -895,7 +888,7 @@ absl::Span<Table*> Table::GroupBy(StringView column) {
   }
   auto [dtype, offset] = result.value();
   size_t row_size = Count();
-  VectorData vec_data = GetColumnByOffset(offset);
+  VectorBuf vec_data = GetColumnByOffset(offset);
   switch (dtype.GetFundamentalType()) {
     case DATA_F64: {
       return GroupBy(reinterpret_cast<const double*>(vec_data.Data()), row_size);
@@ -951,7 +944,7 @@ Vector<Bit> Table::Dedup(const T* data, size_t n, size_t k) {
     size_t exist_n = dedup_map[data[i]]++;
     bits_set(bits, i, exist_n < k);
   }
-  VectorData vdata(bits, n, sizeof(uint64_t) * bits_n);
+  VectorBuf vdata(bits, n, sizeof(uint64_t) * bits_n);
   return Vector<Bit>(vdata);
 }
 
@@ -962,7 +955,7 @@ Vector<Bit> Table::Dedup(StringView column, uint32_t k) {
   }
   auto [dtype, offset] = result.value();
   size_t row_size = Count();
-  VectorData vec_data = GetColumnByOffset(offset);
+  VectorBuf vec_data = GetColumnByOffset(offset);
   Vector<Bit> bits;
   switch (dtype.GetFundamentalType()) {
     case DATA_F64: {
@@ -1033,14 +1026,14 @@ absl::Status Table::Distinct(absl::Span<const StringView> columns) {
 typename Table::DistinctIndiceTable Table::DistinctByColumns(absl::Span<const StringView> columns) {
   size_t count = Count();
   std::vector<DType> key_dtypes;
-  std::vector<VectorData> key_vecs;
+  std::vector<VectorBuf> key_vecs;
   for (auto column : columns) {
     auto result = schema_->GetField(column);
     if (!result.ok()) {
       THROW_LOGIC_ERR("No column:{} found.", column);
     }
     auto [dtype, offset] = result.value();
-    VectorData vec_data = GetColumnByOffset(offset);
+    VectorBuf vec_data = GetColumnByOffset(offset);
     key_dtypes.emplace_back(dtype.Elem());
     key_vecs.emplace_back(vec_data);
   }
@@ -1079,7 +1072,7 @@ absl::Status Table::UnloadColumn(const std::string& name) {
     RUDF_LOG_RETURN_FMT_ERROR("Invalid column:{} to unload", name);
   }
   uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
-  VectorData* vdata = (reinterpret_cast<VectorData*>(vec_ptr));
+  VectorBuf* vdata = (reinterpret_cast<VectorBuf*>(vec_ptr));
   vdata->SetSize(0);  // clear size for reuse
   return absl::OkStatus();
 }
@@ -1088,7 +1081,7 @@ void Table::UnloadAllColumns() {
     if (column.schema != nullptr) {
       uint32_t offset = column.field.bytes_offset;
       uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
-      VectorData* vdata = (reinterpret_cast<VectorData*>(vec_ptr));
+      VectorBuf* vdata = (reinterpret_cast<VectorBuf*>(vec_ptr));
       vdata->SetSize(0);  // clear size for reuse
     }
   }
@@ -1153,5 +1146,5 @@ template absl::Span<Table*> Table::GroupBy<int16_t>(Vector<int16_t> by);
 template absl::Span<Table*> Table::GroupBy<uint8_t>(Vector<uint8_t> by);
 template absl::Span<Table*> Table::GroupBy<int8_t>(Vector<int8_t> by);
 template absl::Span<Table*> Table::GroupBy<StringView>(Vector<StringView> by);
-}  // namespace simd
+}  // namespace table
 }  // namespace rapidudf

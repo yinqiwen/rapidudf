@@ -27,7 +27,7 @@
 #include "rapidudf/reflect/macros.h"
 #include "rapidudf/types/bit.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
 namespace functions {
@@ -38,7 +38,7 @@ namespace functions {
 
 template <OpToken op>
 void compare_string_views(const StringView* left, const StringView* right, uint8_t* ret) {
-  for (size_t i = 0; i < simd::kVectorUnitSize; i++) {
+  for (size_t i = 0; i < kVectorUnitSize; i++) {
     bool v = compare_string_view(static_cast<uint32_t>(op), left[i], right[i]);
     uint32_t byte_idx = i / 8;
     uint8_t bit_cursor = i % 8;

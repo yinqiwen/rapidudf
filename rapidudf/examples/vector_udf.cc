@@ -34,9 +34,7 @@ int main() {
   rapidudf::JitCompiler compiler;
   // CompileExpression的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
   // 'rapidudf::Context' 是在simd 实现中必须携带的参数，涉及arena内存分配
-  auto result =
-      compiler.CompileFunction<simd::Vector<float>, rapidudf::Context&, simd::Vector<StringView>, simd::Vector<float>>(
-          source);
+  auto result = compiler.CompileFunction<Vector<float>, rapidudf::Context&, Vector<StringView>, Vector<float>>(source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;
@@ -54,7 +52,7 @@ int main() {
   rapidudf::Context ctx;
   auto f = std::move(result.value());
   try {
-    auto new_scores = f(ctx, ctx.NewSimdVector(locations), ctx.NewSimdVector(scores));
+    auto new_scores = f(ctx, ctx.NewVector(locations), ctx.NewVector(scores));
     for (size_t i = 0; i < new_scores.Size(); i++) {
       // RUDF_INFO("{}", new_scores[i]);
     }

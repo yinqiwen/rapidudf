@@ -20,26 +20,26 @@
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/reflect/struct.h"
+#include "rapidudf/table/table.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/table.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 namespace rapidudf {
 namespace functions {
 struct SimdTableHelper {
-  static size_t column_count(simd::Table* table) { return table->Size(); }
+  static size_t column_count(table::Table* table) { return table->Size(); }
 
   /**
   ** filter table by bits
   */
-  static simd::Table* filter(simd::Table* table, simd::Vector<Bit> bits) { return table->Filter(bits); }
+  static table::Table* filter(table::Table* table, Vector<Bit> bits) { return table->Filter(bits); }
   /**
   **   Sort table by given column
   */
   template <typename T>
-  static simd::Table* order_by(simd::Table* table, simd::Vector<T> by, bool descending) {
+  static table::Table* order_by(table::Table* table, Vector<T> by, bool descending) {
     return table->OrderBy(by, descending);
   }
-  static simd::Table* order_by_column(simd::Table* table, StringView by, bool descending) {
+  static table::Table* order_by_column(table::Table* table, StringView by, bool descending) {
     return table->OrderBy(by, descending);
   }
 
@@ -47,37 +47,37 @@ struct SimdTableHelper {
   **   Sort & Returns the first k rows as a list of Row.
   */
   template <typename T>
-  static simd::Table* topk(simd::Table* table, simd::Vector<T> by, uint32_t k, bool descending) {
+  static table::Table* topk(table::Table* table, Vector<T> by, uint32_t k, bool descending) {
     return table->Topk(by, k, descending);
   }
   /**
   **   Returns the first num rows as a list of Row.
   */
-  static simd::Table* head(simd::Table* table, uint32_t k) { return table->Head(k); }
+  static table::Table* head(table::Table* table, uint32_t k) { return table->Head(k); }
 
   /**
    **   Returns the first num rows as a list of Row.
    */
-  static simd::Table* tail(simd::Table* table, uint32_t k) { return table->Tail(k); }
+  static table::Table* tail(table::Table* table, uint32_t k) { return table->Tail(k); }
 
   /**
    **   Returns table row count
    */
-  static uint32_t count(simd::Table* table) { return table->Count(); }
+  static uint32_t count(table::Table* table) { return table->Count(); }
 
   /**
    **   Returns the first num rows as a list of Row.
    */
-  static simd::Table* concat(simd::Table* table, simd::Table* other) { return table->Concat(other); }
+  static table::Table* concat(table::Table* table, table::Table* other) { return table->Concat(other); }
 
   template <typename T>
-  static absl::Span<simd::Table*> group_by(simd::Table* table, simd::Vector<T> by) {
+  static absl::Span<table::Table*> group_by(table::Table* table, Vector<T> by) {
     return table->GroupBy(by);
   }
 
   template <typename T>
-  static simd::Vector<T> get_column(simd::Table* table, uint32_t offset) {
-    return simd::Vector<T>(table->GetColumnByOffset(offset));
+  static Vector<T> get_column(table::Table* table, uint32_t offset) {
+    return Vector<T>(table->GetColumnByOffset(offset));
   }
 
   static void Init() {

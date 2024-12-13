@@ -28,7 +28,7 @@
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/reflect/simd_vector.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
 namespace functions {
@@ -38,9 +38,9 @@ static void throw_vector_expression_ex(int line, StringView src_line, StringView
 }
 
 template <typename T>
-static simd::Vector<T> new_simd_vector(Context& ctx, uint32_t n) {
-  simd::VectorData vdata = ctx.NewSimdVector<T>(n);
-  return simd::Vector<T>(vdata);
+static Vector<T> new_simd_vector(Context& ctx, uint32_t n) {
+  VectorBuf vdata = ctx.NewVectorBuf<T>(n);
+  return Vector<T>(vdata);
 }
 template <typename T>
 static void register_new_simd_vector() {
@@ -74,7 +74,7 @@ template <typename T>
 static void register_simd_vector_dot() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_DOT, dtype.ToSimdVector());
-  T (*simd_f0)(simd::Vector<T>, simd::Vector<T>) = simd_vector_dot<T>;
+  T (*simd_f0)(Vector<T>, Vector<T>) = simd_vector_dot<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
   // register_builtin_function("dot");
 }
@@ -83,7 +83,7 @@ template <typename T>
 static void register_simd_vector_iota() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_IOTA, dtype);
-  simd::Vector<T> (*simd_f0)(Context&, T, uint32_t) = simd_vector_iota<T>;
+  Vector<T> (*simd_f0)(Context&, T, uint32_t) = simd_vector_iota<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 }
 
@@ -91,7 +91,7 @@ template <typename T>
 static void register_simd_vector_sum() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_SUM, dtype.ToSimdVector());
-  T (*simd_f0)(simd::Vector<T>) = simd_vector_sum<T>;
+  T (*simd_f0)(Vector<T>) = simd_vector_sum<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 
   func_name = GetFunctionName(OP_AVG, dtype.ToSimdVector());
@@ -101,7 +101,7 @@ template <typename T>
 static void register_simd_vector_filter() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_FILTER, dtype.ToSimdVector());
-  simd::Vector<T> (*simd_f0)(Context& ctx, simd::Vector<T>, simd::Vector<Bit>) = simd_vector_filter;
+  Vector<T> (*simd_f0)(Context& ctx, Vector<T>, Vector<Bit>) = simd_vector_filter;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 }
 
@@ -109,7 +109,7 @@ template <typename T>
 static void register_simd_vector_gather() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_GATHER, dtype.ToSimdVector());
-  simd::Vector<T> (*simd_f0)(Context& ctx, simd::Vector<T>, simd::Vector<int32_t>) = simd_vector_gather;
+  Vector<T> (*simd_f0)(Context& ctx, Vector<T>, Vector<int32_t>) = simd_vector_gather;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 }
 
@@ -117,23 +117,23 @@ template <typename T>
 static void register_simd_vector_sort() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_SORT, dtype.ToSimdVector());
-  void (*simd_f0)(Context&, simd::Vector<T>, bool) = simd_vector_sort<T>;
+  void (*simd_f0)(Context&, Vector<T>, bool) = simd_vector_sort<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 
   func_name = GetFunctionName(OP_SELECT, dtype.ToSimdVector());
-  void (*simd_f1)(Context&, simd::Vector<T>, size_t, bool) = simd_vector_select<T>;
+  void (*simd_f1)(Context&, Vector<T>, size_t, bool) = simd_vector_select<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f1);
 
   func_name = GetFunctionName(OP_TOPK, dtype.ToSimdVector());
-  void (*simd_f2)(Context&, simd::Vector<T>, size_t, bool) = simd_vector_topk<T>;
+  void (*simd_f2)(Context&, Vector<T>, size_t, bool) = simd_vector_topk<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f2);
 
   func_name = GetFunctionName(OP_ARG_SORT, dtype.ToSimdVector());
-  simd::Vector<size_t> (*simd_f3)(Context&, simd::Vector<T>, bool) = simd_vector_argsort<T>;
+  Vector<size_t> (*simd_f3)(Context&, Vector<T>, bool) = simd_vector_argsort<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f3);
 
   func_name = GetFunctionName(OP_ARG_SELECT, dtype.ToSimdVector());
-  simd::Vector<size_t> (*simd_f4)(Context&, simd::Vector<T>, size_t, bool) = simd_vector_argselect<T>;
+  Vector<size_t> (*simd_f4)(Context&, Vector<T>, size_t, bool) = simd_vector_argselect<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f4);
 }
 
@@ -142,15 +142,15 @@ static void register_simd_vector_key_value_sort() {
   DType key_dtype = get_dtype<K>();
   DType value_dtype = get_dtype<V>();
   std::string func_name = GetFunctionName(OP_SORT_KV, key_dtype.ToSimdVector(), value_dtype.ToSimdVector());
-  void (*simd_f0)(Context&, simd::Vector<K>, simd::Vector<V>, bool) = simd_vector_sort_key_value<K, V>;
+  void (*simd_f0)(Context&, Vector<K>, Vector<V>, bool) = simd_vector_sort_key_value<K, V>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 
   func_name = GetFunctionName(OP_SELECT_KV, key_dtype.ToSimdVector(), value_dtype.ToSimdVector());
-  void (*simd_f1)(Context&, simd::Vector<K>, simd::Vector<V>, size_t, bool) = simd_vector_select_key_value<K, V>;
+  void (*simd_f1)(Context&, Vector<K>, Vector<V>, size_t, bool) = simd_vector_select_key_value<K, V>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f1);
 
   func_name = GetFunctionName(OP_TOPK_KV, key_dtype.ToSimdVector(), value_dtype.ToSimdVector());
-  void (*simd_f2)(Context&, simd::Vector<K>, simd::Vector<V>, size_t, bool) = simd_vector_topk_key_value<K, V>;
+  void (*simd_f2)(Context&, Vector<K>, Vector<V>, size_t, bool) = simd_vector_topk_key_value<K, V>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f2);
 }
 

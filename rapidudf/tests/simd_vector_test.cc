@@ -25,20 +25,19 @@
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/rapidudf.h"
-#include "rapidudf/vector/vector.h"
 
 using namespace rapidudf;
 
 TEST(JitCompiler, vector_add) {
   std::vector<float> vec{1, 2, 3};
-  simd::Vector<float> simd_vec(vec);
+  Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<f32> test_func(Context ctx, simd_vector<f32> x){
       return x+5;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<Vector<float>, Context&, Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   Context ctx;
   auto f = std::move(rc.value());
@@ -50,14 +49,14 @@ TEST(JitCompiler, vector_add) {
 }
 TEST(JitCompiler, vector_sub) {
   std::vector<float> vec{1, 2, 3};
-  simd::Vector<float> simd_vec(vec);
+  Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<f32> test_func(Context ctx,simd_vector<f32> x){
       return x-5;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<Vector<float>, Context&, Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -69,14 +68,14 @@ TEST(JitCompiler, vector_sub) {
 }
 TEST(JitCompiler, vector_mul) {
   std::vector<float> vec{1, 2, 3};
-  simd::Vector<float> simd_vec(vec);
+  Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<f32> test_func(Context ctx,simd_vector<f32> x){
       return 5*x;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<Vector<float>, Context&, Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -88,14 +87,14 @@ TEST(JitCompiler, vector_mul) {
 }
 TEST(JitCompiler, vector_div) {
   std::vector<float> vec{1, 2, 3};
-  simd::Vector<float> simd_vec(vec);
+  Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<f32> test_func(Context ctx,simd_vector<f32> x){
       return 5/x;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<Vector<float>, Context&, Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -107,14 +106,14 @@ TEST(JitCompiler, vector_div) {
 }
 TEST(JitCompiler, vector_mod) {
   std::vector<int> vec{1, 2, 3};
-  simd::Vector<int> simd_vec(vec);
+  Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
       return x%5;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<Vector<int>, Context&, Vector<int>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -127,7 +126,7 @@ TEST(JitCompiler, vector_mod) {
 
 TEST(JitCompiler, vector_cmp) {
   std::vector<int> vec{1, 2, 3};
-  simd::Vector<int> simd_vec(vec);
+  Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
@@ -135,7 +134,7 @@ TEST(JitCompiler, vector_cmp) {
       return 5+x;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<Vector<int>, Context&, Vector<int>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -148,14 +147,14 @@ TEST(JitCompiler, vector_cmp) {
 
 TEST(JitCompiler, vector_add2) {
   std::vector<float> vec{1, 2, 3};
-  simd::Vector<float> simd_vec(vec);
+  Vector<float> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<f32> test_func(Context ctx,simd_vector<f32> x){
       return x+5+10;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<float>, Context&, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<Vector<float>, Context&, Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -168,14 +167,14 @@ TEST(JitCompiler, vector_add2) {
 
 TEST(JitCompiler, vector_ternary) {
   std::vector<int> vec{1, 2, 3, 4, 1, 5, 6};
-  simd::Vector<int> simd_vec(vec);
+  Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
       return x>2?1:0;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<Vector<int>, Context&, Vector<int>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -192,16 +191,15 @@ TEST(JitCompiler, vector_string_cmp) {
   std::vector<std::string> right{"afasf", "rwrewe", "qw1231241"};
 
   Context ctx;
-  auto simd_left = ctx.NewSimdVector(left);
-  auto simd_right = ctx.NewSimdVector(right);
+  auto simd_left = ctx.NewVector(left);
+  auto simd_right = ctx.NewVector(right);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<bit> test_func(Context ctx,simd_vector<string_view> x,simd_vector<string_view> y){
       return x > y;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<Bit>, Context&, simd::Vector<StringView>, simd::Vector<StringView>>(
-      content);
+  auto rc = compiler.CompileFunction<Vector<Bit>, Context&, Vector<StringView>, Vector<StringView>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto result = f(ctx, simd_left, simd_right);
@@ -220,20 +218,20 @@ TEST(JitCompiler, vector_filter) {
   std::string content = R"(
     filter(ids, citys=="sz")
   )";
-  auto rc = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<StringView>>(
-      content, {"_", "ids", "citys"});
+  auto rc = compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<StringView>>(content,
+                                                                                               {"_", "ids", "citys"});
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(ctx, ids, ctx.NewSimdVector(citys));
+  auto result = f(ctx, ids, ctx.NewVector(citys));
   ASSERT_EQ(result.Size(), 2);
   ASSERT_EQ(result[0], 10);
   ASSERT_EQ(result[1], 87);
 }
 
-static void print_column(simd::Vector<int> c) { RUDF_INFO("print_column:{}", c.Size()); }
+static void print_column(Vector<int> c) { RUDF_INFO("print_column:{}", c.Size()); }
 
 RUDF_FUNC_REGISTER(print_column)
 
@@ -255,8 +253,7 @@ TEST(JitCompiler, vector_gather) {
     }
   )";
 
-  auto rc = compiler.CompileFunction<void, int32_t, simd::Vector<int>, simd::Vector<int>, simd::Vector<int>,
-                                     simd::Vector<int>>(content);
+  auto rc = compiler.CompileFunction<void, int32_t, Vector<int>, Vector<int>, Vector<int>, Vector<int>>(content);
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
@@ -282,18 +279,18 @@ TEST(JitCompiler, vector_gather) {
 //   )";
 
 //   auto rc =
-//       compiler.CompileFunction<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<float>,
-//       simd::Vector<int>>(
+//       compiler.CompileFunction<Vector<int>, Context&, Vector<int>, Vector<float>,
+//       Vector<int>>(
 //           content);
 //   if (!rc.ok()) {
 //     RUDF_ERROR("{}", rc.status().ToString());
 //   }
 //   ASSERT_TRUE(rc.ok());
 //   auto f = std::move(rc.value());
-//   auto x = ctx.NewSimdVector(scores);
-//   auto idxs = simd::simd_vector_iota<int>(ctx, 0, scores.size());
-//   simd::simd_vector_sort_key_value<float, int>(ctx, scores, idxs, true);
-//   auto result = simd::simd_vector_gather<int>(ctx, ids, idxs);
+//   auto x = ctx.NewVector(scores);
+//   auto idxs = simd_vector_iota<int>(ctx, 0, scores.size());
+//   simd_vector_sort_key_value<float, int>(ctx, scores, idxs, true);
+//   auto result = simd_vector_gather<int>(ctx, ids, idxs);
 //   for (size_t i = 0; i < result.Size(); i++) {
 //     RUDF_INFO("{} {}", ids[i], scores[i]);
 //   }
@@ -308,14 +305,14 @@ TEST(JitCompiler, vector_gather) {
 
 TEST(JitCompiler, vector_pow) {
   std::vector<double> vec{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-  simd::Vector<double> simd_vec(vec);
+  Vector<double> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<f64> test_func(Context ctx, simd_vector<f64> x){
       return pow(x,10);
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<f64>, Context&, simd::Vector<f64>>(content);
+  auto rc = compiler.CompileFunction<Vector<f64>, Context&, Vector<f64>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -333,9 +330,7 @@ TEST(JitCompiler, complex) {
       return x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y;
     }
   )";
-  auto rc =
-      compiler.CompileFunction<simd::Vector<double>, Context&, simd::Vector<double>, simd::Vector<double>, double>(
-          source);
+  auto rc = compiler.CompileFunction<Vector<double>, Context&, Vector<double>, Vector<double>, double>(source);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
 
@@ -358,14 +353,14 @@ TEST(JitCompiler, complex) {
 }
 
 struct Feeds {
-  rapidudf::simd::Vector<double> Click;
-  rapidudf::simd::Vector<double> Like;
-  rapidudf::simd::Vector<double> Inter;
-  rapidudf::simd::Vector<double> Join;
-  rapidudf::simd::Vector<double> TimeV1;
-  rapidudf::simd::Vector<double> PostComment;
-  rapidudf::simd::Vector<double> PositiveCommentV1;
-  rapidudf::simd::Vector<double> ExpoTimeV1;
+  rapidudf::Vector<double> Click;
+  rapidudf::Vector<double> Like;
+  rapidudf::Vector<double> Inter;
+  rapidudf::Vector<double> Join;
+  rapidudf::Vector<double> TimeV1;
+  rapidudf::Vector<double> PostComment;
+  rapidudf::Vector<double> PositiveCommentV1;
+  rapidudf::Vector<double> ExpoTimeV1;
 };
 RUDF_STRUCT_FIELDS(Feeds, Click, Like, Inter, Join, TimeV1, PostComment, PositiveCommentV1, ExpoTimeV1)
 TEST(JitCompiler, test) {
@@ -381,7 +376,7 @@ TEST(JitCompiler, test) {
                               // score *= pow(feeds.ExpoTimeV1, 1.5);
                               return score;
                             })";
-  auto rc = compiler.CompileFunction<rapidudf::simd::Vector<double>, Context&, Feeds&>(source);
+  auto rc = compiler.CompileFunction<rapidudf::Vector<double>, Context&, Feeds&>(source);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto& stat = f.Stats();
@@ -423,7 +418,7 @@ TEST(JitCompiler, duration_score) {
 
   rapidudf::JitCompiler compiler;
   rapidudf::Context ctx;
-  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+  using simd_vector_f32 = rapidudf::Vector<float>;
 
   auto result = compiler.CompileFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, float, float>(source);
   if (!result.ok()) {
@@ -486,7 +481,7 @@ TEST(JitCompiler, wilson_ctr) {
 
   rapidudf::JitCompiler compiler;
   rapidudf::Context ctx;
-  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+  using simd_vector_f32 = rapidudf::Vector<float>;
 
   auto result = compiler.CompileFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, simd_vector_f32>(source);
   if (!result.ok()) {
@@ -535,7 +530,7 @@ TEST(JitCompiler, find) {
   )";
 
   rapidudf::JitCompiler compiler;
-  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+  using simd_vector_f32 = rapidudf::Vector<float>;
   auto result = compiler.CompileExpression<int, simd_vector_f32>(source, {"x"});
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
@@ -559,7 +554,7 @@ TEST(JitCompiler, find_gt) {
   )";
 
   rapidudf::JitCompiler compiler;
-  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+  using simd_vector_f32 = rapidudf::Vector<float>;
   auto result = compiler.CompileExpression<int, simd_vector_f32>(source, {"x"});
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
@@ -583,7 +578,7 @@ TEST(JitCompiler, example) {
   )";
 
   rapidudf::JitCompiler compiler({.print_asm = true});
-  using simd_vector_f32 = rapidudf::simd::Vector<float>;
+  using simd_vector_f32 = rapidudf::Vector<float>;
   auto result =
       compiler.CompileExpression<simd_vector_f32, Context&, simd_vector_f32, simd_vector_f32, simd_vector_f32>(
           source, {"_", "x", "y", "z"});
@@ -600,7 +595,7 @@ struct TestParams {
 static int test_vector_func_unit(int p, TestParams* params) { return p + 100 + params->boost; }
 
 static void test_vector_func(const int* p, TestParams** params, int* output) {
-  for (int i = 0; i < simd::kVectorUnitSize; i++) {
+  for (int i = 0; i < kVectorUnitSize; i++) {
     output[i] = test_vector_func_unit(p[i], params[i]);
   }
 }
@@ -617,7 +612,7 @@ TEST(JitCompiler, user_vector_func) {
   )";
 
   rapidudf::JitCompiler compiler({.print_asm = true});
-  using simd_vector_i32 = rapidudf::simd::Vector<int>;
+  using simd_vector_i32 = rapidudf::Vector<int>;
   auto result = compiler.CompileExpression<simd_vector_i32, Context&, simd_vector_i32, simd_vector_i32, TestParams&>(
       source, {"_", "x", "y", "params"});
   if (!result.ok()) {

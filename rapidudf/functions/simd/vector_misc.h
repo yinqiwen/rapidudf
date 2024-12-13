@@ -19,29 +19,29 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/functions/simd/vector_op.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 namespace rapidudf {
 namespace functions {
 template <typename T>
-T simd_vector_dot(simd::Vector<T> left, simd::Vector<T> right);
+T simd_vector_dot(Vector<T> left, Vector<T> right);
 template <typename T>
-simd::Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
+Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
 template <typename T>
-T simd_vector_sum(simd::Vector<T> left);
+T simd_vector_sum(Vector<T> left);
 template <typename T>
-T simd_vector_avg(simd::Vector<T> left);
+T simd_vector_avg(Vector<T> left);
 template <typename T>
-T simd_vector_reduce_max(simd::Vector<T> left);
+T simd_vector_reduce_max(Vector<T> left);
 template <typename T>
-T simd_vector_reduce_min(simd::Vector<T> left);
+T simd_vector_reduce_min(Vector<T> left);
 
 template <typename T>
-simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vector<int32_t> indices);
+Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indices);
 template <typename T>
-simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vector<Bit> bits);
+Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits);
 
 template <typename T, OpToken op = OP_EQUAL>
-int simd_vector_find(simd::Vector<T> data, T v);
+int simd_vector_find(Vector<T> data, T v);
 
 template <typename T>
 void simd_vector_random(Context& ctx, uint64_t seed, T* output);

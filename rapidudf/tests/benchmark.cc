@@ -43,8 +43,8 @@ static void init_test_numbers() {
 }
 
 static rapidudf::JitFunction<double, double, double, double> g_expr_func;
-static rapidudf::JitFunction<rapidudf::simd::Vector<double>, rapidudf::Context&, rapidudf::simd::Vector<double>,
-                             rapidudf::simd::Vector<double>>
+static rapidudf::JitFunction<rapidudf::Vector<double>, rapidudf::Context&, rapidudf::Vector<double>,
+                             rapidudf::Vector<double>>
     g_vector_expr_func;
 
 static void DoRapidUDFExprSetup(const benchmark::State& state) {
@@ -92,8 +92,8 @@ static void DoRapidUDFVectorExprSetup(const benchmark::State& state) {
     }
   )";
   rapidudf::JitCompiler compiler;
-  auto result = compiler.CompileFunction<rapidudf::simd::Vector<double>, rapidudf::Context&,
-                                         rapidudf::simd::Vector<double>, rapidudf::simd::Vector<double>>(source);
+  auto result = compiler.CompileFunction<rapidudf::Vector<double>, rapidudf::Context&, rapidudf::Vector<double>,
+                                         rapidudf::Vector<double>>(source);
 
   g_vector_expr_func = std::move(result.value());
 
@@ -167,7 +167,7 @@ static void BM_native_wilson_ctr(benchmark::State& state) {
 }
 BENCHMARK(BM_native_wilson_ctr)->Setup(native_wilson_ctr_setup)->Teardown(native_wilson_ctr_teardown);
 
-using simd_vector_f32 = rapidudf::simd::Vector<float>;
+using simd_vector_f32 = rapidudf::Vector<float>;
 static rapidudf::JitFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, simd_vector_f32>
     g_vector_wilson_ctr_func;
 

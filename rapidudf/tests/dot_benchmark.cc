@@ -23,7 +23,6 @@
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
-#include "rapidudf/vector/vector.h"
 
 static std::random_device rd;
 static std::mt19937 gen(rd());
@@ -61,9 +60,9 @@ static void BM_rapidudf_vector_dot(benchmark::State& state) {
     for (auto& left_embedding : left) {
       std::vector<float> result;
       result.reserve(right.size());
-      rapidudf::simd::Vector<float> left_operand(left_embedding.data(), left_embedding.size());
+      rapidudf::Vector<float> left_operand(left_embedding.data(), left_embedding.size());
       for (auto& right_embedding : right) {
-        rapidudf::simd::Vector<float> right_operand(right_embedding.data(), right_embedding.size());
+        rapidudf::Vector<float> right_operand(right_embedding.data(), right_embedding.size());
         result.emplace_back(rapidudf::functions::simd_vector_dot(left_operand, right_operand));
       }
       results.emplace_back(std::move(result));

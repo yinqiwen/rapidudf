@@ -22,8 +22,8 @@
 using namespace rapidudf;
 int main() {
   // 1. 创建table schema
-  auto schema = simd::TableSchema::GetOrCreate(
-      "Student", [](simd::TableSchema* s) { std::ignore = s->AddColumns<examples::Student>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "Student", [](table::TableSchema* s) { std::ignore = s->AddColumns<examples::Student>(); });
 
   // 2. UDF string
   std::string source = R"(
@@ -39,7 +39,7 @@ int main() {
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
   rapidudf::JitCompiler compiler;
   // CompileFunction的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
-  auto result = compiler.CompileFunction<simd::Table*, Context&, simd::Table*>(source);
+  auto result = compiler.CompileFunction<table::Table*, Context&, table::Table*>(source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;

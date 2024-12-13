@@ -44,7 +44,7 @@
 #include "rapidudf/types/json_object.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
 
@@ -243,7 +243,7 @@ static inline uint32_t nextTypeId() {
                 is_specialization<xtype, std::unordered_map>::value ||                                                \
                 is_specialization<xtype, std::unordered_set>::value || is_specialization<xtype, absl::Span>::value || \
                 is_specialization<xtype, std::pair>::value || is_specialization<xtype, std::tuple>::value ||          \
-                is_specialization<xtype, simd::Vector>::value) {                                                      \
+                is_specialization<xtype, Vector>::value) {                                                            \
     static_assert(sizeof(xtype) == -1, "Can NOT get dtype for complex type");                                         \
     return {};                                                                                                        \
   }
@@ -286,7 +286,7 @@ DType get_dtype() {
       return v.ToPtr();
     }
   }
-  if constexpr (is_specialization<T, simd::Vector>::value) {
+  if constexpr (is_specialization<T, Vector>::value) {
     // using val_type = typename T::value_type;
     // if constexpr (is_specialization<val_type, simd::Vector>::value || ){
 

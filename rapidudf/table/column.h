@@ -17,18 +17,18 @@
 #pragma once
 #include <string>
 #include "rapidudf/reflect/struct.h"
-#include "rapidudf/vector/row.h"
+#include "rapidudf/table/row.h"
 
 namespace rapidudf {
-namespace reflect {
+namespace table {
 struct Column {
   std::string name;
-  Field field;
-  const simd::RowSchema* schema = nullptr;
+  reflect::Field field;
+  const RowSchema* schema = nullptr;
   uint32_t field_idx = 0;
 
   const ::google::protobuf::FieldDescriptor* GetProtobufField() const { return schema->pb_desc->field(field_idx); }
   const StructMember* GetStructField() const { return schema->struct_members->at(field_idx); }
 };
-}  // namespace reflect
+}  // namespace table
 }  // namespace rapidudf

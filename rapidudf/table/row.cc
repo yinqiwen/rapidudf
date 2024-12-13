@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "rapidudf/vector/row.h"
+#include "rapidudf/table/row.h"
 #include <cstring>
 #include <vector>
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/functions/simd/vector_misc.h"
 #include "rapidudf/types/pointer.h"
-#include "rapidudf/vector/vector.h"
+
 namespace rapidudf {
-namespace simd {
+namespace table {
 void Rows::SetPointers(Vector<Pointer> new_pointers) {
   objs_.resize(new_pointers.Size());
-  memcpy(&objs_[0], new_pointers.GetVectorData().ReadableData<Pointer>(), new_pointers.Size() * sizeof(const uint8_t*));
+  memcpy(&objs_[0], new_pointers.GetVectorBuf().ReadableData<Pointer>(), new_pointers.Size() * sizeof(const uint8_t*));
 }
 void Rows::Reset(std::vector<const uint8_t*>&& objs) { objs_ = std::move(objs); }
 void Rows::Filter(Vector<Bit> bits) {
@@ -60,9 +60,9 @@ absl::Status Rows::Insert(size_t pos, const uint8_t* ptr) {
   return absl::OkStatus();
 }
 Vector<Pointer> Rows::GetRowPtrs() const {
-  VectorData vdata(objs_.data(), objs_.size());
+  VectorBuf vdata(objs_.data(), objs_.size());
   return Vector<Pointer>(vdata);
 }
+}  // namespace table
 
-}  // namespace simd
 }  // namespace rapidudf

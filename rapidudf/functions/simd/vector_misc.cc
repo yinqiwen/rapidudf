@@ -44,7 +44,7 @@ namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
 
 template <typename T>
-HWY_INLINE T simd_vector_dot_impl(simd::Vector<T> left, simd::Vector<T> right) {
+HWY_INLINE T simd_vector_dot_impl(Vector<T> left, Vector<T> right) {
   if (left.Size() != right.Size()) {
     THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left.Size(), right.Size()));
   }
@@ -63,7 +63,7 @@ HWY_INLINE T simd_vector_dot_impl(simd::Vector<T> left, simd::Vector<T> right) {
 }
 
 template <typename T>
-T simd_vector_sum_impl(simd::Vector<T> left) {
+T simd_vector_sum_impl(Vector<T> left) {
   T sum = {};
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
@@ -82,7 +82,7 @@ T simd_vector_sum_impl(simd::Vector<T> left) {
 }
 
 template <typename T>
-T simd_vector_reduce_max_impl(simd::Vector<T> left) {
+T simd_vector_reduce_max_impl(Vector<T> left) {
   T max_val = std::numeric_limits<T>::max();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
@@ -105,7 +105,7 @@ T simd_vector_reduce_max_impl(simd::Vector<T> left) {
 }
 
 template <typename T>
-T simd_vector_reduce_min_impl(simd::Vector<T> left) {
+T simd_vector_reduce_min_impl(Vector<T> left) {
   T min_val = std::numeric_limits<T>::min();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
@@ -128,10 +128,10 @@ T simd_vector_reduce_min_impl(simd::Vector<T> left) {
 }
 
 template <typename T>
-HWY_INLINE simd::Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t n) {
+HWY_INLINE Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t n) {
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
-  auto result_data = ctx.NewSimdVector<T>(n, lanes * sizeof(T));
+  auto result_data = ctx.NewVectorBuf<T>(n, lanes * sizeof(T));
   uint8_t* arena_data = result_data.template MutableData<uint8_t>();
   size_t i = 0;
   for (; i < n; i += lanes) {
@@ -139,11 +139,11 @@ HWY_INLINE simd::Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t
     hn::StoreU(v, d, reinterpret_cast<T*>(arena_data + i * sizeof(T)));
   }
   result_data.SetReadonly(false);
-  return simd::Vector<T>(result_data);
+  return Vector<T>(result_data);
 }
 
 template <typename T>
-simd::Vector<T> simd_vector_gather_impl(Context& ctx, simd::Vector<T> data, simd::Vector<int32_t> indices) {
+Vector<T> simd_vector_gather_impl(Context& ctx, Vector<T> data, Vector<int32_t> indices) {
   using number_t = T;
   using D = hn::ScalableTag<number_t>;
   const D d;
@@ -151,7 +151,7 @@ simd::Vector<T> simd_vector_gather_impl(Context& ctx, simd::Vector<T> data, simd
   constexpr size_t N = hn::Lanes(d);
   constexpr hn::CappedTag<int32_t, N> indice_d;
   size_t dst_size = indices.Size();
-  simd::VectorData result_data = ctx.NewSimdVector<T>(dst_size, N * sizeof(T));
+  VectorBuf result_data = ctx.NewVectorBuf<T>(dst_size, N * sizeof(T));
   result_data.SetReadonly(false);
   T* dst = result_data.MutableData<T>();
   const int32_t* indice_data = indices.Data();
@@ -174,16 +174,16 @@ simd::Vector<T> simd_vector_gather_impl(Context& ctx, simd::Vector<T> data, simd
   }
 
   if (HWY_UNLIKELY(idx == count)) {
-    return simd::Vector<T>(result_data);
+    return Vector<T>(result_data);
   }
   for (size_t i = idx; i < count; i++) {
     dst[i] = base[indices[i]];
   }
-  return simd::Vector<T>(result_data);
+  return Vector<T>(result_data);
 }
 
 template <typename OPT>
-size_t simd_vector_find_impl(simd::Vector<typename OPT::operand_t> data, typename OPT::operand_t v) {
+size_t simd_vector_find_impl(Vector<typename OPT::operand_t> data, typename OPT::operand_t v) {
   using D = hn::ScalableTag<typename OPT::operand_t>;
   constexpr D d;
   if constexpr (OPT::op == OP_EQUAL) {
@@ -212,10 +212,10 @@ template <typename T>
 void simd_vector_random_impl(Context& ctx, uint64_t seed, T* output) {
   hn::VectorXoshiro* rand = ctx.GetPtr<hn::VectorXoshiro>({}, seed);
   if constexpr (std::is_same_v<double, T>) {
-    auto result = rand->Uniform(simd::kVectorUnitSize);
+    auto result = rand->Uniform(kVectorUnitSize);
     memcpy(output, result.data(), result.size() * sizeof(T));
   } else if constexpr (std::is_same_v<uint64_t, T>) {
-    auto result = (*rand)(simd::kVectorUnitSize);
+    auto result = (*rand)(kVectorUnitSize);
     memcpy(output, result.data(), result.size() * sizeof(T));
   } else {
     static_assert(sizeof(T) == -1, "Invalid random");
@@ -244,19 +244,19 @@ HWY_AFTER_NAMESPACE();
 namespace rapidudf {
 namespace functions {
 template <typename T>
-simd::Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n) {
+Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n) {
   HWY_EXPORT_T(Table1, simd_vector_iota_impl<T>);
   return HWY_DYNAMIC_DISPATCH_T(Table1)(ctx, start, n);
 }
 
 template <typename T>
-T simd_vector_sum(simd::Vector<T> left) {
+T simd_vector_sum(Vector<T> left) {
   HWY_EXPORT_T(Table1, simd_vector_sum_impl<T>);
   return HWY_DYNAMIC_DISPATCH_T(Table1)(left);
 }
 
 template <typename T>
-T simd_vector_dot(simd::Vector<T> left, simd::Vector<T> right) {
+T simd_vector_dot(Vector<T> left, Vector<T> right) {
   // simsimd_distance_t v;
   // if constexpr (std::is_same_v<float, T>) {
   //   simsimd_dot_f32(left.Data(), right.Data(), left.Size(), &v);
@@ -269,13 +269,13 @@ T simd_vector_dot(simd::Vector<T> left, simd::Vector<T> right) {
 }
 
 template <typename T>
-T simd_vector_avg(simd::Vector<T> left) {
+T simd_vector_avg(Vector<T> left) {
   T sum = simd_vector_sum(left);
   return sum / left.Size();
 }
 
 template <typename T>
-simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vector<Bit> bits) {
+Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits) {
   T* raw = reinterpret_cast<T*>(ctx.ArenaAllocate(data.BytesCapacity()));
   size_t filter_cursor = 0;
   if constexpr (std::is_same_v<T, Bit>) {
@@ -301,23 +301,22 @@ simd::Vector<T> simd_vector_filter(Context& ctx, simd::Vector<T> data, simd::Vec
     }
   }
 
-  simd::VectorData vdata(raw, filter_cursor, data.BytesCapacity());
-  vdata.SetTemporary(true);
+  VectorBuf vdata(raw, filter_cursor, data.BytesCapacity());
   vdata.SetReadonly(false);
-  return simd::Vector<T>(vdata);
+  return Vector<T>(vdata);
 }
 
 template <typename T>
-simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vector<int32_t> indices) {
+Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indices) {
   if constexpr (std::is_same_v<StringView, T> || std::is_same_v<int16_t, T> || std::is_same_v<uint16_t, T> ||
                 std::is_same_v<int8_t, T> || std::is_same_v<uint8_t, T>) {
     T* raw = reinterpret_cast<T*>(ctx.ArenaAllocate(sizeof(T) * indices.Size()));
     for (size_t i = 0; i < indices.Size(); i++) {
       raw[i] = data[indices[i]];
     }
-    simd::VectorData vdata(raw, indices.Size());
+    VectorBuf vdata(raw, indices.Size());
     vdata.SetTemporary(true);
-    return simd::Vector<T>(vdata);
+    return Vector<T>(vdata);
   } else if constexpr (std::is_same_v<T, Bit>) {
     size_t n = (indices.Size() + 7) / 8;
     uint64_t* raw = reinterpret_cast<uint64_t*>(ctx.ArenaAllocate(sizeof(uint64_t) * n));
@@ -330,14 +329,13 @@ simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vec
         raw[bits_idx] = bits64_clear(raw[bits_idx], bits_cursor);
       }
     }
-    simd::VectorData vdata(raw, indices.Size());
-    vdata.SetTemporary(true);
-    return simd::Vector<T>(vdata);
+    VectorBuf vdata(raw, indices.Size());
+    return Vector<T>(vdata);
   } else if constexpr (std::is_same_v<T, Pointer>) {
-    simd::Vector<uint64_t> pointers(data.GetVectorData());
+    Vector<uint64_t> pointers(data.GetVectorBuf());
     HWY_EXPORT_T(Table1, simd_vector_gather_impl<uint64_t>);
     auto result = HWY_DYNAMIC_DISPATCH_T(Table1)(ctx, pointers, indices);
-    return simd::Vector<T>(result.GetVectorData());
+    return Vector<T>(result.GetVectorBuf());
   } else {
     HWY_EXPORT_T(Table1, simd_vector_gather_impl<T>);
     return HWY_DYNAMIC_DISPATCH_T(Table1)(ctx, data, indices);
@@ -345,7 +343,7 @@ simd::Vector<T> simd_vector_gather(Context& ctx, simd::Vector<T> data, simd::Vec
 }
 
 template <typename T, OpToken op>
-int simd_vector_find(simd::Vector<T> data, T v) {
+int simd_vector_find(Vector<T> data, T v) {
   if constexpr (std::is_same_v<StringView, T>) {
     for (size_t i = 0; i < data.Size(); i++) {
       if (compare_string_view(op, data[i], v)) {
@@ -365,12 +363,12 @@ int simd_vector_find(simd::Vector<T> data, T v) {
 }
 
 template <typename T>
-T simd_vector_reduce_max(simd::Vector<T> left) {
+T simd_vector_reduce_max(Vector<T> left) {
   HWY_EXPORT_T(Table, simd_vector_reduce_max_impl<T>);
   return HWY_DYNAMIC_DISPATCH_T(Table)(left);
 }
 template <typename T>
-T simd_vector_reduce_min(simd::Vector<T> left) {
+T simd_vector_reduce_min(Vector<T> left) {
   HWY_EXPORT_T(Table, simd_vector_reduce_min_impl<T>);
   return HWY_DYNAMIC_DISPATCH_T(Table)(left);
 }
@@ -388,48 +386,48 @@ T random(uint64_t seed) {
 }
 
 #define DEFINE_SIMD_DOT_OP_TEMPLATE(r, op, ii, TYPE) \
-  template TYPE simd_vector_dot(simd::Vector<TYPE> left, simd::Vector<TYPE> right);
+  template TYPE simd_vector_dot(Vector<TYPE> left, Vector<TYPE> right);
 #define DEFINE_SIMD_DOT_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_DOT_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_DOT_OP(float, double);
 
 #define DEFINE_SIMD_IOTA_OP_TEMPLATE(r, op, ii, TYPE) \
-  template simd::Vector<TYPE> simd_vector_iota(Context&, TYPE start, uint32_t n);
+  template Vector<TYPE> simd_vector_iota(Context&, TYPE start, uint32_t n);
 #define DEFINE_SIMD_IOTA_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_IOTA_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_IOTA_OP(float, double, uint64_t, int64_t, uint32_t, int32_t);
 
-#define DEFINE_SIMD_SUM_OP_TEMPLATE(r, op, ii, TYPE)     \
-  template TYPE simd_vector_sum(simd::Vector<TYPE> vec); \
-  template TYPE simd_vector_avg(simd::Vector<TYPE> vec);
+#define DEFINE_SIMD_SUM_OP_TEMPLATE(r, op, ii, TYPE) \
+  template TYPE simd_vector_sum(Vector<TYPE> vec);   \
+  template TYPE simd_vector_avg(Vector<TYPE> vec);
 #define DEFINE_SIMD_SUM_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_SUM_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 DEFINE_SIMD_SUM_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 
 #define DEFINE_SIMD_REDUCE_MAX_MIN_OP_TEMPLATE(r, op, ii, TYPE) \
-  template TYPE simd_vector_reduce_max(simd::Vector<TYPE> vec); \
-  template TYPE simd_vector_reduce_min(simd::Vector<TYPE> vec);
+  template TYPE simd_vector_reduce_max(Vector<TYPE> vec);       \
+  template TYPE simd_vector_reduce_min(Vector<TYPE> vec);
 #define DEFINE_SIMD_REDUCE_MAX_MIN_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_REDUCE_MAX_MIN_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_REDUCE_MAX_MIN_OP(float, double, uint64_t, int64_t, uint32_t, int32_t, uint16_t, int16_t, uint8_t, int8_t);
 
 #define DEFINE_SIMD_GATHER_OP_TEMPLATE(r, op, ii, TYPE) \
-  template simd::Vector<TYPE> simd_vector_gather(Context& ctx, simd::Vector<TYPE> data, simd::Vector<int32_t> indices);
+  template Vector<TYPE> simd_vector_gather(Context& ctx, Vector<TYPE> data, Vector<int32_t> indices);
 #define DEFINE_SIMD_GATHER_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_GATHER_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_GATHER_OP(float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
                       StringView, Bit, Pointer);
 
 #define DEFINE_SIMD_FILTER_OP_TEMPLATE(r, op, ii, TYPE) \
-  template simd::Vector<TYPE> simd_vector_filter(Context& ctx, simd::Vector<TYPE> data, simd::Vector<Bit> bits);
+  template Vector<TYPE> simd_vector_filter(Context& ctx, Vector<TYPE> data, Vector<Bit> bits);
 #define DEFINE_SIMD_FILTER_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_FILTER_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_FILTER_OP(float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
                       StringView, Bit, Pointer);
 
 #define DEFINE_SIMD_FIND_OP_TEMPLATE(r, op, ii, TYPE) \
-  template int simd_vector_find<TYPE, op>(simd::Vector<TYPE> data, TYPE val);
+  template int simd_vector_find<TYPE, op>(Vector<TYPE> data, TYPE val);
 #define DEFINE_SIMD_FIND_OP(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_FIND_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_FIND_OP(OP_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,

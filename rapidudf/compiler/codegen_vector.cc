@@ -42,7 +42,7 @@ absl::StatusOr<::llvm::Value*> CodeGen::NewConstantVectorValue(DType dtype, ::ll
     auto vector_type = get_vector_type(builder_->getContext(), dtype);
     return ::llvm::ConstantVector::getSplat(vector_type->getElementCount(), reinterpret_cast<::llvm::Constant*>(val));
   }
-  return builder_->CreateVectorSplat(simd::kVectorUnitSize, val);
+  return builder_->CreateVectorSplat(kVectorUnitSize, val);
 }
 absl::StatusOr<::llvm::Value*> CodeGen::NewConstantVectorValue(ValuePtr val) {
   return NewConstantVectorValue(val->GetDType(), val->LoadValue());

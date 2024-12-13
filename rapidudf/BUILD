@@ -12,7 +12,7 @@ cc_library(
         "//rapidudf/compiler",
         "//rapidudf/exec:eval_engine",
         "//rapidudf/reflect",
+        "//rapidudf/table",
         "//rapidudf/types:dyn_object_impl",
-        "//rapidudf/vector:table",
     ],
 )

@@ -50,8 +50,7 @@ TEST(JitCompiler, vector_add) {
   Context ctx;
   JitCompiler compiler;
   std::string expr = "x+y";
-  auto rc0 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>>(
-      expr, {"_", "x", "y"});
+  auto rc0 = compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, i_left, i_right);
@@ -59,8 +58,7 @@ TEST(JitCompiler, vector_add) {
   for (size_t i = 0; i < result0.Size(); i++) {
     ASSERT_EQ(result0[i], i_left[i] + i_right[i]);
   }
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"});
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -69,14 +67,13 @@ TEST(JitCompiler, vector_add) {
     ASSERT_EQ(result1[i], f_left[i] + f_right[i]);
   }
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
-      expr, {"_", "x", "y"});
+  auto rc2 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>, Vector<Bit>>(expr, {"_", "x", "y"});
   if (!rc2.ok()) {
     RUDF_ERROR("{}", rc2.status().ToString());
   }
   ASSERT_FALSE(rc2.ok());
-  auto rc3 = compiler.CompileExpression<simd::Vector<StringView>, Context&, simd::Vector<StringView>,
-                                        simd::Vector<StringView>>(expr, {"_", "x", "y"});
+  auto rc3 = compiler.CompileExpression<Vector<StringView>, Context&, Vector<StringView>, Vector<StringView>>(
+      expr, {"_", "x", "y"});
   if (!rc3.ok()) {
     RUDF_ERROR("{}", rc3.status().ToString());
   }
@@ -111,8 +108,7 @@ TEST(JitCompiler, vector_sub) {
   Context ctx;
   JitCompiler compiler;
   std::string expr = "x-y";
-  auto rc0 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>>(
-      expr, {"_", "x", "y"});
+  auto rc0 = compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, i_left, i_right);
@@ -120,8 +116,7 @@ TEST(JitCompiler, vector_sub) {
   for (size_t i = 0; i < result0.Size(); i++) {
     ASSERT_EQ(result0[i], i_left[i] - i_right[i]);
   }
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"});
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -130,14 +125,13 @@ TEST(JitCompiler, vector_sub) {
     ASSERT_EQ(result1[i], f_left[i] - f_right[i]);
   }
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
-      expr, {"_", "x", "y"});
+  auto rc2 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>, Vector<Bit>>(expr, {"_", "x", "y"});
   if (!rc2.ok()) {
     RUDF_ERROR("{}", rc2.status().ToString());
   }
   ASSERT_FALSE(rc2.ok());
-  auto rc3 = compiler.CompileExpression<simd::Vector<StringView>, Context&, simd::Vector<StringView>,
-                                        simd::Vector<StringView>>(expr, {"_", "x", "y"});
+  auto rc3 = compiler.CompileExpression<Vector<StringView>, Context&, Vector<StringView>, Vector<StringView>>(
+      expr, {"_", "x", "y"});
   if (!rc3.ok()) {
     RUDF_ERROR("{}", rc3.status().ToString());
   }
@@ -172,8 +166,7 @@ TEST(JitCompiler, vector_mul) {
   Context ctx;
   JitCompiler compiler;
   std::string expr = "x*y";
-  auto rc0 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>>(
-      expr, {"_", "x", "y"});
+  auto rc0 = compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, i_left, i_right);
@@ -181,8 +174,7 @@ TEST(JitCompiler, vector_mul) {
   for (size_t i = 0; i < result0.Size(); i++) {
     ASSERT_EQ(result0[i], i_left[i] * i_right[i]);
   }
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"});
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -191,14 +183,13 @@ TEST(JitCompiler, vector_mul) {
     ASSERT_EQ(result1[i], f_left[i] * f_right[i]);
   }
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
-      expr, {"_", "x", "y"});
+  auto rc2 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>, Vector<Bit>>(expr, {"_", "x", "y"});
   if (!rc2.ok()) {
     RUDF_ERROR("{}", rc2.status().ToString());
   }
   ASSERT_FALSE(rc2.ok());
-  auto rc3 = compiler.CompileExpression<simd::Vector<StringView>, Context&, simd::Vector<StringView>,
-                                        simd::Vector<StringView>>(expr, {"_", "x", "y"});
+  auto rc3 = compiler.CompileExpression<Vector<StringView>, Context&, Vector<StringView>, Vector<StringView>>(
+      expr, {"_", "x", "y"});
   if (!rc3.ok()) {
     RUDF_ERROR("{}", rc3.status().ToString());
   }
@@ -233,8 +224,7 @@ TEST(JitCompiler, vector_div) {
   Context ctx;
   JitCompiler compiler;
   std::string expr = "x/y";
-  auto rc0 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>>(
-      expr, {"_", "x", "y"});
+  auto rc0 = compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, i_left, i_right);
@@ -242,8 +232,7 @@ TEST(JitCompiler, vector_div) {
   for (size_t i = 0; i < result0.Size(); i++) {
     ASSERT_EQ(result0[i], i_left[i] / i_right[i]);
   }
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"});
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -252,14 +241,13 @@ TEST(JitCompiler, vector_div) {
     ASSERT_EQ(result1[i], f_left[i] / f_right[i]);
   }
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
-      expr, {"_", "x", "y"});
+  auto rc2 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>, Vector<Bit>>(expr, {"_", "x", "y"});
   if (!rc2.ok()) {
     RUDF_ERROR("{}", rc2.status().ToString());
   }
   ASSERT_FALSE(rc2.ok());
-  auto rc3 = compiler.CompileExpression<simd::Vector<StringView>, Context&, simd::Vector<StringView>,
-                                        simd::Vector<StringView>>(expr, {"_", "x", "y"});
+  auto rc3 = compiler.CompileExpression<Vector<StringView>, Context&, Vector<StringView>, Vector<StringView>>(
+      expr, {"_", "x", "y"});
   if (!rc3.ok()) {
     RUDF_ERROR("{}", rc3.status().ToString());
   }
@@ -292,8 +280,7 @@ TEST(JitCompiler, vector_mod) {
   Context ctx;
   JitCompiler compiler;
   std::string expr = "x%y";
-  auto rc0 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>>(
-      expr, {"_", "x", "y"});
+  auto rc0 = compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, i_left, i_right);
@@ -301,18 +288,16 @@ TEST(JitCompiler, vector_mod) {
   for (size_t i = 0; i < result0.Size(); i++) {
     ASSERT_EQ(result0[i], i_left[i] % i_right[i]);
   }
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"});
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
-      expr, {"_", "x", "y"});
+  auto rc2 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>, Vector<Bit>>(expr, {"_", "x", "y"});
   if (!rc2.ok()) {
     RUDF_ERROR("{}", rc2.status().ToString());
   }
   ASSERT_FALSE(rc2.ok());
-  auto rc3 = compiler.CompileExpression<simd::Vector<StringView>, Context&, simd::Vector<StringView>,
-                                        simd::Vector<StringView>>(expr, {"_", "x", "y"});
+  auto rc3 = compiler.CompileExpression<Vector<StringView>, Context&, Vector<StringView>, Vector<StringView>>(
+      expr, {"_", "x", "y"});
   if (!rc3.ok()) {
     RUDF_ERROR("{}", rc3.status().ToString());
   }
@@ -368,12 +353,10 @@ TEST(JitCompiler, vector_pow) {
   Context ctx;
   JitCompiler compiler;
   std::string expr = "x^y";
-  auto rc0 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>>(
-      expr, {"_", "x", "y"});
+  auto rc0 = compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>>(expr, {"_", "x", "y"});
   ASSERT_FALSE(rc0.ok());
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      expr, {"_", "x", "y"});
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, f_left, f_right);
@@ -382,14 +365,13 @@ TEST(JitCompiler, vector_pow) {
     ASSERT_EQ(result1[i], std::pow(f_left[i], f_right[i]));
   }
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
-      expr, {"_", "x", "y"});
+  auto rc2 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>, Vector<Bit>>(expr, {"_", "x", "y"});
   if (!rc2.ok()) {
     RUDF_ERROR("{}", rc2.status().ToString());
   }
   ASSERT_FALSE(rc2.ok());
-  auto rc3 = compiler.CompileExpression<simd::Vector<StringView>, Context&, simd::Vector<StringView>,
-                                        simd::Vector<StringView>>(expr, {"_", "x", "y"});
+  auto rc3 = compiler.CompileExpression<Vector<StringView>, Context&, Vector<StringView>, Vector<StringView>>(
+      expr, {"_", "x", "y"});
   if (!rc3.ok()) {
     RUDF_ERROR("{}", rc3.status().ToString());
   }

@@ -52,7 +52,7 @@ TEST(JitCompiler, vector_abs) {
   JitCompiler compiler;
   std::string content = "abs(x)";
   std::vector<int64_t> ivs{1, -2, 3, -4, 4, 8, -1};
-  auto rc4 = compiler.CompileExpression<simd::Vector<int64_t>, Context&, simd::Vector<int64_t>>(content, {"_", "x"});
+  auto rc4 = compiler.CompileExpression<Vector<int64_t>, Context&, Vector<int64_t>>(content, {"_", "x"});
   if (!rc4.ok()) {
     RUDF_ERROR("{}", rc4.status().ToString());
   }
@@ -65,7 +65,7 @@ TEST(JitCompiler, vector_abs) {
   }
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -117,8 +117,8 @@ TEST(JitCompiler, vector_max) {
   std::vector<int64_t> y{-1, -2, 13, 14, -14, -8, 1};
   std::vector<double> fx{1.1, -2.1, 3.2, -4.1, 4.2, 8.1, -1.12};
   std::vector<double> fy{1.13, -2.12, 3.02, -4.01, 4.01, 8.02, -1.0001};
-  auto rc0 = compiler.CompileExpression<simd::Vector<int64_t>, Context&, simd::Vector<int64_t>, simd::Vector<int64_t>>(
-      content, {"_", "x", "y"});
+  auto rc0 =
+      compiler.CompileExpression<Vector<int64_t>, Context&, Vector<int64_t>, Vector<int64_t>>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, x, y);
@@ -127,8 +127,8 @@ TEST(JitCompiler, vector_max) {
     ASSERT_FLOAT_EQ(result0[i], std::max(x[i], y[i]));
   }
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<double>, Context&, simd::Vector<double>, simd::Vector<double>>(
-      content, {"_", "x", "y"});
+  auto rc1 =
+      compiler.CompileExpression<Vector<double>, Context&, Vector<double>, Vector<double>>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy);
@@ -177,8 +177,8 @@ TEST(JitCompiler, vector_min) {
   std::vector<int32_t> y{-1, -2, 13, 14, -14, -8, 1};
   std::vector<float> fx{1.1, -2.1, 3.2, -4.1, 4.2, 8.1, -1.12};
   std::vector<float> fy{1.13, -2.12, 3.02, -4.01, 4.01, 8.02, -1.0001};
-  auto rc0 = compiler.CompileExpression<simd::Vector<int32_t>, Context&, simd::Vector<int32_t>, simd::Vector<int32_t>>(
-      content, {"_", "x", "y"});
+  auto rc0 =
+      compiler.CompileExpression<Vector<int32_t>, Context&, Vector<int32_t>, Vector<int32_t>>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, x, y);
@@ -187,8 +187,8 @@ TEST(JitCompiler, vector_min) {
     ASSERT_FLOAT_EQ(result0[i], std::min(x[i], y[i]));
   }
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      content, {"_", "x", "y"});
+  auto rc1 =
+      compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy);
@@ -214,7 +214,7 @@ TEST(JitCompiler, vector_ceil) {
   std::string content = "ceil(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -243,7 +243,7 @@ TEST(JitCompiler, vector_erf) {
   std::string content = "erf(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -272,7 +272,7 @@ TEST(JitCompiler, vector_erfc) {
   std::string content = "erfc(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -301,7 +301,7 @@ TEST(JitCompiler, vector_exp) {
   std::string content = "exp(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -330,7 +330,7 @@ TEST(JitCompiler, vector_exp2) {
   std::string content = "exp2(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -359,7 +359,7 @@ TEST(JitCompiler, vector_expm1) {
   std::string content = "expm1(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -388,7 +388,7 @@ TEST(JitCompiler, vector_floor) {
   std::string content = "floor(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -416,7 +416,7 @@ TEST(JitCompiler, vector_round) {
   std::string content = "round(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -445,7 +445,7 @@ TEST(JitCompiler, vector_rint) {
   std::string content = "rint(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -474,7 +474,7 @@ TEST(JitCompiler, vector_trunc) {
   std::string content = "trunc(x)";
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -503,7 +503,7 @@ TEST(JitCompiler, vector_sqrt) {
   std::string content = "sqrt(x)";
 
   std::vector<float> fvs{1.2, 2.1, 3.2, 1.2, 4, 8, 1.5};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -532,7 +532,7 @@ TEST(JitCompiler, vector_log) {
   std::string content = "log(x)";
 
   std::vector<double> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<double>, Context&, simd::Vector<double>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<double>, Context&, Vector<double>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -561,7 +561,7 @@ TEST(JitCompiler, vector_log2) {
   std::string content = "log2(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -590,7 +590,7 @@ TEST(JitCompiler, vector_log10) {
   std::string content = "log10(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -619,7 +619,7 @@ TEST(JitCompiler, vector_log1p) {
   std::string content = "log1p(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -648,7 +648,7 @@ TEST(JitCompiler, vector_sin) {
   std::string content = "sin(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -677,7 +677,7 @@ TEST(JitCompiler, vector_cos) {
   std::string content = "cos(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -706,7 +706,7 @@ TEST(JitCompiler, vector_tan) {
   std::string content = "tan(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -735,7 +735,7 @@ TEST(JitCompiler, vector_sinh) {
   std::string content = "sinh(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -764,7 +764,7 @@ TEST(JitCompiler, vector_cosh) {
   std::string content = "cosh(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -793,7 +793,7 @@ TEST(JitCompiler, vector_tanh) {
   std::string content = "tanh(x)";
 
   std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -822,7 +822,7 @@ TEST(JitCompiler, vector_asin) {
   std::string content = "asin(x)";
 
   std::vector<float> fvs{0.3, 0.5, 0.2, 0.6, 0.7, 0, 1.0};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -840,10 +840,10 @@ TEST(JitCompiler, vector_asin) {
 //   std::string content = "asin(x)";
 //   std::vector<float> fvs{0.3, 0.5, 0.2, 0.6, 0.7, 0, 1.0};
 //   auto& ctx_ = ctx;
-//   simd::Column* column = ctx.New<simd::Column>(ctx_, fvs);
-//   simd::Table table(ctx);
+//   Column* column = ctx.New<Column>(ctx_, fvs);
+//   Table table(ctx);
 
-//   auto rc5 = compiler.CompileExpression<simd::Column*, Context&, simd::Column*>(content, {"_", "x"});
+//   auto rc5 = compiler.CompileExpression<Column*, Context&, Column*>(content, {"_", "x"});
 //   if (!rc5.ok()) {
 //     RUDF_ERROR("{}", rc5.status().ToString());
 //   }
@@ -873,7 +873,7 @@ TEST(JitCompiler, vector_acos) {
   std::string content = "acos(x)";
 
   std::vector<float> fvs{0.3, 0.5, 0.2, 0.6, 0.7, 0, 1.0};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -902,7 +902,7 @@ TEST(JitCompiler, vector_atan) {
   std::string content = "atan(x)";
 
   std::vector<float> fvs{0.3, 0.5, 0.2, 0.6, 0.7, 0, 1.0};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -931,7 +931,7 @@ TEST(JitCompiler, vector_asinh) {
   std::string content = "asinh(x)";
 
   std::vector<float> fvs{0.3, 0.5, 0.2, 0.6, 0.7, 0, 1.0};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -960,7 +960,7 @@ TEST(JitCompiler, vector_acosh) {
   std::string content = "acosh(x)";
 
   std::vector<float> fvs{10.1, 2.5, 1.2, 2.6, 3.7, 4.6, 7.0};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -989,7 +989,7 @@ TEST(JitCompiler, vector_atanh) {
   std::string content = "atanh(x)";
 
   std::vector<float> fvs{0.8, 0.5, 0.2, 0.6, 0.7, 0.6, 0.7};
-  auto rc5 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
@@ -1020,8 +1020,8 @@ TEST(JitCompiler, vector_atan2) {
   std::vector<float> fx{1.1, -2.1, 3.2, -3.1, 2.2, 1.1, -1.12};
   std::vector<float> fy{1.13, -2.12, 3.02, -2.01, 2.01, 2.02, -1.0001};
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      content, {"_", "x", "y"});
+  auto rc1 =
+      compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy);
@@ -1049,8 +1049,8 @@ TEST(JitCompiler, vector_hypot) {
   std::vector<float> fx{1.1, -2.1, 3.2, -3.1, 2.2, 1.1, -1.12};
   std::vector<float> fy{1.13, -2.12, 3.02, -2.01, 2.01, 2.02, -1.0001};
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>>(
-      content, {"_", "x", "y"});
+  auto rc1 =
+      compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy);
@@ -1063,15 +1063,15 @@ TEST(JitCompiler, vector_hypot) {
 TEST(JitCompiler, vector_sum) {
   std::vector<float> left{1, 2, 3, 4, 1, 5, 6};
   std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
-  simd::Vector<float> simd_left(left);
-  simd::Vector<float> simd_right(right);
+  Vector<float> simd_left(left);
+  Vector<float> simd_right(right);
   JitCompiler compiler;
   std::string content = R"(
     f32 test_func(simd_vector<f32> x){
       return sum(x);
     }
   )";
-  auto rc = compiler.CompileFunction<float, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<float, Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto result = f(simd_left);
@@ -1085,15 +1085,15 @@ TEST(JitCompiler, vector_sum) {
 TEST(JitCompiler, vector_dot) {
   std::vector<float> left{1, 2, 3, 4, 1, 5, 6};
   std::vector<float> right{10, 20, 30, 40, 10, 50, 60};
-  simd::Vector<float> simd_left(left);
-  simd::Vector<float> simd_right(right);
+  Vector<float> simd_left(left);
+  Vector<float> simd_right(right);
   JitCompiler compiler;
   std::string content = R"(
     f32 test_func(simd_vector<f32> x,simd_vector<f32> y){
       return dot(x,y);
     }
   )";
-  auto rc = compiler.CompileFunction<float, simd::Vector<float>, simd::Vector<float>>(content);
+  auto rc = compiler.CompileFunction<float, Vector<float>, Vector<float>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto result = f(simd_left, simd_right);
@@ -1113,7 +1113,7 @@ TEST(JitCompiler, vector_iota) {
       return t;
     }
   )";
-  auto rc = compiler.CompileFunction<simd::Vector<double>, Context&>(content);
+  auto rc = compiler.CompileFunction<Vector<double>, Context&>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
@@ -1143,7 +1143,7 @@ TEST(JitCompiler, vector_fma) {
   std::vector<float> fy{-1.13};
   float fz = {3.5};
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>, float>(
       content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
@@ -1157,8 +1157,8 @@ TEST(JitCompiler, vector_fma) {
   std::vector<int32_t> iy{-1, -1, -2, -3, -4, -5, -6};
   int32_t iz = 11;
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"});
+  auto rc2 =
+      compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>, int>(content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);
@@ -1186,7 +1186,7 @@ TEST(JitCompiler, vector_clamp) {
   std::vector<float> fy{-1.13};
   float fz = {3.5};
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>, float>(
       content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
@@ -1200,8 +1200,8 @@ TEST(JitCompiler, vector_clamp) {
   std::vector<int32_t> iy{-1, -1, -2, -3, -4, -5, -6};
   int32_t iz = 11;
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"});
+  auto rc2 =
+      compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>, int>(content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);
@@ -1229,7 +1229,7 @@ TEST(JitCompiler, vector_fms) {
   std::vector<float> fy{-1.13};
   float fz = {3.5};
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>, float>(
       content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
@@ -1243,8 +1243,8 @@ TEST(JitCompiler, vector_fms) {
   std::vector<int32_t> iy{-1, -1, -2, -3, -4, -5, -6};
   int32_t iz = 11;
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"});
+  auto rc2 =
+      compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>, int>(content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);
@@ -1272,7 +1272,7 @@ TEST(JitCompiler, vector_fnma) {
   std::vector<float> fy{-1.13};
   float fz = {3.5};
 
-  auto rc1 = compiler.CompileExpression<simd::Vector<float>, Context&, simd::Vector<float>, simd::Vector<float>, float>(
+  auto rc1 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>, float>(
       content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
@@ -1286,8 +1286,8 @@ TEST(JitCompiler, vector_fnma) {
   std::vector<int32_t> iy{-1, -1, -2, -3, -4, -5, -6};
   int32_t iz = 11;
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"});
+  auto rc2 =
+      compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>, int>(content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);
@@ -1315,9 +1315,8 @@ TEST(JitCompiler, vector_fnms) {
   std::vector<double> fy{-1.13};
   double fz = {3.5};
 
-  auto rc1 =
-      compiler.CompileExpression<simd::Vector<double>, Context&, simd::Vector<double>, simd::Vector<double>, double>(
-          content, {"_", "x", "y", "z"});
+  auto rc1 = compiler.CompileExpression<Vector<double>, Context&, Vector<double>, Vector<double>, double>(
+      content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy, fz);
@@ -1330,8 +1329,8 @@ TEST(JitCompiler, vector_fnms) {
   std::vector<int32_t> iy{-1, -1, -2, -3, -4, -5, -6};
   int32_t iz = 11;
 
-  auto rc2 = compiler.CompileExpression<simd::Vector<int>, Context&, simd::Vector<int>, simd::Vector<int>, int>(
-      content, {"_", "x", "y", "z"});
+  auto rc2 =
+      compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>, int>(content, {"_", "x", "y", "z"});
   ASSERT_TRUE(rc2.ok());
   auto f2 = std::move(rc2.value());
   auto result2 = f2(ctx, ix, iy, iz);

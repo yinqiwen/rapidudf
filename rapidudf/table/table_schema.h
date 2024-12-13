@@ -24,26 +24,21 @@
 #include "google/protobuf/message.h"
 
 #include "rapidudf/context/context.h"
-#include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
-#include "rapidudf/reflect/reflect.h"
+#include "rapidudf/table/column.h"
+#include "rapidudf/table/row.h"
+#include "rapidudf/table/table.h"
 #include "rapidudf/types/dyn_object.h"
 #include "rapidudf/types/dyn_object_schema.h"
-#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/column.h"
-#include "rapidudf/vector/row.h"
-#include "rapidudf/vector/table.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
-
-namespace simd {
-
-struct TableCreateOptions {
-  std::unordered_set<std::string> includes;
-  std::unordered_set<std::string> excludes;
-
+namespace table {
+struct TableColumnOptions {
+  std::unordered_set<std::string> include_fields;
+  std::unordered_set<std::string> exclude_fields;
+  std::string prefix;
   bool ignore_unsupported_fields = false;
   bool IsAllowed(const std::string& field) const;
 };
@@ -51,36 +46,31 @@ struct TableCreateOptions {
 class TableSchema : public DynObjectSchema {
  public:
   using InitFunc = std::function<void(TableSchema* s)>;
-  static const TableSchema* GetOrCreate(const std::string& name, InitFunc&& init, const TableCreateOptions& opts = {});
+  static const TableSchema* GetOrCreate(const std::string& name, InitFunc&& init);
   static const TableSchema* Get(const std::string& name);
   static TableSchema* GetMutable(const std::string& name);
 
   typename Table::SmartPtr NewTable(Context& ctx) const;
 
   template <typename T>
-  absl::Status AddColumns() {
+  absl::Status AddColumns(const TableColumnOptions& opts = {}) {
     if constexpr (std::is_base_of_v<::google::protobuf::Message, T>) {
       static T msg;
-      return AddColumns(&msg);
+      return AddColumns(opts, &msg);
     } else if constexpr (std::is_base_of_v<::flatbuffers::Table, T>) {
-      return AddColumns(T::MiniReflectTypeTable());
+      return AddColumns(opts, T::MiniReflectTypeTable());
     } else {
-      return AddColumns(get_dtype<T>());
+      return AddColumns(opts, get_dtype<T>());
     }
   }
 
-  // template <typename T>
-  // absl::Status AddColumn(const std::string& name) {
-  //   return AddColumn<T>(name, nullptr, 0);
-  // }
   bool ExistColumn(const std::string& name, const DType& dtype) const;
   bool ExistRow(const RowSchema& row) const;
 
-  const reflect::Column* GetColumnByIdx(uint32_t idx) const;
+  const Column* GetColumnByIdx(uint32_t idx) const;
 
  private:
-  TableSchema(const std::string& name, Options opts, const TableCreateOptions& table_opts)
-      : DynObjectSchema(name, opts), table_opts_(table_opts) {}
+  TableSchema(const std::string& name, Options opts) : DynObjectSchema(name, opts) {}
   template <typename T>
   absl::Status AddField(const std::string& name) {
     return absl::UnimplementedError("AddField");
@@ -89,26 +79,25 @@ class TableSchema : public DynObjectSchema {
   template <typename T>
   absl::Status AddColumn(const std::string& name, const RowSchema* schema, uint32_t field_idx) {
     if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T>) {
-      return AddColumn(name, get_dtype<simd::Vector<StringView>>(), schema, field_idx);
+      return AddColumn(name, get_dtype<Vector<StringView>>(), schema, field_idx);
     } else if constexpr (std::is_same_v<bool, T>) {
-      return AddColumn(name, get_dtype<simd::Vector<Bit>>(), schema, field_idx);
+      return AddColumn(name, get_dtype<Vector<Bit>>(), schema, field_idx);
     } else {
-      return AddColumn(name, get_dtype<simd::Vector<T>>(), schema, field_idx);
+      return AddColumn(name, get_dtype<Vector<T>>(), schema, field_idx);
     }
   }
 
   typename DynObject::SmartPtr NewObject() const { return nullptr; }
 
-  absl::Status AddColumns(const ::google::protobuf::Message* msg);
-  absl::Status AddColumns(const flatbuffers::TypeTable* type_table);
-  absl::Status AddColumns(const DType& dtype);
+  absl::Status AddColumns(const TableColumnOptions& opts, const ::google::protobuf::Message* msg);
+  absl::Status AddColumns(const TableColumnOptions& opts, const flatbuffers::TypeTable* type_table);
+  absl::Status AddColumns(const TableColumnOptions& opts, const DType& dtype);
   absl::Status AddColumn(const std::string& name, const DType& dtype, const RowSchema* schema, uint32_t field_idx);
 
-  TableCreateOptions table_opts_;
   std::vector<RowSchemaPtr> row_schemas_;
-  std::vector<reflect::Column> columns_;
+  std::vector<Column> columns_;
 
   friend class Table;
 };
-}  // namespace simd
+}  // namespace table
 }  // namespace rapidudf

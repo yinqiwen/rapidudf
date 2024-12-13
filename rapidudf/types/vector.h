@@ -25,26 +25,24 @@
 #include "rapidudf/types/bit.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
-namespace simd {
+static constexpr uint32_t kVectorUnitSize = 64;
+
 template <typename T>
 class Vector;
-}
 
 namespace functions {
 template <typename T, OpToken op>
-int simd_vector_find(simd::Vector<T> data, T v);
+int simd_vector_find(Vector<T> data, T v);
 template <typename T>
-T simd_vector_sum(simd::Vector<T> left);
+T simd_vector_sum(Vector<T> left);
 template <typename T>
-T simd_vector_avg(simd::Vector<T> left);
+T simd_vector_avg(Vector<T> left);
 template <typename T>
-T simd_vector_reduce_max(simd::Vector<T> left);
+T simd_vector_reduce_max(Vector<T> left);
 template <typename T>
-T simd_vector_reduce_min(simd::Vector<T> left);
+T simd_vector_reduce_min(Vector<T> left);
 }  // namespace functions
-namespace simd {
 
-static constexpr uint32_t kVectorUnitSize = 64;
 template <typename T>
 struct InternalType {
   using internal_type = T;
@@ -57,10 +55,22 @@ struct InternalType<Bit> {
 template <typename T>
 class Vector;
 
-class VectorData {
+class VectorBuf {
  public:
-  VectorData(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
+  explicit VectorBuf(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
       : temporary_(0), size_(size), writable_(0), bytes_capacity_(bytes_capacity), data_(data) {}
+  template <typename T>
+  explicit VectorBuf(const std::vector<T>& vec) {
+    if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool>) {
+      static_assert(sizeof(T) == -1, "unsupported constructor");
+    } else {
+      temporary_ = 0;
+      size_ = vec.size();
+      data_ = vec.data();
+      bytes_capacity_ = vec.capacity() * sizeof(T);
+      writable_ = 0;
+    }
+  }
   inline size_t Size() const { return size_; }
   inline void SetSize(size_t n) { size_ = n; }
   inline size_t BytesCapacity() const { return bytes_capacity_; };
@@ -100,10 +110,10 @@ class Vector {
     if (capacity == 0) {
       capacity = size;
     }
-    VectorData vdata(data, size, capacity * sizeof(T));
+    VectorBuf vdata(data, size, capacity * sizeof(T));
     vec_data_ = vdata;
   }
-  Vector(VectorData vdata) {
+  Vector(VectorBuf vdata) {
     size_t byte_capacity = vdata.BytesCapacity();
     if (byte_capacity == 0) {
       if constexpr (std::is_same_v<T, Bit>) {
@@ -111,7 +121,7 @@ class Vector {
       } else {
         byte_capacity = vdata.Size() * sizeof(T);
       }
-      vec_data_ = VectorData(vdata.Data(), vdata.Size(), byte_capacity);
+      vec_data_ = VectorBuf(vdata.Data(), vdata.Size(), byte_capacity);
       vec_data_.SetReadonly(vdata.IsReadonly());
     } else {
       vec_data_ = vdata;
@@ -121,7 +131,7 @@ class Vector {
     if constexpr (std::is_same_v<T, Bit>) {
       static_assert(sizeof(T) == -1, "unsupported constructor");
     } else {
-      VectorData vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
+      VectorBuf vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
       vdata.SetReadonly(true);
       vec_data_ = vdata;
     }
@@ -130,12 +140,12 @@ class Vector {
     if constexpr (std::is_same_v<T, Bit>) {
       static_assert(sizeof(T) == -1, "unsupported constructor");
     } else {
-      VectorData vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
+      VectorBuf vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
       vec_data_ = vdata;
       vec_data_.SetReadonly(false);
     }
   }
-  VectorData RawData() { return vec_data_; }
+  VectorBuf RawData() { return vec_data_; }
 
   auto begin() const {
     if constexpr (std::is_same_v<Bit, T>) {
@@ -211,7 +221,7 @@ class Vector {
       auto* data_ptr = Data();
       if (pos % 8 == 0) {
         auto* subvector_data_ptr = data_ptr + pos / 8;
-        VectorData subvector_data(subvector_data_ptr, len, (len + 7) / 8);
+        VectorBuf subvector_data(subvector_data_ptr, len, (len + 7) / 8);
         return Vector<T>(subvector_data);
       } else {
         throw std::logic_error(fmt::format("Can NOT subvector from pos:{}", pos));
@@ -220,7 +230,7 @@ class Vector {
     } else {
       auto* data_ptr = Data();
       auto* subvector_data_ptr = data_ptr + pos;
-      VectorData subvector_data(subvector_data_ptr, len, sizeof(T) * len);
+      VectorBuf subvector_data(subvector_data_ptr, len, sizeof(T) * len);
       return Vector<T>(subvector_data);
     }
   }
@@ -265,17 +275,16 @@ class Vector {
     if (n > vec_data_.Size()) {
       THROW_OUT_OF_RANGE_ERR(n, vec_data_.Size());
     }
-    auto new_vec_data = VectorData(vec_data_.Data(), n, vec_data_.BytesCapacity());
+    auto new_vec_data = VectorBuf(vec_data_.Data(), n, vec_data_.BytesCapacity());
     new_vec_data.SetReadonly(vec_data_.IsReadonly());
     return Vector<T>(new_vec_data);
   }
-  VectorData& GetVectorData() { return vec_data_; }
+  VectorBuf& GetVectorBuf() { return vec_data_; }
 
   void SetReadonly(bool v) { vec_data_.SetReadonly(v); }
   bool IsReadonly() const { return vec_data_.IsReadonly(); }
 
  private:
-  VectorData vec_data_;
+  VectorBuf vec_data_;
 };
-}  // namespace simd
 }  // namespace rapidudf

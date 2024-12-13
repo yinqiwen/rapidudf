@@ -70,7 +70,7 @@ cc_library(
         "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/types",
-        "//rapidudf/vector",
+        "//rapidudf/types:vector",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/types:span",
     ],

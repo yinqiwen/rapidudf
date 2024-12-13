@@ -84,3 +84,16 @@ cc_library(
         "@com_google_nlohmann_json//:json",
     ],
 )
+
+cc_library(
+    name = "vector",
+    hdrs = [
+        "vector.h",
+    ],
+    deps = [
+        ":types",
+        "//rapidudf/arena",
+        "//rapidudf/meta:exception",
+        "//rapidudf/meta:optype",
+    ],
+)

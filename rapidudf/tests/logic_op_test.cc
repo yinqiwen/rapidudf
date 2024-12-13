@@ -79,9 +79,9 @@ TEST(JitCompiler, vector_logic_not) {
   std::string expr = "!x";
   std::vector<bool> bvs0 = {true, false, true, false, true, true, false, false};
   std::vector<bool> bvs1 = {true, false, true, false, true, true, false, false, false, true, true};
-  auto x0 = ctx.NewSimdVector(bvs0);
-  auto x1 = ctx.NewSimdVector(bvs1);
-  auto rc0 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>>(expr, {"_", "x"});
+  auto x0 = ctx.NewVector(bvs0);
+  auto x1 = ctx.NewVector(bvs1);
+  auto rc0 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>>(expr, {"_", "x"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, x0);
@@ -102,10 +102,9 @@ TEST(JitCompiler, vector_logic_and) {
   std::string expr = "x&&y";
   std::vector<bool> left = {true, true, true, false, false, true, false, false, false, true, true};
   std::vector<bool> right = {true, false, true, false, true, true, false, false, false, true, true};
-  auto b_left = ctx.NewSimdVector(left);
-  auto b_right = ctx.NewSimdVector(right);
-  auto rc0 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
-      expr, {"_", "x", "y"});
+  auto b_left = ctx.NewVector(left);
+  auto b_right = ctx.NewVector(right);
+  auto rc0 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>, Vector<Bit>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, b_left, b_right);
@@ -121,10 +120,9 @@ TEST(JitCompiler, vector_logic_or) {
   std::string expr = "x||y";
   std::vector<bool> left = {true, true, true, false, false, true, false, false, false, true, true};
   std::vector<bool> right = {true, false, true, false, true, true, false, false, false, true, true};
-  auto b_left = ctx.NewSimdVector(left);
-  auto b_right = ctx.NewSimdVector(right);
-  auto rc0 = compiler.CompileExpression<simd::Vector<Bit>, Context&, simd::Vector<Bit>, simd::Vector<Bit>>(
-      expr, {"_", "x", "y"});
+  auto b_left = ctx.NewVector(left);
+  auto b_right = ctx.NewVector(right);
+  auto rc0 = compiler.CompileExpression<Vector<Bit>, Context&, Vector<Bit>, Vector<Bit>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
   auto result0 = f0(ctx, b_left, b_right);

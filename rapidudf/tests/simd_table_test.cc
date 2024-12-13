@@ -24,8 +24,6 @@
 #include "rapidudf/rapidudf.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/table.h"
-#include "rapidudf/vector/vector.h"
 
 using namespace rapidudf;
 
@@ -38,8 +36,8 @@ struct SimpleStruct {
 RUDF_STRUCT_FIELDS(SimpleStruct, sv, fv, iv, bv)
 
 TEST(JitCompiler, table_simple) {
-  auto schema = simd::TableSchema::GetOrCreate(
-      "mytable", [](simd::TableSchema* s) { std::ignore = s->AddColumns<SimpleStruct>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "mytable", [](table::TableSchema* s) { std::ignore = s->AddColumns<SimpleStruct>(); });
   Context ctx;
   auto table = schema->NewTable(ctx);
   std::vector<SimpleStruct> objs;
@@ -87,8 +85,8 @@ struct ComplexStruct {
 RUDF_STRUCT_FIELDS(ComplexStruct, Click, Like, Join, Inter, TimeV1, PostComment, PositiveCommentV1, ExpoTimeV1)
 
 TEST(JitCompiler, table_func1) {
-  auto schema = simd::TableSchema::GetOrCreate(
-      "score_table", [](simd::TableSchema* s) { std::ignore = s->AddColumns<ComplexStruct>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "score_table", [](table::TableSchema* s) { std::ignore = s->AddColumns<ComplexStruct>(); });
 
   std::vector<ComplexStruct> objs;
   objs.emplace_back(ComplexStruct{1, 1, 1, 1, 1, 1, 1, 1});
@@ -110,12 +108,12 @@ TEST(JitCompiler, table_func1) {
   )";
 
   JitCompiler compiler;
-  auto rc = compiler.CompileDynObjExpression<simd::Vector<double>, Context&, simd::Table&>(
+  auto rc = compiler.CompileDynObjExpression<Vector<double>, Context&, table::Table&>(
       content, {{"_"}, {"table", "score_table"}});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   auto column = f(ctx, *table);
-  //   simd::Vector<double> result = column->ToVector<double>().value();
+  //   Vector<double> result = column->ToVector<double>().value();
   for (size_t i = 0; i < objs.size(); i++) {
     double actual = std::pow(objs[i].Click, 10.0) * std::pow(objs[i].Like + 0.000082, 4.7) *
                     std::pow(objs[i].Inter, 3.5) * std::pow(objs[i].Join + 0.000024, 5.5) *
@@ -132,8 +130,8 @@ struct TestFilterStruct {
 RUDF_STRUCT_FIELDS(TestFilterStruct, id, city)
 
 TEST(JitCompiler, table_filter) {
-  auto schema = simd::TableSchema::GetOrCreate(
-      "test_filter_table", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestFilterStruct>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "test_filter_table", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestFilterStruct>(); });
 
   Context ctx;
   size_t N = 100;
@@ -150,14 +148,14 @@ TEST(JitCompiler, table_filter) {
     table.filter(table.city=="sz")
   )";
   JitCompiler compiler;
-  auto rc = compiler.CompileDynObjExpression<simd::Table*, Context&, simd::Table*>(
+  auto rc = compiler.CompileDynObjExpression<table::Table*, Context&, table::Table*>(
       expr, {{"_"}, {"table", "test_filter_table"}});
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  simd::Table* new_table = f(ctx, table.get());
+  table::Table* new_table = f(ctx, table.get());
   auto new_id_column = new_table->Get<int>("id").value();
   auto new_city_column = new_table->Get<StringView>("city").value();
 
@@ -176,8 +174,8 @@ struct TestUser {
 };
 RUDF_STRUCT_FIELDS(TestUser, id, score, city, repeate)
 TEST(JitCompiler, table_order_by) {
-  auto schema = simd::TableSchema::GetOrCreate("TestUser",
-                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -194,13 +192,13 @@ TEST(JitCompiler, table_order_by) {
     table.order_by(table.score, true)
   )";
   JitCompiler compiler;
-  auto rc = compiler.CompileDynObjExpression<simd::Table*, simd::Table*>(expr, {{"table", "TestUser"}});
+  auto rc = compiler.CompileDynObjExpression<table::Table*, table::Table*>(expr, {{"table", "TestUser"}});
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  simd::Table* new_table = f(table.get());
+  table::Table* new_table = f(table.get());
 
   auto new_id_column = new_table->Get<int>("id").value();
   auto new_city_column = new_table->Get<StringView>("city").value();
@@ -215,8 +213,8 @@ TEST(JitCompiler, table_order_by) {
 }
 
 TEST(JitCompiler, table_topk) {
-  auto schema = simd::TableSchema::GetOrCreate("TestUser",
-                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -233,13 +231,13 @@ TEST(JitCompiler, table_topk) {
     table.topk(table.score,5,true)
   )";
   JitCompiler compiler;
-  auto rc = compiler.CompileDynObjExpression<simd::Table*, simd::Table*>(expr, {{"table", "TestUser"}});
+  auto rc = compiler.CompileDynObjExpression<table::Table*, table::Table*>(expr, {{"table", "TestUser"}});
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  simd::Table* new_table = f(table.get());
+  table::Table* new_table = f(table.get());
 
   auto new_id_column = new_table->Get<int>("id").value();
   auto new_city_column = new_table->Get<StringView>("city").value();
@@ -253,8 +251,8 @@ TEST(JitCompiler, table_topk) {
 }
 
 TEST(JitCompiler, table_take) {
-  auto schema = simd::TableSchema::GetOrCreate("TestUser",
-                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -274,13 +272,13 @@ TEST(JitCompiler, table_take) {
   )";
 
   JitCompiler compiler;
-  auto rc = compiler.CompileFunction<simd::Table*, simd::Table*>(expr);
+  auto rc = compiler.CompileFunction<table::Table*, table::Table*>(expr);
   if (!rc.ok()) {
     RUDF_ERROR("{}", rc.status().ToString());
   }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  simd::Table* new_table = f(table.get());
+  table::Table* new_table = f(table.get());
   auto new_id_column = new_table->Get<int>("id").value();
   auto new_city_column = new_table->Get<StringView>("city").value();
   auto new_score_column = new_table->Get<double>("score").value();
@@ -296,8 +294,8 @@ TEST(JitCompiler, table_take) {
 }
 
 TEST(JitCompiler, group_by) {
-  auto schema = simd::TableSchema::GetOrCreate("TestUser",
-                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -315,8 +313,8 @@ TEST(JitCompiler, group_by) {
 }
 
 TEST(JitCompiler, dedup) {
-  auto schema = simd::TableSchema::GetOrCreate("TestUser",
-                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -342,8 +340,8 @@ struct FilterStruct {
 RUDF_STRUCT_FIELDS(FilterStruct, city, id, score)
 
 TEST(JitCompiler, filter) {
-  auto schema = simd::TableSchema::GetOrCreate(
-      "test_filter_table1", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "test_filter_table1", [&](table::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -360,11 +358,11 @@ TEST(JitCompiler, filter) {
   std::ignore = table->AddRows(items);
 
   auto [filter_table, filter_bits] =
-      table->Filter<FilterStruct>([](const FilterStruct* item, size_t i) -> simd::FilterStatus {
+      table->Filter<FilterStruct>([](const FilterStruct* item, size_t i) -> table::FilterStatus {
         if (item->city == "bj") {
-          return simd::FilterStatus{simd::FilterStatusCode::kSelect};
+          return table::FilterStatus{table::FilterStatusCode::kSelect};
         }
-        return simd::FilterStatus{simd::FilterStatusCode::kSkip};
+        return table::FilterStatus{table::FilterStatusCode::kSkip};
       });
   ASSERT_EQ(filter_table->Count(), 25);
 }
@@ -375,10 +373,10 @@ struct TransformStruct {
 };
 RUDF_STRUCT_FIELDS(TransformStruct, city, id, score)
 TEST(JitCompiler, map) {
-  auto tranform_schema = simd::TableSchema::GetOrCreate(
-      "test_map_transform", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
-  auto schema = simd::TableSchema::GetOrCreate(
-      "test_filter_table1", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
+  auto tranform_schema = table::TableSchema::GetOrCreate(
+      "test_map_transform", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "test_filter_table1", [&](table::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -408,10 +406,10 @@ TEST(JitCompiler, map) {
 }
 
 TEST(JitCompiler, flat_map) {
-  auto tranform_schema = simd::TableSchema::GetOrCreate(
-      "test_map_transform", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
-  auto schema = simd::TableSchema::GetOrCreate(
-      "test_filter_table1", [&](simd::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
+  auto tranform_schema = table::TableSchema::GetOrCreate(
+      "test_map_transform", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "test_filter_table1", [&](table::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -441,8 +439,8 @@ TEST(JitCompiler, flat_map) {
 }
 
 TEST(JitCompiler, distinct) {
-  auto schema = simd::TableSchema::GetOrCreate("TestUser",
-                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
@@ -467,8 +465,8 @@ TEST(JitCompiler, distinct) {
 }
 
 TEST(JitCompiler, distinct_merge) {
-  auto schema = simd::TableSchema::GetOrCreate("TestUser",
-                                               [&](simd::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
   size_t N = 100;
   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};

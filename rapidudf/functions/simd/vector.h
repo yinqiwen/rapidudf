@@ -20,7 +20,7 @@
 #include "rapidudf/functions/simd/vector_op.h"
 #include "rapidudf/functions/simd/vector_sort.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 namespace rapidudf {
 namespace functions {
 

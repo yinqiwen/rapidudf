@@ -13,19 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "rapidudf/vector/table_schema.h"
+#include "rapidudf/table/table_schema.h"
 #include <memory>
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/types/bit.h"
 namespace rapidudf {
-namespace simd {
-bool TableCreateOptions::IsAllowed(const std::string& field) const {
-  if (!includes.empty()) {
-    return includes.count(field) == 1;
+namespace table {
+bool TableColumnOptions::IsAllowed(const std::string& field) const {
+  if (!include_fields.empty()) {
+    return include_fields.count(field) == 1;
   }
-  if (!excludes.empty()) {
-    return excludes.count(field) == 0;
+  if (!exclude_fields.empty()) {
+    return exclude_fields.count(field) == 0;
   }
   return true;
 }
@@ -41,7 +41,7 @@ TableSchema* TableSchema::GetMutable(const std::string& name) {
 
 const TableSchema* TableSchema::Get(const std::string& name) { return GetMutable(name); }
 
-const reflect::Column* TableSchema::GetColumnByIdx(uint32_t idx) const {
+const Column* TableSchema::GetColumnByIdx(uint32_t idx) const {
   if (idx >= columns_.size()) {
     return nullptr;
   }
@@ -63,7 +63,7 @@ absl::Status TableSchema::AddColumn(const std::string& name, const DType& dtype,
   if (!result.ok()) {
     return result.status();
   }
-  reflect::Column column;
+  Column column;
   column.name = name;
   column.schema = schema;
   column.field = result.value();
@@ -76,8 +76,7 @@ bool TableSchema::ExistColumn(const std::string& name, const DType& dtype) const
   return DynObjectSchema::ExistField(name, dtype);
 }
 
-const TableSchema* TableSchema::GetOrCreate(const std::string& name, InitFunc&& init,
-                                            const TableCreateOptions& table_opts) {
+const TableSchema* TableSchema::GetOrCreate(const std::string& name, InitFunc&& init) {
   Options opts;
   opts.object_header_byte_size = sizeof(Table);
   opts.is_table = true;
@@ -87,7 +86,7 @@ const TableSchema* TableSchema::GetOrCreate(const std::string& name, InitFunc&& 
         TableSchema* table_schema = reinterpret_cast<TableSchema*>(s);
         init(table_schema);
       },
-      [table_opts](const std::string& name, Options opts) { return new TableSchema(name, opts, table_opts); }, opts);
+      [](const std::string& name, Options opts) { return new TableSchema(name, opts); }, opts);
   return reinterpret_cast<const TableSchema*>(s);
 }
 
@@ -103,58 +102,59 @@ typename Table::SmartPtr TableSchema::NewTable(Context& ctx) const {
   return p;
 }
 
-absl::Status TableSchema::AddColumns(const ::google::protobuf::Message* msg) {
+absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const ::google::protobuf::Message* msg) {
   const ::google::protobuf::Descriptor* desc = msg->GetDescriptor();
   RowSchemaPtr schema = std::make_unique<RowSchema>(desc);
   uint32_t valid_column = 0;
   for (int i = 0; i < desc->field_count(); i++) {
     const ::google::protobuf::FieldDescriptor* field_desc = desc->field(i);
-    if (!table_opts_.IsAllowed(field_desc->name())) {
+    if (!opts.IsAllowed(field_desc->name())) {
       continue;
     }
+    std::string column_name = opts.prefix.empty() ? field_desc->name() : opts.prefix + field_desc->name();
     absl::Status status;
     switch (field_desc->type()) {
       case ::google::protobuf::FieldDescriptor::TYPE_BOOL: {
-        status = AddColumn<bool>(field_desc->name(), schema.get(), i);
+        status = AddColumn<bool>(column_name, schema.get(), i);
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_DOUBLE: {
-        status = AddColumn<double>(field_desc->name(), schema.get(), i);
+        status = AddColumn<double>(column_name, schema.get(), i);
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_FLOAT: {
-        status = AddColumn<float>(field_desc->name(), schema.get(), i);
+        status = AddColumn<float>(column_name, schema.get(), i);
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_SINT64:
       case ::google::protobuf::FieldDescriptor::TYPE_SFIXED64:
       case ::google::protobuf::FieldDescriptor::TYPE_INT64: {
-        status = AddColumn<int64_t>(field_desc->name(), schema.get(), i);
+        status = AddColumn<int64_t>(column_name, schema.get(), i);
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_FIXED64:
       case ::google::protobuf::FieldDescriptor::TYPE_UINT64: {
-        status = AddColumn<uint64_t>(field_desc->name(), schema.get(), i);
+        status = AddColumn<uint64_t>(column_name, schema.get(), i);
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_SINT32:
       case ::google::protobuf::FieldDescriptor::TYPE_SFIXED32:
       case ::google::protobuf::FieldDescriptor::TYPE_INT32: {
-        status = AddColumn<int32_t>(field_desc->name(), schema.get(), i);
+        status = AddColumn<int32_t>(column_name, schema.get(), i);
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_FIXED32:
       case ::google::protobuf::FieldDescriptor::TYPE_UINT32: {
-        status = AddColumn<uint32_t>(field_desc->name(), schema.get(), i);
+        status = AddColumn<uint32_t>(column_name, schema.get(), i);
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_STRING:
       case ::google::protobuf::FieldDescriptor::TYPE_BYTES: {
-        status = AddColumn<std::string>(field_desc->name(), schema.get(), i);
+        status = AddColumn<std::string>(column_name, schema.get(), i);
         break;
       }
       default: {
-        if (table_opts_.ignore_unsupported_fields) {
+        if (opts.ignore_unsupported_fields) {
           continue;
         } else {
           status =
@@ -175,14 +175,16 @@ absl::Status TableSchema::AddColumns(const ::google::protobuf::Message* msg) {
   return absl::OkStatus();
 }
 
-absl::Status TableSchema::AddColumns(const flatbuffers::TypeTable* type_table) {
+absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const flatbuffers::TypeTable* type_table) {
   RowSchemaPtr schema = std::make_unique<RowSchema>(type_table);
   uint32_t valid_column = 0;
   for (size_t i = 0; i < type_table->num_elems; i++) {
     auto name = type_table->names[i];
-    if (!table_opts_.IsAllowed(name)) {
+    if (!opts.IsAllowed(name)) {
       continue;
     }
+    std::string column_name = opts.prefix.empty() ? name : opts.prefix + name;
+
     absl::Status status;
 #if FLATBUFFERS_VERSION_MAJOR == 1
     if (type_table->type_codes[i].is_vector) {
@@ -190,7 +192,7 @@ absl::Status TableSchema::AddColumns(const flatbuffers::TypeTable* type_table) {
     if (type_table->type_codes[i].is_repeating) {
 #endif
 
-      if (table_opts_.ignore_unsupported_fields) {
+      if (opts.ignore_unsupported_fields) {
         continue;
       }
       status = absl::UnimplementedError(fmt::format("Not supported field:{} with repeating base_type:{}", name,
@@ -199,55 +201,55 @@ absl::Status TableSchema::AddColumns(const flatbuffers::TypeTable* type_table) {
     }
     switch (type_table->type_codes[i].base_type) {
       case flatbuffers::ET_BOOL: {
-        status = AddColumn<bool>(name, schema.get(), i);
+        status = AddColumn<bool>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_CHAR: {
-        status = AddColumn<int8_t>(name, schema.get(), i);
+        status = AddColumn<int8_t>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_UCHAR: {
-        status = AddColumn<uint8_t>(name, schema.get(), i);
+        status = AddColumn<uint8_t>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_SHORT: {
-        status = AddColumn<int16_t>(name, schema.get(), i);
+        status = AddColumn<int16_t>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_USHORT: {
-        status = AddColumn<uint16_t>(name, schema.get(), i);
+        status = AddColumn<uint16_t>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_INT: {
-        status = AddColumn<int32_t>(name, schema.get(), i);
+        status = AddColumn<int32_t>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_UINT: {
-        status = AddColumn<uint32_t>(name, schema.get(), i);
+        status = AddColumn<uint32_t>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_LONG: {
-        status = AddColumn<int64_t>(name, schema.get(), i);
+        status = AddColumn<int64_t>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_ULONG: {
-        status = AddColumn<uint64_t>(name, schema.get(), i);
+        status = AddColumn<uint64_t>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_FLOAT: {
-        status = AddColumn<float>(name, schema.get(), i);
+        status = AddColumn<float>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_DOUBLE: {
-        status = AddColumn<double>(name, schema.get(), i);
+        status = AddColumn<double>(column_name, schema.get(), i);
         break;
       }
       case flatbuffers::ET_STRING: {
-        status = AddColumn<std::string>(name, schema.get(), i);
+        status = AddColumn<std::string>(column_name, schema.get(), i);
         break;
       }
       default: {
-        if (table_opts_.ignore_unsupported_fields) {
+        if (opts.ignore_unsupported_fields) {
           continue;
         } else {
           status = absl::UnimplementedError(fmt::format("Not supported field:{} with base_type:{}", name,
@@ -268,7 +270,7 @@ absl::Status TableSchema::AddColumns(const flatbuffers::TypeTable* type_table) {
   return absl::OkStatus();
 }
 
-absl::Status TableSchema::AddColumns(const DType& dtype) {
+absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const DType& dtype) {
   auto members = Reflect::GetStructMembers(dtype);
   if (members == nullptr) {
     RUDF_LOG_RETURN_FMT_ERROR("Unsupported dtype:{}", dtype);
@@ -277,7 +279,10 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
   uint32_t valid_column = 0;
   for (size_t i = 0; i < members->size(); i++) {
     auto* member = members->at(i);
-    auto name = member->name;
+    if (!opts.IsAllowed(member->name)) {
+      continue;
+    }
+    std::string column_name = opts.prefix.empty() ? member->name : opts.prefix + member->name;
     DType member_dtype;
 
     if (!member->HasField()) {
@@ -288,9 +293,6 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
       }
     } else {
       member_dtype = (*member->member_field_dtype).Elem();
-    }
-    if (!table_opts_.IsAllowed(name)) {
-      continue;
     }
 
     bool valid_dtype = false;
@@ -305,68 +307,68 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
       valid_dtype = true;
     }
     if (!valid_dtype) {
-      if (table_opts_.ignore_unsupported_fields) {
+      if (opts.ignore_unsupported_fields) {
         continue;
       }
-      RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", name, member_dtype);
+      RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", column_name, member_dtype);
     }
 
     switch (member_dtype.GetFundamentalType()) {
       case DATA_I8: {
-        status = AddColumn<int8_t>(name, schema.get(), i);
+        status = AddColumn<int8_t>(column_name, schema.get(), i);
         break;
       }
       case DATA_U8: {
-        status = AddColumn<uint8_t>(name, schema.get(), i);
+        status = AddColumn<uint8_t>(column_name, schema.get(), i);
         break;
       }
       case DATA_I16: {
-        status = AddColumn<int16_t>(name, schema.get(), i);
+        status = AddColumn<int16_t>(column_name, schema.get(), i);
         break;
       }
       case DATA_U16: {
-        status = AddColumn<uint16_t>(name, schema.get(), i);
+        status = AddColumn<uint16_t>(column_name, schema.get(), i);
         break;
       }
       case DATA_I32: {
-        status = AddColumn<int32_t>(name, schema.get(), i);
+        status = AddColumn<int32_t>(column_name, schema.get(), i);
         break;
       }
       case DATA_U32: {
-        status = AddColumn<uint32_t>(name, schema.get(), i);
+        status = AddColumn<uint32_t>(column_name, schema.get(), i);
         break;
       }
       case DATA_I64: {
-        status = AddColumn<int64_t>(name, schema.get(), i);
+        status = AddColumn<int64_t>(column_name, schema.get(), i);
         break;
       }
       case DATA_U64: {
-        status = AddColumn<uint64_t>(name, schema.get(), i);
+        status = AddColumn<uint64_t>(column_name, schema.get(), i);
         break;
       }
       case DATA_F32: {
-        status = AddColumn<float>(name, schema.get(), i);
+        status = AddColumn<float>(column_name, schema.get(), i);
         break;
       }
       case DATA_F64: {
-        status = AddColumn<double>(name, schema.get(), i);
+        status = AddColumn<double>(column_name, schema.get(), i);
         break;
       }
       case DATA_STRING:
       case DATA_STD_STRING_VIEW:
       case DATA_STRING_VIEW: {
-        status = AddColumn<std::string>(name, schema.get(), i);
+        status = AddColumn<std::string>(column_name, schema.get(), i);
         break;
       }
       case DATA_BIT: {
-        status = AddColumn<bool>(name, schema.get(), i);
+        status = AddColumn<bool>(column_name, schema.get(), i);
         break;
       }
       default: {
-        if (table_opts_.ignore_unsupported_fields) {
+        if (opts.ignore_unsupported_fields) {
           continue;
         } else {
-          RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", name, member_dtype);
+          RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", column_name, member_dtype);
         }
         break;
       }
@@ -383,5 +385,6 @@ absl::Status TableSchema::AddColumns(const DType& dtype) {
   row_schemas_.emplace_back(std::move(schema));
   return absl::OkStatus();
 }
-}  // namespace simd
+}  // namespace table
+
 }  // namespace rapidudf

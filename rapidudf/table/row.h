@@ -24,10 +24,10 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/reflect/reflect.h"
 #include "rapidudf/types/pointer.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
-namespace simd {
+namespace table {
 
 struct RowSchema {
   const ::google::protobuf::Descriptor* pb_desc = nullptr;
@@ -76,5 +76,5 @@ class Rows {
   RowSchema schema_;
 };
 using RowsPtr = std::unique_ptr<Rows>;
-}  // namespace simd
+}  // namespace table
 }  // namespace rapidudf

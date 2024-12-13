@@ -17,12 +17,10 @@
 #pragma once
 
 #include <functional>
-#include <iterator>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
-#include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
 #include "google/protobuf/message.h"
 
@@ -30,13 +28,13 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/exception.h"
+#include "rapidudf/table/column.h"
+#include "rapidudf/table/row.h"
 #include "rapidudf/types/dyn_object.h"
 #include "rapidudf/types/dyn_object_schema.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/column.h"
-#include "rapidudf/vector/row.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 namespace rapidudf {
 
 namespace exec {
@@ -46,9 +44,7 @@ absl::StatusOr<R> eval_function(const std::string& source, Args... args);
 template <class R, class... Args>
 absl::StatusOr<R> eval_expression(const std::string& source, const std::vector<std::string>& arg_names, Args... args);
 }  // namespace exec
-
-namespace simd {
-
+namespace table {
 enum class FilterStatusCode {
   kSkip,
   kSelect,
@@ -92,7 +88,7 @@ class Table : public DynObject {
     }
   }
 
-  VectorData GetColumnByOffset(uint32_t offset);
+  VectorBuf GetColumnByOffset(uint32_t offset);
 
   /**
   ** Unload loaded column(defined by protobuf/flatbuffers/struct)
@@ -274,8 +270,8 @@ class Table : public DynObject {
       THROW_LOGIC_ERR("No row found for schema");
     }
     size_t count = Count();
-    Vector<Bit> filter_mask = ctx_.NewSimdVector<Bit>(count);
-    memset(filter_mask.GetVectorData().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
+    Vector<Bit> filter_mask = ctx_.NewVectorBuf<Bit>(count);
+    memset(filter_mask.GetVectorBuf().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
     for (size_t i = 0; i < count; i++) {
       T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
       if (f(row, i)) {
@@ -297,8 +293,8 @@ class Table : public DynObject {
       THROW_LOGIC_ERR("No row found for schema");
     }
     size_t count = Count();
-    Vector<Bit> select_mask = ctx_.NewSimdVector<Bit>(count);
-    memset(select_mask.GetVectorData().MutableData<uint8_t>(), 0, select_mask.BytesCapacity());
+    Vector<Bit> select_mask = ctx_.NewVectorBuf<Bit>(count);
+    memset(select_mask.GetVectorBuf().MutableData<uint8_t>(), 0, select_mask.BytesCapacity());
     std::vector<int32_t> select_indices;
     select_indices.reserve(count);
     for (size_t i = 0; i < count; i++) {
@@ -431,7 +427,7 @@ class Table : public DynObject {
   bool IsColumnLoaded(uint32_t offset);
   uint8_t* GetColumnMemory(uint32_t offset, const DType& dtype);
   size_t GetColumnMemorySize(const DType& dtype);
-  void SetColumnSize(const reflect::Column& column, void* p);
+  void SetColumnSize(const Column& column, void* p);
 
   template <typename T>
   absl::StatusOr<Vector<T>> GetColumn(const std::string& name) {
@@ -446,7 +442,7 @@ class Table : public DynObject {
     }
     return vec;
   }
-  VectorData GetColumnVectorData(StringView name);
+  VectorBuf GetColumnVectorBuf(StringView name);
 
   template <typename T>
   const RowSchema* GetRowSchema() {
@@ -514,40 +510,26 @@ class Table : public DynObject {
     }
   }
 
-  // template <typename T>
-  // absl::Status DoSet(const std::string& name, const std::vector<T>& v) {
-  //   auto vec = ctx_.NewSimdVector(v);
-  //   return DynObject::DoSet(name, std::move(vec));
-  // }
-  // template <typename T>
-  // absl::Status DoSet(const std::string& name, std::vector<T>&& v) {
-  //   auto vec = ctx_.NewSimdVector(v);
-  //   std::ignore = ctx_.New<std::vector<T>>(std::move(v));
-
-  //   return DynObject::DoSet(name, std::move(vec));
-  // }
-
   template <typename T>
   absl::Span<Table*> GroupBy(const T* by, size_t n);
 
   Table* SubTable(std::vector<int32_t>& indices);
 
-  void SetColumn(uint32_t offset, VectorData vec);
+  void SetColumn(uint32_t offset, VectorBuf vec);
 
-  absl::StatusOr<VectorData> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
-
-  template <typename T>
-  absl::Status LoadProtobufColumn(const Vector<Pointer>& pb_vector, const reflect::Column& column);
-  template <typename T>
-  absl::Status LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, const reflect::Column& column);
-  template <typename T>
-  absl::Status LoadStructColumn(const Vector<Pointer>& struct_vector, const reflect::Column& column);
+  absl::StatusOr<VectorBuf> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
 
   template <typename T>
-  absl::Status LoadColumn(const Vector<Pointer>& objs, const reflect::Column& column);
+  absl::Status LoadProtobufColumn(const Vector<Pointer>& pb_vector, const Column& column);
+  template <typename T>
+  absl::Status LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, const Column& column);
+  template <typename T>
+  absl::Status LoadStructColumn(const Vector<Pointer>& struct_vector, const Column& column);
 
-  absl::Status LoadColumn(const Rows& rows, const reflect::Column& column);
+  template <typename T>
+  absl::Status LoadColumn(const Vector<Pointer>& objs, const Column& column);
 
+  absl::Status LoadColumn(const Rows& rows, const Column& column);
   const RowSchema* GetRowSchema(const RowSchema& schema);
   int GetRowIdx(const RowSchema& schema);
 
@@ -567,6 +549,5 @@ class Table : public DynObject {
   std::vector<Rows> rows_;
   friend class TableSchema;
 };
-
-}  // namespace simd
+}  // namespace table
 }  // namespace rapidudf

@@ -18,13 +18,13 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/functions/simd/vector_op.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
 namespace functions {
-void simd_vector_bits_not(simd::Vector<Bit> src, simd::Vector<Bit> dst);
-void simd_vector_bits_and(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst);
-void simd_vector_bits_or(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst);
-void simd_vector_bits_xor(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst);
+void simd_vector_bits_not(Vector<Bit> src, Vector<Bit> dst);
+void simd_vector_bits_and(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
+void simd_vector_bits_or(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
+void simd_vector_bits_xor(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
 }  // namespace functions
 }  // namespace rapidudf

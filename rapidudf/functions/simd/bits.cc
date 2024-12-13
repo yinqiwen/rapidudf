@@ -17,7 +17,7 @@
 #include "rapidudf/functions/simd/bits.h"
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "rapidudf/functions/simd/bits.cc"  // this file
 
@@ -55,7 +55,7 @@ HWY_INLINE auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
   }
 }
 
-HWY_INLINE void simd_vector_bits_not_impl(simd::Vector<Bit> src, simd::Vector<Bit> dst) {
+HWY_INLINE void simd_vector_bits_not_impl(Vector<Bit> src, Vector<Bit> dst) {
   using D = hn::ScalableTag<uint8_t>;
   constexpr D d;
   constexpr size_t N = hn::Lanes(d);
@@ -65,8 +65,8 @@ HWY_INLINE void simd_vector_bits_not_impl(simd::Vector<Bit> src, simd::Vector<Bi
   if (count % 8 > 0) {
     byte_count++;
   }
-  const uint8_t* in = src.GetVectorData().ReadableData<uint8_t>();
-  uint8_t* out = dst.GetVectorData().MutableData<uint8_t>();
+  const uint8_t* in = src.GetVectorBuf().ReadableData<uint8_t>();
+  uint8_t* out = dst.GetVectorBuf().MutableData<uint8_t>();
   if (byte_count >= N) {
     for (; idx <= byte_count - N; idx += N) {
       const hn::Vec<D> v1 = hn::LoadU(d, in + idx);
@@ -82,7 +82,7 @@ HWY_INLINE void simd_vector_bits_not_impl(simd::Vector<Bit> src, simd::Vector<Bi
 }
 
 template <OpToken op>
-HWY_INLINE void simd_vector_bits_binary_impl(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst) {
+HWY_INLINE void simd_vector_bits_binary_impl(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
   using D = hn::ScalableTag<uint8_t>;
   constexpr D d;
   constexpr size_t N = hn::Lanes(d);
@@ -92,9 +92,9 @@ HWY_INLINE void simd_vector_bits_binary_impl(simd::Vector<Bit> left, simd::Vecto
   if (count % 8 > 0) {
     byte_count++;
   }
-  const uint8_t* left_in = left.GetVectorData().ReadableData<uint8_t>();
-  const uint8_t* right_in = right.GetVectorData().ReadableData<uint8_t>();
-  uint8_t* out = dst.GetVectorData().MutableData<uint8_t>();
+  const uint8_t* left_in = left.GetVectorBuf().ReadableData<uint8_t>();
+  const uint8_t* right_in = right.GetVectorBuf().ReadableData<uint8_t>();
+  uint8_t* out = dst.GetVectorBuf().MutableData<uint8_t>();
   if (byte_count >= N) {
     for (; idx <= byte_count - N; idx += N) {
       const hn::Vec<D> v1 = hn::LoadU(d, left_in + idx);
@@ -120,19 +120,19 @@ HWY_AFTER_NAMESPACE();
 #if HWY_ONCE
 namespace rapidudf {
 namespace functions {
-void simd_vector_bits_not(simd::Vector<Bit> src, simd::Vector<Bit> dst) {
+void simd_vector_bits_not(Vector<Bit> src, Vector<Bit> dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_not_impl);
   HWY_DYNAMIC_DISPATCH_T(Table)(src, dst);
 }
-void simd_vector_bits_and(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst) {
+void simd_vector_bits_and(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_AND>);
   HWY_DYNAMIC_DISPATCH_T(Table)(left, right, dst);
 }
-void simd_vector_bits_or(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst) {
+void simd_vector_bits_or(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_OR>);
   HWY_DYNAMIC_DISPATCH_T(Table)(left, right, dst);
 }
-void simd_vector_bits_xor(simd::Vector<Bit> left, simd::Vector<Bit> right, simd::Vector<Bit> dst) {
+void simd_vector_bits_xor(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_XOR>);
   HWY_DYNAMIC_DISPATCH_T(Table)(left, right, dst);
 }

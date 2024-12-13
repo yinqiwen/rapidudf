@@ -30,10 +30,9 @@
 #include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
 #include "rapidudf/common/allign.h"
-#include "rapidudf/meta/type_traits.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
-#include "rapidudf/vector/vector.h"
+#include "rapidudf/types/vector.h"
 
 namespace rapidudf {
 
@@ -84,8 +83,7 @@ class Context {
   }
 
   template <typename T>
-  simd::VectorData NewSimdVector(size_t n, size_t min_byte_size = 0) {
-    using number_t = typename simd::InternalType<T>::internal_type;
+  VectorBuf NewVectorBuf(size_t n, size_t min_byte_size = 0) {
     uint32_t byte_size = 0;
     if constexpr (std::is_same_v<Bit, T> || std::is_same_v<bool, T>) {
       byte_size = n / 8;
@@ -93,89 +91,32 @@ class Context {
         byte_size++;
       }
     } else {
-      byte_size = sizeof(number_t) * n;
+      byte_size = sizeof(T) * n;
     }
     byte_size = align_to<uint32_t>(byte_size, 8);
     if (min_byte_size > 0 && byte_size < min_byte_size) {
       byte_size = min_byte_size;
     }
     uint8_t* arena_data = ArenaAllocate(byte_size);
-    simd::VectorData vec(arena_data, n, byte_size);
+    VectorBuf vec(arena_data, n, byte_size);
     vec.SetReadonly(false);
     return vec;
   }
 
   template <typename T>
-  auto NewSimdVector(const std::vector<T*>& data) {
-    uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
-    Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
-    for (size_t i = 0; i < data.size(); i++) {
-      *(ptrs + i) = Pointer(data[i]);
-    }
-    return simd::Vector<Pointer>(ptrs, data.size());
+  auto NewVector(T&& data) {
+    return NewVectorImpl(std::forward<T>(data));
   }
 
-  template <typename T>
-  auto NewSimdVector(const std::vector<const T*>& data) {
-    uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
-    Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
-    for (size_t i = 0; i < data.size(); i++) {
-      *(ptrs + i) = Pointer(data[i]);
+  template <typename... T>
+  std::string_view NewString(fmt::format_string<T...> fmt, T&&... args) {
+    size_t n = fmt::formatted_size(fmt, args...);
+    if (n == 0) {
+      return "";
     }
-    return simd::Vector<Pointer>(ptrs, data.size());
-  }
-
-  template <typename T>
-  auto NewSimdVector(const std::vector<T>& data) {
-    if constexpr (std::is_same_v<bool, T>) {
-      size_t byte_size = data.size() / 8;
-      if (data.size() % 8 > 0) {
-        byte_size++;
-      }
-      byte_size = get_arena_element_size(byte_size, 32);  // at least 32bytes
-      uint8_t* arena_data = ArenaAllocate(byte_size);
-      uint64_t* bits = reinterpret_cast<uint64_t*>(arena_data);
-      for (size_t i = 0; i < data.size(); i++) {
-        size_t bits_idx = i / 64;
-        size_t bits_cursor = i % 64;
-        if (data[i]) {
-          bits[bits_idx] = bits64_set(bits[bits_idx], bits_cursor);
-        } else {
-          bits[bits_idx] = bits64_clear(bits[bits_idx], bits_cursor);
-        }
-      }
-      simd::VectorData vdata(arena_data, data.size(), byte_size);
-      vdata.SetReadonly(false);
-      return simd::Vector<Bit>(vdata);
-    } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T> ||
-                         is_std_array_v<T>) {
-      return simd::Vector<T>(data);
-    } else if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T>) {
-      uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(StringView));
-      StringView* strs = reinterpret_cast<StringView*>(arena_data);
-      for (size_t i = 0; i < data.size(); i++) {
-        *(strs + i) = StringView(data[i]);
-      }
-      return simd::Vector<StringView>(strs, data.size());
-    } else {
-      // static_assert(sizeof(T) == -1, "unsupported type to NewSimdVector");
-      uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
-      Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
-      for (size_t i = 0; i < data.size(); i++) {
-        *(ptrs + i) = Pointer(&data[i]);
-      }
-      auto ret = simd::Vector<Pointer>(ptrs, data.size());
-      ret.SetReadonly(false);
-      return ret;
-    }
-  }
-
-  template <typename T>
-  auto NewSimdVector(std::vector<T>& data) {
-    const std::vector<T>& const_ref = data;
-    auto val = NewSimdVector(const_ref);
-    val.GetVectorData().SetReadonly(false);
-    return val;
+    char* data = reinterpret_cast<char*>(ArenaAllocate(n));
+    fmt::format_to(data, fmt, args...);
+    return std::string_view(data, n);
   }
 
   template <typename T>
@@ -191,17 +132,6 @@ class Context {
     cleanups_.insertHead(new CleanupFuncWrapper(std::move(f)));
   }
 
-  template <typename... T>
-  std::string_view NewString(fmt::format_string<T...> fmt, T&&... args) {
-    size_t n = fmt::formatted_size(fmt, args...);
-    if (n == 0) {
-      return "";
-    }
-    char* data = reinterpret_cast<char*>(ArenaAllocate(n));
-    fmt::format_to(data, fmt, args...);
-    return std::string_view(data, n);
-  }
-
   void SetHasNan(bool v = true) { has_nan_ = v; }
   bool HasNan() const { return has_nan_; }
 
@@ -215,6 +145,67 @@ class Context {
     return id;
   }
   Arena& GetArena();
+  template <typename T>
+  auto NewVectorImpl(const std::vector<T>& data, bool readonly = true) {
+    if constexpr (std::is_pointer_v<T>) {
+      uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
+      Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
+      for (size_t i = 0; i < data.size(); i++) {
+        *(ptrs + i) = Pointer(data[i]);
+      }
+      return Vector<Pointer>(ptrs, data.size());
+    } else if constexpr (std::is_same_v<T, bool>) {
+      size_t byte_size = data.size() / 8;
+      if (data.size() % 8 > 0) {
+        byte_size++;
+      }
+      uint8_t* arena_data = ArenaAllocate(byte_size);
+      uint8_t* bits = reinterpret_cast<uint8_t*>(arena_data);
+      for (size_t i = 0; i < data.size(); i++) {
+        size_t bits_idx = i / 8;
+        size_t bits_cursor = i % 8;
+        if (data[i]) {
+          bits[bits_idx] = bit_set(bits[bits_idx], bits_cursor);
+        } else {
+          bits[bits_idx] = bit_clear(bits[bits_idx], bits_cursor);
+        }
+      }
+      VectorBuf vdata(arena_data, data.size(), byte_size);
+      vdata.SetReadonly(false);
+      return Vector<Bit>(vdata);
+    } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T>) {
+      VectorBuf vdata(data);
+      vdata.SetReadonly(readonly);
+      return Vector<T>(vdata);
+    } else if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T>) {
+      uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(StringView));
+      StringView* strs = reinterpret_cast<StringView*>(arena_data);
+      for (size_t i = 0; i < data.size(); i++) {
+        *(strs + i) = StringView(data[i]);
+      }
+      VectorBuf vdata(arena_data, data.size());
+      vdata.SetReadonly(false);
+      return Vector<StringView>(vdata);
+    } else {
+      uint8_t* arena_data = ArenaAllocate(data.size() * sizeof(Pointer));
+      Pointer* ptrs = reinterpret_cast<Pointer*>(arena_data);
+      for (size_t i = 0; i < data.size(); i++) {
+        *(ptrs + i) = Pointer(&data[i]);
+      }
+      auto ret = Vector<Pointer>(ptrs, data.size());
+      ret.SetReadonly(false);
+      return ret;
+    }
+  }
+
+  template <typename T>
+  auto NewVectorImpl(std::vector<T>&& data) {
+    auto p = std::make_unique<std::vector<T>>(std::move(data));
+    const std::vector<T>& const_ref = (*p);
+    auto val = NewVectorImpl(const_ref, false);
+    Own(std::move(p));
+    return val;
+  }
 
   std::unique_ptr<Arena> own_arena_;
   Arena* arena_ = nullptr;
