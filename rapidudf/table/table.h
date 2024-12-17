@@ -18,6 +18,7 @@
 
 #include <functional>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -28,8 +29,10 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/exception.h"
+#include "rapidudf/meta/type_traits.h"
 #include "rapidudf/table/column.h"
 #include "rapidudf/table/row.h"
+#include "rapidudf/table/visitor.h"
 #include "rapidudf/types/dyn_object.h"
 #include "rapidudf/types/dyn_object_schema.h"
 #include "rapidudf/types/pointer.h"
@@ -45,22 +48,6 @@ template <class R, class... Args>
 absl::StatusOr<R> eval_expression(const std::string& source, const std::vector<std::string>& arg_names, Args... args);
 }  // namespace exec
 namespace table {
-enum class FilterStatusCode {
-  kSkip,
-  kSelect,
-  kExit,
-};
-
-class FilterStatus {
- public:
-  explicit FilterStatus(FilterStatusCode code, int reset_cursor = -1) : code_(code), reset_cursor_(reset_cursor) {}
-  FilterStatusCode Code() const { return code_; }
-  int ResetCursor() const { return reset_cursor_; }
-
- private:
-  FilterStatusCode code_;
-  int reset_cursor_ = -1;
-};
 
 class TableSchema;
 class Table : public DynObject {
@@ -103,7 +90,7 @@ class Table : public DynObject {
   absl::Status AddRows(const std::vector<T>&... rows) {
     std::vector<absl::StatusOr<PartialRows>> add_results;
     std::vector<PartialRows> add_rows;
-    add_results.emplace_back((GetPartialRows(rows), ...));
+    (add_results.push_back(GetPartialRows(rows)), ...);
 
     for (auto& result : add_results) {
       if (!result.ok()) {
@@ -118,7 +105,8 @@ class Table : public DynObject {
   template <typename... T>
   absl::Status InsertRow(size_t pos, const T*... row) {
     std::vector<absl::StatusOr<PartialRow>> add_results;
-    add_results.emplace_back((GetPartialRow(row), ...));
+    (add_results.push_back(GetPartialRow(row)), ...);
+
     std::vector<PartialRow> insert_row;
     for (auto& result : add_results) {
       if (!result.ok()) {
@@ -136,7 +124,7 @@ class Table : public DynObject {
   }
 
   template <typename T>
-  const T* GetRow(size_t idx) {
+  const T* SlowGetRow(size_t idx) {
     const RowSchema* schema = GetRowSchema<T>();
     if (schema == nullptr) {
       THROW_LOGIC_ERR("Invalid row object type to get schema");
@@ -151,8 +139,116 @@ class Table : public DynObject {
     }
     return rows_[row_idx].GetRowPtrs()[idx].As<T>();
   }
-  std::pair<Table*, Table*> Split(Vector<Bit> bits);
+
+  template <typename R, typename... T>
+  absl::Status Foreach(typename VisitorSignatureHelper<R, T...>::type f, Vector<Bit>* mask = nullptr) {
+    if constexpr (sizeof...(T) == 1) {
+      using RowType = first_of_variadic_t<T...>;
+      const RowSchema* schema = GetRowSchema<RowType>();
+      if (schema == nullptr) {
+        RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
+      }
+      int row_idx = GetRowIdx(*schema);
+      if (row_idx < 0) {
+        RUDF_LOG_RETURN_FMT_ERROR("No row found for schema");
+      }
+      size_t count = Count();
+      if (mask != nullptr) {
+        if (mask->Size() != count) {
+          RUDF_LOG_RETURN_FMT_ERROR("mask size:{} mismatch table row count:{}", mask->Size(), count);
+        }
+      }
+      for (int i = 0; i < static_cast<int>(count); i++) {
+        if (mask != nullptr) {
+          if (!(*mask)[i]) {
+            continue;
+          }
+        }
+        RowType* row = rows_[row_idx].GetRowPtrs()[i].As<RowType>();
+        if constexpr (std::is_void_v<R>) {
+          f(static_cast<size_t>(i), row);
+        } else {
+          R r = f(static_cast<size_t>(i), row);
+          auto code = HandleIteratorValue(r);
+          switch (code) {
+            case VisitStatusCode::kReset: {
+              i = -1;
+              break;
+            }
+            case VisitStatusCode::kExit: {
+              return absl::OkStatus();
+            }
+            case VisitStatusCode::kNext:
+            default: {
+              break;
+            }
+          }
+        }
+      }
+    } else {
+      std::vector<RowSchema> schemas;
+      (schemas.emplace_back(NewRowSchema<T>()), ...);
+      auto status = Validate(schemas);
+      if (!status.ok()) {
+        return status;
+      }
+
+      size_t count = Count();
+      if (mask != nullptr) {
+        if (mask->Size() != count) {
+          RUDF_LOG_RETURN_FMT_ERROR("mask size:{} mismatch table row count:{}", mask->Size(), count);
+        }
+      }
+      for (int i = 0; i < static_cast<int>(count); i++) {
+        if (mask != nullptr) {
+          if (!(*mask)[i]) {
+            continue;
+          }
+        }
+        if constexpr (std::is_void_v<R>) {
+          VisitRow(static_cast<size_t>(i), f, std::index_sequence_for<T...>{});
+        } else {
+          R r = VisitRow(static_cast<size_t>(i), f, std::index_sequence_for<T...>{});
+          auto code = HandleIteratorValue(r);
+          switch (code) {
+            case VisitStatusCode::kReset: {
+              i = -1;
+              break;
+            }
+            case VisitStatusCode::kExit: {
+              return absl::OkStatus();
+            }
+            case VisitStatusCode::kNext:
+            default: {
+              break;
+            }
+          }
+        }
+      }
+    }
+    return absl::OkStatus();
+  }
+  template <typename... T>
+  Vector<Bit> Filter(typename VisitorSignatureHelper<bool, T...>::type f) {
+    size_t count = Count();
+    Vector<Bit> filter_mask = ctx_.NewVectorBuf<Bit>(count);
+    memset(filter_mask.GetVectorBuf().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
+    Foreach<void, T...>([&](size_t idx, const T*... args) {
+      if (f(idx, args...)) {
+        filter_mask.Set(idx, Bit(true));
+      }
+    });
+    return filter_mask;
+  }
   Table* Filter(Vector<Bit> bits);
+
+  Vector<Bit> Dedup(StringView column, uint32_t k);
+  absl::Status Distinct(absl::Span<const StringView> columns);
+  absl::Status Distinct(const std::vector<StringView>& columns) {
+    return Distinct(absl::Span<const StringView>(columns));
+  }
+  std::pair<Table*, Table*> Split(Vector<Bit> bits);
+
   Table* OrderBy(StringView column, bool descending);
   template <typename T>
   Table* OrderBy(Vector<T> by, bool descending);
@@ -164,207 +260,55 @@ class Table : public DynObject {
   absl::Span<Table*> GroupBy(Vector<T> by);
   absl::Span<Table*> GroupBy(StringView column);
 
-  Vector<Bit> Dedup(StringView column, uint32_t k);
-
-  template <typename T>
-  absl::Status Foreach(std::function<void(const T*)>&& f, Vector<Bit>* mask = nullptr) {
-    const RowSchema* schema = GetRowSchema<T>();
-    if (schema == nullptr) {
-      RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
-    }
-    int row_idx = GetRowIdx(*schema);
-    if (row_idx < 0) {
-      RUDF_LOG_RETURN_FMT_ERROR("No row found for schema");
-    }
-    size_t count = Count();
-    if (mask != nullptr) {
-      if (mask->Size() != count) {
-        RUDF_LOG_RETURN_FMT_ERROR("mask size:{} mismatch table row count:{}", mask->Size(), count);
-      }
-    }
-    for (size_t i = 0; i < count; i++) {
-      if (mask != nullptr) {
-        if (!(*mask)[i]) {
-          continue;
-        }
-      }
-      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
-      f(row);
-    }
-    return absl::OkStatus();
-  }
-
-  template <typename T, typename R>
-  absl::StatusOr<Table*> Map(const std::string& new_table_schema,
-                             std::function<const R*(Context&, const T*, size_t)>&& f) {
-    const RowSchema* schema = GetRowSchema<T>();
-    if (schema == nullptr) {
-      RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
-    }
-    int row_idx = GetRowIdx(*schema);
-    if (row_idx < 0) {
-      RUDF_LOG_RETURN_FMT_ERROR("No row found for schema");
-    }
-    size_t count = Count();
-    Table* new_table = NewTableBySchema(new_table_schema);
-    if (new_table == nullptr) {
-      RUDF_LOG_RETURN_FMT_ERROR("Can NOT create table by schema:{}", new_table_schema);
-    }
-    std::vector<const R*> rows;
-    rows.reserve(count);
-    for (size_t i = 0; i < count; i++) {
-      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
-      const R* r = f(ctx_, row, i);
-      if (r != nullptr) {
-        rows.emplace_back(r);
-      }
-    }
-    auto status = new_table->AddRows(rows);
-    if (!status.ok()) {
-      return status;
-    }
-    return new_table;
-  }
-  template <typename T, typename R>
-  absl::StatusOr<Table*> FlatMap(const std::string& new_table_schema,
-                                 std::function<std::vector<const R*>(Context&, const T*, size_t)>&& f) {
-    const RowSchema* schema = GetRowSchema<T>();
-    if (schema == nullptr) {
-      RUDF_LOG_RETURN_FMT_ERROR("Invalid row object type to get schema");
-    }
-    int row_idx = GetRowIdx(*schema);
-    if (row_idx < 0) {
-      RUDF_LOG_RETURN_FMT_ERROR("No row found for schema");
-    }
-    size_t count = Count();
-    Table* new_table = NewTableBySchema(new_table_schema);
-    if (new_table == nullptr) {
-      RUDF_LOG_RETURN_FMT_ERROR("Can NOT create table by schema:{}", new_table_schema);
-    }
-    std::vector<const R*> rows;
-    rows.reserve(count);
-    for (size_t i = 0; i < count; i++) {
-      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
-      auto iter = f(ctx_, row, i);
-      for (const R* r : iter) {
-        if (r != nullptr) {
-          rows.emplace_back(r);
-        }
-      }
-    }
-    auto status = new_table->AddRows(rows);
-    if (!status.ok()) {
-      return status;
-    }
-    return new_table;
-  }
-
-  template <typename T>
-  Vector<Bit> Filter(std::function<bool(const T*, size_t)>&& f) {
-    const RowSchema* schema = GetRowSchema<T>();
-    if (schema == nullptr) {
-      THROW_LOGIC_ERR("Invalid row object type to get schema");
-    }
-    int row_idx = GetRowIdx(*schema);
-    if (row_idx < 0) {
-      THROW_LOGIC_ERR("No row found for schema");
-    }
-    size_t count = Count();
-    Vector<Bit> filter_mask = ctx_.NewVectorBuf<Bit>(count);
-    memset(filter_mask.GetVectorBuf().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
-    for (size_t i = 0; i < count; i++) {
-      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
-      if (f(row, i)) {
-        filter_mask.Set(i, Bit(true));
-      }
-    }
-    return filter_mask;
-  }
-
-  template <typename T>
-  inline std::pair<Table*, Vector<Bit>> Filter(std::function<FilterStatus(const T*, size_t)>&& select,
-                                               Vector<Bit>* iter_mask = nullptr) {
-    const RowSchema* schema = GetRowSchema<T>();
-    if (schema == nullptr) {
-      THROW_LOGIC_ERR("Invalid row object type to get schema for filter");
-    }
-    int row_idx = GetRowIdx(*schema);
-    if (row_idx < 0) {
-      THROW_LOGIC_ERR("No row found for schema");
-    }
-    size_t count = Count();
-    Vector<Bit> select_mask = ctx_.NewVectorBuf<Bit>(count);
-    memset(select_mask.GetVectorBuf().MutableData<uint8_t>(), 0, select_mask.BytesCapacity());
-    std::vector<int32_t> select_indices;
-    select_indices.reserve(count);
-    for (size_t i = 0; i < count; i++) {
-      if (iter_mask != nullptr) {
-        if (!(*iter_mask)[i]) {
-          continue;
-        }
-      }
-      if (select_mask[i]) {
-        continue;
-      }
-      T* row = rows_[row_idx].GetRowPtrs()[i].As<T>();
-      FilterStatus rc = select(row, i);
-      switch (rc.Code()) {
-        case FilterStatusCode::kExit: {
-          goto end_loop;
-        }
-        case FilterStatusCode::kSelect: {
-          select_mask.Set(i, Bit(true));
-          select_indices.emplace_back(i);
-          if (rc.ResetCursor() >= 0) {
-            i = static_cast<size_t>(rc.ResetCursor());
-          }
-          break;
-        }
-        default: {
-          break;
-        }
-      }
-    }
-  end_loop:
-    auto* sub_table = SubTable(select_indices);
-    return std::make_pair(sub_table, select_mask);
-  }
-
   Table* Concat(Table* other);
   Table* Concat(Table::SmartPtr& ptr) { return Concat(ptr.get()); }
 
-  absl::Status Distinct(absl::Span<const StringView> columns);
-  absl::Status Distinct(const std::vector<StringView>& columns) {
-    return Distinct(absl::Span<const StringView>(columns));
-  }
   absl::Status Distinct(StringView column) {
     std::vector<StringView> columns{column};
     return Distinct(absl::Span<StringView>{columns});
   }
-  template <typename T>
-  absl::Status Distinct(absl::Span<const StringView> columns, std::function<T*(Context&, T*, const T*)>&& merge) {
-    const RowSchema* schema = GetRowSchema<T>();
-    if (schema == nullptr) {
-      THROW_LOGIC_ERR("Invalid row object type to get schema for filter");
+  template <typename... T>
+  absl::Status Distinct(absl::Span<const StringView> columns, typename MergeVisitorSignatureHelper<T...>::type merge) {
+    std::vector<RowSchema> schemas;
+    (schemas.emplace_back(NewRowSchema<T>()), ...);
+    auto status = Validate(schemas);
+    if (!status.ok()) {
+      return status;
     }
-    int row_idx = GetRowIdx(*schema);
-    if (row_idx < 0) {
-      THROW_LOGIC_ERR("No row found for schema");
-    }
-    std::vector<const uint8_t*> distinct_objs;
+    std::vector<std::vector<const uint8_t*>> distinct_objs;
+    distinct_objs.resize(rows_.size());
+    size_t add_distinct_obj_cursor = 0;
+    auto add_distinct_obj = [&](const void* p) {
+      distinct_objs[add_distinct_obj_cursor++].emplace_back(reinterpret_cast<const uint8_t*>(p));
+    };
     DistinctIndiceTable indice_table = DistinctByColumns(columns);
 
     for (auto& [indice, duplicate_indices] : indice_table) {
-      Pointer select_pointer = rows_[row_idx].GetRowPtrs()[indice];
-      T* select_obj = select_pointer.As<T>();
+      std::tuple<T*...> exist_row = LoadMutableRow<T...>(indice, std::index_sequence_for<T...>{});
       for (auto duplicate_indice : duplicate_indices) {
-        Pointer duplicate_pointer = rows_[row_idx].GetRowPtrs()[duplicate_indice];
-        const T* duplicate_obj = duplicate_pointer.As<T>();
-        select_obj = merge(ctx_, select_obj, duplicate_obj);
+        std::tuple<T*...> to_merge_row = LoadMutableRow<T...>(duplicate_indice, std::index_sequence_for<T...>{});
+        std::apply(
+            [&](auto&... exist_row_element) {
+              std::apply(
+                  [&](auto&... merge_row_element) {
+                    if constexpr (sizeof...(T) == 1) {
+                      using RowType = first_of_variadic_t<T...>;
+                      RowType* new_row = merge(exist_row_element..., merge_row_element...);
+                      exist_row = std::tuple<T*...>(new_row);
+                    } else {
+                      exist_row = merge(exist_row_element..., merge_row_element...);
+                    }
+                  },
+                  to_merge_row);
+            },
+            exist_row);
       }
-      distinct_objs.emplace_back(reinterpret_cast<const uint8_t*>(select_obj));
+      std::apply([&](auto&... exist_row_element) { (add_distinct_obj(exist_row_element), ...); }, exist_row);
+      add_distinct_obj_cursor = 0;
     }
-    rows_[row_idx].Reset(std::move(distinct_objs));
+    for (size_t row_idx = 0; row_idx < rows_.size(); row_idx++) {
+      rows_[row_idx].Reset(std::move(distinct_objs[row_idx]));
+    }
     UnloadAllColumns();
     return absl::OkStatus();
   }
@@ -377,6 +321,8 @@ class Table : public DynObject {
    ** return row count
    */
   size_t Count() const;
+
+  Context& GetContext() { return ctx_; }
 
   template <class R, class... Args>
   absl::StatusOr<R> EvalFunction(const std::string& source, Args... args) {
@@ -411,15 +357,16 @@ class Table : public DynObject {
   };
 
   Table(Context& ctx, const DynObjectSchema* s);
+  Table(Table&);
   Table* NewTableBySchema(const std::string& schema);
   Table* Clone();
+
   std::vector<int32_t> GetIndices();
   void SetIndices(std::vector<int32_t>&& indices);
 
   const TableSchema* GetTableSchema() const { return reinterpret_cast<const TableSchema*>(schema_); }
 
   absl::Status DoAddRows(std::vector<PartialRows>&& rows);
-  absl::Status DoAddRows(std::vector<const uint8_t*>&& rows, const RowSchema& schema);
   absl::Status InsertRow(size_t pos, const std::vector<PartialRow>& row);
 
   absl::StatusOr<uint32_t> GetColumnOffset(const std::string& name);
@@ -443,19 +390,23 @@ class Table : public DynObject {
     return vec;
   }
   VectorBuf GetColumnVectorBuf(StringView name);
-
   template <typename T>
-  const RowSchema* GetRowSchema() {
+  RowSchema NewRowSchema() {
     if constexpr (std::is_base_of_v<::google::protobuf::Message, T>) {
       static T msg;
       const ::google::protobuf::Descriptor* desc = msg.GetDescriptor();
-      return GetRowSchema(RowSchema(desc));
+      return RowSchema(desc);
     } else if constexpr (std::is_base_of_v<::flatbuffers::Table, T>) {
       auto* type_table = T::MiniReflectTypeTable();
-      return GetRowSchema(RowSchema(type_table));
+      return RowSchema(type_table);
     } else {
-      return GetRowSchema(RowSchema(get_dtype<T>()));
+      return RowSchema(get_dtype<T>());
     }
+  }
+
+  template <typename T>
+  const RowSchema* GetRowSchema() {
+    return GetRowSchema(NewRowSchema<T>());
   }
   template <typename T>
   absl::StatusOr<PartialRows> GetPartialRows(const std::vector<T>& rows) {
@@ -532,6 +483,7 @@ class Table : public DynObject {
   absl::Status LoadColumn(const Rows& rows, const Column& column);
   const RowSchema* GetRowSchema(const RowSchema& schema);
   int GetRowIdx(const RowSchema& schema);
+  absl::Status Validate(const std::vector<RowSchema>& schemas);
 
   template <typename T>
   Vector<Bit> Dedup(const T* data, size_t n, size_t k);
@@ -541,12 +493,54 @@ class Table : public DynObject {
     return DynObject::Set(name, std::forward<T>(v));
   }
 
+  template <typename R>
+  VisitStatusCode HandleIteratorValue(R v) {
+    if constexpr (std::is_same_v<VisitStatusCode, R>) {
+      return v;
+    } else if constexpr (std::is_integral_v<R>) {
+      if (v == 0) {
+        return VisitStatusCode::kNext;
+      } else {
+        return VisitStatusCode::kExit;
+      }
+    } else {
+      return VisitStatusCode::kNext;
+    }
+  }
+
   DistinctIndiceTable DistinctByColumns(absl::Span<const StringView> columns);
   void DoFilter(Vector<Bit> bits);
+
+  template <typename T>
+  const T* LoadRowElement(size_t i, size_t j) {
+    const T* row = rows_[j].GetRowPtrs()[i].As<T>();
+    return row;
+  }
+  template <typename T>
+  T* LoadMutableRowElement(size_t i, size_t j) {
+    T* row = rows_[j].GetRowPtrs()[i].As<T>();
+    return row;
+  }
+  template <typename... T, size_t... Is>
+  std::tuple<T*...> LoadMutableRow(size_t row_idx, std::index_sequence<Is...>) {
+    return std::make_tuple(LoadMutableRowElement<T>(row_idx, Is)...);
+  }
+
+  template <typename R, typename... T, size_t... Is>
+  R VisitRow(size_t row_idx, std::function<R(size_t, const T*...)>& f, std::index_sequence<Is...>) {
+    return f(row_idx, LoadRowElement<T>(row_idx, Is)...);
+  }
+
+  template <typename R, typename... T, size_t... Is>
+  R MergeRow(size_t current_row_idx, size_t merge_row_idx, std::function<R(T*..., const T*...)>& f,
+             std::index_sequence<Is...>) {
+    return f(LoadMutableRowElement<T>(current_row_idx, Is)..., LoadRowElement<T>(merge_row_idx, Is)...);
+  }
 
   Context& ctx_;
   std::vector<int32_t> indices_;
   std::vector<Rows> rows_;
+  std::mutex table_mutex_;
   friend class TableSchema;
 };
 }  // namespace table

@@ -14,6 +14,7 @@ cc_library(
         "row.h",
         "table.h",
         "table_schema.h",
+        "visitor.h",
     ],
     deps = [
         "//rapidudf/context",

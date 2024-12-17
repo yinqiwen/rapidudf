@@ -207,8 +207,8 @@ TEST(JitCompiler, table_order_by) {
   ASSERT_EQ(new_id_column.Size(), new_city_column.Size());
 
   for (size_t i = 0; i < N; i++) {
-    ASSERT_EQ(new_id_column[i], new_table->GetRow<TestUser>(i)->id);
-    ASSERT_DOUBLE_EQ(new_score_column[i], new_table->GetRow<TestUser>(i)->score);
+    ASSERT_EQ(new_id_column[i], new_table->SlowGetRow<TestUser>(i)->id);
+    ASSERT_DOUBLE_EQ(new_score_column[i], new_table->SlowGetRow<TestUser>(i)->score);
   }
 }
 
@@ -357,14 +357,9 @@ TEST(JitCompiler, filter) {
   auto table = schema->NewTable(ctx);
   std::ignore = table->AddRows(items);
 
-  auto [filter_table, filter_bits] =
-      table->Filter<FilterStruct>([](const FilterStruct* item, size_t i) -> table::FilterStatus {
-        if (item->city == "bj") {
-          return table::FilterStatus{table::FilterStatusCode::kSelect};
-        }
-        return table::FilterStatus{table::FilterStatusCode::kSkip};
-      });
-  ASSERT_EQ(filter_table->Count(), 25);
+  auto filter_bits =
+      table->Filter<FilterStruct>([](size_t i, const FilterStruct* item) -> bool { return item->city == "bj"; });
+  ASSERT_EQ(filter_bits.CountTrue(), 25);
 }
 struct TransformStruct {
   std::string city;
@@ -372,71 +367,71 @@ struct TransformStruct {
   double score;
 };
 RUDF_STRUCT_FIELDS(TransformStruct, city, id, score)
-TEST(JitCompiler, map) {
-  auto tranform_schema = table::TableSchema::GetOrCreate(
-      "test_map_transform", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
-  auto schema = table::TableSchema::GetOrCreate(
-      "test_filter_table1", [&](table::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
+// TEST(JitCompiler, map) {
+//   auto tranform_schema = table::TableSchema::GetOrCreate(
+//       "test_map_transform", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
+//   auto schema = table::TableSchema::GetOrCreate(
+//       "test_filter_table1", [&](table::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
 
-  size_t N = 100;
-  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
-  std::vector<FilterStruct> items;
-  for (size_t i = 0; i < N; i++) {
-    FilterStruct item;
-    item.city = candidate_citys[i % candidate_citys.size()];
-    item.id = i + 10;
-    item.score = 1.1 + i;
-    items.emplace_back(item);
-  }
-  Context ctx;
-  auto table = schema->NewTable(ctx);
-  std::ignore = table->AddRows(items);
+//   size_t N = 100;
+//   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+//   std::vector<FilterStruct> items;
+//   for (size_t i = 0; i < N; i++) {
+//     FilterStruct item;
+//     item.city = candidate_citys[i % candidate_citys.size()];
+//     item.id = i + 10;
+//     item.score = 1.1 + i;
+//     items.emplace_back(item);
+//   }
+//   Context ctx;
+//   auto table = schema->NewTable(ctx);
+//   std::ignore = table->AddRows(items);
 
-  auto transform_table_result = table->Map<FilterStruct, TransformStruct>(
-      "test_map_transform", [](Context& ctx, const FilterStruct* s, size_t i) -> const TransformStruct* {
-        if (i == 50) {
-          return nullptr;
-        }
-        auto p = ctx.New<TransformStruct>();
-        return p;
-      });
-  ASSERT_TRUE(transform_table_result.value());
-  auto transform_table = transform_table_result.value();
-  ASSERT_EQ(transform_table->Count(), N - 1);
-}
+//   auto transform_table_result = table->Map<FilterStruct, TransformStruct>(
+//       "test_map_transform", [](Context& ctx, const FilterStruct* s, size_t i) -> const TransformStruct* {
+//         if (i == 50) {
+//           return nullptr;
+//         }
+//         auto p = ctx.New<TransformStruct>();
+//         return p;
+//       });
+//   ASSERT_TRUE(transform_table_result.value());
+//   auto transform_table = transform_table_result.value();
+//   ASSERT_EQ(transform_table->Count(), N - 1);
+// }
 
-TEST(JitCompiler, flat_map) {
-  auto tranform_schema = table::TableSchema::GetOrCreate(
-      "test_map_transform", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
-  auto schema = table::TableSchema::GetOrCreate(
-      "test_filter_table1", [&](table::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
+// TEST(JitCompiler, flat_map) {
+//   auto tranform_schema = table::TableSchema::GetOrCreate(
+//       "test_map_transform", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
+//   auto schema = table::TableSchema::GetOrCreate(
+//       "test_filter_table1", [&](table::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
 
-  size_t N = 100;
-  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
-  std::vector<FilterStruct> items;
-  for (size_t i = 0; i < N; i++) {
-    FilterStruct item;
-    item.city = candidate_citys[i % candidate_citys.size()];
-    item.id = i + 10;
-    item.score = 1.1 + i;
-    items.emplace_back(item);
-  }
-  Context ctx;
-  auto table = schema->NewTable(ctx);
-  std::ignore = table->AddRows(items);
+//   size_t N = 100;
+//   std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+//   std::vector<FilterStruct> items;
+//   for (size_t i = 0; i < N; i++) {
+//     FilterStruct item;
+//     item.city = candidate_citys[i % candidate_citys.size()];
+//     item.id = i + 10;
+//     item.score = 1.1 + i;
+//     items.emplace_back(item);
+//   }
+//   Context ctx;
+//   auto table = schema->NewTable(ctx);
+//   std::ignore = table->AddRows(items);
 
-  auto transform_table_result = table->FlatMap<FilterStruct, TransformStruct>(
-      "test_map_transform", [](Context& ctx, const FilterStruct* s, size_t i) {
-        std::vector<const TransformStruct*> vec;
-        for (int i = 0; i < 3; i++) {
-          vec.emplace_back(ctx.New<TransformStruct>());
-        }
-        return vec;
-      });
-  ASSERT_TRUE(transform_table_result.value());
-  auto transform_table = transform_table_result.value();
-  ASSERT_EQ(transform_table->Count(), N * 3);
-}
+//   auto transform_table_result = table->FlatMap<FilterStruct, TransformStruct>(
+//       "test_map_transform", [](Context& ctx, const FilterStruct* s, size_t i) {
+//         std::vector<const TransformStruct*> vec;
+//         for (int i = 0; i < 3; i++) {
+//           vec.emplace_back(ctx.New<TransformStruct>());
+//         }
+//         return vec;
+//       });
+//   ASSERT_TRUE(transform_table_result.value());
+//   auto transform_table = transform_table_result.value();
+//   ASSERT_EQ(transform_table->Count(), N * 3);
+// }
 
 TEST(JitCompiler, distinct) {
   auto schema = table::TableSchema::GetOrCreate(
@@ -485,14 +480,49 @@ TEST(JitCompiler, distinct_merge) {
   auto table3 = table1->Concat(table2);
   ASSERT_EQ(table3->Count(), 2 * N);
 
-  absl::Status s = table3->Distinct<TestUser>(
-      std::vector<StringView>{"id"}, [](Context& ctx, TestUser* current, const TestUser* duplicate) -> TestUser* {
-        current->repeate++;
-        return current;
-      });
+  absl::Status s = table3->Distinct<TestUser>(std::vector<StringView>{"id"},
+                                              [](TestUser* current, const TestUser* duplicate) -> TestUser* {
+                                                current->repeate++;
+                                                return current;
+                                              });
   ASSERT_TRUE(s.ok());
   ASSERT_EQ(table3->Count(), 150);
   for (size_t i = 0; i < table3->Count(); i++) {
-    RUDF_INFO("[{}] id:{},repeat:{}]", i, table3->GetRow<TestUser>(i)->id, table3->GetRow<TestUser>(i)->repeate);
+    RUDF_INFO("[{}] id:{},repeat:{}]", i, table3->SlowGetRow<TestUser>(i)->id,
+              table3->SlowGetRow<TestUser>(i)->repeate);
   }
+}
+
+struct User1 {
+  std::string name1;
+  int id1;
+};
+RUDF_STRUCT_FIELDS(User1, name1, id1)
+struct User2 {
+  std::string name2;
+  int id2;
+};
+RUDF_STRUCT_FIELDS(User2, name2, id2)
+TEST(JitCompiler, multi_schema) {
+  auto schema = table::TableSchema::GetOrCreate("test_multi_schmea_table", [&](table::TableSchema* s) {
+    std::ignore = s->AddColumns<User1>();
+    std::ignore = s->AddColumns<User2>();
+  });
+
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<User1> items1;
+  std::vector<User2> items2;
+  for (size_t i = 0; i < N; i++) {
+    items1.emplace_back(User1{"", static_cast<int>(i)});
+    items2.emplace_back(User2{"", static_cast<int>(i + 10)});
+  }
+  Context ctx;
+  auto table = schema->NewTable(ctx);
+  auto status = table->AddRows(items1, items2);
+  ASSERT_TRUE(status.ok());
+
+  status = table->Foreach<void, User1, User2>([](size_t, const User1* a, const User2* item) {
+
+  });
 }

@@ -18,6 +18,7 @@
 #include <stddef.h>
 #include <cstdint>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 #include "rapidudf/meta/exception.h"
@@ -41,6 +42,9 @@ template <typename T>
 T simd_vector_reduce_max(Vector<T> left);
 template <typename T>
 T simd_vector_reduce_min(Vector<T> left);
+
+size_t simd_vector_bits_count_true(Vector<Bit> left);
+
 }  // namespace functions
 
 template <typename T>
@@ -246,6 +250,15 @@ class Vector {
   T ReduceAvg() { return functions::simd_vector_avg(*this); }
   T ReduceMax() { return functions::simd_vector_reduce_max(*this); }
   T ReduceMin() { return functions::simd_vector_reduce_min(*this); }
+
+  size_t CountTrue() {
+    if constexpr (std::is_same_v<Bit, T>) {
+      return functions::simd_vector_bits_count_true(*this);
+    } else {
+      return 0;
+    }
+  }
+  size_t CountFalse() { return Size() - CountTrue(); }
 
   auto ToStdVector() const {
     if constexpr (std::is_same_v<Bit, T>) {

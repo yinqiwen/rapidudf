@@ -26,5 +26,6 @@ void simd_vector_bits_not(Vector<Bit> src, Vector<Bit> dst);
 void simd_vector_bits_and(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
 void simd_vector_bits_or(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
 void simd_vector_bits_xor(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
+size_t simd_vector_bits_count_true(Vector<Bit> src);
 }  // namespace functions
 }  // namespace rapidudf

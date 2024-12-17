@@ -45,6 +45,9 @@ struct RowSchema {
   bool operator==(const RowSchema& s) const {
     return pb_desc == s.pb_desc && fbs_table == s.fbs_table && struct_dtype == s.struct_dtype;
   }
+  bool operator!=(const RowSchema& s) const {
+    return pb_desc != s.pb_desc || fbs_table != s.fbs_table || struct_dtype != s.struct_dtype;
+  }
 };
 using RowSchemaPtr = std::unique_ptr<RowSchema>;
 

@@ -75,4 +75,32 @@ using function_argument_type_t = typename std::tuple_element<N, typename Functio
 
 template <typename F>
 using first_function_argument_type_t = function_argument_type_t<F, 0>;
+
+// 基础模板：用于处理至少有一个参数的情况
+template <typename First, typename... Rest>
+struct FirstOfVariadic {
+  using type = First;
+};
+
+// 辅助类型别名，使代码更简洁
+template <typename... Args>
+using first_of_variadic_t = typename FirstOfVariadic<Args...>::type;
+
+template <typename... T>
+struct ConstPointerFunctionSignatureHelper;
+template <typename T0, typename T1, typename... Ts>
+struct ConstPointerFunctionSignatureHelper<T0, T1, Ts...> {
+  using type = std::function<void(const T0*, const T1*, const Ts*...)>;
+};
+
+template <typename T0>
+struct ConstPointerFunctionSignatureHelper<T0> {
+  using type = std::function<void(const T0*)>;
+};
+
+template <>
+struct ConstPointerFunctionSignatureHelper<> {
+  using type = std::function<void()>;
+};
+
 }  // namespace rapidudf

@@ -17,6 +17,7 @@
 #include "rapidudf/table/table.h"
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <string_view>
 #include <type_traits>
@@ -62,6 +63,13 @@ static std::vector<int32_t> get_indices(size_t n) {
 Table::Table(Context& ctx, const DynObjectSchema* s) : DynObject(s), ctx_(ctx) {
   for (auto& s : GetTableSchema()->row_schemas_) {
     rows_.emplace_back(Rows(ctx, {}, *s));
+  }
+}
+Table::Table(Table& other) : DynObject(other), ctx_(other.ctx_) {
+  indices_ = other.indices_;
+  for (auto& row : other.rows_) {
+    auto ptrs = row.GetRawRowPtrs();
+    rows_.emplace_back(Rows(ctx_, std::move(ptrs), row.GetSchema()));
   }
 }
 
@@ -391,8 +399,6 @@ Table* Table::NewTableBySchema(const std::string& name) {
 std::vector<int32_t> Table::GetIndices() {
   size_t count = Count();
   if (indices_.size() < count) {
-    // indices_.resize(count);
-    // std::iota(indices_.begin(), indices_.end(), 0);
     indices_ = get_indices(count);
   } else if (indices_.size() > count) {
     indices_.resize(count);
@@ -401,67 +407,59 @@ std::vector<int32_t> Table::GetIndices() {
 }
 void Table::SetIndices(std::vector<int32_t>&& indices) { indices_ = std::move(indices); }
 
-absl::Status Table::DoAddRows(std::vector<PartialRows>&& rows) {
-  if (rows.size() != GetTableSchema()->row_schemas_.size()) {
-    RUDF_RETURN_FMT_ERROR("Expected {} column set, but {} given", GetTableSchema()->row_schemas_.size(), rows.size());
+absl::Status Table::Validate(const std::vector<RowSchema>& schemas) {
+  if (schemas.size() != GetTableSchema()->row_schemas_.size()) {
+    RUDF_RETURN_FMT_ERROR("Expected {} column set, but {} given", GetTableSchema()->row_schemas_.size(),
+                          schemas.size());
   }
-  size_t row_count = 0;
-  for (auto& [schema, columns] : rows) {
-    if (row_count == 0) {
-      row_count = columns.size();
-    } else {
-      if (row_count != columns.size()) {
-        RUDF_RETURN_FMT_ERROR("Mismatch rows size {}/{}", row_count, columns.size());
-      }
-    }
-    bool appened = false;
-    for (auto& rows : rows_) {
-      if (rows.GetSchema() == *schema) {
-        rows.Append(columns);
-        appened = true;
-        break;
-      }
-    }
-    if (!appened) {
-      RUDF_RETURN_FMT_ERROR("Missing schema to add rows");
+  for (size_t i = 0; i < schemas.size(); i++) {
+    if (rows_[i].GetSchema() != schemas[i]) {
+      RUDF_RETURN_FMT_ERROR("Rows[{}] has invalid schema.", i);
     }
   }
   return absl::OkStatus();
 }
 
-absl::Status Table::DoAddRows(std::vector<const uint8_t*>&& row_objs, const RowSchema& schema) {
-  if (!GetTableSchema()->ExistRow(schema)) {
-    RUDF_RETURN_FMT_ERROR("Unsupported schema to add rows");
+absl::Status Table::DoAddRows(std::vector<PartialRows>&& rows) {
+  if (rows.size() != GetTableSchema()->row_schemas_.size()) {
+    RUDF_RETURN_FMT_ERROR("Expected {} column set, but {} given", GetTableSchema()->row_schemas_.size(), rows.size());
   }
-  for (auto& rows : rows_) {
-    if (rows.GetSchema() == schema) {
-      rows.Append(row_objs);
-      return absl::OkStatus();
+  std::lock_guard<std::mutex> guard(table_mutex_);
+  size_t row_count = 0;
+  for (size_t i = 0; i < rows.size(); i++) {
+    auto& [schema, columns] = rows[i];
+    if (rows_[i].GetSchema() != *schema) {
+      RUDF_RETURN_FMT_ERROR("Rows[{}] has invalid schema.", i);
     }
-  }
-  rows_.emplace_back(Rows(ctx_, std::move(row_objs), schema));
-  return absl::OkStatus();
-}
-absl::Status Table::InsertRow(size_t pos, const std::vector<PartialRow>& row) {
-  if (row.size() != GetTableSchema()->row_schemas_.size()) {
-    RUDF_RETURN_FMT_ERROR("Expected {} partial rows, but {} given", GetTableSchema()->row_schemas_.size(), row.size());
-  }
-  for (auto& [schema, partial_row] : row) {
-    bool inserted = false;
-    for (auto& rows : rows_) {
-      if (rows.GetSchema() == *schema) {
-        auto status = rows.Insert(pos, partial_row);
-        if (!status.ok()) {
-          return status;
-        }
-        inserted = true;
-        break;
+    if (row_count == 0) {
+      row_count = columns.size();
+    } else {
+      if (row_count != columns.size()) {
+        RUDF_RETURN_FMT_ERROR("Rows[{}] has mismatch rows size {}/{}", i, row_count, columns.size());
       }
     }
-    if (!inserted) {
-      RUDF_RETURN_FMT_ERROR("Missing schema to insert row");
+    rows_[i].Append(columns);
+  }
+  UnloadAllColumns();
+  return absl::OkStatus();
+}
+
+absl::Status Table::InsertRow(size_t pos, const std::vector<PartialRow>& rows) {
+  if (rows.size() != GetTableSchema()->row_schemas_.size()) {
+    RUDF_RETURN_FMT_ERROR("Expected {} partial rows, but {} given", GetTableSchema()->row_schemas_.size(), rows.size());
+  }
+  std::lock_guard<std::mutex> guard(table_mutex_);
+  for (size_t i = 0; i < rows.size(); i++) {
+    auto& [schema, columns] = rows[i];
+    if (rows_[i].GetSchema() != *schema) {
+      RUDF_RETURN_FMT_ERROR("Rows[{}] has invalid schema to insert.", i);
+    }
+    auto status = rows_[i].Insert(pos, columns);
+    if (!status.ok()) {
+      return status;
     }
   }
+  UnloadAllColumns();
   return absl::OkStatus();
 }
 
@@ -721,9 +719,12 @@ template <typename T>
 Table* Table::OrderBy(Vector<T> by, bool descending) {
   auto tmp_indices = GetIndices();
   Vector<int32_t> indices(tmp_indices);
+
   functions::simd_vector_sort_key_value(ctx_, by, indices, descending);
   Table* this_table = this;
+
   Table* new_table = Clone();
+
   for (auto& rows : new_table->rows_) {
     rows.Gather(indices);
   }

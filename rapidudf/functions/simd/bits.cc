@@ -16,6 +16,7 @@
 
 #include "rapidudf/functions/simd/bits.h"
 #include "rapidudf/functions/simd/vector.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/vector.h"
 #undef HWY_TARGET_INCLUDE
@@ -111,6 +112,37 @@ HWY_INLINE void simd_vector_bits_binary_impl(Vector<Bit> left, Vector<Bit> right
   hn::StoreN(do_simd_binary_op<D, op>(d, v1, v2), d, out + idx, remaining);
 }
 
+size_t simd_vector_count_true_impl(Vector<Bit> src) {
+  using D = hn::ScalableTag<uint8_t>;
+  constexpr D d;
+  constexpr size_t N = hn::Lanes(d);
+  size_t idx = 0;
+  size_t count = src.Size();
+  size_t byte_count = count / 8;
+  if (count % 8 > 0) {
+    byte_count++;
+  }
+
+  const uint8_t* src_in = src.GetVectorBuf().ReadableData<uint8_t>();
+  size_t n = 0;
+  if (byte_count >= N) {
+    for (; idx <= byte_count - N; idx += N) {
+      const hn::Vec<D> v = hn::LoadU(d, src_in + idx);
+      auto results = hn::PopulationCount(v);
+      n += hn::ReduceSum(d, results);
+    }
+  }
+  // `count` was a multiple of the vector length `N`: already done.
+  if (HWY_UNLIKELY(idx == byte_count)) return n;
+  const size_t remaining = byte_count - idx;
+  HWY_DASSERT(0 != remaining && remaining < N);
+  const hn::Vec<D> v = hn::LoadN(d, src_in + idx, remaining);
+  auto results = hn::PopulationCount(v);
+  n += hn::ReduceSum(d, results);
+
+  return n;
+}
+
 }  // namespace HWY_NAMESPACE
 }  // namespace functions
 }  // namespace rapidudf
@@ -135,6 +167,10 @@ void simd_vector_bits_or(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
 void simd_vector_bits_xor(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_XOR>);
   HWY_DYNAMIC_DISPATCH_T(Table)(left, right, dst);
+}
+size_t simd_vector_bits_count_true(Vector<Bit> src) {
+  HWY_EXPORT_T(Table, simd_vector_count_true_impl);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(src);
 }
 }  // namespace functions
 }  // namespace rapidudf
