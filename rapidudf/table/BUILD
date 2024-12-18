@@ -17,6 +17,7 @@ cc_library(
         "visitor.h",
     ],
     deps = [
+        "//rapidudf/common:variadic_template_helper",
         "//rapidudf/context",
         "//rapidudf/functions/simd:vector",
         "//rapidudf/reflect",

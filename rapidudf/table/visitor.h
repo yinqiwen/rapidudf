@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 qiyingwang <qiyingwang@tencent.com>. All rights reserved.
+ * Copyright (c) 2024 yinqiwen yinqiwen@gmail.com. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,41 @@ struct MergeVisitorSignatureHelper<T0, T1, Ts...> {
 template <typename T0>
 struct MergeVisitorSignatureHelper<T0> {
   using type = std::function<T0*(T0*, const T0*)>;
+};
+
+template <typename T>
+struct MapVisistorFunctionReturnTypeHelper {
+  using return_t = T*;
+};
+template <typename... Types>
+struct MapVisistorFunctionReturnTypeHelper<std::tuple<Types...>> {
+  using return_t = std::tuple<Types*...>;
+};
+
+template <typename R, typename... T>
+struct MapVisitorSignatureHelper;
+template <typename R, typename T0, typename T1, typename... Ts>
+struct MapVisitorSignatureHelper<R, T0, T1, Ts...> {
+  using type = std::function<typename MapVisistorFunctionReturnTypeHelper<R>::return_t(size_t, const T0*, const T1*,
+                                                                                       const Ts*...)>;
+};
+
+template <typename R, typename T0>
+struct MapVisitorSignatureHelper<R, T0> {
+  using type = std::function<typename MapVisistorFunctionReturnTypeHelper<R>::return_t(size_t, const T0*)>;
+};
+
+template <typename R, typename... T>
+struct FlatMapVisitorSignatureHelper;
+template <typename R, typename T0, typename T1, typename... Ts>
+struct FlatMapVisitorSignatureHelper<R, T0, T1, Ts...> {
+  using type = std::function<std::vector<typename MapVisistorFunctionReturnTypeHelper<R>::return_t>(
+      size_t, const T0*, const T1*, const Ts*...)>;
+};
+
+template <typename R, typename T0>
+struct FlatMapVisitorSignatureHelper<R, T0> {
+  using type = std::function<std::vector<typename MapVisistorFunctionReturnTypeHelper<R>::return_t>(size_t, const T0*)>;
 };
 
 }  // namespace table

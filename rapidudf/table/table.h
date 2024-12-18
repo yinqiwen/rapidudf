@@ -25,6 +25,7 @@
 #include "absl/status/statusor.h"
 #include "google/protobuf/message.h"
 
+#include "rapidudf/common/variadic_template_helper.h"
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
@@ -314,6 +315,112 @@ class Table : public DynObject {
     return absl::OkStatus();
   }
 
+  template <typename R, typename... T>
+  absl::StatusOr<Table*> Map(const std::string& new_table_schema, typename MapVisitorSignatureHelper<R, T...>::type f) {
+    std::vector<RowSchema> schemas;
+    (schemas.emplace_back(NewRowSchema<T>()), ...);
+    auto status = Validate(schemas);
+    if (!status.ok()) {
+      return status;
+    }
+    Table* map_table = NewTableBySchema(new_table_schema);
+    if (map_table == nullptr) {
+      RUDF_LOG_RETURN_FMT_ERROR("Can NOT create table by schema:{}", new_table_schema);
+    }
+    std::vector<RowSchema> map_table_schemas;
+    if constexpr (is_specialization<R, std::tuple>::value) {
+      GetRowSchemaFromTuple<R, 0>(map_table_schemas);
+    } else {
+      map_table_schemas.emplace_back(NewRowSchema<R>());
+    }
+    status = map_table->Validate(map_table_schemas);
+    if (!status.ok()) {
+      return status;
+    }
+    std::vector<std::vector<const uint8_t*>> map_table_row_objs;
+    map_table_row_objs.resize(map_table->rows_.size());
+    size_t add_map_table_row_obj_cursor = 0;
+    auto add_map_table_row_obj = [&](const void* p) {
+      map_table_row_objs[add_map_table_row_obj_cursor++].emplace_back(reinterpret_cast<const uint8_t*>(p));
+    };
+
+    size_t row_count = Count();
+    for (size_t i = 0; i < row_count; i++) {
+      std::tuple<T*...> exist_row = LoadMutableRow<T...>(i, std::index_sequence_for<T...>{});
+      auto map_row = std::apply([&](auto&... exist_row_element) { return f(i, exist_row_element...); }, exist_row);
+      if constexpr (is_specialization<R, std::tuple>::value) {
+        if (!any_nullptr_impl(map_row)) {
+          std::apply([&](auto&... exist_row_element) { (add_map_table_row_obj(exist_row_element), ...); }, map_row);
+          add_map_table_row_obj_cursor = 0;
+        }
+      } else {
+        if (map_row != nullptr) {
+          map_table_row_objs[0].emplace_back(reinterpret_cast<const uint8_t*>(map_row));
+        }
+      }
+    }
+    for (size_t row_idx = 0; row_idx < map_table->rows_.size(); row_idx++) {
+      map_table->rows_[row_idx].Reset(std::move(map_table_row_objs[row_idx]));
+    }
+    return map_table;
+  }
+
+  template <typename R, typename... T>
+  absl::StatusOr<Table*> FlatMap(const std::string& new_table_schema,
+                                 typename FlatMapVisitorSignatureHelper<R, T...>::type f) {
+    std::vector<RowSchema> schemas;
+    (schemas.emplace_back(NewRowSchema<T>()), ...);
+    auto status = Validate(schemas);
+    if (!status.ok()) {
+      return status;
+    }
+    Table* map_table = NewTableBySchema(new_table_schema);
+    if (map_table == nullptr) {
+      RUDF_LOG_RETURN_FMT_ERROR("Can NOT create table by schema:{}", new_table_schema);
+    }
+    std::vector<RowSchema> map_table_schemas;
+    if constexpr (is_specialization<R, std::tuple>::value) {
+      GetRowSchemaFromTuple<R, 0>(map_table_schemas);
+    } else {
+      map_table_schemas.emplace_back(NewRowSchema<R>());
+    }
+    status = map_table->Validate(map_table_schemas);
+    if (!status.ok()) {
+      return status;
+    }
+    std::vector<std::vector<const uint8_t*>> map_table_row_objs;
+    map_table_row_objs.resize(map_table->rows_.size());
+    size_t add_map_table_row_obj_cursor = 0;
+    auto add_map_table_row_obj = [&](const void* p) {
+      map_table_row_objs[add_map_table_row_obj_cursor++].emplace_back(reinterpret_cast<const uint8_t*>(p));
+    };
+
+    size_t row_count = Count();
+    for (size_t i = 0; i < row_count; i++) {
+      std::tuple<T*...> exist_row = LoadMutableRow<T...>(i, std::index_sequence_for<T...>{});
+      auto flatmap_rows = std::apply([&](auto&... exist_row_element) { return f(i, exist_row_element...); }, exist_row);
+      if constexpr (is_specialization<R, std::tuple>::value) {
+        for (auto& flatmap_row : flatmap_rows) {
+          if (!any_nullptr_impl(flatmap_row)) {
+            std::apply([&](auto&... exist_row_element) { (add_map_table_row_obj(exist_row_element), ...); },
+                       flatmap_row);
+            add_map_table_row_obj_cursor = 0;
+          }
+        }
+      } else {
+        for (auto p : flatmap_rows) {
+          if (p != nullptr) {
+            map_table_row_objs[0].emplace_back(reinterpret_cast<const uint8_t*>(p));
+          }
+        }
+      }
+    }
+    for (size_t row_idx = 0; row_idx < map_table->rows_.size(); row_idx++) {
+      map_table->rows_[row_idx].Reset(std::move(map_table_row_objs[row_idx]));
+    }
+    return map_table;
+  }
+
   /**
   ** return column count
   */
@@ -511,6 +618,15 @@ class Table : public DynObject {
 
   DistinctIndiceTable DistinctByColumns(absl::Span<const StringView> columns);
   void DoFilter(Vector<Bit> bits);
+
+  template <typename TupleLike, std::size_t I = 0>
+  void GetRowSchemaFromTuple(std::vector<RowSchema>& schemas) {
+    if constexpr (I < std::tuple_size_v<TupleLike>) {
+      using SelectedType = std::tuple_element_t<I, TupleLike>;
+      schemas.emplace_back(NewRowSchema<SelectedType>());
+      GetRowSchemaFromTuple<TupleLike, I + 1>();
+    }
+  }
 
   template <typename T>
   const T* LoadRowElement(size_t i, size_t j) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 yinqiwen yinqiwen@gmail.com. All rights reserved.
+ * Copyright (c) 2024 qiyingwang <qiyingwang@tencent.com>. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,23 @@
 
 #pragma once
 
-#include <string_view>
-#include <vector>
+#include <tuple>
+#include <utility>
 namespace rapidudf {
-namespace functions {
 
-int simd_string_find_char(std::string_view s, char ch);
-int simd_string_find_string(std::string_view s, std::string_view part);
+template <typename T>
+inline bool is_nullptr(T* ptr) {
+  return ptr == nullptr;
+}
+template <typename Tuple, std::size_t... Is>
+inline bool any_nullptr_impl(const Tuple& t, std::index_sequence<Is...>) {
+  return (... || is_nullptr(std::get<Is>(t)));
+}
 
-std::vector<std::string_view> simd_string_split_by_char(std::string_view s, char ch);
-std::vector<std::string_view> simd_string_split_by_string(std::string_view s, std::string_view sep);
+// 主函数，用于检查 tuple 中是否有 nullptr
+template <typename... Args>
+inline bool any_nullptr(const std::tuple<Args...>& t) {
+  return any_nullptr_impl(t, std::index_sequence_for<Args...>{});
+}
 
-}  // namespace functions
 }  // namespace rapidudf

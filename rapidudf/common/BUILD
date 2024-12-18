@@ -25,3 +25,10 @@ cc_library(
         "allign.h",
     ],
 )
+
+cc_library(
+    name = "variadic_template_helper",
+    hdrs = [
+        "variadic_template_helper.h",
+    ],
+)
