@@ -15,17 +15,24 @@
  */
 
 #pragma once
-
-#include <string_view>
-#include <vector>
+#include <functional>
+#include <optional>
 namespace rapidudf {
-namespace functions {
 
-int simd_string_find_char(std::string_view s, char ch);
-int simd_string_find_string(std::string_view s, std::string_view part);
+template <typename T>
+class LazyData {
+ public:
+  explicit LazyData(std::function<T()>&& f) : data_creator_(f) {}
+  const T& Get() {
+    if (!data_.has_value()) {
+      data_ = data_creator_();
+    }
+    return *data_;
+  }
 
-std::vector<std::string_view> simd_string_split_by_char(std::string_view s, char ch);
-std::vector<std::string_view> simd_string_split_by_string(std::string_view s, std::string_view sep);
+ private:
+  std::optional<T> data_;
+  std::function<T()> data_creator_;
+};
 
-}  // namespace functions
 }  // namespace rapidudf

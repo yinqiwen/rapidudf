@@ -139,4 +139,15 @@ void DynObjectSchema::VisitField(std::function<void(const std::string&, const DT
   }
 }
 
+std::string DynObjectSchema::ToString() const {
+  std::string info;
+  VisitField([&](const std::string& name, const DType& dtype, uint32_t) {
+    if (!info.empty()) {
+      info.append(",");
+    }
+    info.append("{field:").append(name).append(", dtype:").append(dtype.GetTypeString()).append("}");
+  });
+  return "[" + info + "]";
+}
+
 }  // namespace rapidudf

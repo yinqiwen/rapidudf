@@ -243,10 +243,7 @@ class Table : public DynObject {
   Table* Filter(Vector<Bit> bits);
 
   Vector<Bit> Dedup(StringView column, uint32_t k);
-  absl::Status Distinct(absl::Span<const StringView> columns);
-  absl::Status Distinct(const std::vector<StringView>& columns) {
-    return Distinct(absl::Span<const StringView>(columns));
-  }
+
   std::pair<Table*, Table*> Split(Vector<Bit> bits);
 
   Table* OrderBy(StringView column, bool descending);
@@ -263,6 +260,10 @@ class Table : public DynObject {
   Table* Concat(Table* other);
   Table* Concat(Table::SmartPtr& ptr) { return Concat(ptr.get()); }
 
+  absl::Status Distinct(absl::Span<const StringView> columns);
+  absl::Status Distinct(const std::vector<StringView>& columns) {
+    return Distinct(absl::Span<const StringView>(columns));
+  }
   absl::Status Distinct(StringView column) {
     std::vector<StringView> columns{column};
     return Distinct(absl::Span<StringView>{columns});
@@ -324,6 +325,8 @@ class Table : public DynObject {
 
   Context& GetContext() { return ctx_; }
 
+  const TableSchema* GetTableSchema() const { return reinterpret_cast<const TableSchema*>(schema_); }
+
   template <class R, class... Args>
   absl::StatusOr<R> EvalFunction(const std::string& source, Args... args) {
     return exec::eval_function<R, Args...>(source, args...);
@@ -363,8 +366,6 @@ class Table : public DynObject {
 
   std::vector<int32_t> GetIndices();
   void SetIndices(std::vector<int32_t>&& indices);
-
-  const TableSchema* GetTableSchema() const { return reinterpret_cast<const TableSchema*>(schema_); }
 
   absl::Status DoAddRows(std::vector<PartialRows>&& rows);
   absl::Status InsertRow(size_t pos, const std::vector<PartialRow>& row);
@@ -540,7 +541,7 @@ class Table : public DynObject {
   Context& ctx_;
   std::vector<int32_t> indices_;
   std::vector<Rows> rows_;
-  std::mutex table_mutex_;
+  // std::mutex table_mutex_;
   friend class TableSchema;
 };
 }  // namespace table

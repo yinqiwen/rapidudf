@@ -51,6 +51,14 @@ TEST(JitCompiler, string_starts_with) {
   ASSERT_EQ(f("he"), false);
 }
 
+TEST(JitCompiler, split_by_str) {
+  std::string str = "abc;;cde;;eed;;";
+  auto ss = functions::simd_string_split_by_string(str, ";;");
+
+  ASSERT_EQ(ss.size(), 3);
+  ASSERT_EQ(ss[0], "abc");
+}
+
 TEST(JitCompiler, split_by_char) {
   std::string str = "abc,cde,eed,,";
   auto ss = functions::simd_string_split_by_char(str, ',');
@@ -64,6 +72,10 @@ TEST(JitCompiler, find_by_str) {
   auto pos = functions::simd_string_find_string(str, "cde");
 
   ASSERT_EQ(pos, 4);
+
+  str = "eed;;";
+  pos = functions::simd_string_find_string(str, ";;");
+  ASSERT_EQ(pos, 3);
 }
 
 TEST(JitCompiler, find_by_ch) {

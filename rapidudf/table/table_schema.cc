@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "rapidudf/table/table_schema.h"
+#include <fmt/format.h>
 #include <memory>
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype_enums.h"
@@ -385,6 +386,18 @@ absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const DType
   row_schemas_.emplace_back(std::move(schema));
   return absl::OkStatus();
 }
+
+std::string TableSchema::ToString() const {
+  std::string info;
+  VisitField([&](const std::string& name, const DType& dtype, uint32_t) {
+    if (!info.empty()) {
+      info.append(",");
+    }
+    info.append("{field:").append(name).append(", dtype:").append(dtype.Elem().GetTypeString()).append("}");
+  });
+  return fmt::format("Table<{}>({})", name_, info);
+}
+
 }  // namespace table
 
 }  // namespace rapidudf

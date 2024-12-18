@@ -70,6 +70,8 @@ class DynObjectSchema {
 
   const std::string& Name() const { return name_; }
 
+  std::string ToString() const;
+
   virtual ~DynObjectSchema() = default;
 
  protected:

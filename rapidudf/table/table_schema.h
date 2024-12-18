@@ -69,6 +69,8 @@ class TableSchema : public DynObjectSchema {
 
   const Column* GetColumnByIdx(uint32_t idx) const;
 
+  std::string ToString() const;
+
  private:
   TableSchema(const std::string& name, Options opts) : DynObjectSchema(name, opts) {}
   template <typename T>

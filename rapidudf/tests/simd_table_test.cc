@@ -525,4 +525,6 @@ TEST(JitCompiler, multi_schema) {
   status = table->Foreach<void, User1, User2>([](size_t, const User1* a, const User2* item) {
 
   });
+
+  RUDF_INFO("{}", schema->ToString());
 }

@@ -424,7 +424,7 @@ absl::Status Table::DoAddRows(std::vector<PartialRows>&& rows) {
   if (rows.size() != GetTableSchema()->row_schemas_.size()) {
     RUDF_RETURN_FMT_ERROR("Expected {} column set, but {} given", GetTableSchema()->row_schemas_.size(), rows.size());
   }
-  std::lock_guard<std::mutex> guard(table_mutex_);
+  // std::lock_guard<std::mutex> guard(table_mutex_);
   size_t row_count = 0;
   for (size_t i = 0; i < rows.size(); i++) {
     auto& [schema, columns] = rows[i];
@@ -448,7 +448,7 @@ absl::Status Table::InsertRow(size_t pos, const std::vector<PartialRow>& rows) {
   if (rows.size() != GetTableSchema()->row_schemas_.size()) {
     RUDF_RETURN_FMT_ERROR("Expected {} partial rows, but {} given", GetTableSchema()->row_schemas_.size(), rows.size());
   }
-  std::lock_guard<std::mutex> guard(table_mutex_);
+  // std::lock_guard<std::mutex> guard(table_mutex_);
   for (size_t i = 0; i < rows.size(); i++) {
     auto& [schema, columns] = rows[i];
     if (rows_[i].GetSchema() != *schema) {

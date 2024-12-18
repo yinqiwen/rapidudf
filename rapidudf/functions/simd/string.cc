@@ -81,9 +81,10 @@ HWY_INLINE int simd_string_find_string_impl(const char* s, size_t len, const cha
   const hn::Vec<D> cmp_first = hn::Set(d, static_cast<uint8_t>(part[first_pos]));
   const hn::Vec<D> cmp_last = hn::Set(d, static_cast<uint8_t>(part[last_pos]));
   size_t idx = 0;
+  size_t min_simd_block_size = N + part_len - 1;
 
-  if (len >= (N + part_len)) {
-    for (; idx <= len - N - part_len; idx += N) {
+  if (len >= min_simd_block_size) {
+    for (; idx <= len - min_simd_block_size; idx += N) {
       const hn::Vec<D> v0 = hn::LoadU(d, input + idx + first_pos);
       const hn::Vec<D> v1 = hn::LoadU(d, input + idx + last_pos);
       auto mask0 = hn::Eq(v0, cmp_first);
@@ -107,7 +108,7 @@ HWY_INLINE int simd_string_find_string_impl(const char* s, size_t len, const cha
   if (HWY_UNLIKELY(idx == (len - part_len))) {
     return -1;
   }
-  const size_t remaining = len - idx - part_len;
+  const size_t remaining = len - idx - part_len + 1;
 
   HWY_DASSERT(0 != remaining && remaining < N);
   const hn::Vec<D> v0 = hn::LoadN(d, input + idx, remaining);
@@ -191,56 +192,24 @@ HWY_INLINE std::vector<uint32_t> simd_string_split_by_char_impl(std::string_view
   return sep_positions;
 }
 
-HWY_INLINE std::vector<std::string_view> simd_string_split_by_char_impl1(std::string_view s, char ch) {
-  const uint8_t* input = reinterpret_cast<const uint8_t*>(s.data());
-  using D = hn::ScalableTag<uint8_t>;
-  constexpr D d;
-  constexpr size_t N = hn::Lanes(d);
-  const hn::Vec<D> cmp = hn::Set(d, static_cast<uint8_t>(ch));
-  size_t idx = 0;
-  size_t len = s.size();
-  std::vector<uint8_t> indices(s.size());
-  auto indice_vec = hn::Iota(d, 0);
-
-  size_t indice_offset = 0;
-  if (len >= N) {
-    for (; idx <= len - N; idx += N) {
-      const hn::Vec<D> v = hn::LoadU(d, input + idx);
-      auto mask = hn::Eq(v, cmp);
-      size_t n = hn::CompressStore(indice_vec, mask, d, indices.data() + indice_offset + 1);
-      indices[indice_offset] = static_cast<uint8_t>(n);
-      indice_offset += (n + 1);
-    }
+HWY_INLINE std::vector<uint32_t> simd_string_split_by_string_impl(std::string_view s, std::string_view sep) {
+  if (sep.size() == 1) {
+    return simd_string_split_by_char_impl(s, sep[0]);
   }
-  if (idx < len) {
-    const size_t remaining = len - idx;
-    HWY_DASSERT(0 != remaining && remaining < N);
-    const hn::Vec<D> v = hn::LoadN(d, input + idx, remaining);
-    auto mask = hn::Eq(v, cmp);
-    size_t n = hn::CompressStore(indice_vec, mask, d, indices.data() + indice_offset + 1);
-    indices[indice_offset] = static_cast<uint8_t>(n);
-    indice_offset += (n + 1);
+  std::vector<uint32_t> sep_positions;
+  sep_positions.reserve(16);
+  const char* data = s.data();
+  size_t len = s.length();
+  int idx = simd_string_find_string_impl(data, len, sep.data(), sep.size());
+  uint32_t offset = 0;
+  while (idx >= 0) {
+    sep_positions.emplace_back(offset + idx);
+    data += (idx + sep.size());
+    offset += (idx + sep.size());
+    len -= (idx + sep.size());
+    idx = simd_string_find_string_impl(data, len, sep.data(), sep.size());
   }
-  indices.resize(indice_offset);
-
-  indice_offset = 0;
-  size_t last_pos = 0;
-  size_t vec_idx = 0;
-  std::vector<std::string_view> ss;
-  while (indice_offset < indices.size()) {
-    size_t n = indices[indice_offset];
-    for (size_t i = 0; i < n; i++) {
-      auto pos = indices[indice_offset + i + 1] + N * vec_idx;
-      if (pos != last_pos) {
-        auto part = s.substr(last_pos, pos - last_pos);
-        ss.emplace_back(part);
-      }
-      last_pos = pos + 1;
-    }
-    vec_idx++;
-    indice_offset += (n + 1);
-  }
-  return ss;
+  return sep_positions;
 }
 
 }  // namespace HWY_NAMESPACE
@@ -277,8 +246,25 @@ std::vector<std::string_view> simd_string_split_by_char(std::string_view s, char
     last_pos = pos + 1;
   }
   return ss;
-  //   HWY_EXPORT_T(Table, simd_string_split_by_char_impl1);
-  //   return HWY_DYNAMIC_DISPATCH_T(Table)(s, ch);
+}
+
+std::vector<std::string_view> simd_string_split_by_string(std::string_view s, std::string_view sep) {
+  HWY_EXPORT_T(Table, simd_string_split_by_string_impl);
+  std::vector<uint32_t> sep_positions = HWY_DYNAMIC_DISPATCH_T(Table)(s, sep);
+
+  std::vector<std::string_view> ss;
+  ss.reserve(sep_positions.size());
+  size_t last_pos = 0;
+  for (auto pos : sep_positions) {
+    if (pos != last_pos) {
+      auto part = s.substr(last_pos, pos - last_pos);
+      if (!part.empty()) {
+        ss.emplace_back(part);
+      }
+    }
+    last_pos = pos + sep.size();
+  }
+  return ss;
 }
 
 }  // namespace functions
