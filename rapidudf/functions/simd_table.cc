@@ -74,6 +74,7 @@ struct SimdTableHelper {
   static absl::Span<table::Table*> group_by(table::Table* table, Vector<T> by) {
     return table->GroupBy(by);
   }
+  static absl::Span<table::Table*> group_by_column(table::Table* table, StringView by) { return table->GroupBy(by); }
 
   template <typename T>
   static Vector<T> get_column(table::Table* table, uint32_t offset) {

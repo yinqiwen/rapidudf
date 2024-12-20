@@ -256,7 +256,8 @@ class Table : public DynObject {
   Table* Tail(uint32_t k);
   template <typename T>
   absl::Span<Table*> GroupBy(Vector<T> by);
-  absl::Span<Table*> GroupBy(StringView column);
+  absl::Span<Table*> GroupBy(absl::Span<const StringView> columns);
+  absl::Span<Table*> GroupBy(StringView column) { return GroupBy(std::vector<StringView>{column}); }
 
   Table* Concat(Table* other);
   Table* Concat(Table::SmartPtr& ptr) { return Concat(ptr.get()); }
@@ -316,17 +317,16 @@ class Table : public DynObject {
   }
 
   template <typename R, typename... T>
-  absl::StatusOr<Table*> Map(const std::string& new_table_schema, typename MapVisitorSignatureHelper<R, T...>::type f) {
+  absl::StatusOr<SmartPtr> Map(const TableSchema* new_table_schema,
+                               typename MapVisitorSignatureHelper<R, T...>::type f) {
     std::vector<RowSchema> schemas;
     (schemas.emplace_back(NewRowSchema<T>()), ...);
     auto status = Validate(schemas);
     if (!status.ok()) {
       return status;
     }
-    Table* map_table = NewTableBySchema(new_table_schema);
-    if (map_table == nullptr) {
-      RUDF_LOG_RETURN_FMT_ERROR("Can NOT create table by schema:{}", new_table_schema);
-    }
+    SmartPtr map_table = NewTableBySchema(new_table_schema);
+
     std::vector<RowSchema> map_table_schemas;
     if constexpr (is_specialization<R, std::tuple>::value) {
       GetRowSchemaFromTuple<R, 0>(map_table_schemas);
@@ -366,18 +366,16 @@ class Table : public DynObject {
   }
 
   template <typename R, typename... T>
-  absl::StatusOr<Table*> FlatMap(const std::string& new_table_schema,
-                                 typename FlatMapVisitorSignatureHelper<R, T...>::type f) {
+  absl::StatusOr<SmartPtr> FlatMap(const TableSchema* new_table_schema,
+                                   typename FlatMapVisitorSignatureHelper<R, T...>::type f) {
     std::vector<RowSchema> schemas;
     (schemas.emplace_back(NewRowSchema<T>()), ...);
     auto status = Validate(schemas);
     if (!status.ok()) {
       return status;
     }
-    Table* map_table = NewTableBySchema(new_table_schema);
-    if (map_table == nullptr) {
-      RUDF_LOG_RETURN_FMT_ERROR("Can NOT create table by schema:{}", new_table_schema);
-    }
+    SmartPtr map_table = NewTableBySchema(new_table_schema);
+
     std::vector<RowSchema> map_table_schemas;
     if constexpr (is_specialization<R, std::tuple>::value) {
       GetRowSchemaFromTuple<R, 0>(map_table_schemas);
@@ -469,6 +467,7 @@ class Table : public DynObject {
   Table(Context& ctx, const DynObjectSchema* s);
   Table(Table&);
   Table* NewTableBySchema(const std::string& schema);
+  SmartPtr NewTableBySchema(const TableSchema* schema);
   Table* Clone();
 
   std::vector<int32_t> GetIndices();
@@ -657,7 +656,6 @@ class Table : public DynObject {
   Context& ctx_;
   std::vector<int32_t> indices_;
   std::vector<Rows> rows_;
-  // std::mutex table_mutex_;
   friend class TableSchema;
 };
 }  // namespace table

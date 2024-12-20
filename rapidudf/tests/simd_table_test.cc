@@ -388,7 +388,7 @@ TEST(JitCompiler, map) {
   std::ignore = table->AddRows(items);
 
   auto transform_table_result = table->Map<TransformStruct, FilterStruct>(
-      "test_map_transform", [&](size_t i, const FilterStruct* s) -> TransformStruct* {
+      tranform_schema, [&](size_t i, const FilterStruct* s) -> TransformStruct* {
         if (i == 50) {
           return nullptr;
         }
@@ -396,7 +396,7 @@ TEST(JitCompiler, map) {
         return p;
       });
   ASSERT_TRUE(transform_table_result.value());
-  auto transform_table = transform_table_result.value();
+  auto transform_table = std::move(transform_table_result.value());
   ASSERT_EQ(transform_table->Count(), N - 1);
 }
 
@@ -421,7 +421,7 @@ TEST(JitCompiler, flat_map) {
   std::ignore = table->AddRows(items);
 
   auto transform_table_result =
-      table->FlatMap<TransformStruct, FilterStruct>("test_map_transform", [&](size_t i, const FilterStruct* s) {
+      table->FlatMap<TransformStruct, FilterStruct>(tranform_schema, [&](size_t i, const FilterStruct* s) {
         std::vector<TransformStruct*> vec;
         for (int i = 0; i < 3; i++) {
           vec.emplace_back(table->GetContext().New<TransformStruct>());
@@ -429,7 +429,7 @@ TEST(JitCompiler, flat_map) {
         return vec;
       });
   ASSERT_TRUE(transform_table_result.value());
-  auto transform_table = transform_table_result.value();
+  auto transform_table = std::move(transform_table_result.value());
   ASSERT_EQ(transform_table->Count(), N * 3);
 }
 

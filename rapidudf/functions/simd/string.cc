@@ -16,6 +16,7 @@
 
 #include "rapidudf/functions/simd/string.h"
 #include <string.h>
+#include <limits>
 #include <vector>
 #include "rapidudf/log/log.h"
 
@@ -131,22 +132,29 @@ HWY_INLINE int simd_string_find_string_impl(const char* s, size_t len, const cha
   return -1;
 }
 
-// HWY_INLINE std::vector<uint32_t> simd_string_split_by_char_impl(std::string_view s, char ch) {
-//   std::vector<uint32_t> sep_positions;
-//   sep_positions.reserve(16);
-//   const char* data = s.data();
-//   size_t len = s.length();
-//   int idx = simd_string_find_char_impl(data, len, ch);
-//   uint32_t offset = 0;
-//   while (idx >= 0) {
-//     sep_positions.emplace_back(offset + idx);
-//     data += (idx + 1);
-//     offset += (idx + 1);
-//     len -= (idx + 1);
-//     idx = simd_string_find_char_impl(data, len, ch);
-//   }
-//   return sep_positions;
-// }
+template <typename T>
+struct ClearMaskHelper {
+  using D = hn::ScalableTag<T>;
+  using Mask = hn::Mask<D>;
+  static HWY_INLINE Mask GetClearMask(size_t i) {
+    constexpr D d;
+    constexpr size_t N = hn::Lanes(d);
+    static Mask masks[N];
+    static bool inited = false;
+    if (!inited) {
+      T data[N];
+      memset(data, 0, N);
+      for (size_t pos_to_clear = 0; pos_to_clear < N; pos_to_clear++) {
+        data[pos_to_clear] = std::numeric_limits<T>::max();
+        auto clear_mask = hn::MaskFromVec(hn::LoadU(d, data));
+        masks[pos_to_clear] = clear_mask;
+        data[pos_to_clear] = 0;
+      }
+      inited = true;
+    }
+    return masks[i];
+  }
+};
 
 HWY_INLINE std::vector<uint32_t> simd_string_split_by_char_impl(std::string_view s, char ch) {
   std::vector<uint32_t> sep_positions;
@@ -163,12 +171,12 @@ HWY_INLINE std::vector<uint32_t> simd_string_split_by_char_impl(std::string_view
     for (; idx <= len - N; idx += N) {
       const hn::Vec<D> v = hn::LoadU(d, input + idx);
       auto mask = hn::Eq(v, cmp);
-
       auto found = hn::FindFirstTrue(d, mask);
       while (found >= 0) {
         sep_positions.emplace_back(idx + found);
         auto tmp = hn::SetOnlyFirst(mask);
-        mask = hn::And(mask, hn::Not(tmp));
+        // auto tmp = ClearMaskHelper<uint8_t>::GetClearMask(found);
+        mask = hn::AndNot(tmp, mask);
         found = hn::FindFirstTrue(d, mask);
       }
     }
@@ -186,7 +194,8 @@ HWY_INLINE std::vector<uint32_t> simd_string_split_by_char_impl(std::string_view
     }
     sep_positions.emplace_back(idx + found);
     auto tmp = hn::SetOnlyFirst(mask);
-    mask = hn::And(mask, hn::Not(tmp));
+    // auto tmp = ClearMaskHelper<uint8_t>::GetClearMask(found);
+    mask = hn::AndNot(tmp, mask);
     found = hn::FindFirstTrue(d, mask);
   }
   return sep_positions;
