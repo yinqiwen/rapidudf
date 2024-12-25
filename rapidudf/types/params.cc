@@ -21,7 +21,7 @@ namespace rapidudf {
 
 Params::Params(bool invalid) : iv_(0), dv_(0), bv_(false), parent_(nullptr) {
   if (invalid) {
-    json_type_ = JSON_INVALID;
+    param_type_ = PARAM_INVALID;
   }
 }
 void Params::SetParent(const Params* p) {
@@ -41,42 +41,42 @@ void Params::SetParent(const Params* p) {
     const_cast<Params*>(parent_)->SetParent(p);
   }
 }
-bool Params::Valid() const { return json_type_ != JSON_INVALID; }
+bool Params::Valid() const { return param_type_ != PARAM_INVALID; }
 bool Params::IsBool() const {
   if (!Valid()) {
     return false;
   }
-  return json_type_ == JSON_BOOL;
+  return param_type_ == PARAM_BOOL;
 }
 bool Params::IsString() const {
   if (!Valid()) {
     return false;
   }
-  return json_type_ == JSON_STRING;
+  return param_type_ == PARAM_STRING;
 }
 bool Params::IsDouble() const {
   if (!Valid()) {
     return false;
   }
-  return json_type_ == JSON_DOUBLE;
+  return param_type_ == PARAM_DOUBLE;
 }
 bool Params::IsInt() const {
   if (!Valid()) {
     return false;
   }
-  return json_type_ == JSON_INT;
+  return param_type_ == PARAM_INT;
 }
 bool Params::IsObject() const {
   if (!Valid()) {
     return false;
   }
-  return json_type_ == JSON_OBJECT;
+  return param_type_ == PARAM_OBJECT;
 }
 bool Params::IsArray() const {
   if (!Valid()) {
     return false;
   }
-  return json_type_ == JSON_ARRAY;
+  return param_type_ == PARAM_ARRAY;
 }
 const ParamString& Params::String() const { return str_; }
 int64_t Params::Int() const { return iv_; }
@@ -84,19 +84,19 @@ bool Params::Bool() const { return bv_; }
 double Params::Double() const { return dv_; }
 void Params::SetString(const ParamString& v) {
   str_ = v;
-  json_type_ = JSON_STRING;
+  param_type_ = PARAM_STRING;
 }
 void Params::SetInt(int64_t v) {
   iv_ = v;
-  json_type_ = JSON_INT;
+  param_type_ = PARAM_INT;
 }
 void Params::SetDouble(double d) {
   dv_ = d;
-  json_type_ = JSON_DOUBLE;
+  param_type_ = PARAM_DOUBLE;
 }
 void Params::SetBool(bool v) {
   bv_ = v;
-  json_type_ = JSON_BOOL;
+  param_type_ = PARAM_BOOL;
 }
 size_t Params::Size() const {
   if (IsObject()) {
@@ -129,7 +129,7 @@ Params& Params::operator[](const ParamString& name) {
   if (p.Valid()) {
     return const_cast<Params&>(p);
   }
-  json_type_ = JSON_OBJECT;
+  param_type_ = PARAM_OBJECT;
   return members_[name];
 }
 const Params& Params::operator[](size_t idx) const {
@@ -143,31 +143,31 @@ const Params& Params::operator[](size_t idx) const {
 }
 Params& Params::Add() {
   array_.resize(array_.size() + 1);
-  json_type_ = JSON_ARRAY;
+  param_type_ = PARAM_ARRAY;
   return array_[array_.size() - 1];
 }
 Params& Params::Put(const ParamString& name, const char* value) {
-  json_type_ = JSON_OBJECT;
+  param_type_ = PARAM_OBJECT;
   members_[name].SetString(value);
   return *this;
 }
 Params& Params::Put(const ParamString& name, const ParamString& value) {
-  json_type_ = JSON_OBJECT;
+  param_type_ = PARAM_OBJECT;
   members_[name].SetString(value);
   return *this;
 }
 Params& Params::Put(const ParamString& name, int64_t value) {
-  json_type_ = JSON_OBJECT;
+  param_type_ = PARAM_OBJECT;
   members_[name].SetInt(value);
   return *this;
 }
 Params& Params::Put(const ParamString& name, double value) {
-  json_type_ = JSON_OBJECT;
+  param_type_ = PARAM_OBJECT;
   members_[name].SetDouble(value);
   return *this;
 }
 Params& Params::Put(const ParamString& name, bool value) {
-  json_type_ = JSON_OBJECT;
+  param_type_ = PARAM_OBJECT;
   members_[name].SetBool(value);
   return *this;
 }
@@ -177,7 +177,7 @@ Params& Params::operator[](size_t idx) {
       return array_[idx];
     }
   }
-  json_type_ = JSON_ARRAY;
+  param_type_ = PARAM_ARRAY;
   array_.resize(idx + 1);
   return array_[idx];
 }

@@ -79,6 +79,8 @@ void Table::Deleter::operator()(Table* ptr) const {
   delete[] bytes;
 }
 
+std::array<size_t, 2> Table::Shape() const { return {Count(), GetTableSchema()->FieldCount()}; }
+
 uint32_t Table::GetIdxByOffset(uint32_t offset) {
   size_t header_size = align_to<size_t>(sizeof(Table), 16);
   uint32_t idx = (offset - header_size) / sizeof(VectorBuf);
@@ -595,77 +597,7 @@ void Table::DoFilter(Vector<Bit> bits) {
   for (auto& rows : rows_) {
     rows.Filter(bits);
   }
-  schema_->VisitField([&](const std::string& name, const DType& dtype, uint32_t offset) {
-    uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
-    if (!IsColumnLoaded(offset)) {
-      // lazy load column
-      return;
-    }
-    VectorBuf new_vec;
-    switch (dtype.GetFundamentalType()) {
-      case DATA_BIT: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<Bit>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_U8: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<uint8_t>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_U16: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<uint16_t>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_U32: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<uint32_t>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_U64: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<uint64_t>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_I8: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<int8_t>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_I16: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<int16_t>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_I32: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<int32_t>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_I64: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<int64_t>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_F32: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<float>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_F64: {
-        new_vec = functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<double>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      case DATA_STRING_VIEW: {
-        new_vec =
-            functions::simd_vector_filter(ctx_, *reinterpret_cast<Vector<StringView>*>(vec_ptr), bits).GetVectorBuf();
-        break;
-      }
-      default: {
-        RUDF_ERROR("Unsupported dtype:{} for column:{}", dtype, name);
-        return;
-      }
-    }
-    SetColumn(offset, new_vec);
-  });
+  UnloadAllColumns();
 }
 
 Table* Table::Filter(Vector<Bit> bits) {
@@ -918,6 +850,7 @@ Vector<Bit> Table::Dedup(StringView column, uint32_t k) {
       THROW_LOGIC_ERR("Invalid column:{} with dtype:{} to dedup.", column, dtype);
     }
   }
+
   return bits;
 }
 

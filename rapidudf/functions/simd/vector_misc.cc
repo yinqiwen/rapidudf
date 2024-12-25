@@ -23,7 +23,9 @@
 
 #include "rapidudf/context/context.h"
 #include "rapidudf/functions/simd/vector_misc.h"
+#include "rapidudf/log/log.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
 
 #undef HWY_TARGET_INCLUDE
@@ -234,6 +236,61 @@ T random_impl(uint64_t seed) {
   }
 }
 
+HWY_INLINE const uint8_t* get_mask_bits(const uint8_t* bits, size_t idx, uint64_t& tmp) {
+  size_t bits_offset = idx / 8;
+  size_t bits_cursor = idx % 8;
+  uint8_t shift_bits = (bits[bits_offset] >> bits_cursor);
+  tmp = shift_bits;
+  return reinterpret_cast<uint8_t*>(&tmp);
+}
+
+template <typename T>
+HWY_INLINE size_t simd_vector_filter_impl(const T* in, const uint8_t* bits, T* out, size_t count) {
+  using D = hn::ScalableTag<T>;
+  constexpr D d;
+  constexpr size_t N = hn::Lanes(d);
+  if constexpr (N % 8 > 0) {
+    size_t idx = 0;
+    size_t out_offset = 0;
+    uint64_t tmp_bits = 0;
+    if (count >= N) {
+      for (; idx <= count - N; idx += N) {
+        auto v = hn::LoadU(d, in + idx);
+        auto mask = hn::LoadMaskBits(d, get_mask_bits(bits, idx, tmp_bits));
+        size_t n = hn::CompressBlendedStore(v, mask, d, out + out_offset);
+        out_offset += n;
+      }
+    }
+    // `count` was a multiple of the vector length `N`: already done.
+    if (HWY_UNLIKELY(idx == count)) return out_offset;
+    const size_t remaining = count - idx;
+    HWY_DASSERT(0 != remaining && remaining < N);
+    const hn::Vec<D> v = hn::LoadN(d, in + idx, remaining);
+    auto mask = hn::And(hn::FirstN(d, remaining), hn::LoadMaskBits(d, get_mask_bits(bits, idx, tmp_bits)));
+    out_offset += hn::CompressBlendedStore(v, mask, d, out + out_offset);
+    return out_offset;
+  } else {
+    size_t idx = 0;
+    size_t out_offset = 0;
+    if (count >= N) {
+      for (; idx <= count - N; idx += N) {
+        auto v = hn::LoadU(d, in + idx);
+        size_t bits_offset = idx / 8;
+        out_offset += hn::CompressBitsStore(v, bits + bits_offset, d, out + out_offset);
+      }
+    }
+    // `count` was a multiple of the vector length `N`: already done.
+    if (HWY_UNLIKELY(idx == count)) return out_offset;
+    const size_t remaining = count - idx;
+    HWY_DASSERT(0 != remaining && remaining < N);
+    const hn::Vec<D> v = hn::LoadN(d, in + idx, remaining);
+    size_t bits_offset = idx / 8;
+    auto mask = hn::And(hn::FirstN(d, remaining), hn::LoadMaskBits(d, bits + bits_offset));
+    out_offset += hn::CompressBlendedStore(v, mask, d, out + out_offset);
+    return out_offset;
+  }
+}
+
 }  // namespace HWY_NAMESPACE
 }  // namespace functions
 }  // namespace rapidudf
@@ -293,12 +350,27 @@ Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits) {
         filter_cursor++;
       }
     }
-  } else {
+    // } else {
+    //   for (size_t i = 0; i < data.Size(); i++) {
+    //     if (bits[i]) {
+    //       raw[filter_cursor++] = data[i];
+    //     }
+    //   }
+    // }
+  } else if constexpr (std::is_same_v<T, StringView>) {
     for (size_t i = 0; i < data.Size(); i++) {
       if (bits[i]) {
         raw[filter_cursor++] = data[i];
       }
     }
+  } else if constexpr (std::is_same_v<T, Pointer>) {
+    HWY_EXPORT_T(Table, simd_vector_filter_impl<uint64_t>);
+    const uint64_t* in = reinterpret_cast<const uint64_t*>(data.Data());
+    uint64_t* out = reinterpret_cast<uint64_t*>(raw);
+    filter_cursor = HWY_DYNAMIC_DISPATCH_T(Table)(in, bits.Data(), out, data.Size());
+  } else {
+    HWY_EXPORT_T(Table, simd_vector_filter_impl<T>);
+    filter_cursor = HWY_DYNAMIC_DISPATCH_T(Table)(data.Data(), bits.Data(), raw, data.Size());
   }
 
   VectorBuf vdata(raw, filter_cursor, data.BytesCapacity());

@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <array>
 #include <functional>
 #include <string>
 #include <tuple>
@@ -427,6 +428,7 @@ class Table : public DynObject {
    ** return row count
    */
   size_t Count() const;
+  std::array<size_t, 2> Shape() const;
 
   Context& GetContext() { return ctx_; }
 

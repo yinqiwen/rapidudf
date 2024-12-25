@@ -15,8 +15,7 @@
  */
 
 #pragma once
-#include <stdint.h>
-#include <map>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -35,16 +34,16 @@ class Params {
 
  protected:
   enum ParamType {
-    JSON_INVALID = 0,
-    JSON_EMPTY,
-    JSON_STRING,
-    JSON_INT,
-    JSON_DOUBLE,
-    JSON_BOOL,
-    JSON_OBJECT,
-    JSON_ARRAY,
+    PARAM_INVALID = 0,
+    PARAM_EMPTY,
+    PARAM_STRING,
+    PARAM_INT,
+    PARAM_DOUBLE,
+    PARAM_BOOL,
+    PARAM_OBJECT,
+    PARAM_ARRAY,
   };
-  ParamType json_type_ = JSON_EMPTY;
+  ParamType param_type_ = PARAM_EMPTY;
   ParamString str_;
   int64_t iv_;
   double dv_;
@@ -75,7 +74,7 @@ class Params {
   void SetBool(bool v);
   size_t Size() const;
   const ParamsTable& Members() const;
-  uint32_t Type() const { return json_type_; }
+  uint32_t Type() const { return param_type_; }
 
   const Params& operator[](const ParamString& name) const;
   const Params& operator[](std::string_view name) const;
