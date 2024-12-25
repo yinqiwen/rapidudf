@@ -21,12 +21,58 @@
 #include <vector>
 
 #include "rapidudf/context/context.h"
+#include "rapidudf/functions/simd/vector_misc.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
+
+static float l2_distance(const std::vector<float>& vec1, const std::vector<float>& vec2) {
+  if (vec1.size() != vec2.size()) {
+    throw std::invalid_argument("Vectors must have the same length.");
+  }
+
+  float sum_of_squares = std::inner_product(vec1.begin(), vec1.end(), vec2.begin(), 0.0f, std::plus<>(),
+                                            [](float a, float b) { return (a - b) * (a - b); });
+
+  return std::sqrt(sum_of_squares);
+}
+static float dot_product(const std::vector<float>& vec1, const std::vector<float>& vec2) {
+  if (vec1.size() != vec2.size()) {
+    throw std::invalid_argument("Vectors must have the same length.");
+  }
+  return std::inner_product(vec1.begin(), vec1.end(), vec2.begin(), 0.0f);
+}
+
+static float l2_norm(const std::vector<float>& vec) {
+  float sum_of_squares = std::inner_product(vec.begin(), vec.end(), vec.begin(), 0.0f, std::plus<>(),
+                                            [](float a, float b) { return a * b; });
+  return std::sqrt(sum_of_squares);
+}
+
+static float cosine_similarity(const std::vector<float>& vec1, const std::vector<float>& vec2) {
+  if (vec1.size() != vec2.size()) {
+    throw std::invalid_argument("Vectors must have the same length.");
+  }
+
+  float dot = dot_product(vec1, vec2);
+
+  float norm1 = l2_norm(vec1);
+  float norm2 = l2_norm(vec2);
+
+  if (norm1 == 0.0f || norm2 == 0.0f) {
+    return 0.0f;
+  }
+  RUDF_INFO("###dot：{}, left:{}, right:{}", dot, norm1, norm2);
+  return dot / (norm1 * norm2);
+}
+
+static float cosine_distance(const std::vector<float>& vec1, const std::vector<float>& vec2) {
+  float similarity = cosine_similarity(vec1, vec2);
+  return 1.0f - similarity;
+}
 
 TEST(JitCompiler, vector_add) {
   std::vector<float> vec{1, 2, 3};
@@ -635,4 +681,27 @@ TEST(JitCompiler, user_vector_func) {
   for (size_t i = 0; i < test_x.size(); i++) {
     ASSERT_EQ(z[i], test_z[i]);
   }
+}
+
+TEST(JitCompiler, vector_l2_distance) {
+  std::vector<float> vec1, vec2;
+  for (size_t i = 0; i < 100; i++) {
+    vec1.emplace_back(i + 1.1);
+    vec2.emplace_back(i + 1.88);
+  }
+  float score = l2_distance(vec1, vec2);
+  float score1 = functions::simd_vector_l2_distance<float>(vec1, vec2);
+  ASSERT_FLOAT_EQ(score, score1);
+}
+
+TEST(JitCompiler, vector_cos_distance) {
+  std::vector<float> vec1, vec2;
+  for (size_t i = 0; i < 124; i++) {
+    vec1.emplace_back(i + 1.1);
+    vec2.emplace_back(i + 1.58);
+  }
+  float score = cosine_distance(vec1, vec2);
+  float score1 = functions::simd_vector_cosine_distance<float>(vec1, vec2);
+  RUDF_INFO("{} {}", score, score1);
+  ASSERT_FLOAT_EQ(score, score1);
 }

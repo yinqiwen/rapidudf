@@ -17,6 +17,7 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <type_traits>
@@ -51,7 +52,7 @@ HWY_INLINE T simd_vector_dot_impl(Vector<T> left, Vector<T> right) {
     THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left.Size(), right.Size()));
   }
   using D = hn::ScalableTag<T>;
-  const D d;
+  constexpr D d;
   constexpr auto lanes = hn::Lanes(d);
   T val;
   if (left.Size() >= lanes) {
@@ -62,6 +63,76 @@ HWY_INLINE T simd_vector_dot_impl(Vector<T> left, Vector<T> right) {
     val = hn::Dot::Compute<assumptions, D, T>(d, left.Data(), right.Data(), left.Size());
   }
   return val;
+}
+
+template <typename T>
+HWY_INLINE T simd_vector_cos_distance_impl(Vector<T> left, Vector<T> right) {
+  if (left.Size() != right.Size()) {
+    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left.Size(), right.Size()));
+  }
+  using D = hn::ScalableTag<T>;
+  constexpr D d;
+  constexpr auto N = hn::Lanes(d);
+  size_t idx = 0;
+  size_t count = left.Size();
+  hn::Vec<D> dot_v = hn::Zero(d);
+  hn::Vec<D> norm_left_v = hn::Zero(d);
+  hn::Vec<D> norm_right_v = hn::Zero(d);
+
+  if (count >= N) {
+    for (; idx <= count - N; idx += N) {
+      auto lv = hn::LoadU(d, left.Data() + idx);
+      auto rv = hn::LoadU(d, right.Data() + idx);
+      dot_v = hn::MulAdd(lv, rv, dot_v);
+      norm_left_v = hn::MulAdd(lv, lv, norm_left_v);
+      norm_right_v = hn::MulAdd(rv, rv, norm_right_v);
+    }
+  }
+  if (HWY_LIKELY(idx != left.Size())) {
+    const size_t remaining = left.Size() - idx;
+    const hn::Vec<D> lv = hn::LoadN(d, left.Data() + idx, remaining);
+    const hn::Vec<D> rv = hn::LoadN(d, right.Data() + idx, remaining);
+    dot_v = hn::MulAdd(lv, rv, dot_v);
+    norm_left_v = hn::MulAdd(lv, lv, norm_left_v);
+    norm_right_v = hn::MulAdd(rv, rv, norm_right_v);
+  }
+  T norm_left = std::sqrt(hn::ReduceSum(d, norm_left_v));
+  T norm_right = std::sqrt(hn::ReduceSum(d, norm_right_v));
+  T dot = hn::ReduceSum(d, dot_v);
+  // RUDF_INFO("###simd dot：{}, left:{}, right:{}, {}/{}/{}", dot, norm_left, norm_right, idx, left.Size(), N);
+  T cosine_similarity = dot / (norm_left * norm_right);
+
+  return 1.0f - cosine_similarity;
+}
+
+template <typename T>
+HWY_INLINE T simd_vector_l2_distance_impl(Vector<T> left, Vector<T> right) {
+  if (left.Size() != right.Size()) {
+    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left.Size(), right.Size()));
+  }
+  using D = hn::ScalableTag<T>;
+  constexpr D d;
+  constexpr auto N = hn::Lanes(d);
+  T val = 0;
+  size_t idx = 0;
+  size_t count = left.Size();
+  hn::Vec<D> distance_v = hn::Zero(d);
+  if (count >= N) {
+    for (; idx <= count - N; idx += N) {
+      auto lv = hn::LoadU(d, left.Data() + idx);
+      auto rv = hn::LoadU(d, right.Data() + idx);
+      auto sub_v = hn::Abs(hn::Sub(lv, rv));
+      distance_v = hn::MulAdd(sub_v, sub_v, distance_v);
+    }
+  }
+  if (HWY_LIKELY(idx != count)) {
+    const size_t remaining = count - idx;
+    const hn::Vec<D> lv = hn::LoadN(d, left.Data() + idx, remaining);
+    const hn::Vec<D> rv = hn::LoadN(d, right.Data() + idx, remaining);
+    auto sub_v = hn::Abs(hn::Sub(lv, rv));
+    distance_v = hn::MulAdd(sub_v, sub_v, distance_v);
+  }
+  return std::sqrt(hn::ReduceSum(d, distance_v));
 }
 
 template <typename T>
@@ -313,15 +384,19 @@ T simd_vector_sum(Vector<T> left) {
 }
 
 template <typename T>
-T simd_vector_dot(Vector<T> left, Vector<T> right) {
-  // simsimd_distance_t v;
-  // if constexpr (std::is_same_v<float, T>) {
-  //   simsimd_dot_f32(left.Data(), right.Data(), left.Size(), &v);
-  // } else if constexpr (std::is_same_v<double, T>) {
-  //   simsimd_dot_f64(left.Data(), right.Data(), left.Size(), &v);
-  // }
-  // return static_cast<T>(v);
+T simd_vector_dot_distance(Vector<T> left, Vector<T> right) {
   HWY_EXPORT_T(Table, simd_vector_dot_impl<T>);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left, right);
+}
+template <typename T>
+T simd_vector_cosine_distance(Vector<T> left, Vector<T> right) {
+  HWY_EXPORT_T(Table, simd_vector_cos_distance_impl<T>);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left, right);
+}
+
+template <typename T>
+T simd_vector_l2_distance(Vector<T> left, Vector<T> right) {
+  HWY_EXPORT_T(Table, simd_vector_l2_distance_impl<T>);
   return HWY_DYNAMIC_DISPATCH_T(Table)(left, right);
 }
 
@@ -458,10 +533,22 @@ T random(uint64_t seed) {
 }
 
 #define DEFINE_SIMD_DOT_OP_TEMPLATE(r, op, ii, TYPE) \
-  template TYPE simd_vector_dot(Vector<TYPE> left, Vector<TYPE> right);
+  template TYPE simd_vector_dot_distance(Vector<TYPE> left, Vector<TYPE> right);
 #define DEFINE_SIMD_DOT_OP(...) \
   BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_DOT_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 DEFINE_SIMD_DOT_OP(float, double);
+
+#define DEFINE_SIMD_COS_OP_TEMPLATE(r, op, ii, TYPE) \
+  template TYPE simd_vector_cosine_distance(Vector<TYPE> left, Vector<TYPE> right);
+#define DEFINE_SIMD_COS_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_COS_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_COS_OP(float, double);
+
+#define DEFINE_SIMD_L2_OP_TEMPLATE(r, op, ii, TYPE) \
+  template TYPE simd_vector_l2_distance(Vector<TYPE> left, Vector<TYPE> right);
+#define DEFINE_SIMD_L2_OP(...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_L2_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_L2_OP(float, double);
 
 #define DEFINE_SIMD_IOTA_OP_TEMPLATE(r, op, ii, TYPE) \
   template Vector<TYPE> simd_vector_iota(Context&, TYPE start, uint32_t n);

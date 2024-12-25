@@ -74,7 +74,7 @@ template <typename T>
 static void register_simd_vector_dot() {
   DType dtype = get_dtype<T>();
   std::string func_name = GetFunctionName(OP_DOT, dtype.ToSimdVector());
-  T (*simd_f0)(Vector<T>, Vector<T>) = simd_vector_dot<T>;
+  T (*simd_f0)(Vector<T>, Vector<T>) = simd_vector_dot_distance<T>;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
   // register_builtin_function("dot");
 }

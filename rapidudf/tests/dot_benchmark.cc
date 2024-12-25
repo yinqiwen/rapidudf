@@ -63,7 +63,7 @@ static void BM_rapidudf_vector_dot(benchmark::State& state) {
       rapidudf::Vector<float> left_operand(left_embedding.data(), left_embedding.size());
       for (auto& right_embedding : right) {
         rapidudf::Vector<float> right_operand(right_embedding.data(), right_embedding.size());
-        result.emplace_back(rapidudf::functions::simd_vector_dot(left_operand, right_operand));
+        result.emplace_back(rapidudf::functions::simd_vector_dot_distance(left_operand, right_operand));
       }
       results.emplace_back(std::move(result));
     }

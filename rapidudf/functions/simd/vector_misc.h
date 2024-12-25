@@ -23,7 +23,12 @@
 namespace rapidudf {
 namespace functions {
 template <typename T>
-T simd_vector_dot(Vector<T> left, Vector<T> right);
+T simd_vector_dot_distance(Vector<T> left, Vector<T> right);
+template <typename T>
+T simd_vector_cosine_distance(Vector<T> left, Vector<T> right);
+template <typename T>
+T simd_vector_l2_distance(Vector<T> left, Vector<T> right);
+
 template <typename T>
 Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
 template <typename T>
