@@ -11,6 +11,7 @@ cc_library(
     deps = [
         "//rapidudf/compiler",
         "//rapidudf/exec:eval_engine",
+        "//rapidudf/memory:arena_container",
         "//rapidudf/reflect",
         "//rapidudf/table",
         "//rapidudf/types:dyn_object_impl",

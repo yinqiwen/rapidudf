@@ -92,7 +92,7 @@ cc_library(
     ],
     deps = [
         ":types",
-        "//rapidudf/arena",
+        "//rapidudf/memory:arena",
         "//rapidudf/meta:exception",
         "//rapidudf/meta:optype",
     ],

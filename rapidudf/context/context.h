@@ -27,9 +27,9 @@
 #include "absl/container/flat_hash_map.h"
 #include "fmt/format.h"
 
-#include "rapidudf/arena/arena.h"
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
 #include "rapidudf/common/allign.h"
+#include "rapidudf/memory/arena.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
 #include "rapidudf/types/vector.h"
@@ -49,9 +49,7 @@ class Context {
  public:
   using CleanupFunc = std::function<void()>;
 
-  Context(Arena* arena = nullptr);
-
-  void Reset();
+  Context(ThreadCachedArena* arena = nullptr);
 
   uint8_t* ArenaAllocate(size_t n);
 
@@ -63,6 +61,10 @@ class Context {
     T* p = tmp.get();
     Own(std::move(tmp));
     return p;
+  }
+  template <typename T, typename... Args>
+  ArenaObjPtr<T> ArenaNew(Args&&... args) {
+    return arena_->New<T>(std::forward<Args>(args)...);
   }
 
   template <typename T, typename... Args>
@@ -135,16 +137,19 @@ class Context {
   void SetHasNan(bool v = true) { has_nan_ = v; }
   bool HasNan() const { return has_nan_; }
 
+  void Reset();
+
   ~Context();
 
  private:
   static uint32_t NextTypeId();
+
   template <typename T>
   static uint32_t GetTypeId() {
     static uint32_t id = NextTypeId();
     return id;
   }
-  Arena& GetArena();
+  ThreadCachedArena& GetArena();
   template <typename T>
   auto NewVectorImpl(const std::vector<T>& data, bool readonly = true) {
     if constexpr (std::is_pointer_v<T>) {
@@ -207,8 +212,8 @@ class Context {
     return val;
   }
 
-  std::unique_ptr<Arena> own_arena_;
-  Arena* arena_ = nullptr;
+  std::unique_ptr<ThreadCachedArena> own_arena_;
+  ThreadCachedArena* arena_ = nullptr;
   using PtrMap = absl::flat_hash_map<uint32_t, void*>;
   PtrMap ptrs_;
 

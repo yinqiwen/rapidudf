@@ -19,6 +19,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 #include "fmt/format.h"
@@ -258,5 +259,9 @@ struct hash<::rapidudf::StringView> {
   size_t operator()(const ::rapidudf::StringView view) const {
     return std::hash<std::string_view>{}({view.data(), view.size()});
   }
+};
+template <>
+struct is_trivially_destructible<::rapidudf::StringView> {
+  static constexpr bool value = true;
 };
 }  // namespace std

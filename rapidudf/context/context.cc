@@ -17,9 +17,9 @@
 #include <memory>
 
 namespace rapidudf {
-Context::Context(Arena* arena) : arena_(arena) {
+Context::Context(ThreadCachedArena* arena) : arena_(arena) {
   if (nullptr == arena_) {
-    own_arena_ = std::make_unique<Arena>();
+    own_arena_ = std::make_unique<ThreadCachedArena>();
     arena_ = own_arena_.get();
   }
 }
@@ -30,7 +30,7 @@ uint32_t Context::NextTypeId() {
 }
 
 Context::~Context() { Reset(); }
-Arena& Context::GetArena() { return *arena_; }
+ThreadCachedArena& Context::GetArena() { return *arena_; }
 uint8_t* Context::ArenaAllocate(size_t n) {
   uint8_t* p = GetArena().Allocate(n);
   // allocated_arena_ptrs_.insert(p);

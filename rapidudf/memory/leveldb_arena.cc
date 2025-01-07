@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
-#include "rapidudf/arena/leveldb_arena.h"
+#include "rapidudf/memory/leveldb_arena.h"
 
 namespace rapidudf {
 namespace leveldb {

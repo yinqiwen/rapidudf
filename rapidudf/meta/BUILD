@@ -20,8 +20,8 @@ cc_library(
     ],
     deps = [
         ":exception",
-        "//rapidudf/arena",
         "//rapidudf/log",
+        "//rapidudf/memory:arena",
         "@com_github_fmtlib//:fmt",
     ],
 )
@@ -85,7 +85,7 @@ cc_library(
     deps = [
         ":dtype",
         ":optype",
-        "//rapidudf/arena",
         "//rapidudf/log",
+        "//rapidudf/memory:arena",
     ],
 )

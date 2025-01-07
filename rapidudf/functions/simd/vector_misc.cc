@@ -99,7 +99,6 @@ HWY_INLINE T simd_vector_cos_distance_impl(Vector<T> left, Vector<T> right) {
   T norm_left = std::sqrt(hn::ReduceSum(d, norm_left_v));
   T norm_right = std::sqrt(hn::ReduceSum(d, norm_right_v));
   T dot = hn::ReduceSum(d, dot_v);
-  // RUDF_INFO("###simd dot：{}, left:{}, right:{}, {}/{}/{}", dot, norm_left, norm_right, idx, left.Size(), N);
   T cosine_similarity = dot / (norm_left * norm_right);
 
   return 1.0f - cosine_similarity;
@@ -136,7 +135,7 @@ HWY_INLINE T simd_vector_l2_distance_impl(Vector<T> left, Vector<T> right) {
 }
 
 template <typename T>
-T simd_vector_sum_impl(Vector<T> left) {
+HWY_INLINE T simd_vector_sum_impl(Vector<T> left) {
   T sum = {};
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
@@ -155,7 +154,7 @@ T simd_vector_sum_impl(Vector<T> left) {
 }
 
 template <typename T>
-T simd_vector_reduce_max_impl(Vector<T> left) {
+HWY_INLINE T simd_vector_reduce_max_impl(Vector<T> left) {
   T max_val = std::numeric_limits<T>::max();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
@@ -178,7 +177,7 @@ T simd_vector_reduce_max_impl(Vector<T> left) {
 }
 
 template <typename T>
-T simd_vector_reduce_min_impl(Vector<T> left) {
+HWY_INLINE T simd_vector_reduce_min_impl(Vector<T> left) {
   T min_val = std::numeric_limits<T>::min();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
@@ -216,7 +215,7 @@ HWY_INLINE Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t n) {
 }
 
 template <typename T>
-Vector<T> simd_vector_gather_impl(Context& ctx, Vector<T> data, Vector<int32_t> indices) {
+HWY_INLINE Vector<T> simd_vector_gather_impl(Context& ctx, Vector<T> data, Vector<int32_t> indices) {
   using number_t = T;
   using D = hn::ScalableTag<number_t>;
   const D d;
@@ -256,7 +255,7 @@ Vector<T> simd_vector_gather_impl(Context& ctx, Vector<T> data, Vector<int32_t> 
 }
 
 template <typename OPT>
-size_t simd_vector_find_impl(Vector<typename OPT::operand_t> data, typename OPT::operand_t v) {
+HWY_INLINE size_t simd_vector_find_impl(Vector<typename OPT::operand_t> data, typename OPT::operand_t v) {
   using D = hn::ScalableTag<typename OPT::operand_t>;
   constexpr D d;
   if constexpr (OPT::op == OP_EQUAL) {
@@ -282,7 +281,7 @@ size_t simd_vector_find_impl(Vector<typename OPT::operand_t> data, typename OPT:
 }
 
 template <typename T>
-void simd_vector_random_impl(Context& ctx, uint64_t seed, T* output) {
+HWY_INLINE void simd_vector_random_impl(Context& ctx, uint64_t seed, T* output) {
   hn::VectorXoshiro* rand = ctx.GetPtr<hn::VectorXoshiro>({}, seed);
   if constexpr (std::is_same_v<double, T>) {
     auto result = rand->Uniform(kVectorUnitSize);
@@ -296,7 +295,7 @@ void simd_vector_random_impl(Context& ctx, uint64_t seed, T* output) {
 }
 
 template <typename T>
-T random_impl(uint64_t seed) {
+HWY_INLINE T random_impl(uint64_t seed) {
   hn::internal::Xoshiro rand(seed);
   if constexpr (std::is_same_v<double, T>) {
     return rand.Uniform();

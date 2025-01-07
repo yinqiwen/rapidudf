@@ -383,3 +383,27 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "arena_test",
+    size = "small",
+    srcs = ["arena_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "hwy_test",
+    size = "small",
+    srcs = ["hwy_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)

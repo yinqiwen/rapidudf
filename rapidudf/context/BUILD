@@ -9,10 +9,10 @@ cc_library(
         "context.h",
     ],
     deps = [
-        "//rapidudf/arena",
         "//rapidudf/common:allign",
         "//rapidudf/common:atomic_intrusive_list",
         "//rapidudf/log",
+        "//rapidudf/memory:arena",
         "//rapidudf/meta",
         "//rapidudf/types:vector",
         "@com_google_absl//absl/container:flat_hash_set",
