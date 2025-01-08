@@ -19,7 +19,7 @@
 #include "rapidudf/memory/arena.h"
 namespace rapidudf {
 namespace arena {
-template <typename C, typename CH = ::std::char_traits<C>, typename R = ThreadCachedArenaAllocator<C>>
+template <typename C, typename CH = ::std::char_traits<C>, typename R = ThreadSafeArenaAllocator<C>>
 class BasicString : public ::std::basic_string<C, CH, R> {
  private:
   using Base = ::std::basic_string<C, CH, R>;

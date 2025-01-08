@@ -93,6 +93,9 @@ class VectorBuf {
     return reinterpret_cast<const T*>(data_);
   }
 
+  template <typename T>
+  void Load(T* buf, size_t n) {}
+
  private:
   union {
     struct {
@@ -251,14 +254,14 @@ class Vector {
   T ReduceMax() { return functions::simd_vector_reduce_max(*this); }
   T ReduceMin() { return functions::simd_vector_reduce_min(*this); }
 
+  template <typename U = T, typename std::enable_if<std::is_same<U, Bit>::value, int>::type = 0>
   size_t CountTrue() {
-    if constexpr (std::is_same_v<Bit, T>) {
-      return functions::simd_vector_bits_count_true(*this);
-    } else {
-      return 0;
-    }
+    return functions::simd_vector_bits_count_true(*this);
   }
-  size_t CountFalse() { return Size() - CountTrue(); }
+  template <typename U = T, typename std::enable_if<std::is_same<U, Bit>::value, int>::type = 0>
+  size_t CountFalse() {
+    return Size() - CountTrue();
+  }
 
   auto ToStdVector() const {
     if constexpr (std::is_same_v<Bit, T>) {

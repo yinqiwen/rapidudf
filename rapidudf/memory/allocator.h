@@ -17,13 +17,9 @@
 #pragma once
 
 #include <cassert>
-#include <cerrno>
 #include <cstddef>
 #include <cstdlib>
-#include <exception>
-#include <limits>
 #include <memory>
-#include <stdexcept>
 #include <type_traits>
 #include <utility>
 

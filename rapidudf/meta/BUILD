@@ -21,7 +21,6 @@ cc_library(
     deps = [
         ":exception",
         "//rapidudf/log",
-        "//rapidudf/memory:arena",
         "@com_github_fmtlib//:fmt",
     ],
 )

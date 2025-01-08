@@ -25,21 +25,22 @@
 #include "rapidudf/memory/allocator.h"
 #include "rapidudf/memory/folly_arena.h"
 #include "rapidudf/memory/leveldb_arena.h"
+#include "rapidudf/meta/type_traits.h"
 
 namespace rapidudf {
 
 class Arena;
 class ThreadCachedArena;
 template <typename T>
-using ArenaAllocator = CxxAllocatorAdaptor<T, Arena>;
+using ThreadUnsafeArenaAllocator = CxxAllocatorAdaptor<T, Arena>;
 
 template <typename T>
-using ThreadCachedArenaAllocator = CxxAllocatorAdaptor<T, ThreadCachedArena>;
+using ThreadSafeArenaAllocator = CxxAllocatorAdaptor<T, ThreadCachedArena>;
 
 template <typename T>
 struct ArenaObjDeleter {
   void operator()([[maybe_unused]] T* ptr) const {
-    if constexpr (std::is_trivially_destructible_v<T>) {
+    if constexpr (is_destructor_disabled_v<T>) {
       // do nothing
     } else {
       ptr->~T();
@@ -74,10 +75,10 @@ class Arena {
     if constexpr (!std::is_trivially_destructible_v<T>) {
       static_assert(sizeof(T) == -1, "Arena class MUST be trivially destructible!");
     }
-    ArenaAllocator<T> allocator(*this);
+    ThreadUnsafeArenaAllocator<T> allocator(*this);
     T* memory = allocator.allocate(1);
 
-    if constexpr (has_allocator_constructor_v<T, ArenaAllocator<T>, Args...>) {
+    if constexpr (has_allocator_constructor_v<T, ThreadUnsafeArenaAllocator<T>, Args...>) {
       new (memory) T(std::forward<Args>(args)..., allocator);
     } else {
       new (memory) T(std::forward<Args>(args)...);
@@ -114,15 +115,21 @@ class ThreadCachedArena {
  public:
   ThreadCachedArena();
 
+  template <typename T = char>
+  ThreadSafeArenaAllocator<T> GetAllocator() {
+    ThreadSafeArenaAllocator<T> allocator(*this);
+    return allocator;
+  }
+
   template <typename T, typename... Args>
   ArenaObjPtr<T> New(Args&&... args) {
-    if constexpr (!std::is_trivially_destructible_v<T>) {
-      static_assert(sizeof(T) == -1, "Arena class MUST be trivially destructible!");
-    }
-    ThreadCachedArenaAllocator<T> allocator(*this);
+    // if constexpr (!is_destructor_disabled_v<T>) {
+    //   static_assert(sizeof(T) == -1, "Arena class MUST be trivially destructible or destructor disabled!");
+    // }
+    ThreadSafeArenaAllocator<T> allocator(*this);
     T* memory = allocator.allocate(1);
 
-    if constexpr (has_allocator_constructor_v<T, ThreadCachedArenaAllocator<T>, Args...>) {
+    if constexpr (has_allocator_constructor_v<T, ThreadSafeArenaAllocator<T>, Args...>) {
       new (memory) T(std::forward<Args>(args)..., allocator);
     } else {
       new (memory) T(std::forward<Args>(args)...);
@@ -144,7 +151,7 @@ class ThreadCachedArena {
 
   template <typename U>
   inline void destroy([[maybe_unused]] U* p) {
-    if constexpr (std::is_trivially_destructible_v<U>) {
+    if constexpr (is_destructor_disabled_v<U>) {
       // do nothing
     } else {
       p->~U();

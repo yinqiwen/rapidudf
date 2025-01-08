@@ -22,11 +22,26 @@
 #include "rapidudf/memory/arena.h"
 #include "rapidudf/memory/arena_container.h"
 #include "rapidudf/memory/arena_string.h"
+#include "rapidudf/meta/type_traits.h"
 
 using namespace rapidudf;
+
+struct Test1 {
+  int a;
+  int b;
+  std::string_view s;
+};
+struct Test2 {
+  static constexpr bool destructor_disabled = true;
+  int a;
+  int b;
+  ::arena::String s;
+  Test2(const ThreadSafeArenaAllocator<char>& a) : s(a) {}
+};
+
 TEST(Arena, simple) {
   ThreadCachedArena arena;
-  ThreadCachedArenaAllocator<char> alloc(arena);
+  auto alloc = arena.GetAllocator();
   arena::String s(alloc);
 
   auto p = arena.New<arena::String>();
@@ -50,7 +65,10 @@ TEST(Arena, simple) {
   auto x = arena.New<int>();
   *x = 111;
   RUDF_INFO("###{}  ", *x);
-
+  ASSERT_TRUE(std::is_trivially_destructible<Test1>::value);
+  ASSERT_TRUE(is_destructor_disabled_v<Test2>);
+  ASSERT_TRUE(is_destructor_disabled_v<int>);
+  ASSERT_TRUE(is_destructor_disabled_v<std::string_view>);
   // ThreadCachedArena thread_safe_arena;
   // auto p1 = thread_safe_arena.New<arena::String>();
   // p1->assign("aaa");

@@ -28,38 +28,38 @@
 #include "rapidudf/memory/arena.h"
 namespace rapidudf {
 namespace arena {
-template <typename T, typename A = ThreadCachedArenaAllocator<T>>
+template <typename T, typename A = ThreadSafeArenaAllocator<T>>
 using Vector = ::std::vector<T, A>;
 
-template <typename T, typename A = ThreadCachedArenaAllocator<T>>
+template <typename T, typename A = ThreadSafeArenaAllocator<T>>
 using List = ::std::list<T, A>;
 
-template <typename T, typename A = ThreadCachedArenaAllocator<T>>
+template <typename T, typename A = ThreadSafeArenaAllocator<T>>
 using Deque = ::std::deque<T, A>;
 
 template <class K, class V, class Hash = absl::container_internal::hash_default_hash<K>,
           class Eq = absl::container_internal::hash_default_eq<K>,
-          class A = ThreadCachedArenaAllocator<std::pair<const K, V>>>
+          class A = ThreadSafeArenaAllocator<std::pair<const K, V>>>
 using HashMap = absl::flat_hash_map<K, V, Hash, Eq, A>;
 
 template <class K, class Hash = absl::container_internal::hash_default_hash<K>,
-          class Eq = absl::container_internal::hash_default_eq<K>, class A = ThreadCachedArenaAllocator<K>>
+          class Eq = absl::container_internal::hash_default_eq<K>, class A = ThreadSafeArenaAllocator<K>>
 using HashSet = absl::flat_hash_set<K, Hash, Eq, A>;
 
 template <typename Key, typename Value, typename Compare = std::less<Key>,
-          typename A = ThreadCachedArenaAllocator<std::pair<const Key, Value>>>
+          typename A = ThreadSafeArenaAllocator<std::pair<const Key, Value>>>
 using BTreeMap = absl::btree_map<Key, Value, Compare, A>;
 
-template <typename Key, typename Compare = std::less<Key>, class A = ThreadCachedArenaAllocator<Key>>
+template <typename Key, typename Compare = std::less<Key>, class A = ThreadSafeArenaAllocator<Key>>
 using BTreeSet = absl::btree_set<Key, Compare, A>;
 
 template <class K, class V, class Hash = absl::container_internal::hash_default_hash<K>,
           class Eq = absl::container_internal::hash_default_eq<K>,
-          class A = ThreadCachedArenaAllocator<std::pair<const K, V>>>
+          class A = ThreadSafeArenaAllocator<std::pair<const K, V>>>
 using NodeHashMap = absl::node_hash_map<K, V, Hash, Eq, A>;
 
 template <class K, class Hash = absl::container_internal::hash_default_hash<K>,
-          class Eq = absl::container_internal::hash_default_eq<K>, class A = ThreadCachedArenaAllocator<K>>
+          class Eq = absl::container_internal::hash_default_eq<K>, class A = ThreadSafeArenaAllocator<K>>
 using NodeHashSet = absl::node_hash_set<K, Hash, Eq, A>;
 
 }  // namespace arena

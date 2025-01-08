@@ -15,6 +15,7 @@
  */
 #include "rapidudf/memory/arena.h"
 #include <mutex>
+#include "rapidudf/log/log.h"
 namespace rapidudf {
 ThreadCachedArena::ThreadCachedArena()
     : arena_([](Arena* p) {

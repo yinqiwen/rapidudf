@@ -103,4 +103,17 @@ struct ConstPointerFunctionSignatureHelper<> {
   using type = std::function<void()>;
 };
 
+template <typename T, typename = std::void_t<>>
+struct is_destructor_disabled : std::false_type {};
+
+template <typename T>
+struct is_destructor_disabled<T, std::void_t<decltype(T::destructor_disabled)>>
+    : std::conditional_t<T::destructor_disabled, std::true_type, std::false_type> {};
+template <typename T>
+struct is_destructor_disabled<T, std::enable_if_t<std::is_trivially_destructible_v<T>>> : std::true_type {};
+
+// 辅助类型别名，简化使用
+template <typename T>
+constexpr bool is_destructor_disabled_v = is_destructor_disabled<T>::value;
+
 }  // namespace rapidudf
