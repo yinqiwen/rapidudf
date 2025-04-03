@@ -28,7 +28,6 @@
 
 namespace rapidudf {
 using JitCompiler = compiler::JitCompiler;
-// using JitCompilerCache = llvm::JitCompilerCache;
 
 template <typename RET, typename... Args>
 using JitFunction = compiler::JitFunction<RET, Args...>;

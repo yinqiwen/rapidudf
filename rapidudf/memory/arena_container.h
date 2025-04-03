@@ -17,7 +17,9 @@
 #pragma once
 
 #include <deque>
+#include <forward_list>
 #include <list>
+#include <type_traits>
 #include <vector>
 #include "absl/container/btree_map.h"
 #include "absl/container/btree_set.h"
@@ -33,6 +35,9 @@ using Vector = ::std::vector<T, A>;
 
 template <typename T, typename A = ThreadSafeArenaAllocator<T>>
 using List = ::std::list<T, A>;
+
+template <typename T, typename A = ThreadSafeArenaAllocator<T>>
+using ForwardList = ::std::forward_list<T, A>;
 
 template <typename T, typename A = ThreadSafeArenaAllocator<T>>
 using Deque = ::std::deque<T, A>;
@@ -66,46 +71,51 @@ using NodeHashSet = absl::node_hash_set<K, Hash, Eq, A>;
 }  // namespace rapidudf
 
 namespace std {
-template <typename T>
-struct is_trivially_destructible<::rapidudf::arena::Vector<T>> {
-  static constexpr bool value = true;
+template <typename T, typename A>
+struct is_trivially_destructible<::rapidudf::arena::Vector<T, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<T>;
 };
 
-template <typename T>
-struct is_trivially_destructible<::rapidudf::arena::List<T>> {
-  static constexpr bool value = true;
+template <typename T, typename A>
+struct is_trivially_destructible<::rapidudf::arena::List<T, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<T>;
 };
 
-template <typename T>
-struct is_trivially_destructible<::rapidudf::arena::Deque<T>> {
-  static constexpr bool value = true;
+template <typename T, typename A>
+struct is_trivially_destructible<::rapidudf::arena::ForwardList<T, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<T>;
 };
 
-template <class K, class V, class Hash, class Eq>
-struct is_trivially_destructible<::rapidudf::arena::HashMap<K, V, Hash, Eq>> {
-  static constexpr bool value = true;
-};
-template <class K, class V, class Hash, class Eq>
-struct is_trivially_destructible<::rapidudf::arena::NodeHashMap<K, V, Hash, Eq>> {
-  static constexpr bool value = true;
+template <typename T, typename A>
+struct is_trivially_destructible<::rapidudf::arena::Deque<T, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<T>;
 };
 
-template <class K, class Hash, class Eq>
-struct is_trivially_destructible<::rapidudf::arena::HashSet<K, Hash, Eq>> {
-  static constexpr bool value = true;
+template <class K, class V, class Hash, class Eq, typename A>
+struct is_trivially_destructible<::rapidudf::arena::HashMap<K, V, Hash, Eq, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<K> && rapidudf::is_destructor_disabled_v<V>;
 };
-template <class K, class Hash, class Eq>
-struct is_trivially_destructible<::rapidudf::arena::NodeHashSet<K, Hash, Eq>> {
-  static constexpr bool value = true;
+template <class K, class V, class Hash, class Eq, typename A>
+struct is_trivially_destructible<::rapidudf::arena::NodeHashMap<K, V, Hash, Eq, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<K> && rapidudf::is_destructor_disabled_v<V>;
 };
 
-template <typename Key, typename Value, typename Compare>
-struct is_trivially_destructible<::rapidudf::arena::BTreeMap<Key, Value, Compare>> {
-  static constexpr bool value = true;
+template <class K, class Hash, class Eq, typename A>
+struct is_trivially_destructible<::rapidudf::arena::HashSet<K, Hash, Eq, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<K>;
 };
-template <typename Key, typename Compare>
-struct is_trivially_destructible<::rapidudf::arena::BTreeSet<Key, Compare>> {
-  static constexpr bool value = true;
+template <class K, class Hash, class Eq, typename A>
+struct is_trivially_destructible<::rapidudf::arena::NodeHashSet<K, Hash, Eq, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<K>;
+};
+
+template <typename Key, typename Value, typename Compare, typename A>
+struct is_trivially_destructible<::rapidudf::arena::BTreeMap<Key, Value, Compare, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<Key> && rapidudf::is_destructor_disabled_v<Value>;
+};
+template <typename Key, typename Compare, typename A>
+struct is_trivially_destructible<::rapidudf::arena::BTreeSet<Key, Compare, A>> {
+  static constexpr bool value = rapidudf::is_destructor_disabled_v<Key>;
 };
 
 }  // namespace std

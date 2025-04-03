@@ -15,6 +15,7 @@
  */
 
 #include "rapidudf/functions/simd/bits.h"
+#include <cstring>
 #include "rapidudf/functions/simd/vector.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/optype.h"
@@ -173,5 +174,6 @@ size_t simd_vector_bits_count_true(Vector<Bit> src) {
   return HWY_DYNAMIC_DISPATCH_T(Table)(src);
 }
 }  // namespace functions
+
 }  // namespace rapidudf
 #endif  // HWY_ONCE

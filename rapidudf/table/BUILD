@@ -19,6 +19,7 @@ cc_library(
     deps = [
         "//rapidudf/common:variadic_template_helper",
         "//rapidudf/context",
+        "//rapidudf/executors:thread_pool",
         "//rapidudf/functions/simd:vector",
         "//rapidudf/reflect",
         "//rapidudf/types:dyn_object_impl",

@@ -28,6 +28,7 @@
 
 #include "rapidudf/common/variadic_template_helper.h"
 #include "rapidudf/context/context.h"
+#include "rapidudf/executors/thread_pool.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/exception.h"
@@ -40,6 +41,7 @@
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
 #include "rapidudf/types/vector.h"
+
 namespace rapidudf {
 
 namespace exec {
@@ -143,7 +145,8 @@ class Table : public DynObject {
   }
 
   template <typename R, typename... T>
-  absl::Status Foreach(typename VisitorSignatureHelper<R, T...>::type f, Vector<Bit>* mask = nullptr) {
+  absl::Status Foreach(typename VisitorSignatureHelper<R, T...>::type f,
+                       std::shared_ptr<ThreadPool> thread_pool = nullptr, Vector<Bit>* mask = nullptr) {
     if constexpr (sizeof...(T) == 1) {
       using RowType = first_of_variadic_t<T...>;
       const RowSchema* schema = GetRowSchema<RowType>();
@@ -160,6 +163,21 @@ class Table : public DynObject {
           RUDF_LOG_RETURN_FMT_ERROR("mask size:{} mismatch table row count:{}", mask->Size(), count);
         }
       }
+      if constexpr (std::is_void_v<R>) {
+        if (thread_pool != nullptr) {
+          thread_pool->Run(0, count, [&](size_t i) {
+            if (mask != nullptr) {
+              if (!(*mask)[i]) {
+                return;
+              }
+            }
+            RowType* row = rows_[row_idx].GetRowPtrs()[i].As<RowType>();
+            f(static_cast<size_t>(i), row);
+          });
+          return absl::OkStatus();
+        }
+      }
+
       for (int i = 0; i < static_cast<int>(count); i++) {
         if (mask != nullptr) {
           if (!(*mask)[i]) {
@@ -201,6 +219,21 @@ class Table : public DynObject {
           RUDF_LOG_RETURN_FMT_ERROR("mask size:{} mismatch table row count:{}", mask->Size(), count);
         }
       }
+
+      if constexpr (std::is_void_v<R>) {
+        if (thread_pool != nullptr) {
+          thread_pool->Run(0, count, [&](size_t i) {
+            if (mask != nullptr) {
+              if (!(*mask)[i]) {
+                return;
+              }
+            }
+            VisitRow(static_cast<size_t>(i), f, std::index_sequence_for<T...>{});
+          });
+          return absl::OkStatus();
+        }
+      }
+
       for (int i = 0; i < static_cast<int>(count); i++) {
         if (mask != nullptr) {
           if (!(*mask)[i]) {
@@ -231,15 +264,18 @@ class Table : public DynObject {
     return absl::OkStatus();
   }
   template <typename... T>
-  Vector<Bit> Filter(typename VisitorSignatureHelper<bool, T...>::type f) {
+  Vector<Bit> Filter(typename VisitorSignatureHelper<bool, T...>::type f,
+                     std::shared_ptr<ThreadPool> thread_pool = nullptr) {
     size_t count = Count();
     Vector<Bit> filter_mask = ctx_.NewVectorBuf<Bit>(count);
     memset(filter_mask.GetVectorBuf().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
-    Foreach<void, T...>([&](size_t idx, const T*... args) {
-      if (f(idx, args...)) {
-        filter_mask.Set(idx, Bit(true));
-      }
-    });
+    Foreach<void, T...>(
+        [&](size_t idx, const T*... args) {
+          if (f(idx, args...)) {
+            filter_mask.Set(idx, Bit(true));
+          }
+        },
+        thread_pool);
     return filter_mask;
   }
   Table* Filter(Vector<Bit> bits);
@@ -316,6 +352,28 @@ class Table : public DynObject {
     UnloadAllColumns();
     return absl::OkStatus();
   }
+  template <typename... T>
+  absl::Status Distinct(StringView by_column, typename MergeVisitorSignatureHelper<T...>::type merge) {
+    return Distinct(std::vector<StringView>{by_column}, merge);
+  }
+
+  template <typename... T>
+  absl::Status Merge(Table* other, absl::Span<const StringView> by_columns,
+                     typename MergeVisitorSignatureHelper<T...>::type merge) {
+    auto status = DoConcat(other);
+    if (!status.ok()) {
+      return status;
+    }
+    return Distinct(by_columns, merge);
+  }
+  template <typename... T>
+  absl::Status Merge(Table* other, StringView by_column, typename MergeVisitorSignatureHelper<T...>::type merge) {
+    return Merge(other, std::vector<StringView>{by_column}, merge);
+  }
+
+  // absl::Status Join(Table* left, Table* right, absl::Span<const StringView> on_columns) {
+
+  // }
 
   template <typename R, typename... T>
   absl::StatusOr<SmartPtr> Map(const TableSchema* new_table_schema,
@@ -619,6 +677,8 @@ class Table : public DynObject {
 
   DistinctIndiceTable DistinctByColumns(absl::Span<const StringView> columns);
   void DoFilter(Vector<Bit> bits);
+
+  absl::Status DoConcat(Table* other);
 
   template <typename TupleLike, std::size_t I = 0>
   void GetRowSchemaFromTuple(std::vector<RowSchema>& schemas) {

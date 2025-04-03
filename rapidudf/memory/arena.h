@@ -24,7 +24,6 @@
 
 #include "rapidudf/memory/allocator.h"
 #include "rapidudf/memory/folly_arena.h"
-#include "rapidudf/memory/leveldb_arena.h"
 #include "rapidudf/meta/type_traits.h"
 
 namespace rapidudf {
@@ -114,6 +113,7 @@ class Arena {
 class ThreadCachedArena {
  public:
   ThreadCachedArena();
+  ThreadCachedArena(const ThreadCachedArena&) = delete;
 
   template <typename T = char>
   ThreadSafeArenaAllocator<T> GetAllocator() {

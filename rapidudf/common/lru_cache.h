@@ -15,21 +15,25 @@
  */
 
 #pragma once
+#include <functional>
 #include <list>
+#include <mutex>
 #include <optional>
 #include "absl/container/flat_hash_map.h"
+#include "boost/thread/tss.hpp"
 
 // copy & modified from boost
 namespace rapidudf {
 
 // a cache which evicts the least recently used item when it is full
-template <class Key, class Value>
+template <class Key, class Value, class Hash = absl::container_internal::hash_default_hash<Key>,
+          class Eq = absl::container_internal::hash_default_eq<Key>>
 class lru_cache {
  public:
   typedef Key key_type;
   typedef Value value_type;
   typedef std::list<key_type> list_type;
-  typedef absl::flat_hash_map<key_type, std::pair<value_type, typename list_type::iterator> > map_type;
+  typedef absl::flat_hash_map<key_type, std::pair<value_type, typename list_type::iterator>, Hash, Eq> map_type;
 
   lru_cache(size_t capacity) : m_capacity(capacity) {}
 
@@ -123,4 +127,53 @@ class lru_cache {
   list_type m_list;
   size_t m_capacity;
 };
+
+template <class Key, class Value, class Hash = absl::container_internal::hash_default_hash<Key>,
+          class Eq = absl::container_internal::hash_default_eq<Key>>
+class ThreadCachedLRU {
+ public:
+  using key_type = Key;
+  using value_type = Value;
+  using lru_type = lru_cache<Key, Value, Hash, Eq>;
+  static constexpr size_t kDefaultCacapacity = 1024;
+  ThreadCachedLRU(size_t capacity) : capacity_(capacity) {}
+  bool Contains(const key_type& key) { return GetLRU()->contains(key); }
+
+  void Insert(const key_type& key, const value_type& value) { GetLRU()->insert(key, value); }
+  std::optional<value_type> Get(const key_type& key) { return GetLRU()->get(key); }
+  void Erase(const key_type& key) { GetLRU()->erase(key); }
+
+  value_type GetOrInsert(const key_type& key, const std::function<value_type()>& func) {
+    auto result = Get(key);
+    if (result.has_value()) {
+      return *result;
+    }
+    auto val = func();
+    Insert(key, val);
+    return val;
+  }
+
+ private:
+  lru_type* GetLRU() {
+    lru_type* lru = lru_.get();
+    if (lru == nullptr) {
+      lru = new lru_type(capacity_);
+      lru_.reset(lru);
+    }
+    return lru;
+  }
+  boost::thread_specific_ptr<lru_type> lru_;
+  size_t capacity_;
+};
+
+template <class Key, class Value, class Hash = absl::container_internal::hash_default_hash<Key>,
+          class Eq = absl::container_internal::hash_default_eq<Key>>
+std::shared_ptr<ThreadCachedLRU<Key, Value, Hash, Eq>> get_global_lru_cache(
+    size_t num = ThreadCachedLRU<Key, Value, Hash, Eq>::kDefaultCacapacity) {
+  static std::once_flag g_lru_init_flag;
+  static std::shared_ptr<ThreadCachedLRU<Key, Value, Hash, Eq>> g_lru;
+  std::call_once(g_lru_init_flag, [num]() { g_lru = std::make_shared<ThreadCachedLRU<Key, Value, Hash, Eq>>(num); });
+  return g_lru;
+}
+
 }  // namespace rapidudf

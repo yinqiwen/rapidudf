@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <vector>
 #include "rapidudf/context/context.h"
+#include "rapidudf/executors/thread_pool.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/rapidudf.h"
@@ -522,9 +523,11 @@ TEST(JitCompiler, multi_schema) {
   auto status = table->AddRows(items1, items2);
   ASSERT_TRUE(status.ok());
 
-  status = table->Foreach<void, User1, User2>([](size_t, const User1* a, const User2* item) {
+  std::atomic<int> visit_count{0};
+  status = table->Foreach<void, User1, User2>([&](size_t, const User1* a, const User2* item) { visit_count++; },
+                                              get_global_thread_pool(1));
 
-  });
+  ASSERT_EQ(visit_count.load(), table->Count());
 
   RUDF_INFO("{}", schema->ToString());
 }

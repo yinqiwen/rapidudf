@@ -155,7 +155,7 @@ HWY_INLINE T simd_vector_sum_impl(Vector<T> left) {
 
 template <typename T>
 HWY_INLINE T simd_vector_reduce_max_impl(Vector<T> left) {
-  T max_val = std::numeric_limits<T>::max();
+  T max_val = std::numeric_limits<T>::min();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
@@ -178,7 +178,7 @@ HWY_INLINE T simd_vector_reduce_max_impl(Vector<T> left) {
 
 template <typename T>
 HWY_INLINE T simd_vector_reduce_min_impl(Vector<T> left) {
-  T min_val = std::numeric_limits<T>::min();
+  T min_val = std::numeric_limits<T>::max();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
@@ -314,6 +314,38 @@ HWY_INLINE const uint8_t* get_mask_bits(const uint8_t* bits, size_t idx, uint64_
   return reinterpret_cast<uint8_t*>(&tmp);
 }
 
+template <typename D>
+HWY_INLINE void store_mask_bits(hn::Mask<D> mask, uint8_t* bits, size_t idx) {
+  constexpr D d;
+  constexpr size_t N = hn::Lanes(d);
+  size_t bits_offset = idx / 8;
+  size_t bits_cursor = idx % 8;
+
+  if constexpr (N < 8) {
+    uint8_t tmp[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    hn::StoreMaskBits(d, mask, tmp);
+    bits[bits_offset] = (bits[bits_offset] | (tmp[0] << bits_cursor));
+  } else {
+    hn::StoreMaskBits(d, mask, bits + bits_offset);
+  }
+}
+template <typename D, OpToken op>
+HWY_INLINE hn::Mask<D> compare_value(hn::Vec<D> left, hn::Vec<D> right) {
+  if constexpr (op == OP_EQUAL) {
+    return hn::Eq(left, right);
+  } else if constexpr (op == OP_GREATER_EQUAL) {
+    return hn::Ge(left, right);
+  } else if constexpr (op == OP_GREATER) {
+    return hn::Gt(left, right);
+  } else if constexpr (op == OP_NOT_EQUAL) {
+    return hn::Ne(left, right);
+  } else if constexpr (op == OP_LESS_EQUAL) {
+    return hn::Le(left, right);
+  } else if constexpr (op == OP_LESS) {
+    return hn::Lt(left, right);
+  }
+}
+
 template <typename T>
 HWY_INLINE size_t simd_vector_filter_impl(const T* in, const uint8_t* bits, T* out, size_t count) {
   using D = hn::ScalableTag<T>;
@@ -359,6 +391,40 @@ HWY_INLINE size_t simd_vector_filter_impl(const T* in, const uint8_t* bits, T* o
     out_offset += hn::CompressBlendedStore(v, mask, d, out + out_offset);
     return out_offset;
   }
+}
+
+template <typename OPT>
+HWY_INLINE size_t simd_vector_match_impl(const typename OPT::operand_t* data, size_t len, typename OPT::operand_t cmp,
+                                         uint64_t& mask_bits) {
+  size_t max_match_len = len;
+  if (max_match_len > sizeof(uint64_t) * 8) {
+    max_match_len = sizeof(uint64_t) * 8;
+  }
+  uint64_t mask_bits_tmp[2] = {0, 0};
+  uint8_t* mask_bits_p = reinterpret_cast<uint8_t*>(mask_bits_tmp);
+  using D = hn::ScalableTag<typename OPT::operand_t>;
+  constexpr D d;
+  constexpr size_t N = hn::Lanes(d);
+  const hn::Vec<D> cmp_v = hn::Set(d, cmp);
+  size_t idx = 0;
+  if (len >= N) {
+    for (; idx <= max_match_len - N; idx += N) {
+      const hn::Vec<D> v = hn::LoadU(d, data + idx);
+      hn::Mask<D> mask = compare_value<D, OPT::op>(v, cmp_v);
+      store_mask_bits<D>(mask, mask_bits_p, idx);
+    }
+  }
+  if (HWY_UNLIKELY(idx == max_match_len)) {
+    mask_bits = mask_bits_tmp[0];
+    return max_match_len;
+  }
+  const size_t remaining = max_match_len - idx;
+  HWY_DASSERT(0 != remaining && remaining < N);
+  const hn::Vec<D> v = hn::LoadN(d, data + idx, remaining);
+  hn::Mask<D> mask = compare_value<D, OPT::op>(v, cmp_v);
+  store_mask_bits<D>(mask, mask_bits_p, idx);
+  mask_bits = mask_bits_tmp[0];
+  return max_match_len;
 }
 
 }  // namespace HWY_NAMESPACE
@@ -508,6 +574,13 @@ int simd_vector_find(Vector<T> data, T v) {
   }
 }
 
+template <typename T, OpToken op>
+size_t simd_vector_match(const T* data, size_t len, T v, uint64_t& mask) {
+  using OPT = OperandType<T, op>;
+  HWY_EXPORT_T(Table, simd_vector_match_impl<OPT>);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(data, len, v, mask);
+}
+
 template <typename T>
 T simd_vector_reduce_max(Vector<T> left) {
   HWY_EXPORT_T(Table, simd_vector_reduce_max_impl<T>);
@@ -600,6 +673,23 @@ DEFINE_SIMD_FIND_OP(OP_LESS_EQUAL, float, double, uint8_t, int8_t, uint16_t, int
                     int64_t, StringView);
 DEFINE_SIMD_FIND_OP(OP_NOT_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
                     int64_t, StringView);
+
+#define DEFINE_SIMD_MATCH_OP_TEMPLATE(r, op, ii, TYPE) \
+  template size_t simd_vector_match<TYPE, op>(const TYPE* data, size_t len, TYPE v, uint64_t& mask);
+#define DEFINE_SIMD_MATCH_OP(op, ...) \
+  BOOST_PP_SEQ_FOR_EACH_I(DEFINE_SIMD_MATCH_OP_TEMPLATE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+DEFINE_SIMD_MATCH_OP(OP_EQUAL, uint8_t);
+// DEFINE_SIMD_MATCH_OP(OP_GREATER_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t,
+// uint64_t,
+//                      int64_t);
+// DEFINE_SIMD_MATCH_OP(OP_GREATER, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+//                      int64_t);
+// DEFINE_SIMD_MATCH_OP(OP_LESS, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+// int64_t); DEFINE_SIMD_MATCH_OP(OP_LESS_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t,
+// uint64_t,
+//                      int64_t);
+// DEFINE_SIMD_MATCH_OP(OP_NOT_EQUAL, float, double, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
+//                      int64_t);
 
 #define DEFINE_SIMD_RANDOM_OP_TEMPLATE(r, op, ii, TYPE) \
   template void simd_vector_random(Context& ctx, uint64_t seed, TYPE* output);

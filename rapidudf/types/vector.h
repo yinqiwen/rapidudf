@@ -16,6 +16,7 @@
 
 #pragma once
 #include <stddef.h>
+#include <atomic>
 #include <cstdint>
 #include <stdexcept>
 #include <type_traits>
@@ -92,9 +93,6 @@ class VectorBuf {
   const T* ReadableData() {
     return reinterpret_cast<const T*>(data_);
   }
-
-  template <typename T>
-  void Load(T* buf, size_t n) {}
 
  private:
   union {
@@ -209,11 +207,26 @@ class Vector {
       size_t byte_idx = idx / 8;
       size_t bit_cursor = idx % 8;
       uint8_t* bits = vec_data_.MutableData<uint8_t>();
-      if (v) {
-        bits[byte_idx] = bit_set(bits[byte_idx], bit_cursor);
-      } else {
-        bits[byte_idx] = bit_clear(bits[byte_idx], bit_cursor);
-      }
+      do {
+        uint8_t current_byte_v = bits[byte_idx];
+        uint8_t new_byte_v = 0;
+        if (v) {
+          new_byte_v = bit_set(bits[byte_idx], bit_cursor);
+        } else {
+          new_byte_v = bit_clear(bits[byte_idx], bit_cursor);
+        }
+        if (__sync_val_compare_and_swap(&bits[byte_idx], current_byte_v, new_byte_v)) {
+          break;
+        }
+      } while (1);
+      // uint8_t current_byte_v = bits[byte_idx];
+      // uint8_t new_byte_v = 0;
+      // if (v) {
+      //   new_byte_v = bit_set(bits[byte_idx], bit_cursor);
+      // } else {
+      //   new_byte_v = bit_clear(bits[byte_idx], bit_cursor);
+      // }
+      // bits[byte_idx] = new_byte_v;
     } else {
       vec_data_.MutableData<T>()[idx] = v;
     }

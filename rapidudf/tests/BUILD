@@ -407,3 +407,15 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "concurrent_clock_cache_test",
+    size = "small",
+    srcs = ["concurrent_clock_cache_test.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf/container:concurrent_clock_cache",
+        "@com_google_googletest//:gtest_main",
+    ],
+)

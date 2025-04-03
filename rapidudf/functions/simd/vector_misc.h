@@ -48,6 +48,12 @@ Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits);
 template <typename T, OpToken op = OP_EQUAL>
 int simd_vector_find(Vector<T> data, T v);
 
+/**
+ * return matched data count, store matched mask into param 'mask'
+ */
+template <typename T, OpToken op = OP_EQUAL>
+size_t simd_vector_match(const T* data, size_t len, T v, uint64_t& mask);
+
 template <typename T>
 void simd_vector_random(Context& ctx, uint64_t seed, T* output);
 

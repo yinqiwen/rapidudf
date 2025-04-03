@@ -950,20 +950,28 @@ int Table::GetRowIdx(const RowSchema& schema) {
 }
 
 Table* Table::Concat(Table* other) {
-  if (GetTableSchema() != other->GetTableSchema()) {
-    THROW_LOGIC_ERR("Can NOT merge table:{} to {}", other->GetTableSchema()->Name(), GetTableSchema()->Name());
-  }
   Table* new_table = Clone();
   new_table->UnloadAllColumns();
-  for (size_t i = 0; i < new_table->rows_.size(); i++) {
+  auto status = new_table->DoConcat(other);
+  if (!status.ok()) {
+    THROW_LOGIC_ERR("{}", status.ToString());
+  }
+  return new_table;
+}
+
+absl::Status Table::DoConcat(Table* other) {
+  if (GetTableSchema() != other->GetTableSchema()) {
+    RUDF_RETURN_FMT_ERROR("Can NOT concat table:{} to {}", other->GetTableSchema()->Name(), GetTableSchema()->Name());
+  }
+  for (size_t i = 0; i < rows_.size(); i++) {
     for (size_t j = 0; j < other->rows_.size(); j++) {
-      if (new_table->rows_[i].GetSchema() == other->rows_[j].GetSchema()) {
-        new_table->rows_[i].Append(other->rows_[j].GetRawRowPtrs());
+      if (rows_[i].GetSchema() == other->rows_[j].GetSchema()) {
+        rows_[i].Append(other->rows_[j].GetRawRowPtrs());
         break;
       }
     }
   }
-  return new_table;
+  return absl::OkStatus();
 }
 
 template Table* Table::OrderBy<uint32_t>(Vector<uint32_t> by, bool descending);
