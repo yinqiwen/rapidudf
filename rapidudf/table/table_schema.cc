@@ -293,7 +293,7 @@ absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const DType
         continue;
       }
     } else {
-      member_dtype = (*member->member_field_dtype).Elem();
+      member_dtype = (*member->member_field_dtype);
     }
 
     bool valid_dtype = false;

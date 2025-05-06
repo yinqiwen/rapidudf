@@ -373,6 +373,18 @@ cc_test(
 )
 
 cc_test(
+    name = "simd_table_test2",
+    size = "small",
+    srcs = ["simd_table_test2.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "dyn_object_test",
     size = "small",
     srcs = ["dyn_object_test.cc"],
@@ -404,18 +416,6 @@ cc_test(
     linkstatic = True,
     deps = [
         "//rapidudf",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "concurrent_clock_cache_test",
-    size = "small",
-    srcs = ["concurrent_clock_cache_test.cc"],
-    linkopts = RUDF_DEFAULT_LINKOPTS,
-    linkstatic = True,
-    deps = [
-        "//rapidudf/container:concurrent_clock_cache",
         "@com_google_googletest//:gtest_main",
     ],
 )

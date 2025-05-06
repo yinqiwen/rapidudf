@@ -40,3 +40,32 @@ TEST(SIMD, mask) {
 
   RUDF_INFO("{} {}", hn::Lanes(D{}), hn::Lanes(D2{}));
 }
+
+TEST(SIMD, rebind) {
+  using D = hn::ScalableTag<uint32_t>;
+  hn::Rebind<uint8_t, D> d8;
+
+  uint32_t t[32];
+  uint8_t t1[32];
+  for (size_t i = 0; i < 32; i++) {
+    t[i] = i;
+    t1[i] = 0;
+  }
+
+  const D d;
+  constexpr auto lanes = hn::Lanes(d);
+
+  size_t idx = 0;
+  for (; (idx + lanes) <= 32; idx += lanes) {
+    const hn::Vec<D> v = hn::LoadU(d, t + idx);
+    auto period_u8 = hn::U8FromU32(v);
+    hn::StoreU(period_u8, d8, t1 + idx);
+    // auto period = hn::MaskedDiv(mask, elapsed, decay_val);
+    // auto period_u8 = hn::U8FromU32(period);
+  }
+
+  RUDF_INFO("{} {}", hn::Lanes(D{}), hn::Lanes(d8));
+  for (size_t i = 0; i < 32; i++) {
+    RUDF_INFO("{} {}", t1[i], t[i]);
+  }
+}

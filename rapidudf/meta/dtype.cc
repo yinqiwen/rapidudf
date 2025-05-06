@@ -174,7 +174,7 @@ DType DType::ToArray(size_t fixed_size) const {
   result.ctrl_.control_ = ctrl_.control_;
   result.ctrl_.container_type_ = COLLECTION_ARRAY;
   result.element_types_ = element_types_;
-  result.ctrl_.fixed_vector_size_ = fixed_size;
+  result.ctrl_.fixed_array_size_ = fixed_size;
   return result;
 }
 DType DType::ToVector() const {

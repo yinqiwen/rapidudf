@@ -68,11 +68,19 @@ class DType {
   void Reset();
   FundamentalType GetFundamentalType() const { return static_cast<FundamentalType>(ctrl_.t0_); }
   bool IsSimdVector(size_t fixed_size = 0) const {
-    return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR && fixed_size == ctrl_.fixed_vector_size_;
+    if (fixed_size == 0) {
+      return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR;
+    } else {
+      return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR && fixed_size == ctrl_.fixed_array_size_;
+    }
   }
   bool IsVector() const { return ctrl_.container_type_ == COLLECTION_VECTOR; }
-  bool IsArray(size_t fixed_size) const {
-    return ctrl_.container_type_ == COLLECTION_ARRAY && fixed_size == ctrl_.fixed_vector_size_;
+  bool IsArray(size_t fixed_size = 0) const {
+    if (fixed_size == 0) {
+      return ctrl_.container_type_ == COLLECTION_ARRAY;
+    } else {
+      return ctrl_.container_type_ == COLLECTION_ARRAY && fixed_size == ctrl_.fixed_array_size_;
+    }
   }
   bool IsAbslSpan() const { return ctrl_.container_type_ == COLLECTION_ABSL_SPAN; }
   bool IsTuple() const { return ctrl_.container_type_ == COLLECTION_TUPLE; }
@@ -172,7 +180,7 @@ class DType {
  private:
   static constexpr uint32_t kContainerTypeBits = 6;
   static constexpr uint32_t kPrimitiveTypeBits = 14;
-  static constexpr uint32_t kFixedVectorSizeBits = 16;
+  static constexpr uint32_t kFixedArraySizeBits = 29;
 
   union ControlValue {
     struct {
@@ -180,10 +188,8 @@ class DType {
       uint64_t ptr_bit_ : 1;
       uint64_t t0_ : kPrimitiveTypeBits;
       uint64_t t1_ : kPrimitiveTypeBits;
-      // uint64_t t2_ : kPrimitiveTypeBits;
-      // uint64_t t3_ : kPrimitiveTypeBits;
-      uint64_t fixed_vector_size_ : kFixedVectorSizeBits;
-      uint64_t reserved_ : 64 - kContainerTypeBits - 2 * kPrimitiveTypeBits - kFixedVectorSizeBits - 1;
+      uint64_t fixed_array_size_ : kFixedArraySizeBits;
+      // uint64_t reserved_ : 64 - kContainerTypeBits - 2 * kPrimitiveTypeBits - kFixedVectorSizeBits - 1;
     };
     uint64_t control_;
     ControlValue(uint64_t v = 0) { control_ = v; }

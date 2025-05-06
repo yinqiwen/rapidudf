@@ -371,10 +371,6 @@ class Table : public DynObject {
     return Merge(other, std::vector<StringView>{by_column}, merge);
   }
 
-  // absl::Status Join(Table* left, Table* right, absl::Span<const StringView> on_columns) {
-
-  // }
-
   template <typename R, typename... T>
   absl::StatusOr<SmartPtr> Map(const TableSchema* new_table_schema,
                                typename MapVisitorSignatureHelper<R, T...>::type f) {
