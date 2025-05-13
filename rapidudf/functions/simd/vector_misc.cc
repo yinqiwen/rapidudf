@@ -47,51 +47,51 @@ namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
 
 template <typename T>
-HWY_INLINE T simd_vector_dot_impl(Vector<T> left, Vector<T> right) {
-  if (left.Size() != right.Size()) {
-    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left.Size(), right.Size()));
+HWY_INLINE T simd_vector_dot_impl(const T* left, size_t left_len, const T* right, size_t right_len) {
+  if (left_len != right_len) {
+    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left_len, right_len));
   }
   using D = hn::ScalableTag<T>;
   constexpr D d;
   constexpr auto lanes = hn::Lanes(d);
   T val;
-  if (left.Size() >= lanes) {
+  if (left_len >= lanes) {
     constexpr auto assumptions = hn::Dot::Assumptions::kAtLeastOneVector;
-    val = hn::Dot::Compute<assumptions, D, T>(d, left.Data(), right.Data(), left.Size());
+    val = hn::Dot::Compute<assumptions, D, T>(d, left, right, left_len);
   } else {
     constexpr auto assumptions = hn::Dot::Assumptions::kPaddedToVector;
-    val = hn::Dot::Compute<assumptions, D, T>(d, left.Data(), right.Data(), left.Size());
+    val = hn::Dot::Compute<assumptions, D, T>(d, left, right, left_len);
   }
   return val;
 }
 
 template <typename T>
-HWY_INLINE T simd_vector_cos_distance_impl(Vector<T> left, Vector<T> right) {
-  if (left.Size() != right.Size()) {
-    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left.Size(), right.Size()));
+HWY_INLINE T simd_vector_cos_distance_impl(const T* left, size_t left_len, const T* right, size_t right_len) {
+  if (left_len != right_len) {
+    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left_len, right_len));
   }
   using D = hn::ScalableTag<T>;
   constexpr D d;
   constexpr auto N = hn::Lanes(d);
   size_t idx = 0;
-  size_t count = left.Size();
+  size_t count = left_len;
   hn::Vec<D> dot_v = hn::Zero(d);
   hn::Vec<D> norm_left_v = hn::Zero(d);
   hn::Vec<D> norm_right_v = hn::Zero(d);
 
   if (count >= N) {
     for (; idx <= count - N; idx += N) {
-      auto lv = hn::LoadU(d, left.Data() + idx);
-      auto rv = hn::LoadU(d, right.Data() + idx);
+      auto lv = hn::LoadU(d, left + idx);
+      auto rv = hn::LoadU(d, right + idx);
       dot_v = hn::MulAdd(lv, rv, dot_v);
       norm_left_v = hn::MulAdd(lv, lv, norm_left_v);
       norm_right_v = hn::MulAdd(rv, rv, norm_right_v);
     }
   }
-  if (HWY_LIKELY(idx != left.Size())) {
-    const size_t remaining = left.Size() - idx;
-    const hn::Vec<D> lv = hn::LoadN(d, left.Data() + idx, remaining);
-    const hn::Vec<D> rv = hn::LoadN(d, right.Data() + idx, remaining);
+  if (HWY_LIKELY(idx != left_len)) {
+    const size_t remaining = left_len - idx;
+    const hn::Vec<D> lv = hn::LoadN(d, left + idx, remaining);
+    const hn::Vec<D> rv = hn::LoadN(d, right + idx, remaining);
     dot_v = hn::MulAdd(lv, rv, dot_v);
     norm_left_v = hn::MulAdd(lv, lv, norm_left_v);
     norm_right_v = hn::MulAdd(rv, rv, norm_right_v);
@@ -105,29 +105,28 @@ HWY_INLINE T simd_vector_cos_distance_impl(Vector<T> left, Vector<T> right) {
 }
 
 template <typename T>
-HWY_INLINE T simd_vector_l2_distance_impl(Vector<T> left, Vector<T> right) {
-  if (left.Size() != right.Size()) {
-    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left.Size(), right.Size()));
+HWY_INLINE T simd_vector_l2_distance_impl(const T* left, size_t left_len, const T* right, size_t right_len) {
+  if (left_len != right_len) {
+    THROW_LOGIC_ERR(fmt::format("vector dot size mismatch {}:{}", left_len, right_len));
   }
   using D = hn::ScalableTag<T>;
   constexpr D d;
   constexpr auto N = hn::Lanes(d);
-  T val = 0;
   size_t idx = 0;
-  size_t count = left.Size();
+  size_t count = left_len;
   hn::Vec<D> distance_v = hn::Zero(d);
   if (count >= N) {
     for (; idx <= count - N; idx += N) {
-      auto lv = hn::LoadU(d, left.Data() + idx);
-      auto rv = hn::LoadU(d, right.Data() + idx);
+      auto lv = hn::LoadU(d, left + idx);
+      auto rv = hn::LoadU(d, right + idx);
       auto sub_v = hn::Abs(hn::Sub(lv, rv));
       distance_v = hn::MulAdd(sub_v, sub_v, distance_v);
     }
   }
   if (HWY_LIKELY(idx != count)) {
     const size_t remaining = count - idx;
-    const hn::Vec<D> lv = hn::LoadN(d, left.Data() + idx, remaining);
-    const hn::Vec<D> rv = hn::LoadN(d, right.Data() + idx, remaining);
+    const hn::Vec<D> lv = hn::LoadN(d, left + idx, remaining);
+    const hn::Vec<D> rv = hn::LoadN(d, right + idx, remaining);
     auto sub_v = hn::Abs(hn::Sub(lv, rv));
     distance_v = hn::MulAdd(sub_v, sub_v, distance_v);
   }
@@ -135,18 +134,18 @@ HWY_INLINE T simd_vector_l2_distance_impl(Vector<T> left, Vector<T> right) {
 }
 
 template <typename T>
-HWY_INLINE T simd_vector_sum_impl(Vector<T> left) {
+HWY_INLINE T simd_vector_sum_impl(const T* left, size_t left_len) {
   T sum = {};
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
-  for (; (i + lanes) < left.Size(); i += lanes) {
-    auto lv = hn::LoadU(d, left.Data() + i);
+  for (; (i + lanes) < left_len; i += lanes) {
+    auto lv = hn::LoadU(d, left + i);
     auto sum_v = hn::ReduceSum(d, lv);
     sum += sum_v;
   }
-  if (i < left.Size()) {
-    for (; i < left.Size(); i++) {
+  if (i < left_len) {
+    for (; i < left_len; i++) {
       sum += left[i];
     }
   }
@@ -154,20 +153,20 @@ HWY_INLINE T simd_vector_sum_impl(Vector<T> left) {
 }
 
 template <typename T>
-HWY_INLINE T simd_vector_reduce_max_impl(Vector<T> left) {
+HWY_INLINE T simd_vector_reduce_max_impl(const T* left, size_t left_len) {
   T max_val = std::numeric_limits<T>::min();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
-  for (; (i + lanes) < left.Size(); i += lanes) {
-    auto lv = hn::LoadU(d, left.Data() + i);
+  for (; (i + lanes) < left_len; i += lanes) {
+    auto lv = hn::LoadU(d, left + i);
     auto max_v = hn::ReduceMax(d, lv);
     if (max_v > max_val) {
       max_val = max_v;
     }
   }
-  if (i < left.Size()) {
-    for (; i < left.Size(); i++) {
+  if (i < left_len) {
+    for (; i < left_len; i++) {
       if (left[i] > max_val) {
         max_val = left[i];
       }
@@ -177,20 +176,20 @@ HWY_INLINE T simd_vector_reduce_max_impl(Vector<T> left) {
 }
 
 template <typename T>
-HWY_INLINE T simd_vector_reduce_min_impl(Vector<T> left) {
+HWY_INLINE T simd_vector_reduce_min_impl(const T* left, size_t left_len) {
   T min_val = std::numeric_limits<T>::max();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
-  for (; (i + lanes) < left.Size(); i += lanes) {
-    auto lv = hn::LoadU(d, left.Data() + i);
+  for (; (i + lanes) < left_len; i += lanes) {
+    auto lv = hn::LoadU(d, left + i);
     auto min_v = hn::ReduceMin(d, lv);
     if (min_v < min_val) {
       min_val = min_v;
     }
   }
-  if (i < left.Size()) {
-    for (; i < left.Size(); i++) {
+  if (i < left_len) {
+    for (; i < left_len; i++) {
       if (left[i] < min_val) {
         min_val = left[i];
       }
@@ -445,24 +444,24 @@ Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n) {
 template <typename T>
 T simd_vector_sum(Vector<T> left) {
   HWY_EXPORT_T(Table1, simd_vector_sum_impl<T>);
-  return HWY_DYNAMIC_DISPATCH_T(Table1)(left);
+  return HWY_DYNAMIC_DISPATCH_T(Table1)(left.Data(), left.Size());
 }
 
 template <typename T>
 T simd_vector_dot_distance(Vector<T> left, Vector<T> right) {
   HWY_EXPORT_T(Table, simd_vector_dot_impl<T>);
-  return HWY_DYNAMIC_DISPATCH_T(Table)(left, right);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left.Data(), left.Size(), right.Data(), right.Size());
 }
 template <typename T>
 T simd_vector_cosine_distance(Vector<T> left, Vector<T> right) {
   HWY_EXPORT_T(Table, simd_vector_cos_distance_impl<T>);
-  return HWY_DYNAMIC_DISPATCH_T(Table)(left, right);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left.Data(), left.Size(), right.Data(), right.Size());
 }
 
 template <typename T>
 T simd_vector_l2_distance(Vector<T> left, Vector<T> right) {
   HWY_EXPORT_T(Table, simd_vector_l2_distance_impl<T>);
-  return HWY_DYNAMIC_DISPATCH_T(Table)(left, right);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left.Data(), left.Size(), right.Data(), right.Size());
 }
 
 template <typename T>
@@ -584,12 +583,12 @@ size_t simd_vector_match(const T* data, size_t len, T v, uint64_t& mask) {
 template <typename T>
 T simd_vector_reduce_max(Vector<T> left) {
   HWY_EXPORT_T(Table, simd_vector_reduce_max_impl<T>);
-  return HWY_DYNAMIC_DISPATCH_T(Table)(left);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left.Data(), left.Size());
 }
 template <typename T>
 T simd_vector_reduce_min(Vector<T> left) {
   HWY_EXPORT_T(Table, simd_vector_reduce_min_impl<T>);
-  return HWY_DYNAMIC_DISPATCH_T(Table)(left);
+  return HWY_DYNAMIC_DISPATCH_T(Table)(left.Data(), left.Size());
 }
 
 template <typename T>

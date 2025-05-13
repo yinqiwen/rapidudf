@@ -31,24 +31,12 @@ enum CollectionType {
   COLLECTION_UNORDERED_SET,
   COLLECTION_ABSL_SPAN,
   COLLECTION_TUPLE,
-  COLLECTION_JAGGED_VECTORS,
-  COLLECTION_FIXEDSIZE_VECTORS,
   COLLECTION_SIMD_VECTOR,
   COLLECTION_END,
 };
 
-constexpr std::array<std::string_view, COLLECTION_END> kCollectionTypeStrs = {"",
-                                                                              "array",
-                                                                              "vector",
-                                                                              "map",
-                                                                              "set",
-                                                                              "unordered_map",
-                                                                              "unordered_set",
-                                                                              "absl_span",
-                                                                              "tuple",
-                                                                              "jagged_vectors",
-                                                                              "fixed_size_vectors",
-                                                                              "simd_vector"};
+constexpr std::array<std::string_view, COLLECTION_END> kCollectionTypeStrs = {
+    "", "array", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector"};
 enum FundamentalType {
   DATA_INVALID = 0,
   DATA_VOID,

@@ -33,6 +33,11 @@
 namespace rapidudf {
 namespace functions {
 
+template <typename VEC>
+static typename VEC::value_type* simd_vector_slice_by_offset(VEC* v, uint32_t offset) {
+  return v->RawByOffset(offset);
+}
+
 static void throw_vector_expression_ex(int line, StringView src_line, StringView msg) {
   throw VectorExpressionException(line, src_line, msg);
 }
@@ -112,6 +117,14 @@ static void register_simd_vector_gather() {
   Vector<T> (*simd_f0)(Context& ctx, Vector<T>, Vector<int32_t>) = simd_vector_gather;
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 }
+
+// template <typename T>
+// static void register_simd_vector_slice_by_offset() {
+//   DType dtype = get_dtype<T>();
+//   std::string func_name = GetFunctionName(OP_GATHER, dtype.ToSimdVector());
+//   T* (*simd_f0)(uint32_t) = simd_vector_slice_by_offset;
+//   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
+// }
 
 template <typename T>
 static void register_simd_vector_sort() {

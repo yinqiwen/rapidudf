@@ -13,4 +13,5 @@ RUDF_DEFAULT_LINKOPTS = [
     "-ldl",
     "-lrt",
     "-lboost_thread",
+    "-larrow",
 ]

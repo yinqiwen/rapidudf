@@ -68,14 +68,23 @@ cc_library(
 )
 
 cc_library(
+    name = "bit",
+    hdrs = [
+        "bit.h",
+    ],
+    deps = [
+    ],
+)
+
+cc_library(
     name = "types",
     srcs = ["params.cc"],
     hdrs = [
-        "bit.h",
         "json_object.h",
         "params.h",
     ],
     deps = [
+        ":bit",
         ":dyn_object",
         ":pointer",
         ":string_view",
@@ -92,8 +101,23 @@ cc_library(
     ],
     deps = [
         ":types",
+        "//rapidudf/common:arrow_helper",
         "//rapidudf/memory:arena",
         "//rapidudf/meta:exception",
         "//rapidudf/meta:optype",
     ],
 )
+
+# cc_library(
+#     name = "arrow",
+#     hdrs = [
+#         "arrow.h",
+#     ],
+#     deps = [
+#         ":types",
+#         "//rapidudf/common:arrow_helper",
+#         "//rapidudf/memory:arena",
+#         "//rapidudf/meta:exception",
+#         "//rapidudf/meta:optype",
+#     ],
+# )

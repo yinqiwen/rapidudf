@@ -32,3 +32,14 @@ cc_library(
         "variadic_template_helper.h",
     ],
 )
+
+cc_library(
+    name = "arrow_helper",
+    hdrs = [
+        "arrow_helper.h",
+    ],
+    deps = [
+        "//rapidudf/meta",
+        "//rapidudf/types:bit",
+    ],
+)

@@ -36,6 +36,13 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
     )
 
     http_archive(
+        name = "bazel_features",
+        sha256 = "d852f389ce8db8b8c2f9807a4faf065b0d0ba302163898cd2428b6ca7d086681",
+        strip_prefix = "bazel_features-1.29.0",
+        url = "https://github.com/bazel-contrib/bazel_features/releases/download/v1.29.0/bazel_features-v1.29.0.tar.gz",
+    )
+
+    http_archive(
         name = "rules_foreign_cc",
         strip_prefix = "rules_foreign_cc-0.9.0",
         url = "https://github.com/bazelbuild/rules_foreign_cc/archive/0.9.0.zip",

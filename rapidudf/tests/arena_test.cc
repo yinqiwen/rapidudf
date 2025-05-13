@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include "rapidudf/log/log.h"
 #include "rapidudf/memory/arena.h"
@@ -69,9 +70,12 @@ TEST(Arena, simple) {
   ASSERT_TRUE(is_destructor_disabled_v<Test2>);
   ASSERT_TRUE(is_destructor_disabled_v<int>);
   ASSERT_TRUE(is_destructor_disabled_v<std::string_view>);
+
   // ThreadCachedArena thread_safe_arena;
   // auto p1 = thread_safe_arena.New<arena::String>();
   // p1->assign("aaa");
 
   // RUDF_INFO("###cmp:{}", *p == *p1);
+
+  // arrow::ListBuilder builder(arrow::default_memory_pool());
 }
