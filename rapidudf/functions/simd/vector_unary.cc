@@ -72,6 +72,22 @@ extern __m512 Sleef_erfcf16_u15(__m512);
 extern __m128d Sleef_erfcd2_u15(__m128d);
 extern __m256d Sleef_erfcd4_u15(__m256d);
 extern __m512d Sleef_erfcd8_u15(__m512d);
+
+extern __m128d Sleef_logd2_u10(__m128d a);
+extern __m256d Sleef_logd4_u10(__m256d a);
+extern __m512d Sleef_logd8_u10(__m512d a);
+
+extern __m128d Sleef_log2d2_u10(__m128d a);
+extern __m256d Sleef_log2d4_u10(__m256d a);
+extern __m512d Sleef_log2d8_u10(__m512d a);
+
+extern __m128d Sleef_log10d2_u10(__m128d a);
+extern __m256d Sleef_log10d4_u10(__m256d a);
+extern __m512d Sleef_log10d8_u10(__m512d a);
+
+extern __m128d Sleef_log1pd2_u10(__m128d a);
+extern __m256d Sleef_log1pd4_u10(__m256d a);
+extern __m512d Sleef_log1pd8_u10(__m512d a);
 }
 
 HWY_BEFORE_NAMESPACE();
@@ -125,13 +141,76 @@ static HWY_INLINE auto do_simd_unary_op([[maybe_unused]] D d, V lv) {
   } else if constexpr (op == OP_EXPM1) {
     return hn::Expm1(d, lv);
   } else if constexpr (op == OP_LOG) {
-    return hn::Log(d, lv);
+    if constexpr (std::is_same_v<hn::TFromV<V>, double>) {
+#if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
+      auto val = Sleef_logd8_u10(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_AVX2
+      auto val = Sleef_logd4_u10(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_SSE4 || HWY_TARGET == HWY_SSSE3 || HWY_TARGET == HWY_SSE2
+      auto val = Sleef_logd2_u10(lv.raw);
+      return V{val};
+#else
+      static_assert(sizeof(lv.raw) == -1, "unsupported type");
+#endif
+    } else {
+      return hn::Log(d, lv);
+    }
   } else if constexpr (op == OP_LOG2) {
-    return hn::Log2(d, lv);
+    if constexpr (std::is_same_v<hn::TFromV<V>, double>) {
+#if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
+      auto val = Sleef_log2d8_u10(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_AVX2
+      auto val = Sleef_log2d4_u10(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_SSE4 || HWY_TARGET == HWY_SSSE3 || HWY_TARGET == HWY_SSE2
+      auto val = Sleef_log2d2_u10(lv.raw);
+      return V{val};
+#else
+      static_assert(sizeof(lv.raw) == -1, "unsupported type");
+#endif
+    } else {
+      return hn::Log2(d, lv);
+    }
+
   } else if constexpr (op == OP_LOG10) {
-    return hn::Log10(d, lv);
+    if constexpr (std::is_same_v<hn::TFromV<V>, double>) {
+#if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
+      auto val = Sleef_log10d8_u10(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_AVX2
+      auto val = Sleef_log10d4_u10(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_SSE4 || HWY_TARGET == HWY_SSSE3 || HWY_TARGET == HWY_SSE2
+      auto val = Sleef_log10d2_u10(lv.raw);
+      return V{val};
+#else
+      static_assert(sizeof(lv.raw) == -1, "unsupported type");
+#endif
+    } else {
+      return hn::Log10(d, lv);
+    }
+
   } else if constexpr (op == OP_LOG1P) {
-    return hn::Log1p(d, lv);
+    if constexpr (std::is_same_v<hn::TFromV<V>, double>) {
+#if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
+      auto val = Sleef_log1pd8_u10(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_AVX2
+      auto val = Sleef_log1pd4_u10(lv.raw);
+      return V{val};
+#elif HWY_TARGET == HWY_SSE4 || HWY_TARGET == HWY_SSSE3 || HWY_TARGET == HWY_SSE2
+      auto val = Sleef_log1pd2_u10(lv.raw);
+      return V{val};
+#else
+      static_assert(sizeof(lv.raw) == -1, "unsupported type");
+#endif
+    } else {
+      return hn::Log1p(d, lv);
+    }
+
   } else if constexpr (op == OP_CEIL) {
     return hn::Ceil(lv);
   } else if constexpr (op == OP_APPROX_RECIP) {
