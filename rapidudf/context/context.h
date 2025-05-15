@@ -28,6 +28,7 @@
 
 #include "rapidudf/common/AtomicIntrusiveLinkedList.h"
 #include "rapidudf/common/allign.h"
+#include "rapidudf/common/arrow_helper.h"
 #include "rapidudf/memory/arena.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
@@ -81,7 +82,7 @@ class Context {
   }
   template <typename T>
   Vector<T>* NewVector(size_t n) {
-    auto result = Vector<T>::Make(n);
+    auto result = Vector<T>::Make(arrow_pool_, n);
     if (result.ok()) {
       auto p = std::make_unique<Vector<T>>(std::move(result.value()));
       return Own(std::move(p));
@@ -89,43 +90,36 @@ class Context {
     return nullptr;
   }
   template <typename T>
-  Vector<T>* NewVector(const std::vector<T>& data, bool clone = false) {
-    if constexpr (std::is_same_v<std::string, T>) {
-    } else if constexpr (std::is_same_v<bool, T>) {
+  Vector<typename VectorElementTypeTraits<T>::DataType>* NewVector(const std::vector<T>& data, bool clone = false) {
+    if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T> || std::is_same_v<bool, T> ||
+                  std::is_same_v<Bit, T>) {
+      using value_type = typename VectorElementTypeTraits<T>::DataType;
+      auto iter = data.begin();
+      auto result = Vector<value_type>::Make(
+          arrow_pool_,
+          [&]() -> std::optional<value_type> {
+            if (iter == data.end()) {
+              return {};
+            }
+            value_type v = *iter;
+            iter++;
+            return v;
+          },
+          data.size());
+      if (result.ok()) {
+        auto p = std::make_unique<Vector<value_type>>(std::move(result.value()));
+        return Own(std::move(p));
+      }
+      return nullptr;
+    } else {
+      auto result = Vector<T>::Wrap(default_arrow_memory_pool(), data, clone);
+      if (result.ok()) {
+        auto p = std::make_unique<Vector<T>>(std::move(result.value()));
+        return Own(std::move(p));
+      }
+      return nullptr;
     }
-    auto result = Vector<T>::Make(data, clone);
-    if (result.ok()) {
-      auto p = std::make_unique<Vector<T>>(std::move(result.value()));
-      return Own(std::move(p));
-    }
-    return nullptr;
   }
-
-  // template <typename T>
-  // VectorBuf NewVectorBuf(size_t n, size_t min_byte_size = 0) {
-  //   uint32_t byte_size = 0;
-  //   if constexpr (std::is_same_v<Bit, T> || std::is_same_v<bool, T>) {
-  //     byte_size = n / 8;
-  //     if (n % 8 > 0) {
-  //       byte_size++;
-  //     }
-  //   } else {
-  //     byte_size = sizeof(T) * n;
-  //   }
-  //   byte_size = align_to<uint32_t>(byte_size, 8);
-  //   if (min_byte_size > 0 && byte_size < min_byte_size) {
-  //     byte_size = min_byte_size;
-  //   }
-  //   uint8_t* arena_data = ArenaAllocate(byte_size);
-  //   VectorBuf vec(arena_data, n, byte_size);
-  //   vec.SetReadonly(false);
-  //   return vec;
-  // }
-
-  // template <typename T>
-  // auto NewVector(T&& data) {
-  //   return NewVectorImpl(std::forward<T>(data));
-  // }
 
   template <typename... T>
   std::string_view NewString(fmt::format_string<T...> fmt, T&&... args) {
@@ -235,6 +229,8 @@ class Context {
   ThreadCachedArena* arena_ = nullptr;
   using PtrMap = absl::flat_hash_map<uint32_t, void*>;
   PtrMap ptrs_;
+
+  arrow::MemoryPool* arrow_pool_ = default_arrow_memory_pool();
 
   CleanupFuncWrapper::List cleanups_;
   bool has_nan_ = false;

@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include <arrow/array/array_binary.h>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -25,7 +26,9 @@
 #include "arrow/type_traits.h"
 #include "rapidudf/common/arrow_helper.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
+static constexpr uint32_t kVectorUnitSize = 64;
 
 template <typename T>
 struct VectorBase {
@@ -37,6 +40,7 @@ template <typename T>
 class Vector : public VectorBase<Vector<T>> {
  public:
   using value_type = typename VectorElementTypeTraits<T>::DataType;
+  using arrow_value_type = typename VectorElementTypeTraits<T>::ArrowDataType;
   using value_iterator_func = std::function<std::optional<value_type>()>;
 
   static absl::StatusOr<Vector> Wrap(arrow::MemoryPool* pool, const T* data, size_t size, size_t capacity = 0,
@@ -52,20 +56,8 @@ class Vector : public VectorBase<Vector<T>> {
   }
 
   static absl::StatusOr<Vector> Make(arrow::MemoryPool* pool, const std::vector<T>& data) {
-    if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool>) {
-      auto iter = data.begin();
-      return Make(
-          pool,
-          [&]() -> std::optional<bool> {
-            if (iter == data.end()) {
-              return {};
-            }
-            auto v = *iter;
-            iter++;
-            return v;
-          },
-          data.size());
-    } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
+    if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool> || std::is_same_v<T, std::string> ||
+                  std::is_same_v<T, std::string_view>) {
       auto iter = data.begin();
       return Make(
           pool,
@@ -73,7 +65,7 @@ class Vector : public VectorBase<Vector<T>> {
             if (iter == data.end()) {
               return {};
             }
-            std::string_view v = *iter;
+            value_type v = *iter;
             iter++;
             return v;
           },
@@ -87,26 +79,47 @@ class Vector : public VectorBase<Vector<T>> {
   auto Data(size_t offset = 0) const {
     if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool>) {
       return data_->data()->GetValues<uint8_t>(1, offset / 8);
+    } else if constexpr (std::is_same_v<value_type, StringView>) {
+      auto actual_array = static_cast<arrow::FixedSizeBinaryArray*>(data_.get());
+      return reinterpret_cast<const StringView*>(actual_array->GetValue(offset));
     } else {
-      auto actual_array = static_cast<typename arrow::CTypeTraits<T>::ArrayType*>(data_.get());
+      auto actual_array = static_cast<typename VectorElementTypeTraits<T>::ArrayType*>(data_.get());
       return actual_array->raw_values() + offset;
     }
   }
   auto MutableData(size_t offset = 0) {
     if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool>) {
       return data_->data()->GetMutableValues<uint8_t>(1, offset / 8);
+    } else if constexpr (std::is_same_v<value_type, StringView>) {
+      auto actual_array = static_cast<arrow::FixedSizeBinaryArray*>(data_.get());
+      const uint8_t* data = actual_array->GetValue(offset);
+      return const_cast<StringView*>(reinterpret_cast<const StringView*>(data));
     } else {
-      auto actual_array = static_cast<typename arrow::CTypeTraits<T>::ArrayType*>(data_.get());
-      return const_cast<T*>(actual_array->raw_values() + offset);
+      auto actual_array = static_cast<typename VectorElementTypeTraits<T>::ArrayType*>(data_.get());
+      return const_cast<arrow_value_type*>(actual_array->raw_values() + offset);
     }
   }
 
   auto Value(size_t offset) const {
-    auto actual_array = static_cast<typename arrow::CTypeTraits<T>::ArrayType*>(data_.get());
-    return actual_array->Value(offset);
+    if constexpr (std::is_same_v<value_type, StringView>) {
+      arrow::FixedSizeBinaryArray* actual_array = static_cast<arrow::FixedSizeBinaryArray*>(data_.get());
+      StringView s;
+      memcpy(&s, actual_array->GetValue(offset), sizeof(StringView));
+      return s;
+    } else {
+      auto actual_array = static_cast<typename VectorElementTypeTraits<T>::ArrayType*>(data_.get());
+      auto v = actual_array->Value(offset);
+      return value_type(v);
+    }
   }
 
+  auto operator[](size_t idx) const { return Value(idx); }
+
+  void Set(size_t offset, T v);
+
   Vector<T> Slice(int64_t offset, int64_t length) const;
+
+  void Resize(size_t new_size);
 
  private:
   Vector(std::shared_ptr<arrow::Array> p) : data_(p) {}
@@ -129,7 +142,7 @@ absl::StatusOr<Vector<T>> Vector<T>::Wrap(arrow::MemoryPool* pool, const T* data
     if (!status.ok()) {
       RUDF_LOG_RETURN_FMT_ERROR("Builder create failed:{}", status.ToString());
     }
-    auto actual_builder = static_cast<typename arrow::CTypeTraits<T>::BuilderType*>(builder.get());
+    auto actual_builder = static_cast<typename VectorElementTypeTraits<T>::BuilderType*>(builder.get());
     if constexpr (std::is_pointer_v<T>) {
       const uint64_t* int_data = reinterpret_cast<const uint64_t*>(data);
       status = actual_builder->AppendValues(int_data, size);
@@ -169,7 +182,7 @@ absl::StatusOr<Vector<T>> Vector<T>::Make(arrow::MemoryPool* pool, const value_i
   if (!status.ok()) {
     RUDF_LOG_RETURN_FMT_ERROR("Builder create failed:{}", status.ToString());
   }
-  auto actual_builder = static_cast<typename arrow::CTypeTraits<T>::BuilderType*>(builder.get());
+  auto actual_builder = static_cast<typename VectorElementTypeTraits<T>::BuilderType*>(builder.get());
   status = actual_builder->Reserve(length);
   if (!status.ok()) {
     RUDF_LOG_RETURN_FMT_ERROR("Builder reserve:{} failed:{}", length, status.ToString());
@@ -177,7 +190,12 @@ absl::StatusOr<Vector<T>> Vector<T>::Make(arrow::MemoryPool* pool, const value_i
   while (1) {
     auto val = iter();
     if (val.has_value()) {
-      status = actual_builder->Append(val.value());
+      if constexpr (std::is_same_v<value_type, StringView>) {
+        const StringView& s = val.value();
+        actual_builder->Append(reinterpret_cast<const uint8_t*>(&s));
+      } else {
+        status = actual_builder->Append(val.value());
+      }
       if (!status.ok()) {
         RUDF_LOG_RETURN_FMT_ERROR("Builder append  failed:{}", status.ToString());
       }
@@ -199,7 +217,7 @@ absl::StatusOr<Vector<T>> Vector<T>::Make(arrow::MemoryPool* pool, size_t size) 
   if (!status.ok()) {
     RUDF_LOG_RETURN_FMT_ERROR("Builder create failed:{}", status.ToString());
   }
-  auto actual_builder = static_cast<typename arrow::CTypeTraits<T>::BuilderType*>(builder.get());
+  auto actual_builder = static_cast<typename VectorElementTypeTraits<T>::BuilderType*>(builder.get());
   status = actual_builder->AppendEmptyValues(size);
   if (!status.ok()) {
     RUDF_LOG_RETURN_FMT_ERROR("Builder append empty values failed:{}", status.ToString());
@@ -215,6 +233,34 @@ template <typename T>
 Vector<T> Vector<T>::Slice(int64_t offset, int64_t length) const {
   auto new_data = data_->Slice(offset, length);
   return Vector<T>(new_data);
+}
+template <typename T>
+void Vector<T>::Resize(size_t new_size) {
+  if (new_size >= static_cast<size_t>(data_->length())) {
+    return;
+  }
+  data_ = data_->Slice(0, new_size);
+}
+template <typename T>
+void Vector<T>::Set(size_t offset, T v) {
+  auto* p = MutableData(offset);
+  if constexpr (std::is_same_v<Bit, T> || std::is_same_v<bool, T>) {
+    size_t bit_cursor = offset % 8;
+    do {
+      uint8_t current_byte_v = *p;
+      uint8_t new_byte_v = 0;
+      if (v) {
+        new_byte_v = bit_set(*p, bit_cursor);
+      } else {
+        new_byte_v = bit_clear(*p, bit_cursor);
+      }
+      if (__sync_val_compare_and_swap(p, current_byte_v, new_byte_v)) {
+        break;
+      }
+    } while (1);
+  } else {
+    *p = v;
+  }
 }
 
 }  // namespace rapidudf

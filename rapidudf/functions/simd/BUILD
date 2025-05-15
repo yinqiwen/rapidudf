@@ -38,6 +38,7 @@ cc_library(
     copts = ["-O3"],
     deps = [
         ":vector_op",
+        "//rapidudf/common:allign",
         "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/meta:dtype",
@@ -84,7 +85,9 @@ cc_library(
         "bits.h",
         "vector.h",
     ],
-    copts = ["-O3"],
+    copts = [
+        "-O3",
+    ],
     deps = [
         ":string",
         ":vector_misc",

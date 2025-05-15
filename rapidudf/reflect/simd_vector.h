@@ -25,10 +25,10 @@ namespace reflect {
 
 template <typename T>
 struct SimdVectorHelper {
-  static T get(Vector<T> v, size_t i) { return v[i]; }
-  static size_t size(Vector<T> v) { return v.Size(); }
-  static Vector<T> subvector(Vector<T> v, uint32_t pos, uint32_t len) { return v.SubVector(pos, len); }
-  static int find(Vector<T> vec, T v) { return vec.Find(v); }
+  static T get(Vector<T>* v, size_t i) { return v->Value(i); }
+  static size_t size(Vector<T>* v) { return v->Size(); }
+  static Vector<T> subvector(Vector<T>* v, uint32_t pos, uint32_t len) { return v.SubVector(pos, len); }
+  static int find(Vector<T>* vec, T v) { return vec.Find(v); }
   static int find_neq(Vector<T> vec, T v) { return vec.FindNeq(v); }
   static int find_gt(Vector<T> vec, T v) { return vec.FindGt(v); }
   static int find_ge(Vector<T> vec, T v) { return vec.FindGe(v); }

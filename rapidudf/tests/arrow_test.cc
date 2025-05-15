@@ -20,6 +20,7 @@
 #include <arrow/type_traits.h>
 #include <gtest/gtest.h>
 #include <vector>
+#include "rapidudf/types/string_view.h"
 #include "rapidudf/types/vector.h"
 
 using namespace rapidudf;
@@ -78,6 +79,12 @@ TEST(Arrow, simple) {
   std::vector<int*> ps;
   auto ptest = Vector<int*>::Make(nullptr, ps);
 
-  std::vector<std::string> ss;
-  Vector<std::string>::Make(nullptr, ss);
+  std::vector<std::string> ss{"hello", "world"};
+  auto vec = Vector<std::string>::Make(nullptr, ss).value();
+  StringView sss = vec.Value(1);
+  RUDF_INFO("###{} \n", sss);
+
+  const StringView* xps = vec.Data();
+
+  vec.Slice(0, 1);
 }

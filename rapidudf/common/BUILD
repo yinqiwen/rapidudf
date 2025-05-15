@@ -41,5 +41,6 @@ cc_library(
     deps = [
         "//rapidudf/meta",
         "//rapidudf/types:bit",
+        "//rapidudf/types:pointer",
     ],
 )

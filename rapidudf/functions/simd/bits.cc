@@ -183,56 +183,29 @@ HWY_AFTER_NAMESPACE();
 #if HWY_ONCE
 namespace rapidudf {
 namespace functions {
-void simd_vector_bits_not(Vector<Bit> src, Vector<Bit> dst) {
-  HWY_EXPORT_T(Table, simd_vector_bits_not_impl);
-  HWY_DYNAMIC_DISPATCH_T(Table)
-  (src.GetVectorBuf().ReadableData<uint8_t>(), dst.GetVectorBuf().MutableData<uint8_t>(), src.Size());
-}
-void simd_vector_bits_and(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
-  HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_AND>);
-  HWY_DYNAMIC_DISPATCH_T(Table)
-  (left.GetVectorBuf().ReadableData<uint8_t>(), right.GetVectorBuf().ReadableData<uint8_t>(),
-   dst.GetVectorBuf().MutableData<uint8_t>(), left.Size());
-}
-void simd_vector_bits_or(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
-  HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_OR>);
-  HWY_DYNAMIC_DISPATCH_T(Table)
-  (left.GetVectorBuf().ReadableData<uint8_t>(), right.GetVectorBuf().ReadableData<uint8_t>(),
-   dst.GetVectorBuf().MutableData<uint8_t>(), left.Size());
-}
-void simd_vector_bits_xor(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst) {
-  HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_XOR>);
-  HWY_DYNAMIC_DISPATCH_T(Table)
-  (left.GetVectorBuf().ReadableData<uint8_t>(), right.GetVectorBuf().ReadableData<uint8_t>(),
-   dst.GetVectorBuf().MutableData<uint8_t>(), left.Size());
-}
-size_t simd_vector_bits_count_true(Vector<Bit> src) {
-  HWY_EXPORT_T(Table, simd_vector_count_true_impl);
-  return HWY_DYNAMIC_DISPATCH_T(Table)(src.GetVectorBuf().ReadableData<uint8_t>(), src.Size());
-}
 
-void simd_vector_bits_not(const ArrowVector<Bit>* src, ArrowVector<Bit>* dst) {
+void simd_vector_bits_not(const Vector<Bit>* src, Vector<Bit>* dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_not_impl);
   return HWY_DYNAMIC_DISPATCH_T(Table)(src->Data(), dst->MutableData(), src->Size());
 }
 
-void simd_vector_bits_and(const ArrowVector<Bit>* left, const ArrowVector<Bit>* right, ArrowVector<Bit>* dst) {
+void simd_vector_bits_and(const Vector<Bit>* left, const Vector<Bit>* right, Vector<Bit>* dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_AND>);
   HWY_DYNAMIC_DISPATCH_T(Table)
   (left->Data(), right->Data(), dst->MutableData(), left->Size());
 }
-void simd_vector_bits_or(const ArrowVector<Bit>* left, const ArrowVector<Bit>* right, ArrowVector<Bit>* dst) {
+void simd_vector_bits_or(const Vector<Bit>* left, const Vector<Bit>* right, Vector<Bit>* dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_OR>);
   HWY_DYNAMIC_DISPATCH_T(Table)
   (left->Data(), right->Data(), dst->MutableData(), left->Size());
 }
-void simd_vector_bits_xor(const ArrowVector<Bit>* left, const ArrowVector<Bit>* right, ArrowVector<Bit>* dst) {
+void simd_vector_bits_xor(const Vector<Bit>* left, const Vector<Bit>* right, Vector<Bit>* dst) {
   HWY_EXPORT_T(Table, simd_vector_bits_binary_impl<OP_LOGIC_XOR>);
   HWY_DYNAMIC_DISPATCH_T(Table)
   (left->Data(), right->Data(), dst->MutableData(), left->Size());
 }
 
-size_t simd_vector_bits_count_true(const ArrowVector<Bit>* src) {
+size_t simd_vector_bits_count_true(const Vector<Bit>* src) {
   HWY_EXPORT_T(Table, simd_vector_count_true_impl);
   return HWY_DYNAMIC_DISPATCH_T(Table)(src->Data(), src->Size());
 }

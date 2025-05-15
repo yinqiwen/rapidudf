@@ -264,15 +264,15 @@ class Table : public DynObject {
     return absl::OkStatus();
   }
   template <typename... T>
-  Vector<Bit> Filter(typename VisitorSignatureHelper<bool, T...>::type f,
-                     std::shared_ptr<ThreadPool> thread_pool = nullptr) {
+  Vector<Bit>* Filter(typename VisitorSignatureHelper<bool, T...>::type f,
+                      std::shared_ptr<ThreadPool> thread_pool = nullptr) {
     size_t count = Count();
-    Vector<Bit> filter_mask = ctx_.NewVectorBuf<Bit>(count);
-    memset(filter_mask.GetVectorBuf().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
+    Vector<Bit>* filter_mask = ctx_.NewVector<Bit>(count);
+    // memset(filter_mask->MutableData(), 0, filter_mask.BytesCapacity());
     Foreach<void, T...>(
         [&](size_t idx, const T*... args) {
           if (f(idx, args...)) {
-            filter_mask.Set(idx, Bit(true));
+            filter_mask->Set(idx, Bit(true));
           }
         },
         thread_pool);
@@ -280,7 +280,7 @@ class Table : public DynObject {
   }
   Table* Filter(Vector<Bit> bits);
 
-  Vector<Bit> Dedup(StringView column, uint32_t k);
+  Vector<Bit>* Dedup(StringView column, uint32_t k);
 
   std::pair<Table*, Table*> Split(Vector<Bit> bits);
 

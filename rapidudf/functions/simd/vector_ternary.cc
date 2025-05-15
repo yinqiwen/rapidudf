@@ -72,7 +72,6 @@ template <typename OPT>
 HWY_INLINE void simd_vector_ternary_op_impl(const typename OPT::operand_t* a, const typename OPT::operand_t* b,
                                             const typename OPT::operand_t* c, typename OPT::operand_t* output) {
   using D = hn::ScalableTag<typename OPT::operand_t>;
-  constexpr D d;
   auto transform_func = do_simd_ternary_op<D, OPT::op>;
   do_ternary_transform(a, b, c, output, transform_func);
 }

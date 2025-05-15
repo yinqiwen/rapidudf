@@ -560,8 +560,8 @@ TEST(JitCompiler, vector_log2) {
   JitCompiler compiler;
   std::string content = "log2(x)";
 
-  std::vector<float> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1};
-  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
+  std::vector<double> fvs{0.3, 0.5, 3.2, 0.6, 4, 8, 1.1, 9};
+  auto rc5 = compiler.CompileExpression<Vector<double>, Context&, Vector<double>>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }

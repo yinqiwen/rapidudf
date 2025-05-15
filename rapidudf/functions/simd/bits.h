@@ -19,22 +19,21 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/functions/simd/vector_op.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/types/arrow.h"
 #include "rapidudf/types/vector.h"
 
 namespace rapidudf {
 namespace functions {
-void simd_vector_bits_not(Vector<Bit> src, Vector<Bit> dst);
-void simd_vector_bits_and(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
-void simd_vector_bits_or(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
-void simd_vector_bits_xor(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
-size_t simd_vector_bits_count_true(Vector<Bit> src);
+// void simd_vector_bits_not(Vector<Bit> src, Vector<Bit> dst);
+// void simd_vector_bits_and(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
+// void simd_vector_bits_or(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
+// void simd_vector_bits_xor(Vector<Bit> left, Vector<Bit> right, Vector<Bit> dst);
+// size_t simd_vector_bits_count_true(Vector<Bit> src);
 
-void simd_vector_bits_not(const ArrowVector<Bit>* src, ArrowVector<Bit>* dst);
-void simd_vector_bits_and(const ArrowVector<Bit>* left, const ArrowVector<Bit>* right, ArrowVector<Bit>* dst);
-void simd_vector_bits_or(const ArrowVector<Bit>* left, const ArrowVector<Bit>* right, ArrowVector<Bit>* dst);
-void simd_vector_bits_xor(const ArrowVector<Bit>* left, const ArrowVector<Bit>* right, ArrowVector<Bit>* dst);
-size_t simd_vector_bits_count_true(const ArrowVector<Bit>* src);
+void simd_vector_bits_not(const Vector<Bit>* src, Vector<Bit>* dst);
+void simd_vector_bits_and(const Vector<Bit>* left, const Vector<Bit>* right, Vector<Bit>* dst);
+void simd_vector_bits_or(const Vector<Bit>* left, const Vector<Bit>* right, Vector<Bit>* dst);
+void simd_vector_bits_xor(const Vector<Bit>* left, const Vector<Bit>* right, Vector<Bit>* dst);
+size_t simd_vector_bits_count_true(const Vector<Bit>* src);
 
 }  // namespace functions
 

@@ -20,6 +20,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "fmt/format.h"
@@ -51,6 +52,9 @@ struct StringView {
     static_assert(sizeof(StringView) == 16);
     memset(this, 0, sizeof(StringView));
   }
+
+  StringView(const StringView& other) = default;
+  StringView& operator=(const StringView& other) = default;
 
   StringView(const char* data, int32_t len) : size_(len) {
     // VELOX_CHECK_GE(len, 0);
@@ -96,7 +100,7 @@ struct StringView {
   //
   /* implicit */ StringView(const char* data) : StringView(data, strlen(data)) {}
 
-  explicit StringView(const std::string& value) : StringView(value.data(), value.size()) {}
+  StringView(const std::string& value) : StringView(value.data(), value.size()) {}
   explicit StringView(std::string&& value) = delete;
 
   explicit StringView(std::string_view value) : StringView(value.data(), value.size()) {}
@@ -163,6 +167,12 @@ struct StringView {
   bool operator>(const StringView& other) const { return compare(other) > 0; }
 
   bool operator>=(const StringView& other) const { return compare(other) >= 0; }
+
+  // StringView& operator=(const std::string& str) {
+  //   StringView other(str);
+  //   mempcpy(this, &other, sizeof(StringView));
+  //   return *this;
+  // }
 
   operator std::string() const { return std::string(data(), size()); }
 

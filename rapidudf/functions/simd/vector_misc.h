@@ -19,54 +19,34 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/functions/simd/vector_op.h"
 #include "rapidudf/meta/optype.h"
-#include "rapidudf/types/arrow.h"
 #include "rapidudf/types/vector.h"
 namespace rapidudf {
 namespace functions {
 template <typename T>
-T simd_vector_dot_distance(Vector<T> left, Vector<T> right);
+T simd_vector_dot_distance(const Vector<T>* left, const Vector<T>* right);
 template <typename T>
-T simd_vector_cosine_distance(Vector<T> left, Vector<T> right);
+T simd_vector_cosine_distance(const Vector<T>* left, const Vector<T>* right);
 template <typename T>
-T simd_vector_l2_distance(Vector<T> left, Vector<T> right);
-
-// template <typename T>
-// T simd_vector_dot_distance(const ArrowVector<T>* left, const ArrowVector<T>* right);
-// template <typename T>
-// T simd_vector_cosine_distance(const ArrowVector<T>* left, const ArrowVector<T>* right);
-// template <typename T>
-// T simd_vector_l2_distance(const ArrowVector<T>* left, const ArrowVector<T>* right);
+T simd_vector_l2_distance(const Vector<T>* left, const Vector<T>* right);
 
 template <typename T>
-Vector<T> simd_vector_iota(Context& ctx, T start, uint32_t n);
+Vector<T>* simd_vector_iota(Context& ctx, T start, uint32_t n);
 template <typename T>
-T simd_vector_sum(Vector<T> left);
+T simd_vector_sum(const Vector<T>* left);
 template <typename T>
-T simd_vector_avg(Vector<T> left);
+T simd_vector_avg(const Vector<T>* left);
 template <typename T>
-T simd_vector_reduce_max(Vector<T> left);
+T simd_vector_reduce_max(const Vector<T>* left);
 template <typename T>
-T simd_vector_reduce_min(Vector<T> left);
-
-// template <typename T>
-// T simd_vector_sum(const ArrowVector<T>* left);
-// template <typename T>
-// T simd_vector_avg(const ArrowVector<T>* left);
-// template <typename T>
-// T simd_vector_reduce_max(const ArrowVector<T>* left);
-// template <typename T>
-// T simd_vector_reduce_min(const ArrowVector<T>* left);
+T simd_vector_reduce_min(const Vector<T>* left);
 
 template <typename T>
-Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indices);
+Vector<T>* simd_vector_gather(Context& ctx, const Vector<T>* data, const Vector<int32_t>* indices);
 template <typename T>
-Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits);
+Vector<T>* simd_vector_filter(Context& ctx, const Vector<T>* data, const Vector<Bit>* bits);
 
 template <typename T, OpToken op = OP_EQUAL>
-int simd_vector_find(Vector<T> data, T v);
-
-template <typename T, OpToken op = OP_EQUAL>
-int simd_vector_find(const ArrowVector<T>* data, T v);
+int simd_vector_find(const Vector<T>* data, T v);
 
 /**
  * return matched data count, store matched mask into param 'mask'

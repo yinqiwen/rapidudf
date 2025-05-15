@@ -22,21 +22,21 @@
 namespace rapidudf {
 namespace functions {
 template <typename T>
-void simd_vector_sort(Context& ctx, Vector<T> data, bool descending);
+void simd_vector_sort(Context& ctx, Vector<T>* data, bool descending);
 template <typename T>
-void simd_vector_select(Context& ctx, Vector<T> data, size_t k, bool descending);
+void simd_vector_select(Context& ctx, Vector<T>* data, size_t k, bool descending);
 template <typename T>
-void simd_vector_topk(Context& ctx, Vector<T> data, size_t k, bool descending);
+void simd_vector_topk(Context& ctx, Vector<T>* data, size_t k, bool descending);
 template <typename T>
-Vector<size_t> simd_vector_argsort(Context& ctx, Vector<T> data, bool descending);
+Vector<size_t>* simd_vector_argsort(Context& ctx, Vector<T>* data, bool descending);
 template <typename T>
-Vector<size_t> simd_vector_argselect(Context& ctx, Vector<T> data, size_t k, bool descending);
+Vector<size_t>* simd_vector_argselect(Context& ctx, Vector<T>* data, size_t k, bool descending);
 
 template <typename K, typename V>
-void simd_vector_sort_key_value(Context& ctx, Vector<K> key, Vector<V> value, bool descending);
+void simd_vector_sort_key_value(Context& ctx, Vector<K>* key, Vector<V>* value, bool descending);
 template <typename K, typename V>
-void simd_vector_select_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
+void simd_vector_select_key_value(Context& ctx, Vector<K>* key, Vector<V>* value, size_t k, bool descending);
 template <typename K, typename V>
-void simd_vector_topk_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending);
+void simd_vector_topk_key_value(Context& ctx, Vector<K>* key, Vector<V>* value, size_t k, bool descending);
 }  // namespace functions
 }  // namespace rapidudf
