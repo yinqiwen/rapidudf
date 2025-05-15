@@ -37,10 +37,10 @@ extern void init_builtin_time_funcs();
 
 static std::once_flag g_init_builtin_flag;
 void init_builtin() {
-  for (uint32_t op = OP_UNARY_BEGIN; op < OP_END; op++) {
-    get_builtin_func_op_mapping().emplace(kOpTokenStrs[op], static_cast<OpToken>(op));
-  }
   std::call_once(g_init_builtin_flag, []() {
+    for (uint32_t op = OP_UNARY_BEGIN; op < OP_END; op++) {
+      get_builtin_func_op_mapping().emplace(kOpTokenStrs[op], static_cast<OpToken>(op));
+    }
     init_builtin_math_funcs();
     init_builtin_stl_vectors_funcs();
     init_builtin_stl_maps_funcs();
