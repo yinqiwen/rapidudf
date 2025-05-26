@@ -53,29 +53,31 @@ using RowSchemaPtr = std::unique_ptr<RowSchema>;
 class Rows {
  public:
   explicit Rows(Context& ctx, std::vector<const uint8_t*>&& objs, const RowSchema& s)
-      : ctx_(ctx), objs_(std::move(objs)), schema_(s) {}
+      : ctx_(ctx), objs_(std::move(objs)), obj_ptrs_(nullptr), schema_(s), dirty_(true) {}
   absl::Status Insert(size_t pos, const uint8_t* ptr);
   void Append(const std::vector<const uint8_t*>& objs);
 
   const RowSchema& GetSchema() const { return schema_; }
-  Vector<Pointer> GetRowPtrs() const;
+  Vector<Pointer>* GetRowPtrs();
   const std::vector<const uint8_t*> GetRawRowPtrs() const { return objs_; }
 
   size_t RowCount() const { return objs_.size(); }
 
-  void Filter(Vector<Bit> bits);
+  void Filter(Vector<Bit>* bits);
   void Truncate(size_t k);
   void Truncate(size_t pos, size_t k);
-  void Gather(Vector<int32_t> indices);
+  void Gather(Vector<int32_t>* indices);
 
   void Reset(std::vector<const uint8_t*>&& objs);
 
  private:
-  void SetPointers(Vector<Pointer> ptrs);
+  void SetPointers(Vector<Pointer>* ptrs);
 
   Context& ctx_;
   std::vector<const uint8_t*> objs_;
+  Vector<Pointer>* obj_ptrs_;
   RowSchema schema_;
+  bool dirty_;
 };
 using RowsPtr = std::unique_ptr<Rows>;
 }  // namespace table

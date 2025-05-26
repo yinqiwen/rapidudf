@@ -77,39 +77,39 @@ absl::Status Value::CopyFrom(ValuePtr other) {
 }
 
 absl::StatusOr<::llvm::Value*> Value::GetStructPtrValue() {
-  if (!dtype_.IsSimdVector() && !dtype_.IsStringView()) {
-    return absl::InvalidArgumentError(fmt::format("Can not retirve simd vector ptr field on {}", dtype_));
+  if (!dtype_.IsStringView()) {
+    return absl::InvalidArgumentError(fmt::format("Can not retirve  string view ptr field on {}", dtype_));
   }
   if (ptr_element_type_ == nullptr) {
-    return absl::InvalidArgumentError(fmt::format("Can not retirve simd vector ptr field  with empty type"));
+    return absl::InvalidArgumentError(fmt::format("Can not retirve  string view ptr field  with empty type"));
   }
   auto ptr_field_ptr = ir_builder_->CreateInBoundsGEP(
       ptr_element_type_, val_, std::vector<::llvm::Value*>{ir_builder_->getInt32(0), ir_builder_->getInt32(1)});
   return ir_builder_->CreateLoad(::llvm::PointerType::get(ir_builder_->getInt64Ty(), 0), ptr_field_ptr);
 }
 absl::StatusOr<::llvm::Value*> Value::GetStructSizeValue() {
-  if (!dtype_.IsSimdVector() && !dtype_.IsStringView()) {
-    return absl::InvalidArgumentError(fmt::format("Can not retirve simd vector size field on {}", dtype_));
+  if (!dtype_.IsStringView()) {
+    return absl::InvalidArgumentError(fmt::format("Can not retirve string view size field on {}", dtype_));
   }
   if (ptr_element_type_ == nullptr) {
-    return absl::InvalidArgumentError(fmt::format("Can not retirve simd vector size field  with empty type"));
+    return absl::InvalidArgumentError(fmt::format("Can not retirve  string view size field  with empty type"));
   }
   auto size_field_ptr = ir_builder_->CreateInBoundsGEP(
       ptr_element_type_, val_, std::vector<::llvm::Value*>{ir_builder_->getInt32(0), ir_builder_->getInt32(0)});
   return ir_builder_->CreateLoad(ir_builder_->getInt64Ty(), size_field_ptr);
 }
-absl::StatusOr<ValuePtr> Value::GetVectorSizeValue() {
-  auto size_result = GetStructSizeValue();
-  if (!size_result.ok()) {
-    return size_result.status();
-  }
-  ::llvm::Value* size_capacity_val = size_result.value();
-  size_capacity_val = ir_builder_->CreateLShr(size_capacity_val, ir_builder_->getInt64(1));
-  auto mask = ir_builder_->getInt64(0x7FFFFFFFLL);
-  size_capacity_val = ir_builder_->CreateAnd(size_capacity_val, mask);
-  size_capacity_val = ir_builder_->CreateTrunc(size_capacity_val, ir_builder_->getInt32Ty());
-  return New(DATA_I32, ir_builder_, size_capacity_val);
-}
+// absl::StatusOr<ValuePtr> Value::GetVectorSizeValue() {
+//   auto size_result = GetStructSizeValue();
+//   if (!size_result.ok()) {
+//     return size_result.status();
+//   }
+//   ::llvm::Value* size_capacity_val = size_result.value();
+//   size_capacity_val = ir_builder_->CreateLShr(size_capacity_val, ir_builder_->getInt64(1));
+//   auto mask = ir_builder_->getInt64(0x7FFFFFFFLL);
+//   size_capacity_val = ir_builder_->CreateAnd(size_capacity_val, mask);
+//   size_capacity_val = ir_builder_->CreateTrunc(size_capacity_val, ir_builder_->getInt32Ty());
+//   return New(DATA_I32, ir_builder_, size_capacity_val);
+// }
 
 absl::Status Value::Inc(uint64_t v) {
   if (ptr_element_type_ == nullptr) {

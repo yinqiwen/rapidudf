@@ -37,7 +37,11 @@ namespace compiler {
 ValuePtr CodeGen::NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type) {
   return Value::New(dtype, builder_.get(), val, type);
 }
-
+ValuePtr CodeGen::NewU64Var(uint64_t init) {
+  ::llvm::Value* cursor_val = builder_->CreateAlloca(builder_->getInt64Ty());
+  builder_->CreateStore(builder_->getInt64(init), cursor_val);
+  return Value::New(DATA_U64, builder_.get(), cursor_val, builder_->getInt64Ty());
+}
 ValuePtr CodeGen::NewU32Var(uint32_t init) {
   ::llvm::Value* cursor_val = builder_->CreateAlloca(builder_->getInt32Ty());
   builder_->CreateStore(builder_->getInt32(init), cursor_val);
@@ -53,6 +57,11 @@ ValuePtr CodeGen::NewVar(DType dtype) {
   auto typ = get_type(builder_->getContext(), dtype);
   ::llvm::Value* cursor_val = builder_->CreateAlloca(typ);
   return Value::New(dtype, builder_.get(), cursor_val, typ);
+}
+
+ValuePtr CodeGen::NewU64(uint64_t v) {
+  auto val = builder_->getInt64(v);
+  return NewValue(DATA_U64, val);
 }
 
 ValuePtr CodeGen::NewU32(uint32_t v) {

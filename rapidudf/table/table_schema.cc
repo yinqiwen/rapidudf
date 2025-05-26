@@ -60,7 +60,7 @@ bool TableSchema::ExistRow(const RowSchema& row) const {
 
 absl::Status TableSchema::AddColumn(const std::string& name, const DType& dtype, const RowSchema* schema,
                                     uint32_t field_idx) {
-  auto result = Add(name, dtype);
+  auto result = Add(name, dtype.ToPtr());
   if (!result.ok()) {
     return result.status();
   }

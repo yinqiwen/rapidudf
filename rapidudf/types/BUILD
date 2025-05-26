@@ -23,6 +23,9 @@ cc_library(
     hdrs = [
         "pointer.h",
     ],
+    deps = [
+        "@com_google_absl//absl/types:span",
+    ],
 )
 
 cc_library(

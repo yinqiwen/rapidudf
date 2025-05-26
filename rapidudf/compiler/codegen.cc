@@ -57,6 +57,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/vector.h"
 namespace rapidudf {
 namespace compiler {
 
@@ -194,7 +195,6 @@ absl::StatusOr<DType> CodeGen::NormalizeDType(const std::vector<DType>& dtypes) 
 absl::StatusOr<::llvm::Type*> CodeGen::GetType(DType dtype) {
   auto type = get_type(*context_, dtype);
   if (nullptr == type) {
-    // abort();
     RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError(fmt::format("get type failed for:{}", dtype)));
   }
   return type;
@@ -203,6 +203,7 @@ absl::StatusOr<::llvm::Type*> CodeGen::GetType(DType dtype) {
 absl::StatusOr<::llvm::FunctionType*> CodeGen::GetFunctionType(const FunctionDesc& desc) {
   auto return_type_result = GetType(desc.return_type);
   if (!return_type_result.ok()) {
+    abort();
     return return_type_result.status();
   }
   ::llvm::Type* return_type = return_type_result.value();
@@ -265,6 +266,21 @@ absl::Status CodeGen::DeclareExternFunctions(
   auto& dylib = jit_->getMainJITDylib();
   ::llvm::orc::SymbolMap extern_func_map;
   ::llvm::orc::MangleAndInterner mangle(jit_->getExecutionSession(), jit_->getDataLayout());
+
+  FunctionDesc vector_size_func_desc;
+  vector_size_func_desc.name = std::string(kVectorGetSizeFuncName);
+  vector_size_func_desc.return_type = DATA_I32;
+  vector_size_func_desc.arg_types.emplace_back(get_dtype<void*>());
+  vector_size_func_desc.func = reinterpret_cast<void*>(VectorBase::GetSize);
+  func_calls.emplace(vector_size_func_desc.name, &vector_size_func_desc);
+
+  FunctionDesc vector_data_func_desc;
+  vector_data_func_desc.name = std::string(kVectorGetDataFuncName);
+  vector_data_func_desc.return_type = get_dtype<const uint8_t*>();
+  vector_data_func_desc.arg_types.emplace_back(get_dtype<void*>());
+  vector_data_func_desc.func = reinterpret_cast<void*>(VectorBase::GetData);
+  func_calls.emplace(vector_data_func_desc.name, &vector_data_func_desc);
+
   for (auto [_, desc] : func_calls) {
     auto exec_addr = ::llvm::orc::ExecutorAddr::fromPtr(desc->func);
     extern_func_map.insert({mangle(desc->name), {exec_addr, ::llvm::JITSymbolFlags::Callable}});
@@ -290,7 +306,6 @@ absl::Status CodeGen::DeclareExternFunctions(
         }
       }
     }
-
     extern_funcs_[desc->name] = extern_func;
   }
 

@@ -39,13 +39,13 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
   auto* absl_span_type = ::llvm::StructType::create(ctx, "absl_span");
   absl_span_type->setBody({pointer_type, size_type});
 
-  auto* simd_vector_type = ::llvm::StructType::create(ctx, "simd_vector");
-  simd_vector_type->setBody({size_type, pointer_type});
+  // auto* simd_vector_type = ::llvm::StructType::create(ctx, "simd_vector");
+  // simd_vector_type->setBody({size_type, pointer_type});
   // auto* simd_vector_type = ::llvm::IntegerType::get(ctx, 128);
 }
 ::llvm::Type* get_type(::llvm::LLVMContext& ctx, DType dtype) {
   if (dtype.IsPtr()) {
-    if (dtype.IsContextPtr()) {
+    if (dtype.IsContextPtr() || dtype.IsSimdVectorPtr()) {
       return ::llvm::PointerType::get(ctx, 0);
     }
     auto base_type = get_type(ctx, dtype.PtrTo());
@@ -60,10 +60,10 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
     return ::llvm::StructType::getTypeByName(ctx, "absl_span");
     // return ::llvm::IntegerType::get(ctx, 128);
   }
-  if (dtype.IsSimdVector()) {
-    return ::llvm::StructType::getTypeByName(ctx, "simd_vector");
-    // return ::llvm::IntegerType::get(ctx, 128);
-  }
+  // if (dtype.IsSimdVector()) {
+  //   return ::llvm::StructType::getTypeByName(ctx, "simd_vector");
+  //   // return ::llvm::IntegerType::get(ctx, 128);
+  // }
 
   switch (dtype.GetFundamentalType()) {
     case DATA_VOID: {
@@ -110,7 +110,7 @@ void init_buitin_types(::llvm::LLVMContext& ctx) {
 }
 
 ::llvm::VectorType* get_vector_type(::llvm::LLVMContext& ctx, DType dtype) {
-  DType ele_dtype = dtype.Elem();
+  DType ele_dtype = dtype.PtrTo().Elem();
   uint32_t n = 0;
   if (ele_dtype.Bits() > 0 && ele_dtype.Bits() <= 128) {
     n = kVectorUnitSize;

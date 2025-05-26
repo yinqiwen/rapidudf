@@ -21,6 +21,7 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/types/vector.h"
 
 using namespace rapidudf;
 
@@ -53,8 +54,8 @@ TEST(JitCompiler, array_simple) {
     }
   )";
 
-  auto result1 = compiler.CompileFunction<rapidudf::Vector<double>, rapidudf::Context&, rapidudf::Vector<double>,
-                                          rapidudf::Vector<double>>(source1);
+  auto result1 =
+      compiler.CompileFunction<simd_vector_f64, rapidudf::Context&, simd_vector_f64, simd_vector_f64>(source1);
   if (!result1.ok()) {
     RUDF_ERROR("###{}", result1.status().ToString());
   }
@@ -66,12 +67,11 @@ TEST(JitCompiler, array_simple) {
     yy.emplace_back(i + 101);
   }
   rapidudf::Context ctx;
-  auto fr = ff(ctx, xx, yy);
+  auto fr = ff(ctx, ctx.NewVector(xx), ctx.NewVector(yy));
 }
 
 TEST(JitCompiler, vector_cmp) {
   std::vector<int> vec{1, 2, 3};
-  Vector<int> simd_vec(vec);
   JitCompiler compiler;
   std::string content = R"(
     simd_vector<i32> test_func(Context ctx,simd_vector<i32> x){
@@ -79,13 +79,13 @@ TEST(JitCompiler, vector_cmp) {
       return 5+x;
     }
   )";
-  auto rc = compiler.CompileFunction<Vector<int>, Context&, Vector<int>>(content);
+  auto rc = compiler.CompileFunction<simd_vector_i32, Context&, simd_vector_i32>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
   Context ctx;
-  auto result = f(ctx, simd_vec);
-  ASSERT_EQ(result.Size(), vec.size());
-  for (size_t i = 0; i < result.Size(); i++) {
-    ASSERT_FLOAT_EQ(result[i], vec[i] + 5);
+  auto result = f(ctx, ctx.NewVector(vec));
+  ASSERT_EQ(result->Size(), vec.size());
+  for (size_t i = 0; i < result->Size(); i++) {
+    ASSERT_FLOAT_EQ((*result)[i], vec[i] + 5);
   }
 }

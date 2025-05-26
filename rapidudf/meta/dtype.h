@@ -74,6 +74,9 @@ class DType {
       return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR && fixed_size == ctrl_.fixed_array_size_;
     }
   }
+  bool IsSimdVectorPtr(size_t fixed_size = 0) const { return IsPtr() && (PtrTo().IsSimdVector(fixed_size)); }
+  bool IsSimdVectorBitPtr() const { return IsSimdVectorPtr() && ctrl_.t0_ == DATA_BIT; }
+
   bool IsVector() const { return ctrl_.container_type_ == COLLECTION_VECTOR; }
   bool IsArray(size_t fixed_size = 0) const {
     if (fixed_size == 0) {
@@ -90,7 +93,7 @@ class DType {
   bool IsCollection() const { return ctrl_.container_type_ != 0; }
   bool IsPtr() const { return ctrl_.ptr_bit_ == 1; }
   bool IsIntegerPtr() const { return IsPtr() && (PtrTo().IsInteger()); }
-  bool IsSimdVectorBit() const { return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR && ctrl_.t0_ == DATA_BIT; }
+
   bool IsPrimitive() const { return IsFundamental() && (ctrl_.t0_ >= DATA_BIT && ctrl_.t0_ <= DATA_STRING_VIEW); }
   bool IsFundamental() const { return ctrl_.ptr_bit_ == 0 && ctrl_.container_type_ == 0; }
   bool IsNumber() const { return IsFundamental() && (ctrl_.t0_ >= DATA_U8 && ctrl_.t0_ <= DATA_F80); }
@@ -106,6 +109,7 @@ class DType {
   bool IsU32() const { return IsFundamental() && (ctrl_.t0_ == DATA_U32); }
   bool IsSigned() const;
   bool IsVoid() const { return ctrl_.t0_ == DATA_VOID; }
+  bool IsVoidPtr() const { return IsVoid() && IsPtr(); }
   bool IsBit() const { return IsFundamental() && ctrl_.t0_ == DATA_BIT; }
   bool IsBool() const { return IsBit(); }
   bool IsStringView() const { return IsFundamental() && ctrl_.t0_ == DATA_STRING_VIEW; }

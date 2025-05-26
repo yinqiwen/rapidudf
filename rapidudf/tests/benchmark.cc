@@ -20,6 +20,7 @@
 #include "rapidudf/context/context.h"
 #include "rapidudf/rapidudf.h"
 #include "rapidudf/types/string_view.h"
+#include "rapidudf/types/vector.h"
 
 static size_t test_n = 4099;
 static const double pi = 3.14159265358979323846264338327950288419716939937510;
@@ -42,10 +43,10 @@ static void init_test_numbers() {
   }
 }
 
+using namespace rapidudf;
+
 static rapidudf::JitFunction<double, double, double, double> g_expr_func;
-static rapidudf::JitFunction<rapidudf::Vector<double>, rapidudf::Context&, rapidudf::Vector<double>,
-                             rapidudf::Vector<double>>
-    g_vector_expr_func;
+static rapidudf::JitFunction<simd_vector_f64, rapidudf::Context&, simd_vector_f64, simd_vector_f64> g_vector_expr_func;
 
 static void DoRapidUDFExprSetup(const benchmark::State& state) {
   std::string source = R"(
@@ -92,8 +93,7 @@ static void DoRapidUDFVectorExprSetup(const benchmark::State& state) {
     }
   )";
   rapidudf::JitCompiler compiler;
-  auto result = compiler.CompileFunction<rapidudf::Vector<double>, rapidudf::Context&, rapidudf::Vector<double>,
-                                         rapidudf::Vector<double>>(source);
+  auto result = compiler.CompileFunction<simd_vector_f64, rapidudf::Context&, simd_vector_f64, simd_vector_f64>(source);
 
   g_vector_expr_func = std::move(result.value());
 
@@ -106,8 +106,8 @@ static void BM_rapidudf_vector_expr_func(benchmark::State& state) {
   rapidudf::Context ctx;
   for (auto _ : state) {
     ctx.Reset();
-    auto results = g_vector_expr_func(ctx, xx, yy);
-    RUDF_DEBUG("size:{}", results.Size());
+    auto results = g_vector_expr_func(ctx, ctx.NewVector(xx), ctx.NewVector(yy));
+    RUDF_DEBUG("size:{}", results->Size());
   }
 }
 BENCHMARK(BM_rapidudf_vector_expr_func)->Setup(DoRapidUDFVectorExprSetup)->Teardown(DoRapidUDFVectorExprTeardown);
@@ -167,7 +167,6 @@ static void BM_native_wilson_ctr(benchmark::State& state) {
 }
 BENCHMARK(BM_native_wilson_ctr)->Setup(native_wilson_ctr_setup)->Teardown(native_wilson_ctr_teardown);
 
-using simd_vector_f32 = rapidudf::Vector<float>;
 static rapidudf::JitFunction<simd_vector_f32, rapidudf::Context&, simd_vector_f32, simd_vector_f32>
     g_vector_wilson_ctr_func;
 
@@ -192,8 +191,8 @@ static void BM_rapidudf_vector_wilson_ctr(benchmark::State& state) {
   rapidudf::Context ctx;
   for (auto _ : state) {
     ctx.Reset();
-    auto result = g_vector_wilson_ctr_func(ctx, exp_cnt, clk_cnt);
-    RUDF_DEBUG("{}", result.Size());
+    auto result = g_vector_wilson_ctr_func(ctx, ctx.NewVector(exp_cnt), ctx.NewVector(clk_cnt));
+    RUDF_DEBUG("{}", result->Size());
   }
 }
 BENCHMARK(BM_rapidudf_vector_wilson_ctr)->Setup(rapidudf_vector_wilson_ctr_setup);

@@ -100,7 +100,7 @@ absl::StatusOr<std::pair<DType, uint32_t>> DynObjectSchema::GetField(const std::
   return std::make_pair(found->second.dtype, found->second.bytes_offset);
 }
 absl::StatusOr<reflect::Field> DynObjectSchema::Add(const std::string& name, DType dtype) {
-  if (dtype.IsPrimitive() || dtype.IsSimdVector()) {
+  if (dtype.IsPrimitive() || dtype.IsSimdVectorPtr()) {
     // allowed dtype
     uint32_t byte_size = dtype.ByteSize();
     if (byte_size < 8) {

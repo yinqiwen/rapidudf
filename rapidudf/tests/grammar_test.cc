@@ -20,7 +20,9 @@
 
 #include "rapidudf/ast/context.h"
 #include "rapidudf/ast/grammar.h"
+#include "rapidudf/ast/symbols.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/reflect/simd_vector.h"
 
 using namespace rapidudf;
 using namespace rapidudf::ast;
@@ -84,6 +86,24 @@ TEST(Grammar, duplicate_var_name) {
     RUDF_ERROR("{}", f.status().ToString());
   }
   ASSERT_FALSE(f.ok());
+}
+
+TEST(Grammar, simd_vector) {
+  // spdlog::set_level(spdlog::level::debug);
+  ParseContext ctx;
+  std::string content = R"(
+    int test_func(simd_vector<f32> x){  
+     return 1;
+    }
+  )";
+
+  reflect::SimdVectorHelper<float>::Init();
+  Symbols::Init();
+  auto f = parse_function_ast(ctx, content);
+  if (!f.ok()) {
+    RUDF_ERROR("{}", f.status().ToString());
+  }
+  ASSERT_TRUE(f.ok());
 }
 
 TEST(Grammar, var_not_exist) {

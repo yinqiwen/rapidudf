@@ -111,7 +111,6 @@ template <typename OPT>
 HWY_INLINE void simd_vector_binary_op_impl(const typename OPT::operand_t* left, const typename OPT::operand_t* right,
                                            typename OPT::operand_t* output) {
   using D = hn::ScalableTag<typename OPT::operand_t>;
-  constexpr D d;
   auto transform_func = do_simd_binary_op<D, OPT::op>;
   do_binary_transform(left, right, output, transform_func);
 }

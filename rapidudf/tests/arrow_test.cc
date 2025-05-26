@@ -20,6 +20,8 @@
 #include <arrow/type_traits.h>
 #include <gtest/gtest.h>
 #include <vector>
+#include "rapidudf/context/context.h"
+#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
 #include "rapidudf/types/vector.h"
 
@@ -79,12 +81,26 @@ TEST(Arrow, simple) {
   std::vector<int*> ps;
   auto ptest = Vector<int*>::Make(nullptr, ps);
 
-  std::vector<std::string> ss{"hello", "world"};
+  std::vector<std::string> ss{"hello", "world", "aaaaaa", "aaaaa", "aaaaa"};
   auto vec = Vector<std::string>::Make(nullptr, ss).value();
   StringView sss = vec.Value(1);
-  RUDF_INFO("###{} \n", sss);
+  auto zero = vec.Slice(0, 0);
+  RUDF_INFO("###{} capcaity:{} {}/{}\n", sss, vec.BytesCapacity(), zero.Size(), zero.BytesCapacity());
 
   const StringView* xps = vec.Data();
 
   vec.Slice(0, 1);
+}
+
+TEST(Arrow, ptr) {
+  std::vector<const uint8_t*> ptrs;
+
+  auto x = Pointer::Wrap(ptrs);
+  std::vector<Pointer> y;
+  Vector<Pointer>::Wrap(nullptr, x);
+  Vector<Pointer>::Wrap(nullptr, y);
+
+  Context ctx;
+  ctx.NewVector(x);
+  ctx.NewVector(y);
 }

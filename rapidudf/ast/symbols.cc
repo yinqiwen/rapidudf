@@ -117,13 +117,14 @@ void Symbols::Init() {
       name_view = *name_str;
       symbol_cache.emplace(name, std::move(name_str));
     }
+
     if (dtype.IsPtr()) {
       kDtypeSymbols.insert_for_next_parse(name_view, {dtype, empty_attr});
     } else if (!dtype.IsPrimitive()) {
       DType reg_dtype = dtype;
-      if (!dtype.IsSimdVector()) {
-        reg_dtype = dtype.ToPtr();
-      }
+      // if (!dtype.IsSimdVector()) {
+      reg_dtype = dtype.ToPtr();
+      //}
       kDtypeSymbols.insert_for_next_parse(name_view, {reg_dtype, empty_attr});
     }
   });

@@ -87,7 +87,7 @@ absl::StatusOr<ValuePtr> CodeGen::CastTo(ValuePtr val, DType dst_dtype) {
     return val;
   }
   if (!src_dtype.CanCastTo(dst_dtype)) {
-    RUDF_LOG_RETURN_FMT_ERROR("Can NOT cast from {} to {}", src_dtype, dst_dtype);
+    RUDF_LOG_RETURN_FMT_ERROR("Can NOT cast from {} to {}:{}", src_dtype, dst_dtype);
   }
   if (src_dtype.IsJsonPtr() && dst_dtype.IsPrimitive()) {
     std::string func_name = GetFunctionName(functions::kBuiltinJsonExtract, dst_dtype);
@@ -114,6 +114,8 @@ absl::StatusOr<ValuePtr> CodeGen::CastTo(ValuePtr val, DType dst_dtype) {
       }
       return result.status();
     }
+  } else if (dst_dtype.IsVoidPtr() && src_dtype.IsPtr()) {
+    return val;
   }
 
   RUDF_LOG_RETURN_FMT_ERROR("Can NOT cast from {} to {}", src_dtype, dst_dtype);

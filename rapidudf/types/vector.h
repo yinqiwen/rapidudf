@@ -22,22 +22,53 @@
 #include <type_traits>
 #include <vector>
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "arrow/api.h"
 #include "arrow/type_traits.h"
 #include "rapidudf/common/arrow_helper.h"
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/optype.h"
+#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
+
 namespace rapidudf {
 static constexpr uint32_t kVectorUnitSize = 64;
-
 template <typename T>
-struct VectorBase {
-  static size_t GetSize(const T* t) { return t->Size(); }
-  static auto GetData(const T* t, size_t offset) { return t->Data(offset); }
+class Vector;
+namespace functions {
+template <typename T, OpToken op>
+int simd_vector_find(const Vector<T>* data, T v);
+template <typename T>
+T simd_vector_sum(const Vector<T>* left);
+template <typename T>
+T simd_vector_avg(const Vector<T>* left);
+template <typename T>
+T simd_vector_reduce_max(const Vector<T>* left);
+template <typename T>
+T simd_vector_reduce_min(const Vector<T>* left);
+
+size_t simd_vector_bits_count_true(const Vector<Bit>* left);
+
+}  // namespace functions
+
+class VectorBase {
+ public:
+  VectorBase(std::shared_ptr<arrow::Array> p) : data_(p) {}
+
+  const uint8_t* GetMemory() const { return data_->data()->GetValues<uint8_t>(1, 0); }
+  uint8_t* GetMutableMemory() { return const_cast<uint8_t*>(GetMemory()); }
+  size_t BytesCapacity() const { return data_->data()->buffers[1]->capacity(); }
+  int32_t Size() const { return static_cast<int32_t>(data_->length()); }
+
+  static int32_t GetSize(const VectorBase* v) { return v->Size(); }
+  static const uint8_t* GetData(const VectorBase* v) { return v->GetMemory(); }
+
+ protected:
+  std::shared_ptr<arrow::Array> data_;
 };
 
 template <typename T>
-class Vector : public VectorBase<Vector<T>> {
+class Vector : public VectorBase {
  public:
   using value_type = typename VectorElementTypeTraits<T>::DataType;
   using arrow_value_type = typename VectorElementTypeTraits<T>::ArrowDataType;
@@ -49,6 +80,9 @@ class Vector : public VectorBase<Vector<T>> {
   static absl::StatusOr<Vector> Make(arrow::MemoryPool* pool, size_t size);
   static absl::StatusOr<Vector> Wrap(arrow::MemoryPool* pool, const std::vector<T>& data, bool copy = false) {
     return Wrap(pool, data.data(), data.size(), data.capacity(), copy);
+  }
+  static absl::StatusOr<Vector> Wrap(arrow::MemoryPool* pool, const absl::Span<T>& data, bool copy = false) {
+    return Wrap(pool, data.data(), data.size(), data.size(), copy);
   }
 
   static absl::StatusOr<Vector> Make(arrow::MemoryPool* pool, const T* data, size_t size) {
@@ -75,7 +109,9 @@ class Vector : public VectorBase<Vector<T>> {
     }
   }
 
-  size_t Size() const { return data_->length(); }
+  explicit Vector(const std::vector<T>& data);
+
+  size_t Size() const { return VectorBase::Size(); }
   auto Data(size_t offset = 0) const {
     if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool>) {
       return data_->data()->GetValues<uint8_t>(1, offset / 8);
@@ -109,7 +145,12 @@ class Vector : public VectorBase<Vector<T>> {
     } else {
       auto actual_array = static_cast<typename VectorElementTypeTraits<T>::ArrayType*>(data_.get());
       auto v = actual_array->Value(offset);
-      return value_type(v);
+      if constexpr (std::is_same_v<Pointer, T>) {
+        uint64_t ptr_val = v;
+        return Pointer(ptr_val);
+      } else {
+        return value_type(v);
+      }
     }
   }
 
@@ -117,14 +158,44 @@ class Vector : public VectorBase<Vector<T>> {
 
   void Set(size_t offset, T v);
 
-  Vector<T> Slice(int64_t offset, int64_t length) const;
+  Vector<T> Slice(uint32_t offset, uint32_t length) const;
 
   void Resize(size_t new_size);
 
+  int Find(T v) { return functions::simd_vector_find<T, OP_EQUAL>(this, v); }
+  int FindNeq(T v) { return functions::simd_vector_find<T, OP_NOT_EQUAL>(this, v); }
+  int FindGt(T v) { return functions::simd_vector_find<T, OP_GREATER>(this, v); }
+  int FindGe(T v) { return functions::simd_vector_find<T, OP_GREATER_EQUAL>(this, v); }
+  int FindLt(T v) { return functions::simd_vector_find<T, OP_LESS>(this, v); }
+  int FindLe(T v) { return functions::simd_vector_find<T, OP_LESS_EQUAL>(this, v); }
+
+  T ReduceSum() { return functions::simd_vector_sum(this); }
+  T ReduceAvg() { return functions::simd_vector_avg(this); }
+  T ReduceMax() { return functions::simd_vector_reduce_max(this); }
+  T ReduceMin() { return functions::simd_vector_reduce_min(this); }
+
+  template <typename U = T, typename std::enable_if<std::is_same<U, Bit>::value, int>::type = 0>
+  size_t CountTrue() {
+    return functions::simd_vector_bits_count_true(*this);
+  }
+  template <typename U = T, typename std::enable_if<std::is_same<U, Bit>::value, int>::type = 0>
+  size_t CountFalse() {
+    return Size() - CountTrue();
+  }
+
  private:
-  Vector(std::shared_ptr<arrow::Array> p) : data_(p) {}
-  std::shared_ptr<arrow::Array> data_;
+  Vector(std::shared_ptr<arrow::Array> p) : VectorBase(p) {}
 };
+template <typename T>
+Vector<T>::Vector(const std::vector<T>& data) : VectorBase(nullptr) {
+  auto result = Vector<T>::Wrap(nullptr, data, false);
+  std::shared_ptr<arrow::Array> p;
+  if (result.ok()) {
+    p = result->data_;
+  }
+  data_ = p;
+}
+
 template <typename T>
 absl::StatusOr<Vector<T>> Vector<T>::Wrap(arrow::MemoryPool* pool, const T* data, size_t size, size_t capacity,
                                           bool copy) {
@@ -143,7 +214,7 @@ absl::StatusOr<Vector<T>> Vector<T>::Wrap(arrow::MemoryPool* pool, const T* data
       RUDF_LOG_RETURN_FMT_ERROR("Builder create failed:{}", status.ToString());
     }
     auto actual_builder = static_cast<typename VectorElementTypeTraits<T>::BuilderType*>(builder.get());
-    if constexpr (std::is_pointer_v<T>) {
+    if constexpr (std::is_pointer_v<T> || std::is_same_v<T, Pointer>) {
       const uint64_t* int_data = reinterpret_cast<const uint64_t*>(data);
       status = actual_builder->AppendValues(int_data, size);
     } else {
@@ -158,7 +229,7 @@ absl::StatusOr<Vector<T>> Vector<T>::Wrap(arrow::MemoryPool* pool, const T* data
       RUDF_LOG_RETURN_FMT_ERROR("Builder finish failed:{}", status.ToString());
     }
   } else {
-    typename arrow::CTypeTraits<T>::ArrowType arrow_type;
+    typename arrow::CTypeTraits<typename VectorElementTypeTraits<T>::ArrowDataType>::ArrowType arrow_type;
     size_t byte_length = 0;
     if (arrow_type.byte_width() > 0) {
       byte_length = size * arrow_type.byte_width();
@@ -192,7 +263,7 @@ absl::StatusOr<Vector<T>> Vector<T>::Make(arrow::MemoryPool* pool, const value_i
     if (val.has_value()) {
       if constexpr (std::is_same_v<value_type, StringView>) {
         const StringView& s = val.value();
-        actual_builder->Append(reinterpret_cast<const uint8_t*>(&s));
+        status = actual_builder->Append(reinterpret_cast<const uint8_t*>(&s));
       } else {
         status = actual_builder->Append(val.value());
       }
@@ -230,8 +301,8 @@ absl::StatusOr<Vector<T>> Vector<T>::Make(arrow::MemoryPool* pool, size_t size) 
   return Vector<T>(array_data);
 }
 template <typename T>
-Vector<T> Vector<T>::Slice(int64_t offset, int64_t length) const {
-  auto new_data = data_->Slice(offset, length);
+Vector<T> Vector<T>::Slice(uint32_t offset, uint32_t length) const {
+  auto new_data = data_->Slice(static_cast<int64_t>(offset), static_cast<int64_t>(length));
   return Vector<T>(new_data);
 }
 template <typename T>
@@ -262,5 +333,18 @@ void Vector<T>::Set(size_t offset, T v) {
     *p = v;
   }
 }
+
+using simd_vector_bool = Vector<Bit>*;
+using simd_vector_i8 = Vector<int8_t>*;
+using simd_vector_u8 = Vector<uint8_t>*;
+using simd_vector_i16 = Vector<int16_t>*;
+using simd_vector_u16 = Vector<uint16_t>*;
+using simd_vector_i32 = Vector<int32_t>*;
+using simd_vector_u32 = Vector<uint32_t>*;
+using simd_vector_i64 = Vector<int64_t>*;
+using simd_vector_u64 = Vector<uint64_t>*;
+using simd_vector_f32 = Vector<float>*;
+using simd_vector_f64 = Vector<double>*;
+using simd_vector_string = Vector<StringView>*;
 
 }  // namespace rapidudf

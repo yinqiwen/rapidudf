@@ -38,7 +38,7 @@ namespace rapidudf {
 namespace ast {
 void RPN::SetDType(ParseContext& ctx, DType dtype) {
   this->dtype = dtype;
-  if (dtype.IsSimdVector()) {
+  if (dtype.IsSimdVectorPtr()) {
     std::string fname = GetFunctionName(functions::kBuiltinNewSimdVector, dtype.Elem());
     std::ignore = ctx.CheckFuncExist(fname);
     std::ignore = ctx.CheckFuncExist(functions::kBuiltinThrowVectorExprEx);
@@ -129,7 +129,7 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v, RP
           return absl::InvalidArgumentError("No avaialble");
         }
         if (result.ok()) {
-          if (result.value().dtype.IsSimdVector()) {
+          if (result.value().dtype.IsSimdVectorPtr()) {
             ctx.SetVectorExressionFlag(true);
           }
         }
@@ -167,7 +167,7 @@ absl::StatusOr<VarTag> VarRef::Validate(ParseContext& ctx) {
     return result;
   }
   auto var = result.value();
-  if (var.dtype.IsSimdVector()) {
+  if (var.dtype.IsSimdVectorPtr()) {
     ctx.SetVectorExressionFlag(true);
   }
   return var;
@@ -254,7 +254,7 @@ absl::StatusOr<VarTag> FieldAccess::Validate(ParseContext& ctx, VarTag src) {
       return ctx.GetErrorStatus(fmt::format("Can NOT get field:{} accessor for dtype:{}", field, src_dtype));
     }
     DType field_dtype = *struct_member.member_field_dtype;
-    if (!field_dtype.IsPrimitive() && !field_dtype.IsPtr() && !field_dtype.IsSimdVector() &&
+    if (!field_dtype.IsPrimitive() && !field_dtype.IsPtr() && !field_dtype.IsSimdVectorPtr() &&
         !field_dtype.IsStdStringView() && !field_dtype.IsStringView() && !field_dtype.IsAbslSpan()) {
       field_dtype = field_dtype.ToPtr();
     }
@@ -283,7 +283,7 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
         bool can_not = false;
         if (result->dtype.IsBool()) {
           can_not = true;
-        } else if (result->dtype.IsSimdVector() && result->dtype.Elem().IsBool()) {
+        } else if (result->dtype.IsSimdVectorPtr() && result->dtype.Elem().IsBool()) {
           can_not = true;
           // std::string fname = GetFunctionName(*op, result->dtype);
           // auto check_result = ctx.CheckFuncExist(fname, true);
@@ -300,7 +300,7 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
         bool can_neg = false;
         if (result->dtype.IsNumber() && result->dtype.IsSigned()) {
           can_neg = true;
-        } else if (result->dtype.IsSimdVector() && result->dtype.Elem().IsSigned()) {
+        } else if (result->dtype.IsSimdVectorPtr() && result->dtype.Elem().IsSigned()) {
           can_neg = true;
           // std::string fname = GetFunctionName(*op, result->dtype);
           // auto check_result = ctx.CheckFuncExist(fname, true);
@@ -324,8 +324,8 @@ absl::StatusOr<VarTag> UnaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
 }
 
 static bool IsValidSimdVectorBinaryOperands(ParseContext& ctx, DType left, DType right) {
-  if (left.IsSimdVector() || right.IsSimdVector()) {
-    if (left.IsSimdVector() && right.IsSimdVector()) {
+  if (left.IsSimdVectorPtr() || right.IsSimdVectorPtr()) {
+    if (left.IsSimdVectorPtr() && right.IsSimdVectorPtr()) {
       if (left != right) {
         return false;
       }
@@ -370,7 +370,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
         break;
       }
 
-      if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
+      if (left_var.dtype.IsSimdVectorPtr() || right_result->dtype.IsSimdVectorPtr()) {
         if (IsValidSimdVectorBinaryOperands(ctx, left_var.dtype, right_result->dtype)) {
           can_binary_op = true;
         } else {
@@ -436,13 +436,13 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
           return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
                                                 left_result->dtype, right_result->dtype));
         }
-        if (right_result->dtype.IsSimdVector()) {
+        if (right_result->dtype.IsSimdVectorPtr()) {
           left_var.dtype = right_result->dtype;
         }
         if (op == OP_POW) {
           // RUDF_INFO("#####{}", GetFunctionName(op, left_var.dtype.ToSimdVector()));
           // std::ignore = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype.ToSimdVector()));
-          if (left_var.dtype.IsSimdVector()) {
+          if (left_var.dtype.IsSimdVectorPtr()) {
             std::ignore = ctx.CheckFuncExist(GetFunctionName(op, left_var.dtype.ToSimdVector()));
           }
         }
@@ -491,7 +491,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
           }
         } else if (left_var.dtype.IsJsonPtr() && right_result->dtype.IsJsonPtr()) {
           can_cmp = true;
-        } else if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
+        } else if (left_var.dtype.IsSimdVectorPtr() || right_result->dtype.IsSimdVectorPtr()) {
           can_cmp = true;
           auto left_ele_dtype = left_var.dtype.Elem();
           auto right_ele_dtype = right_result->dtype.Elem();
@@ -518,8 +518,8 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
             return result.status();
           }
         }
-        if (left_var.dtype.IsSimdVector() || right_result->dtype.IsSimdVector()) {
-          left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+        if (left_var.dtype.IsSimdVectorPtr() || right_result->dtype.IsSimdVectorPtr()) {
+          left_var = VarTag(DType(DATA_BIT).ToSimdVector().ToPtr());
         } else {
           left_var = VarTag(DType(DATA_BIT));
         }
@@ -528,13 +528,13 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
       }
       case OP_LOGIC_AND:
       case OP_LOGIC_OR: {
-        if (left_var.dtype.IsSimdVectorBit() || right_result->dtype.IsSimdVectorBit()) {
+        if (left_var.dtype.IsSimdVectorBitPtr() || right_result->dtype.IsSimdVectorBitPtr()) {
           // std::string implicit_func_call = GetFunctionName(op, left_var.dtype, right_result->dtype);
           // auto result = ctx.CheckFuncExist(implicit_func_call, true);
           // if (!result.ok()) {
           //   return result.status();
           // }
-          left_var = VarTag(DType(DATA_BIT).ToSimdVector());
+          left_var = VarTag(DType(DATA_BIT).ToSimdVector().ToPtr());
         } else {
           if (!left_var.dtype.IsBit() || !right_result->dtype.IsBit()) {
             return ctx.GetErrorStatus(fmt::format("can NOT do {} with left dtype:{}, right dtype:{}", op,
@@ -588,24 +588,24 @@ absl::StatusOr<VarTag> SelectExpr::Validate(ParseContext& ctx, RPN& rpn) {
         ternary_result_dtype = true_expr_result->dtype;
         return VarTag(ternary_result_dtype);
       }
-    } else if (cond_result->dtype.IsSimdVectorBit()) {
+    } else if (cond_result->dtype.IsSimdVectorBitPtr()) {
       bool can_select = false;
       std::string implicit_func_call;
-      if (true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
+      if (true_expr_result->dtype.IsSimdVectorPtr() && false_expr_result->dtype.IsSimdVectorPtr()) {
         if (true_expr_result->dtype == false_expr_result->dtype) {
           ternary_result_dtype = true_expr_result->dtype;
           can_select = true;
           // implicit_func_call =
           //     GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype);
         }
-      } else if (true_expr_result->dtype.IsSimdVector() && !false_expr_result->dtype.IsSimdVector()) {
+      } else if (true_expr_result->dtype.IsSimdVectorPtr() && !false_expr_result->dtype.IsSimdVectorPtr()) {
         if (ctx.CanCastTo(false_expr_result->dtype, true_expr_result->dtype.Elem())) {
           ternary_result_dtype = true_expr_result->dtype;
           can_select = true;
           // implicit_func_call =
           //     GetFunctionName(OP_CONDITIONAL, cond_result->dtype, true_expr_result->dtype, false_expr_result->dtype);
         }
-      } else if (!true_expr_result->dtype.IsSimdVector() && false_expr_result->dtype.IsSimdVector()) {
+      } else if (!true_expr_result->dtype.IsSimdVectorPtr() && false_expr_result->dtype.IsSimdVectorPtr()) {
         if (ctx.CanCastTo(true_expr_result->dtype, false_expr_result->dtype.Elem())) {
           ternary_result_dtype = false_expr_result->dtype;
           can_select = true;
@@ -786,7 +786,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
       if (!has_simd_vector && need_compute_dtype && arg_dtype.dtype > compute_dtype) {
         compute_dtype = arg_dtype.dtype;
       }
-      if (arg_dtype.dtype.IsSimdVector()) {
+      if (arg_dtype.dtype.IsSimdVectorPtr()) {
         has_simd_vector = true;
         if (need_compute_dtype) {
           compute_dtype = arg_dtype.dtype;

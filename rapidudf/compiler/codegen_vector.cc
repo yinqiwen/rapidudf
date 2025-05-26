@@ -37,6 +37,14 @@
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace compiler {
+
+absl::StatusOr<ValuePtr> CodeGen::GetVectorSizeValue(ValuePtr obj) {
+  return CallFunction(std::string(kVectorGetSizeFuncName), {obj});
+}
+absl::StatusOr<ValuePtr> CodeGen::GetVectorDataValue(ValuePtr obj) {
+  return CallFunction(std::string(kVectorGetDataFuncName), {obj});
+}
+
 absl::StatusOr<::llvm::Value*> CodeGen::NewConstantVectorValue(DType dtype, ::llvm::Value* val) {
   if (::llvm::isa<::llvm::Constant>(val)) {
     auto vector_type = get_vector_type(builder_->getContext(), dtype);

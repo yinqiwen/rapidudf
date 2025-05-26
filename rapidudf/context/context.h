@@ -80,6 +80,7 @@ class Context {
     ptrs_[tid] = p;
     return p;
   }
+
   template <typename T>
   Vector<T>* NewVector(size_t n) {
     auto result = Vector<T>::Make(arrow_pool_, n);
@@ -89,8 +90,8 @@ class Context {
     }
     return nullptr;
   }
-  template <typename T>
-  Vector<typename VectorElementTypeTraits<T>::DataType>* NewVector(const std::vector<T>& data, bool clone = false) {
+  template <typename T, template <typename> class Container = std::vector>
+  Vector<typename VectorElementTypeTraits<T>::DataType>* NewVector(const Container<T>& data, bool clone = false) {
     if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T> || std::is_same_v<bool, T> ||
                   std::is_same_v<Bit, T>) {
       using value_type = typename VectorElementTypeTraits<T>::DataType;

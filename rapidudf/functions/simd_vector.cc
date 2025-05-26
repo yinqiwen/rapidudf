@@ -99,7 +99,8 @@ static void register_simd_vector_sum() {
   RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_f0);
 
   func_name = GetFunctionName(OP_AVG, dtype.ToSimdVector());
-  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_vector_avg<T>);
+  T (*simd_1)(const Vector<T>*) = simd_vector_sum<T>;
+  RUDF_FUNC_REGISTER_WITH_NAME(func_name.c_str(), simd_1);
 }
 template <typename T>
 static void register_simd_vector_filter() {
@@ -194,8 +195,8 @@ static void register_simd_vector_key_value_sort() {
 
 void init_builtin_simd_vector_funcs() {
   RUDF_FUNC_REGISTER_WITH_NAME(kBuiltinThrowVectorExprEx, throw_vector_expression_ex);
-  REGISTER_SIMD_VECTOR_FUNCS(register_new_simd_vector, float, double, long double, int64_t, int32_t, int16_t, int8_t,
-                             uint64_t, uint32_t, uint16_t, uint8_t, Bit, StringView)
+  REGISTER_SIMD_VECTOR_FUNCS(register_new_simd_vector, float, double, int64_t, int32_t, int16_t, int8_t, uint64_t,
+                             uint32_t, uint16_t, uint8_t, Bit, StringView)
   REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_dot, float, double)
   REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_iota, float, double, int64_t, int32_t, uint64_t, uint32_t)
   REGISTER_SIMD_VECTOR_FUNCS(register_simd_vector_sum, float, double, int64_t, int32_t, uint64_t, uint32_t)

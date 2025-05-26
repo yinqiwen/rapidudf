@@ -52,29 +52,29 @@ TEST(JitCompiler, vector_abs) {
   JitCompiler compiler;
   std::string content = "abs(x)";
   std::vector<int64_t> ivs{1, -2, 3, -4, 4, 8, -1};
-  auto rc4 = compiler.CompileExpression<Vector<int64_t>, Context&, Vector<int64_t>>(content, {"_", "x"});
+  auto rc4 = compiler.CompileExpression<simd_vector_i64, Context&, simd_vector_i64>(content, {"_", "x"});
   if (!rc4.ok()) {
     RUDF_ERROR("{}", rc4.status().ToString());
   }
   ASSERT_TRUE(rc4.ok());
   auto f4 = std::move(rc4.value());
-  auto result4 = f4(ctx, ivs);
-  ASSERT_EQ(result4.Size(), ivs.size());
+  auto result4 = f4(ctx, ctx.NewVector(ivs));
+  ASSERT_EQ(result4->Size(), ivs.size());
   for (size_t i = 0; i < ivs.size(); i++) {
-    ASSERT_EQ(result4[i], std::abs(ivs[i]));
+    ASSERT_EQ((*result4)[i], std::abs(ivs[i]));
   }
 
   std::vector<float> fvs{1, -2.1, 3.2, -4, 4, 8, -1};
-  auto rc5 = compiler.CompileExpression<Vector<float>, Context&, Vector<float>>(content, {"_", "x"});
+  auto rc5 = compiler.CompileExpression<simd_vector_f32, Context&, simd_vector_f32>(content, {"_", "x"});
   if (!rc5.ok()) {
     RUDF_ERROR("{}", rc5.status().ToString());
   }
   ASSERT_TRUE(rc5.ok());
   auto f5 = std::move(rc5.value());
-  auto result5 = f5(ctx, fvs);
-  ASSERT_EQ(result5.Size(), fvs.size());
+  auto result5 = f5(ctx, ctx.NewVector(fvs));
+  ASSERT_EQ(result5->Size(), fvs.size());
   for (size_t i = 0; i < fvs.size(); i++) {
-    ASSERT_FLOAT_EQ(result5[i], std::abs(fvs[i]));
+    ASSERT_FLOAT_EQ((*result5)[i], std::abs(fvs[i]));
   }
 }
 
@@ -118,23 +118,23 @@ TEST(JitCompiler, vector_max) {
   std::vector<double> fx{1.1, -2.1, 3.2, -4.1, 4.2, 8.1, -1.12};
   std::vector<double> fy{1.13, -2.12, 3.02, -4.01, 4.01, 8.02, -1.0001};
   auto rc0 =
-      compiler.CompileExpression<Vector<int64_t>, Context&, Vector<int64_t>, Vector<int64_t>>(content, {"_", "x", "y"});
+      compiler.CompileExpression<simd_vector_i64, Context&, simd_vector_i64, simd_vector_i64>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
-  auto result0 = f0(ctx, x, y);
-  ASSERT_EQ(result0.Size(), x.size());
+  auto result0 = f0(ctx, ctx.NewVector(x), ctx.NewVector(y));
+  ASSERT_EQ(result0->Size(), x.size());
   for (size_t i = 0; i < x.size(); i++) {
-    ASSERT_FLOAT_EQ(result0[i], std::max(x[i], y[i]));
+    ASSERT_FLOAT_EQ((*result0)[i], std::max(x[i], y[i]));
   }
 
   auto rc1 =
-      compiler.CompileExpression<Vector<double>, Context&, Vector<double>, Vector<double>>(content, {"_", "x", "y"});
+      compiler.CompileExpression<simd_vector_f64, Context&, simd_vector_f64, simd_vector_f64>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
   auto result1 = f1(ctx, fx, fy);
-  ASSERT_EQ(result1.Size(), x.size());
+  ASSERT_EQ(result1->Size(), x.size());
   for (size_t i = 0; i < x.size(); i++) {
-    ASSERT_FLOAT_EQ(result1[i], std::max(fx[i], fy[i]));
+    ASSERT_FLOAT_EQ((*result1)[i], std::max(fx[i], fy[i]));
   }
 }
 
@@ -178,23 +178,23 @@ TEST(JitCompiler, vector_min) {
   std::vector<float> fx{1.1, -2.1, 3.2, -4.1, 4.2, 8.1, -1.12};
   std::vector<float> fy{1.13, -2.12, 3.02, -4.01, 4.01, 8.02, -1.0001};
   auto rc0 =
-      compiler.CompileExpression<Vector<int32_t>, Context&, Vector<int32_t>, Vector<int32_t>>(content, {"_", "x", "y"});
+      compiler.CompileExpression<simd_vector_i32, Context&, simd_vector_i32, simd_vector_i32>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());
   auto f0 = std::move(rc0.value());
-  auto result0 = f0(ctx, x, y);
-  ASSERT_EQ(result0.Size(), x.size());
+  auto result0 = f0(ctx, ctx.NewVector(x), ctx.NewVector(y));
+  ASSERT_EQ(result0->Size(), x.size());
   for (size_t i = 0; i < x.size(); i++) {
-    ASSERT_FLOAT_EQ(result0[i], std::min(x[i], y[i]));
+    ASSERT_FLOAT_EQ((*result0)[i], std::min(x[i], y[i]));
   }
 
   auto rc1 =
-      compiler.CompileExpression<Vector<float>, Context&, Vector<float>, Vector<float>>(content, {"_", "x", "y"});
+      compiler.CompileExpression<simd_vector_f32, Context&, simd_vector_f32, simd_vector_f32>(content, {"_", "x", "y"});
   ASSERT_TRUE(rc1.ok());
   auto f1 = std::move(rc1.value());
-  auto result1 = f1(ctx, fx, fy);
-  ASSERT_EQ(result1.Size(), x.size());
+  auto result1 = f1(ctx, ctx.NewVector(fx), ctx.NewVector(fy));
+  ASSERT_EQ(result1->Size(), x.size());
   for (size_t i = 0; i < x.size(); i++) {
-    ASSERT_FLOAT_EQ(result1[i], std::min(fx[i], fy[i]));
+    ASSERT_FLOAT_EQ((*result1)[i], std::min(fx[i], fy[i]));
   }
 }
 

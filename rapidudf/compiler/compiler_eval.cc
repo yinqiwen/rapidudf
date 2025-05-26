@@ -76,7 +76,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::RPN& rpn) {
             return val_result.status();
           }
           auto operand = val_result.value();
-          if (operand->GetDType().IsSimdVector()) {
+          if (operand->GetDType().IsSimdVectorPtr()) {
             is_vector_expr = true;
           }
           eval_nodes.emplace_back(operand);
@@ -173,7 +173,6 @@ absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode
       }
 
       if (operand_count == 1) {
-        // result = codegen_->UnaryOp(op, compute_dtype, operands[operands.size() - 1].second);
         if (use_vector_call) {
           result = codegen_->VectorUnaryOp(op, compute_dtype, operands[operands.size() - 1].first, node.op_temp_val);
         } else {
@@ -236,14 +235,15 @@ absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode
       auto value = node.val;
       ::llvm::Value* load_value_ptr = nullptr;
       ::llvm::Value* load_value = nullptr;
-      if (value->GetDType().IsSimdVector()) {
+      if (value->GetDType().IsSimdVectorPtr()) {
         absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> load_result;
-        auto ptr_val = value->GetStructPtrValue().value();
+        // auto ptr_val = value->GetStructPtrValue().value();
+        auto ptr_val = codegen_->GetVectorDataValue(value).value();
         if (remaining) {
-          load_result =
-              codegen_->LoadNVector(value->GetDType().Elem(), ptr_val, cursor->LoadValue(), remaining->LoadValue());
+          load_result = codegen_->LoadNVector(value->GetDType().Elem(), ptr_val->GetPtrValue(), cursor->LoadValue(),
+                                              remaining->LoadValue());
         } else {
-          load_result = codegen_->LoadVector(value->GetDType().Elem(), ptr_val, cursor->LoadValue());
+          load_result = codegen_->LoadVector(value->GetDType().Elem(), ptr_val->GetPtrValue(), cursor->LoadValue());
         }
         if (!load_result.ok()) {
           return load_result.status();
@@ -322,7 +322,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
       bool no_vector = true;
       for (int i = 0; i < count; i++) {
         auto [dtype, _] = operands[operands.size() - count + i];
-        if (dtype.IsSimdVector()) {
+        if (dtype.IsSimdVectorPtr()) {
           compute_dtype = dtype.Elem();
           no_vector = false;
           break;
@@ -348,7 +348,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
           }
           nodes[idx].val = result.value();
         }
-        operands[operands.size() - count + i].first = compute_dtype.ToSimdVector();
+        operands[operands.size() - count + i].first = compute_dtype.ToSimdVector().ToPtr();
       }
       for (int i = 0; i < operand_count; i++) {
         operands.pop_back();
@@ -356,7 +356,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
       if (no_vector) {
         return compute_dtype.Elem();
       } else {
-        return compute_dtype.ToSimdVector();
+        return compute_dtype.ToSimdVector().ToPtr();
       }
     };
 
@@ -372,7 +372,8 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
         }
         dtype = normalize_result.value();
         if (is_compare_op(op)) {
-          operands.emplace_back(std::make_pair(DATA_BIT, idxs));
+          DType result_dtype = DType(DATA_BIT).ToSimdVector().ToPtr();
+          operands.emplace_back(std::make_pair(result_dtype, idxs));
         } else {
           operands.emplace_back(std::make_pair(dtype, idxs));
         }
@@ -383,15 +384,16 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
           node.op_temp_val = codegen_->NewVectorVar(dtype);
         }
       } else if (node.func_invocation.Valid()) {
-        DType result_dtype = node.func_invocation.func->LastArg().PtrTo();
-        node.op_temp_val = codegen_->NewVectorVar(result_dtype);
+        DType func_result_dtype = node.func_invocation.func->LastArg().PtrTo();
+        node.op_temp_val = codegen_->NewVectorVar(func_result_dtype);
         std::vector<size_t> idxs;
-        operands.emplace_back(std::make_pair(result_dtype, idxs));
+        operands.emplace_back(std::make_pair(func_result_dtype.ToSimdVector().ToPtr(), idxs));
       } else {
         auto value = node.val;
         operands.emplace_back(std::make_pair(value->GetDType(), std::vector<size_t>{i}));
-        if (value->GetDType().IsSimdVector()) {
-          auto result = value->GetVectorSizeValue();
+        if (value->GetDType().IsSimdVectorPtr()) {
+          // auto result = value->GetVectorSizeValue();
+          auto result = codegen_->GetVectorSizeValue(value);
           if (!result.ok()) {
             return result.status();
           }
@@ -425,7 +427,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
         continue;
       }
       auto value = node.val;
-      if (!value->GetDType().IsSimdVector()) {
+      if (!value->GetDType().IsSimdVectorPtr()) {
         auto result = codegen_->NewStackConstantVector(value);
         if (!result.ok()) {
           return result.status();
@@ -446,7 +448,12 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
     if (!status.ok()) {
       return status;
     }
-    ::llvm::Value* output_ptr = output_val->GetStructPtrValue().value();
+    // ::llvm::Value* output_ptr = output_val->GetStructPtrValue().value();
+    auto output_data_result = codegen_->GetVectorDataValue(output_val);
+    if (!output_data_result.ok()) {
+      return output_data_result.status();
+    }
+    ::llvm::Value* output_ptr = output_data_result.value()->GetPtrValue();
 
     auto vector_loop_limit_size =
         codegen_->BinaryOp(OP_MINUS, vector_size_val, codegen_->NewI32(kVectorUnitSize)).value();

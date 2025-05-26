@@ -48,4 +48,5 @@ void Context::Reset() {
     delete wrapper;
   });
 }
+
 }  // namespace rapidudf

@@ -16,6 +16,8 @@
 
 #pragma once
 #include <cstdint>
+#include <vector>
+#include "absl/types/span.h"
 
 namespace rapidudf {
 class Pointer {
@@ -24,6 +26,7 @@ class Pointer {
   Pointer(const T* p) {
     ptr_val_ = reinterpret_cast<uintptr_t>(p);
   }
+  Pointer(uint64_t v) { ptr_val_ = v; }
   template <typename T>
   T* As() const {
     return reinterpret_cast<T*>(ptr_val_);
@@ -31,7 +34,15 @@ class Pointer {
 
   bool IsNull() const { return ptr_val_ == 0; }
 
+  template <typename R>
+  static absl::Span<Pointer> Wrap(const std::vector<R*>& ptrs) {
+    auto* ptr_data = ptrs.data();
+    Pointer* p = const_cast<Pointer*>(reinterpret_cast<const Pointer*>(ptr_data));
+    return absl::MakeSpan(p, ptrs.size());
+  }
+
  private:
   uintptr_t ptr_val_;
 };
+
 }  // namespace rapidudf

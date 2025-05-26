@@ -26,7 +26,7 @@ static std::unique_ptr<FuncRegMap> g_regs = nullptr;
 
 std::string GetFunctionName(std::string_view op, DType dtype) {
   std::string fname(op);
-  if (dtype.IsSimdVector()) {
+  if (dtype.IsSimdVector() || dtype.IsSimdVectorPtr()) {
     fname = fname + "_" + dtype.Elem().GetTypeString();
     return std::string(FunctionFactory::kSimdVectorFuncPrefix) + "_" + fname;
   } else {
@@ -36,7 +36,7 @@ std::string GetFunctionName(std::string_view op, DType dtype) {
 }
 std::string GetFunctionName(std::string_view op, DType dtype0, DType dtype1) {
   std::string fname(op);
-  if (dtype0.IsSimdVector() || dtype1.IsSimdVector()) {
+  if (dtype0.IsSimdVector() || dtype1.IsSimdVector() || dtype0.IsSimdVectorPtr() || dtype1.IsSimdVectorPtr()) {
     fname = fname + "_" + dtype0.Elem().GetTypeString() + "_" + dtype1.Elem().GetTypeString();
     return std::string(FunctionFactory::kSimdVectorFuncPrefix) + "_" + fname;
   } else {
@@ -89,14 +89,12 @@ bool FunctionDesc::PassArgByValue(size_t argno) const {
     uint32_t request_param_registers = 0;
     if (arg_types[i].IsPtr() || arg_types[i].IsInteger() || arg_types[i].IsBit()) {
       request_param_registers = 1;
-    } else if (arg_types[i].IsAbslSpan() || arg_types[i].IsStringView() || arg_types[i].IsStdStringView() ||
-               arg_types[i].IsSimdVector()) {
+    } else if (arg_types[i].IsAbslSpan() || arg_types[i].IsStringView() || arg_types[i].IsStdStringView()) {
       request_param_registers = 2;
     }
     used_param_registers += request_param_registers;
   }
-  if (arg_types[argno].IsSimdVector() || arg_types[argno].IsAbslSpan() || arg_types[argno].IsStringView() ||
-      arg_types[argno].IsStdStringView()) {
+  if (arg_types[argno].IsAbslSpan() || arg_types[argno].IsStringView() || arg_types[argno].IsStdStringView()) {
     if (used_param_registers > total_param_registers) {
       return true;
     }
@@ -115,7 +113,7 @@ bool FunctionDesc::ValidateArgs(const std::vector<DType>& ts) const {
   }
   for (size_t i = 0; i < verify_arg_size; i++) {
     if (is_vector_func) {
-      if (ts[i].IsSimdVector()) {
+      if (ts[i].IsSimdVectorPtr()) {
         if (ts[i].Elem() != arg_types[i].PtrTo()) {
           RUDF_ERROR("Func:{} arg[{}] dtype:{}, while given arg value dtype:{}", name, i, arg_types[i], ts[i]);
           return false;

@@ -79,7 +79,7 @@ class Table : public DynObject {
     }
   }
 
-  VectorBuf GetColumnByOffset(uint32_t offset);
+  // VectorBase* GetColumnByOffset(uint32_t offset);
 
   /**
   ** Unload loaded column(defined by protobuf/flatbuffers/struct)
@@ -89,6 +89,24 @@ class Table : public DynObject {
    ** Unload all loaded column(defined by protobuf/flatbuffers/struct)
    */
   void UnloadAllColumns();
+  template <typename T>
+  Vector<T>* LoadColumnByOffset(uint32_t offset);
+  VectorBase* LoadColumnBaseByOffset(uint32_t offset);
+
+  template <typename T>
+  Vector<T>* GetColumnByOffset(uint32_t offset) {
+    uint8_t* vec_ptr = reinterpret_cast<uint8_t*>(this) + offset;
+    Vector<T>* vec = nullptr;
+    memcpy(&vec, vec_ptr, sizeof(Vector<T>*));
+    if (vec != nullptr || vec->Size() >= Count()) {
+      // reuse
+      return vec;
+    } else {
+      vec = ctx_.NewVector<T>(Count());
+      memcpy(vec_ptr, &vec, sizeof(Vector<T>*));
+      return vec;
+    }
+  }
 
   template <typename... T>
   absl::Status AddRows(const std::vector<T>&... rows) {
@@ -141,7 +159,8 @@ class Table : public DynObject {
     if (idx >= count) {
       THROW_LOGIC_ERR("GetRow outofbound with idx:{} size:{}", idx, count);
     }
-    return rows_[row_idx].GetRowPtrs()[idx].As<T>();
+    return rows_[row_idx].GetRowPtrs()->Value(idx).template As<T>();
+    // return rows_[row_idx].GetRowPtrs()[idx].As<T>();
   }
 
   template <typename R, typename... T>
@@ -171,7 +190,8 @@ class Table : public DynObject {
                 return;
               }
             }
-            RowType* row = rows_[row_idx].GetRowPtrs()[i].As<RowType>();
+            // RowType* row = rows_[row_idx].GetRowPtrs()[i].As<RowType>();
+            RowType* row = rows_[row_idx].GetRowPtrs()->Value(i).template As<RowType>();
             f(static_cast<size_t>(i), row);
           });
           return absl::OkStatus();
@@ -184,7 +204,8 @@ class Table : public DynObject {
             continue;
           }
         }
-        RowType* row = rows_[row_idx].GetRowPtrs()[i].As<RowType>();
+        // RowType* row = rows_[row_idx].GetRowPtrs()[i].As<RowType>();
+        RowType* row = rows_[row_idx].GetRowPtrs()->Value(i).template As<RowType>();
         if constexpr (std::is_void_v<R>) {
           f(static_cast<size_t>(i), row);
         } else {
@@ -278,21 +299,21 @@ class Table : public DynObject {
         thread_pool);
     return filter_mask;
   }
-  Table* Filter(Vector<Bit> bits);
+  Table* Filter(Vector<Bit>* bits);
 
   Vector<Bit>* Dedup(StringView column, uint32_t k);
 
-  std::pair<Table*, Table*> Split(Vector<Bit> bits);
+  std::pair<Table*, Table*> Split(Vector<Bit>* bits);
 
   Table* OrderBy(StringView column, bool descending);
   template <typename T>
-  Table* OrderBy(Vector<T> by, bool descending);
+  Table* OrderBy(Vector<T>* by, bool descending);
   template <typename T>
-  Table* Topk(Vector<T> by, uint32_t k, bool descending);
+  Table* Topk(Vector<T>* by, uint32_t k, bool descending);
   Table* Head(uint32_t k);
   Table* Tail(uint32_t k);
   template <typename T>
-  absl::Span<Table*> GroupBy(Vector<T> by);
+  absl::Span<Table*> GroupBy(Vector<T>* by);
   absl::Span<Table*> GroupBy(absl::Span<const StringView> columns);
   absl::Span<Table*> GroupBy(StringView column) { return GroupBy(std::vector<StringView>{column}); }
 
@@ -535,24 +556,23 @@ class Table : public DynObject {
   absl::StatusOr<uint32_t> GetColumnOffset(const std::string& name);
 
   bool IsColumnLoaded(uint32_t offset);
-  uint8_t* GetColumnMemory(uint32_t offset, const DType& dtype);
+
   size_t GetColumnMemorySize(const DType& dtype);
-  void SetColumnSize(const Column& column, void* p);
 
   template <typename T>
-  absl::StatusOr<Vector<T>> GetColumn(const std::string& name) {
+  absl::StatusOr<Vector<T>*> GetColumn(const std::string& name) {
     uint32_t offset = 0;
-    auto result = DynObject::Get<Vector<T>>(name, &offset);
+    auto result = DynObject::Get<Vector<T>*>(name, &offset);
     if (!result.ok()) {
       return result;
     }
-    Vector<T> vec = std::move(result.value());
-    if (vec.Data() == nullptr) {
-      return Vector<T>(GetColumnByOffset(offset));
+    Vector<T>* vec = std::move(result.value());
+    if (vec == nullptr) {
+      vec = GetColumnByOffset<T>(offset);
     }
     return vec;
   }
-  VectorBuf GetColumnVectorBuf(StringView name);
+  // VectorBuf GetColumnVectorBuf(StringView name);
   template <typename T>
   RowSchema NewRowSchema() {
     if constexpr (std::is_base_of_v<::google::protobuf::Message, T>) {
@@ -627,29 +647,30 @@ class Table : public DynObject {
   template <typename T>
   absl::Span<Table*> GroupBy(const T* by, size_t n);
 
-  Table* SubTable(std::vector<int32_t>& indices);
+  Table* GatherSubTable(std::vector<int32_t>& indices);
 
-  void SetColumn(uint32_t offset, VectorBuf vec);
+  void SetColumn(uint32_t offset, VectorBase* vec);
 
-  absl::StatusOr<VectorBuf> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
-
-  template <typename T>
-  absl::Status LoadProtobufColumn(const Vector<Pointer>& pb_vector, const Column& column);
-  template <typename T>
-  absl::Status LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, const Column& column);
-  template <typename T>
-  absl::Status LoadStructColumn(const Vector<Pointer>& struct_vector, const Column& column);
+  absl::StatusOr<VectorBase*> GatherField(uint8_t* vec_ptr, const DType& dtype, uint32_t offset,
+                                          Vector<int32_t> indices);
 
   template <typename T>
-  absl::Status LoadColumn(const Vector<Pointer>& objs, const Column& column);
+  absl::Status LoadProtobufColumn(Vector<Pointer>* pb_vector, const Column& column);
+  template <typename T>
+  absl::Status LoadFlatbuffersColumn(Vector<Pointer>* fbs_vector, const Column& column);
+  template <typename T>
+  absl::Status LoadStructColumn(Vector<Pointer>* struct_vector, const Column& column);
 
-  absl::Status LoadColumn(const Rows& rows, const Column& column);
+  template <typename T>
+  absl::Status LoadColumn(Vector<Pointer>* objs, const Column& column);
+
+  absl::Status LoadColumn(Rows& rows, const Column& column);
   const RowSchema* GetRowSchema(const RowSchema& schema);
   int GetRowIdx(const RowSchema& schema);
   absl::Status Validate(const std::vector<RowSchema>& schemas);
 
   template <typename T>
-  Vector<Bit> Dedup(const T* data, size_t n, size_t k);
+  Vector<Bit>* Dedup(Vector<T>* data, size_t n, size_t k);
 
   template <typename T>
   absl::Status Set(const std::string& name, T&& v) {
@@ -672,7 +693,7 @@ class Table : public DynObject {
   }
 
   DistinctIndiceTable DistinctByColumns(absl::Span<const StringView> columns);
-  void DoFilter(Vector<Bit> bits);
+  void DoFilter(Vector<Bit>* bits);
 
   absl::Status DoConcat(Table* other);
 
@@ -687,12 +708,14 @@ class Table : public DynObject {
 
   template <typename T>
   const T* LoadRowElement(size_t i, size_t j) {
-    const T* row = rows_[j].GetRowPtrs()[i].As<T>();
+    // const T* row = rows_[j].GetRowPtrs()[i].As<T>();
+    const T* row = rows_[j].GetRowPtrs()->Value(i).template As<T>();
     return row;
   }
   template <typename T>
   T* LoadMutableRowElement(size_t i, size_t j) {
-    T* row = rows_[j].GetRowPtrs()[i].As<T>();
+    // T* row = rows_[j].GetRowPtrs()[i].As<T>();
+    T* row = rows_[j].GetRowPtrs()->Value(i).template As<T>();
     return row;
   }
   template <typename... T, size_t... Is>

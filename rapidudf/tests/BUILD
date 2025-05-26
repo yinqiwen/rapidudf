@@ -429,6 +429,7 @@ cc_test(
     deps = [
         # "//rapidudf",
         "//rapidudf/types:vector",
+        "//rapidudf/context",
         "@com_google_googletest//:gtest_main",
     ],
 )

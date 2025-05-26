@@ -227,6 +227,7 @@ DType DType::Elem() const {
     result.ctrl_.t0_ = result.ctrl_.t1_;
   }
   result.ctrl_.container_type_ = 0;
+  result.ctrl_.ptr_bit_ = 0;
   return result;
 }
 
@@ -294,6 +295,9 @@ bool DType::CanCastTo(DType other) const {
     return true;
   }
   if (IsVoid()) {
+    return true;
+  }
+  if (other.IsVoidPtr() && IsPtr()) {
     return true;
   }
   if (IsNumber() && other.IsNumber()) {

@@ -144,6 +144,7 @@ class CodeGen {
                                                  ::llvm::Value* c, ::llvm::Value* output);
 
   absl::StatusOr<ValuePtr> CallFunction(const std::string& name, const std::vector<ValuePtr>& const_arg_values);
+
   absl::StatusOr<ValuePtr> CallFunction(std::string_view name, const std::vector<ValuePtr>& arg_values) {
     return CallFunction(std::string(name), arg_values);
   }
@@ -153,6 +154,8 @@ class CodeGen {
   ValuePtr NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* ptr_element_type = nullptr);
   ValuePtr NewU32(uint32_t);
   ValuePtr NewI32(uint32_t);
+  ValuePtr NewU64(uint64_t);
+  ValuePtr NewU64Var(uint64_t init = 0);
   ValuePtr NewU32Var(uint32_t init = 0);
   ValuePtr NewI32Var(uint32_t init = 0);
   ValuePtr NewBool(bool);
@@ -163,6 +166,9 @@ class CodeGen {
   ValuePtr NewVar(DType dtype);
   absl::StatusOr<ValuePtr> NewArray(DType dtype, const std::vector<ValuePtr>& vals);
   absl::StatusOr<ValuePtr> GetStructField(ValuePtr obj, DType field_dtype, uint32_t offset);
+
+  absl::StatusOr<ValuePtr> GetVectorSizeValue(ValuePtr obj);
+  absl::StatusOr<ValuePtr> GetVectorDataValue(ValuePtr obj);
 
   absl::StatusOr<::llvm::Type*> GetType(DType dtype);
   absl::StatusOr<::llvm::FunctionType*> GetFunctionType(const FunctionDesc& desc);
@@ -178,6 +184,9 @@ class CodeGen {
   void PrintAsm();
 
  private:
+  static constexpr std::string_view kVectorGetSizeFuncName = "simd_vector_size";
+  static constexpr std::string_view kVectorGetDataFuncName = "simd_vector_data";
+
   uint32_t GetLabelCursor() { return label_cursor_++; }
   ::llvm::Type* GetElementType(::llvm::Type* t);
 

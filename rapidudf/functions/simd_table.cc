@@ -31,12 +31,12 @@ struct SimdTableHelper {
   /**
   ** filter table by bits
   */
-  static table::Table* filter(table::Table* table, Vector<Bit> bits) { return table->Filter(bits); }
+  static table::Table* filter(table::Table* table, Vector<Bit>* bits) { return table->Filter(bits); }
   /**
   **   Sort table by given column
   */
   template <typename T>
-  static table::Table* order_by(table::Table* table, Vector<T> by, bool descending) {
+  static table::Table* order_by(table::Table* table, Vector<T>* by, bool descending) {
     return table->OrderBy(by, descending);
   }
   static table::Table* order_by_column(table::Table* table, StringView by, bool descending) {
@@ -47,7 +47,7 @@ struct SimdTableHelper {
   **   Sort & Returns the first k rows as a list of Row.
   */
   template <typename T>
-  static table::Table* topk(table::Table* table, Vector<T> by, uint32_t k, bool descending) {
+  static table::Table* topk(table::Table* table, Vector<T>* by, uint32_t k, bool descending) {
     return table->Topk(by, k, descending);
   }
   /**
@@ -71,14 +71,14 @@ struct SimdTableHelper {
   static table::Table* concat(table::Table* table, table::Table* other) { return table->Concat(other); }
 
   template <typename T>
-  static absl::Span<table::Table*> group_by(table::Table* table, Vector<T> by) {
+  static absl::Span<table::Table*> group_by(table::Table* table, Vector<T>* by) {
     return table->GroupBy(by);
   }
   static absl::Span<table::Table*> group_by_column(table::Table* table, StringView by) { return table->GroupBy(by); }
 
   template <typename T>
-  static Vector<T> get_column(table::Table* table, uint32_t offset) {
-    return Vector<T>(table->GetColumnByOffset(offset));
+  static Vector<T>* get_column(table::Table* table, uint32_t offset) {
+    return table->GetColumnByOffset<T>(offset);
   }
 
   static void Init() {
