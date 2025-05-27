@@ -238,7 +238,8 @@ absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode
       if (value->GetDType().IsSimdVectorPtr()) {
         absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> load_result;
         // auto ptr_val = value->GetStructPtrValue().value();
-        auto ptr_val = codegen_->GetVectorDataValue(value).value();
+        // auto ptr_val = codegen_->GetVectorDataValue(value).value();
+        auto ptr_val = node.vector_data_val;
         if (remaining) {
           load_result = codegen_->LoadNVector(value->GetDType().Elem(), ptr_val->GetPtrValue(), cursor->LoadValue(),
                                               remaining->LoadValue());
@@ -397,6 +398,11 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
           if (!result.ok()) {
             return result.status();
           }
+          auto vector_data_result = codegen_->GetVectorDataValue(value);
+          if (!vector_data_result.ok()) {
+            return vector_data_result.status();
+          }
+          node.vector_data_val = vector_data_result.value();
           if (!vector_size_val) {
             vector_size_val = result.value();
           } else {

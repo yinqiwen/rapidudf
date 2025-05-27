@@ -104,9 +104,11 @@ static void DoRapidUDFVectorExprTeardown(const benchmark::State& state) {}
 
 static void BM_rapidudf_vector_expr_func(benchmark::State& state) {
   rapidudf::Context ctx;
+  Vector<double> x = std::move(Vector<double>::Wrap(nullptr, xx).value());
+  Vector<double> y = std::move(Vector<double>::Wrap(nullptr, yy).value());
   for (auto _ : state) {
     ctx.Reset();
-    auto results = g_vector_expr_func(ctx, ctx.NewVector(xx), ctx.NewVector(yy));
+    auto results = g_vector_expr_func(ctx, &x, &y);
     RUDF_DEBUG("size:{}", results->Size());
   }
 }
@@ -189,9 +191,12 @@ static void rapidudf_vector_wilson_ctr_setup(const benchmark::State& state) {
 static void BM_rapidudf_vector_wilson_ctr(benchmark::State& state) {
   double results = 0;
   rapidudf::Context ctx;
+
+  Vector<float> x_exp_cnt = std::move(Vector<float>::Wrap(nullptr, exp_cnt).value());
+  Vector<float> x_clk_cnt = std::move(Vector<float>::Wrap(nullptr, clk_cnt).value());
   for (auto _ : state) {
     ctx.Reset();
-    auto result = g_vector_wilson_ctr_func(ctx, ctx.NewVector(exp_cnt), ctx.NewVector(clk_cnt));
+    auto result = g_vector_wilson_ctr_func(ctx, &x_exp_cnt, &x_clk_cnt);
     RUDF_DEBUG("{}", result->Size());
   }
 }
