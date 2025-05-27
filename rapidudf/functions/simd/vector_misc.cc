@@ -112,7 +112,6 @@ HWY_INLINE T simd_vector_l2_distance_impl(Vector<T> left, Vector<T> right) {
   using D = hn::ScalableTag<T>;
   constexpr D d;
   constexpr auto N = hn::Lanes(d);
-  T val = 0;
   size_t idx = 0;
   size_t count = left.Size();
   hn::Vec<D> distance_v = hn::Zero(d);
@@ -527,7 +526,8 @@ Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indic
       raw[i] = data[indices[i]];
     }
     VectorBuf vdata(raw, indices.Size());
-    vdata.SetTemporary(true);
+    vdata.SetReadonly(false);
+    // vdata.SetTemporary(true);
     return Vector<T>(vdata);
   } else if constexpr (std::is_same_v<T, Bit>) {
     size_t n = (indices.Size() + 7) / 8;

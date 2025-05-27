@@ -60,6 +60,8 @@ struct InternalType<Bit> {
 template <typename T>
 class Vector;
 
+class VectorBase {};
+
 class VectorBuf {
  public:
   explicit VectorBuf(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
@@ -80,8 +82,7 @@ class VectorBuf {
   inline void SetSize(size_t n) { size_ = n; }
   inline size_t BytesCapacity() const { return bytes_capacity_; };
   inline const void* Data() const { return data_; }
-  inline void SetTemporary(bool v) { temporary_ = v ? 1 : 0; }
-  inline bool IsTemporary() const { return temporary_ && writable_; };
+
   inline void SetReadonly(bool v) { writable_ = (v ? 0 : 1); }
   inline bool IsReadonly() const { return !writable_; };
 
@@ -219,14 +220,6 @@ class Vector {
           break;
         }
       } while (1);
-      // uint8_t current_byte_v = bits[byte_idx];
-      // uint8_t new_byte_v = 0;
-      // if (v) {
-      //   new_byte_v = bit_set(bits[byte_idx], bit_cursor);
-      // } else {
-      //   new_byte_v = bit_clear(bits[byte_idx], bit_cursor);
-      // }
-      // bits[byte_idx] = new_byte_v;
     } else {
       vec_data_.MutableData<T>()[idx] = v;
     }
