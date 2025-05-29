@@ -85,7 +85,7 @@ absl::StatusOr<::llvm::Value*> Value::GetStructPtrValue() {
   }
   auto ptr_field_ptr = ir_builder_->CreateInBoundsGEP(
       ptr_element_type_, val_, std::vector<::llvm::Value*>{ir_builder_->getInt32(0), ir_builder_->getInt32(1)});
-  return ir_builder_->CreateLoad(::llvm::PointerType::get(ir_builder_->getInt64Ty(), 0), ptr_field_ptr);
+  return ir_builder_->CreateLoad(::llvm::PointerType::get(ir_builder_->getInt8Ty(), 0), ptr_field_ptr);
 }
 absl::StatusOr<::llvm::Value*> Value::GetStructSizeValue() {
   if (!dtype_.IsSimdVector() && !dtype_.IsStringView()) {
@@ -98,17 +98,30 @@ absl::StatusOr<::llvm::Value*> Value::GetStructSizeValue() {
       ptr_element_type_, val_, std::vector<::llvm::Value*>{ir_builder_->getInt32(0), ir_builder_->getInt32(0)});
   return ir_builder_->CreateLoad(ir_builder_->getInt64Ty(), size_field_ptr);
 }
-absl::StatusOr<ValuePtr> Value::GetVectorSizeValue() {
+absl::StatusOr<ValuePtr> Value::GetRawVectorSizeValue() {
   auto size_result = GetStructSizeValue();
   if (!size_result.ok()) {
     return size_result.status();
   }
   ::llvm::Value* size_capacity_val = size_result.value();
-  size_capacity_val = ir_builder_->CreateLShr(size_capacity_val, ir_builder_->getInt64(1));
-  auto mask = ir_builder_->getInt64(0x7FFFFFFFLL);
+  // size_capacity_val = ir_builder_->CreateLShr(size_capacity_val, ir_builder_->getInt64(1));
+  auto mask = ir_builder_->getInt64(0x3FFFFFFFLL);
   size_capacity_val = ir_builder_->CreateAnd(size_capacity_val, mask);
   size_capacity_val = ir_builder_->CreateTrunc(size_capacity_val, ir_builder_->getInt32Ty());
   return New(DATA_I32, ir_builder_, size_capacity_val);
+}
+
+absl::StatusOr<ValuePtr> Value::GetVectorArrowFlag() {
+  auto size_result = GetStructSizeValue();
+  if (!size_result.ok()) {
+    return size_result.status();
+  }
+  ::llvm::Value* size_capacity_val = size_result.value();
+  // size_capacity_val = ir_builder_->CreateLShr(size_capacity_val, ir_builder_->getInt64(1));
+  auto mask = ir_builder_->getInt64(0x40000000LL);
+  size_capacity_val = ir_builder_->CreateAnd(size_capacity_val, mask);
+  size_capacity_val = ir_builder_->CreateTrunc(size_capacity_val, ir_builder_->getInt32Ty());
+  return New(DATA_U32, ir_builder_, size_capacity_val);
 }
 
 absl::Status Value::Inc(uint64_t v) {

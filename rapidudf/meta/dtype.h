@@ -68,12 +68,16 @@ class DType {
   void Reset();
   FundamentalType GetFundamentalType() const { return static_cast<FundamentalType>(ctrl_.t0_); }
   bool IsSimdVector(size_t fixed_size = 0) const {
+    if (IsSimdVectorAny()) {
+      return true;
+    }
     if (fixed_size == 0) {
       return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR;
     } else {
       return ctrl_.container_type_ == COLLECTION_SIMD_VECTOR && fixed_size == ctrl_.fixed_array_size_;
     }
   }
+  bool IsSimdVectorAny() const { return IsFundamental() && ctrl_.t0_ == DATA_SIMD_VECTOR_ANY; }
   bool IsVector() const { return ctrl_.container_type_ == COLLECTION_VECTOR; }
   bool IsArray(size_t fixed_size = 0) const {
     if (fixed_size == 0) {
@@ -420,7 +424,7 @@ DType get_dtype() {
     //   d3 = get_dtype<typename std::tuple_element<3, T>::type>();
     // }
 
-    FundamentalType t0, t1, t2, t3;
+    FundamentalType t0, t1;
     if (d0.IsPtr() || d0.IsCollection()) {
       t0 = DATA_COMPLEX_OBJECT;
     } else {
@@ -526,6 +530,9 @@ DType get_dtype() {
 
   if constexpr (std::is_same_v<Pointer, T>) {
     return DType(DATA_POINTER);
+  }
+  if constexpr (std::is_same_v<VectorBase, T>) {
+    return DType(DATA_SIMD_VECTOR_ANY);
   }
   static uint32_t id = nextTypeId();
   DType dtype(static_cast<FundamentalType>(id));

@@ -25,6 +25,7 @@
 #include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/bit.h"
+#include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
 namespace rapidudf {
 static constexpr uint32_t kVectorUnitSize = 64;
@@ -60,154 +61,175 @@ struct InternalType<Bit> {
 template <typename T>
 class Vector;
 
-class VectorBase {};
-
-class VectorBuf {
+class VectorBase {
  public:
-  explicit VectorBuf(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
-      : temporary_(0), size_(size), writable_(0), bytes_capacity_(bytes_capacity), data_(data) {}
+  static constexpr size_t kVectorSizeBits = 30;
+  static constexpr size_t kVectorCapacityBits = 30;
+  static constexpr size_t kMaxVectorSize = ((uint64_t)1 << kVectorSizeBits) - 1;
+  static constexpr size_t kMaxVectorCapacity = ((uint64_t)1 << kVectorCapacityBits) - 1;
   template <typename T>
-  explicit VectorBuf(const std::vector<T>& vec) {
-    if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool>) {
-      static_assert(sizeof(T) == -1, "unsupported constructor");
-    } else {
-      temporary_ = 0;
-      size_ = vec.size();
-      data_ = vec.data();
-      bytes_capacity_ = vec.capacity() * sizeof(T);
-      writable_ = 0;
+  VectorBase(const T* data = nullptr, size_t size = 0, size_t capacity = 0, bool readonly = true)
+      : size_(size), arrow_obj_(0), capacity_(capacity), writable_(readonly ? 0 : 1), data_(data) {
+    if (capacity == 0) {
+      capacity_ = size_;
     }
   }
-  inline size_t Size() const { return size_; }
-  inline void SetSize(size_t n) { size_ = n; }
-  inline size_t BytesCapacity() const { return bytes_capacity_; };
-  inline const void* Data() const { return data_; }
-
-  inline void SetReadonly(bool v) { writable_ = (v ? 0 : 1); }
+  template <typename T>
+  explicit VectorBase(const std::vector<T>& vec, bool readonly = true)
+      : VectorBase(vec.data(), vec.size(), vec.capacity(), readonly) {}
+  inline bool IsArrow() const { return arrow_obj_ != 0; }
+  inline void SetReadonly() { writable_ = 0; }
+  inline void SetWritable() { writable_ = 1; }
   inline bool IsReadonly() const { return !writable_; };
 
+  inline const void* GetMemory() const { return data_; }
+
+  inline int32_t Size() const { return static_cast<int32_t>(size_); }
+  inline size_t Capacity() const { return static_cast<size_t>(capacity_); }
+
+  void SetSize(size_t n) { size_ = n; }
+
   template <typename T>
-  T* MutableData() {
-    return reinterpret_cast<T*>(const_cast<void*>(data_));
-  }
-  template <typename T>
-  const T* ReadableData() {
-    return reinterpret_cast<const T*>(data_);
+  auto Data() const {
+    if constexpr (std::is_same_v<Bit, T>) {
+      return reinterpret_cast<const uint8_t*>(GetMemory());
+    } else {
+      return reinterpret_cast<const T*>(GetMemory());
+    }
   }
 
- private:
+  template <typename T>
+  auto MutableData() {
+    if constexpr (std::is_same_v<Bit, T>) {
+      uint8_t* v = nullptr;
+      if (!IsReadonly()) {
+        v = const_cast<uint8_t*>(Data<uint8_t>());
+      }
+      return v;
+    } else {
+      T* v = nullptr;
+      if (!IsReadonly()) {
+        v = const_cast<T*>(Data<T>());
+      }
+      return v;
+    }
+  }
+
+  static int32_t GetSize(VectorBase v) { return v.Size(); }
+  static const void* GetData(VectorBase v) { return v.GetMemory(); }
+
+ protected:
+  void CopyFrom(const VectorBase& other) { memcpy(this, &other, sizeof(VectorBase)); }
   union {
     struct {
-      uint64_t temporary_ : 1;
-      uint64_t size_ : 31;  // corresponds to logical address
+      uint64_t size_ : 30;
+      uint64_t arrow_obj_ : 1;
+      uint64_t reserved0_ : 1;
+      uint64_t capacity_ : 30;
       uint64_t writable_ : 1;
-      uint64_t bytes_capacity_ : 31;
+      uint64_t reserved1_ : 1;
     };
   };
   const void* data_ = nullptr;
 };
 
+// class VectorBuf {
+//  public:
+//   explicit VectorBuf(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
+//       : temporary_(0), size_(size), writable_(0), bytes_capacity_(bytes_capacity), data_(data) {}
+//   template <typename T>
+//   explicit VectorBuf(const std::vector<T>& vec) {
+//     if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool>) {
+//       static_assert(sizeof(T) == -1, "unsupported constructor");
+//     } else {
+//       temporary_ = 0;
+//       size_ = vec.size();
+//       data_ = vec.data();
+//       bytes_capacity_ = vec.capacity() * sizeof(T);
+//       writable_ = 0;
+//     }
+//   }
+//   inline size_t Size() const { return size_; }
+//   inline void SetSize(size_t n) { size_ = n; }
+//   inline size_t BytesCapacity() const { return bytes_capacity_; };
+//   inline const void* Data() const { return data_; }
+
+//   inline void SetReadonly(bool v) { writable_ = (v ? 0 : 1); }
+//   inline bool IsReadonly() const { return !writable_; };
+
+//   template <typename T>
+//   T* MutableData() {
+//     return reinterpret_cast<T*>(const_cast<void*>(data_));
+//   }
+//   template <typename T>
+//   const T* ReadableData() {
+//     return reinterpret_cast<const T*>(data_);
+//   }
+
+//  private:
+//   union {
+//     struct {
+//       uint64_t temporary_ : 1;
+//       uint64_t size_ : 31;  // corresponds to logical address
+//       uint64_t writable_ : 1;
+//       uint64_t bytes_capacity_ : 31;
+//     };
+//   };
+//   const void* data_ = nullptr;
+// };
+struct VectorBuildOptions {
+  bool readonly = true;
+  bool clone = false;
+};
+
 template <typename T>
-class Vector {
+class Vector : public VectorBase {
  public:
   using value_type = T;
-  Vector() {}
-  Vector(const T* data, size_t size, size_t capacity = 0) {
-    if (capacity == 0) {
-      capacity = size;
-    }
-    VectorBuf vdata(data, size, capacity * sizeof(T));
-    vec_data_ = vdata;
-  }
-  Vector(VectorBuf vdata) {
-    size_t byte_capacity = vdata.BytesCapacity();
-    if (byte_capacity == 0) {
-      if constexpr (std::is_same_v<T, Bit>) {
-        byte_capacity = (vdata.Size() + 7) / 8;
-      } else {
-        byte_capacity = vdata.Size() * sizeof(T);
-      }
-      vec_data_ = VectorBuf(vdata.Data(), vdata.Size(), byte_capacity);
-      vec_data_.SetReadonly(vdata.IsReadonly());
-    } else {
-      vec_data_ = vdata;
-    }
-  }
-  Vector(const std::vector<T>& vec) {
-    if constexpr (std::is_same_v<T, Bit>) {
-      static_assert(sizeof(T) == -1, "unsupported constructor");
-    } else {
-      VectorBuf vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
-      vdata.SetReadonly(true);
-      vec_data_ = vdata;
-    }
-  }
-  Vector(std::vector<T>& vec) {
-    if constexpr (std::is_same_v<T, Bit>) {
-      static_assert(sizeof(T) == -1, "unsupported constructor");
-    } else {
-      VectorBuf vdata(vec.data(), vec.size(), vec.capacity() * sizeof(T));
-      vec_data_ = vdata;
-      vec_data_.SetReadonly(false);
-    }
-  }
-  VectorBuf RawData() { return vec_data_; }
+  Vector() : VectorBase((T*)nullptr) {}
+  Vector(const T* data, size_t size, size_t capacity = 0, bool readonly = true)
+      : VectorBase(data, size, capacity * sizeof(T), readonly) {}
 
-  auto begin() const {
-    if constexpr (std::is_same_v<Bit, T>) {
-      return reinterpret_cast<const uint8_t*>(vec_data_.Data());
+  Vector(const std::vector<T>& vec, bool readonly = true) : VectorBase(vec, readonly) {}
+  template <typename R, typename U = T, typename std::enable_if<std::is_same<U, Pointer>::value, int>::type = 0>
+  Vector(const std::vector<const R*>& vec, bool readonly = true)
+      : VectorBase(vec.data(), vec.size(), vec.capacity(), readonly) {}
+
+  Vector(const VectorBase& base) : VectorBase(base) {}
+
+  template <typename R>
+  Vector(const Vector<R>& vec) : VectorBase((uint8_t*)nullptr, 0, 0, false) {
+    if constexpr (sizeof(T) != sizeof(R)) {
+      static_assert(sizeof(T) == -1, "unsupported constructor from other simd vector");
     } else {
-      return reinterpret_cast<const T*>(vec_data_.Data());
-    }
-  }
-  auto end() const {
-    if constexpr (std::is_same_v<Bit, T>) {
-      return reinterpret_cast<const uint8_t*>(vec_data_.Data()) + ElementSize();
-    } else {
-      return reinterpret_cast<const T*>(vec_data_.Data()) + ElementSize();
+      CopyFrom(vec);
     }
   }
 
-  size_t Size() const { return vec_data_.Size(); }
-  size_t ElementSize() const {
-    if constexpr (std::is_same_v<Bit, T>) {
-      size_t n = Size();
-      size_t byte_n = n / 8;
-      if (n % 8 > 0) {
-        byte_n++;
-      }
-      return byte_n;
-    } else {
-      return Size();
-    }
+  VectorBase RawData() const {
+    const VectorBase& v = *this;
+    return v;
   }
-  size_t BytesCapacity() const { return vec_data_.BytesCapacity(); }
-  auto Data() const {
-    if constexpr (std::is_same_v<Bit, T>) {
-      return reinterpret_cast<const uint8_t*>(vec_data_.Data());
-    } else {
-      return reinterpret_cast<const T*>(vec_data_.Data());
-    }
-  }
-  T operator[](size_t idx) const {
+
+  inline T operator[](size_t idx) const {
     if constexpr (std::is_same_v<Bit, T>) {
       size_t byte_idx = idx / 8;
       size_t bit_cursor = idx % 8;
-      uint8_t bits = *(reinterpret_cast<const uint8_t*>(vec_data_.Data()) + byte_idx);
+      uint8_t bits = *(Data() + byte_idx);
       uint8_t v = (bits >> bit_cursor) & 1;
       return Bit(v > 0);
     } else {
       return Data()[idx];
     }
   }
-  void Set(size_t idx, T v) {
+  inline void Set(size_t idx, T v) {
     if (idx >= Size()) {
       throw std::logic_error(fmt::format("Can NOT set at pos:{}", idx));
     }
     if constexpr (std::is_same_v<Bit, T>) {
       size_t byte_idx = idx / 8;
       size_t bit_cursor = idx % 8;
-      uint8_t* bits = vec_data_.MutableData<uint8_t>();
+      uint8_t* bits = MutableData();
       do {
         uint8_t current_byte_v = bits[byte_idx];
         uint8_t new_byte_v = 0;
@@ -221,30 +243,7 @@ class Vector {
         }
       } while (1);
     } else {
-      vec_data_.MutableData<T>()[idx] = v;
-    }
-  }
-
-  Vector<T> SubVector(uint32_t pos, uint32_t len) {
-    if (pos + len > Size()) {
-      THROW_OUT_OF_RANGE_ERR((pos + len), Size());
-    }
-    if constexpr (std::is_same_v<T, Bit>) {
-      // static_assert(sizeof(T) == -1, "unsupported subvector for Vector<Bit>");
-      auto* data_ptr = Data();
-      if (pos % 8 == 0) {
-        auto* subvector_data_ptr = data_ptr + pos / 8;
-        VectorBuf subvector_data(subvector_data_ptr, len, (len + 7) / 8);
-        return Vector<T>(subvector_data);
-      } else {
-        throw std::logic_error(fmt::format("Can NOT subvector from pos:{}", pos));
-      }
-
-    } else {
-      auto* data_ptr = Data();
-      auto* subvector_data_ptr = data_ptr + pos;
-      VectorBuf subvector_data(subvector_data_ptr, len, sizeof(T) * len);
-      return Vector<T>(subvector_data);
+      MutableData()[idx] = v;
     }
   }
 
@@ -269,44 +268,64 @@ class Vector {
     return Size() - CountTrue();
   }
 
-  auto ToStdVector() const {
-    if constexpr (std::is_same_v<Bit, T>) {
-      std::vector<uint8_t> bits;
-      size_t bytes = Size() / 8;
-      if (Size() % 8 > 0) {
-        bytes++;
+  Vector<T> Slice(uint32_t pos, uint32_t len) const {
+    if (pos + len > Size()) {
+      THROW_OUT_OF_RANGE_ERR((pos + len), Size());
+    }
+    if constexpr (std::is_same_v<T, Bit>) {
+      // static_assert(sizeof(T) == -1, "unsupported subvector for Vector<Bit>");
+      auto* data_ptr = Data();
+      if (pos % 8 == 0) {
+        Vector<T> ret = *this;
+        auto* subvector_data_ptr = data_ptr + pos / 8;
+        ret.data_ = subvector_data_ptr;
+        ret.size_ = len;
+        ret.capacity_ = ret.capacity_ - pos;
+        return ret;
+      } else {
+        throw std::logic_error(fmt::format("Can NOT subvector from pos:{}", pos));
       }
-      bits.assign(Data(), Data() + bytes);
-      return bits;
-    } else if constexpr (std::is_same_v<StringView, T>) {
-      std::vector<std::string> strs;
-      for (size_t i = 0; i < Size(); i++) {
-        strs.emplace_back((Data() + i)->str());
-      }
-      return strs;
     } else {
-      std::vector<T> datas;
-      datas.assign(Data(), Data() + Size());
-      return datas;
+      Vector<T> ret = *this;
+      ret.data_ = Data() + pos;
+      ret.size_ = len;
+      ret.capacity_ = ret.capacity_ - pos;
+      return ret;
     }
   }
-  Vector<T> Resize(size_t n) const {
-    if (vec_data_.Size() == 0) {
-      return *this;
+
+  Vector<T> Resize(size_t n) const { return Slice(0, n); }
+
+  auto Data() const { return VectorBase::Data<T>(); }
+  auto MutableData() { return VectorBase::MutableData<T>(); }
+
+  size_t Size() const { return static_cast<size_t>(VectorBase::Size()); }
+  size_t SizeByBytes() const {
+    if constexpr (std::is_same_v<T, Bit>) {
+      size_t n = Size();
+      size_t bytes_n = n / 8;
+      if (n % 8 != 0) {
+        bytes_n++;
+      }
+      return bytes_n;
+
+    } else {
+      return Size() * sizeof(T);
     }
-    if (n > vec_data_.Size()) {
-      THROW_OUT_OF_RANGE_ERR(n, vec_data_.Size());
-    }
-    auto new_vec_data = VectorBuf(vec_data_.Data(), n, vec_data_.BytesCapacity());
-    new_vec_data.SetReadonly(vec_data_.IsReadonly());
-    return Vector<T>(new_vec_data);
   }
-  VectorBuf& GetVectorBuf() { return vec_data_; }
-
-  void SetReadonly(bool v) { vec_data_.SetReadonly(v); }
-  bool IsReadonly() const { return vec_data_.IsReadonly(); }
-
- private:
-  VectorBuf vec_data_;
 };
+
+using simd_vector_bool = Vector<Bit>;
+using simd_vector_i8 = Vector<int8_t>;
+using simd_vector_u8 = Vector<uint8_t>;
+using simd_vector_i16 = Vector<int16_t>;
+using simd_vector_u16 = Vector<uint16_t>;
+using simd_vector_i32 = Vector<int32_t>;
+using simd_vector_u32 = Vector<uint32_t>;
+using simd_vector_i64 = Vector<int64_t>;
+using simd_vector_u64 = Vector<uint64_t>*;
+using simd_vector_f32 = Vector<float>;
+using simd_vector_f64 = Vector<double>;
+using simd_vector_string = Vector<StringView>;
+using simd_vector_pointer = Vector<Pointer>;
 }  // namespace rapidudf

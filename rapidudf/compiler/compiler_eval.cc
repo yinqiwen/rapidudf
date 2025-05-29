@@ -238,7 +238,8 @@ absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode
       ::llvm::Value* load_value = nullptr;
       if (value->GetDType().IsSimdVector()) {
         absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> load_result;
-        auto ptr_val = value->GetStructPtrValue().value();
+        // auto ptr_val = value->GetStructPtrValue().value();
+        auto ptr_val = node.vector_data_ptr->LoadValue();
         if (remaining) {
           load_result =
               codegen_->LoadNVector(value->GetDType().Elem(), ptr_val, cursor->LoadValue(), remaining->LoadValue());
@@ -391,10 +392,16 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
         auto value = node.val;
         operands.emplace_back(std::make_pair(value->GetDType(), std::vector<size_t>{i}));
         if (value->GetDType().IsSimdVector()) {
-          auto result = value->GetVectorSizeValue();
+          // auto result = value->GetVectorSizeValue();
+          auto result = codegen_->GetVectorSizeValue(value);
           if (!result.ok()) {
             return result.status();
           }
+          auto vector_data_result = codegen_->GetVectorDataValue(value);
+          if (!vector_data_result.ok()) {
+            return vector_data_result.status();
+          }
+          node.vector_data_ptr = vector_data_result.value();
           if (!vector_size_val) {
             vector_size_val = result.value();
           } else {
@@ -447,6 +454,11 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, std::vec
       return status;
     }
     ::llvm::Value* output_ptr = output_val->GetStructPtrValue().value();
+    // auto output_data_result = codegen_->GetVectorDataValue(output_val);
+    // if (!output_data_result.ok()) {
+    //   return output_data_result.status();
+    // }
+    // ::llvm::Value* output_ptr = output_data_result.value()->GetPtrValue();
 
     auto vector_loop_limit_size =
         codegen_->BinaryOp(OP_MINUS, vector_size_val, codegen_->NewI32(kVectorUnitSize)).value();

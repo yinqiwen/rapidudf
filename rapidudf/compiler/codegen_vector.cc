@@ -37,6 +37,94 @@
 #include "rapidudf/meta/optype.h"
 namespace rapidudf {
 namespace compiler {
+absl::StatusOr<ValuePtr> CodeGen::GetVectorSizeValue(ValuePtr obj) {
+  // auto arrow_flag_val_result = obj->GetVectorArrowFlag();
+  // if (!arrow_flag_val_result.ok()) {
+  //   return arrow_flag_val_result.status();
+  // }
+  // auto is_arrow_flag = NewU32(0x40000000LL);
+  // auto cmp_result = BinaryOp(OP_EQUAL, arrow_flag_val_result.value(), is_arrow_flag);
+  // if (!cmp_result.ok()) {
+  //   return cmp_result.status();
+  // }
+  // auto final_size_val = NewVar(DATA_I32);
+  // auto condition = NewCondition(0, true);
+  // BeginIf(condition, cmp_result.value());
+  // auto size_result = CallFunction(std::string(kVectorGetSizeFuncName), {obj});
+  // if (!size_result.ok()) {
+  //   return size_result.status();
+  // }
+  // final_size_val->CopyFrom(size_result.value());
+  // EndIf(condition);
+  // BeginElse(condition);
+  // size_result = obj->GetRawVectorSizeValue();
+  // if (!size_result.ok()) {
+  //   return size_result.status();
+  // }
+  // final_size_val->CopyFrom(size_result.value());
+  // EndElse(condition);
+  // FinishCondition(condition);
+  // return final_size_val;
+  return CallFunction(std::string(kVectorGetSizeFuncName), {obj});
+}
+absl::StatusOr<ValuePtr> CodeGen::GetVectorDataValue(ValuePtr obj) {
+  // DType result_dtype = get_dtype<uint8_t*>();
+  // auto final_ptr_val = NewVar(result_dtype);
+  // auto raw_ptr_result = obj->GetStructPtrValue();
+  // if (!raw_ptr_result.ok()) {
+  //   return raw_ptr_result.status();
+  // }
+  // auto raw_ptr_val = Value::New(result_dtype, builder_.get(), raw_ptr_result.value(), nullptr);
+  // auto result = final_ptr_val->CopyFrom(raw_ptr_val);
+  // if (!result.ok()) {
+  //   return result;
+  // }
+  // return final_ptr_val;
+
+  // return CallFunction(std::string(kVectorGetDataFuncName), {obj});
+  auto raw_ptr_result = obj->GetStructPtrValue();
+  if (!raw_ptr_result.ok()) {
+    return raw_ptr_result.status();
+  }
+  auto raw_ptr_val = Value::New(DATA_POINTER, builder_.get(), raw_ptr_result.value(), nullptr);
+
+  return raw_ptr_val;
+  // auto arrow_flag_val_result = obj->GetVectorArrowFlag();
+  // if (!arrow_flag_val_result.ok()) {
+  //   return arrow_flag_val_result.status();
+  // }
+  // auto is_arrow_flag = NewU32(0x40000000LL);
+  // auto cmp_result = BinaryOp(OP_EQUAL, arrow_flag_val_result.value(), is_arrow_flag);
+  // if (!cmp_result.ok()) {
+  //   return cmp_result.status();
+  // }
+  // DType result_dtype = get_dtype<uint8_t*>();
+  // auto final_ptr_val = NewVar(result_dtype);
+  // auto condition = NewCondition(0, true);
+  // BeginIf(condition, cmp_result.value());
+  // auto ptr_result = CallFunction(std::string(kVectorGetDataFuncName), {obj});
+  // if (!ptr_result.ok()) {
+  //   return ptr_result.status();
+  // }
+  // auto result = final_ptr_val->CopyFrom(ptr_result.value());
+  // if (!result.ok()) {
+  //   return result;
+  // }
+  // EndIf(condition);
+  // BeginElse(condition);
+  // auto raw_ptr_result = obj->GetStructPtrValue();
+  // if (!raw_ptr_result.ok()) {
+  //   return raw_ptr_result.status();
+  // }
+  // auto raw_ptr_val = Value::New(result_dtype, builder_.get(), raw_ptr_result.value(), nullptr);
+  // result = final_ptr_val->CopyFrom(raw_ptr_val);
+  // if (!result.ok()) {
+  //   return result;
+  // }
+  // EndElse(condition);
+  // FinishCondition(condition);
+  // return final_ptr_val;
+}
 absl::StatusOr<::llvm::Value*> CodeGen::NewConstantVectorValue(DType dtype, ::llvm::Value* val) {
   if (::llvm::isa<::llvm::Constant>(val)) {
     auto vector_type = get_vector_type(builder_->getContext(), dtype);

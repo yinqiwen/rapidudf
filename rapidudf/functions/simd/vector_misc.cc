@@ -28,6 +28,7 @@
 #include "rapidudf/meta/optype.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
+#include "rapidudf/types/vector.h"
 
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "rapidudf/functions/simd/vector_misc.cc"  // this file
@@ -202,15 +203,14 @@ template <typename T>
 HWY_INLINE Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t n) {
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
-  auto result_data = ctx.NewVectorBuf<T>(n, lanes * sizeof(T));
-  uint8_t* arena_data = result_data.template MutableData<uint8_t>();
+  auto result = ctx.NewEmptyVector<T>(n);
+  T* arena_data = result.MutableData();
   size_t i = 0;
   for (; i < n; i += lanes) {
     auto v = hn::Iota(d, start + i);
-    hn::StoreU(v, d, reinterpret_cast<T*>(arena_data + i * sizeof(T)));
+    hn::StoreU(v, d, arena_data + i);
   }
-  result_data.SetReadonly(false);
-  return Vector<T>(result_data);
+  return result;
 }
 
 template <typename T>
@@ -222,9 +222,10 @@ HWY_INLINE Vector<T> simd_vector_gather_impl(Context& ctx, Vector<T> data, Vecto
   constexpr size_t N = hn::Lanes(d);
   constexpr hn::CappedTag<int32_t, N> indice_d;
   size_t dst_size = indices.Size();
-  VectorBuf result_data = ctx.NewVectorBuf<T>(dst_size, N * sizeof(T));
-  result_data.SetReadonly(false);
-  T* dst = result_data.MutableData<T>();
+  Vector<T> result = ctx.NewEmptyVector<T>(dst_size);
+  // VectorBuf result_data = ctx.NewVectorBuf<T>(dst_size, N * sizeof(T));
+  // result_data.SetReadonly(false);
+  T* dst = result.MutableData();
   const int32_t* indice_data = indices.Data();
   size_t idx = 0;
   size_t count = indices.Size();
@@ -245,12 +246,12 @@ HWY_INLINE Vector<T> simd_vector_gather_impl(Context& ctx, Vector<T> data, Vecto
   }
 
   if (HWY_UNLIKELY(idx == count)) {
-    return Vector<T>(result_data);
+    return result;
   }
   for (size_t i = idx; i < count; i++) {
     dst[i] = base[indices[i]];
   }
-  return Vector<T>(result_data);
+  return result;
 }
 
 template <typename OPT>
@@ -472,7 +473,9 @@ T simd_vector_avg(Vector<T> left) {
 
 template <typename T>
 Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits) {
-  T* raw = reinterpret_cast<T*>(ctx.ArenaAllocate(data.BytesCapacity()));
+  Vector<T> result = ctx.NewEmptyVector<T>(data.Size());
+  // T* raw = reinterpret_cast<T*>(ctx.ArenaAllocate(data.BytesCapacity()));
+  auto* raw = result.MutableData();
   size_t filter_cursor = 0;
   if constexpr (std::is_same_v<T, Bit>) {
     uint64_t* bits64 = reinterpret_cast<uint64_t*>(raw);
@@ -511,27 +514,25 @@ Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits) {
     HWY_EXPORT_T(Table, simd_vector_filter_impl<T>);
     filter_cursor = HWY_DYNAMIC_DISPATCH_T(Table)(data.Data(), bits.Data(), raw, data.Size());
   }
-
-  VectorBuf vdata(raw, filter_cursor, data.BytesCapacity());
-  vdata.SetReadonly(false);
-  return Vector<T>(vdata);
+  result.SetSize(filter_cursor);
+  // VectorBuf vdata(raw, filter_cursor, data.BytesCapacity());
+  // vdata.SetReadonly(false);
+  return result;
 }
 
 template <typename T>
 Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indices) {
   if constexpr (std::is_same_v<StringView, T> || std::is_same_v<int16_t, T> || std::is_same_v<uint16_t, T> ||
                 std::is_same_v<int8_t, T> || std::is_same_v<uint8_t, T>) {
-    T* raw = reinterpret_cast<T*>(ctx.ArenaAllocate(sizeof(T) * indices.Size()));
+    Vector<T> result = ctx.NewEmptyVector<T>(indices.Size());
+    T* raw = result.MutableData();
     for (size_t i = 0; i < indices.Size(); i++) {
       raw[i] = data[indices[i]];
     }
-    VectorBuf vdata(raw, indices.Size());
-    vdata.SetReadonly(false);
-    // vdata.SetTemporary(true);
-    return Vector<T>(vdata);
+    return result;
   } else if constexpr (std::is_same_v<T, Bit>) {
-    size_t n = (indices.Size() + 7) / 8;
-    uint64_t* raw = reinterpret_cast<uint64_t*>(ctx.ArenaAllocate(sizeof(uint64_t) * n));
+    Vector<T> result = ctx.NewEmptyVector<T>(indices.Size());
+    uint64_t* raw = reinterpret_cast<uint64_t*>(result.MutableData());
     for (size_t i = 0; i < indices.Size(); i++) {
       size_t bits_idx = i / 64;
       size_t bits_cursor = i % 64;
@@ -541,13 +542,12 @@ Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indic
         raw[bits_idx] = bits64_clear(raw[bits_idx], bits_cursor);
       }
     }
-    VectorBuf vdata(raw, indices.Size());
-    return Vector<T>(vdata);
+    return result;
   } else if constexpr (std::is_same_v<T, Pointer>) {
-    Vector<uint64_t> pointers(data.GetVectorBuf());
+    Vector<uint64_t> pointers(data);
     HWY_EXPORT_T(Table1, simd_vector_gather_impl<uint64_t>);
     auto result = HWY_DYNAMIC_DISPATCH_T(Table1)(ctx, pointers, indices);
-    return Vector<T>(result.GetVectorBuf());
+    return Vector<T>(result);
   } else {
     HWY_EXPORT_T(Table1, simd_vector_gather_impl<T>);
     return HWY_DYNAMIC_DISPATCH_T(Table1)(ctx, data, indices);

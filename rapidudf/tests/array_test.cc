@@ -15,6 +15,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <cstring>
 #include <vector>
 #include "absl/strings/str_join.h"
 
@@ -89,3 +90,12 @@ TEST(JitCompiler, vector_cmp) {
     ASSERT_FLOAT_EQ(result[i], vec[i] + 5);
   }
 }
+
+struct Test11 {
+  const std::string& s;
+  int a = 0;
+};
+
+void test_func(const Test11& x) { fmt::print("{}  {}\n", x.s, x.a); }
+
+TEST(JitCompiler, xxxx) { test_func({.s = "aaa1"}); }

@@ -67,8 +67,8 @@ HWY_INLINE void simd_vector_bits_not_impl(Vector<Bit> src, Vector<Bit> dst) {
   if (count % 8 > 0) {
     byte_count++;
   }
-  const uint8_t* in = src.GetVectorBuf().ReadableData<uint8_t>();
-  uint8_t* out = dst.GetVectorBuf().MutableData<uint8_t>();
+  const uint8_t* in = src.Data();
+  uint8_t* out = dst.MutableData();
   if (byte_count >= N) {
     for (; idx <= byte_count - N; idx += N) {
       const hn::Vec<D> v1 = hn::LoadU(d, in + idx);
@@ -94,9 +94,9 @@ HWY_INLINE void simd_vector_bits_binary_impl(Vector<Bit> left, Vector<Bit> right
   if (count % 8 > 0) {
     byte_count++;
   }
-  const uint8_t* left_in = left.GetVectorBuf().ReadableData<uint8_t>();
-  const uint8_t* right_in = right.GetVectorBuf().ReadableData<uint8_t>();
-  uint8_t* out = dst.GetVectorBuf().MutableData<uint8_t>();
+  const uint8_t* left_in = left.Data();
+  const uint8_t* right_in = right.Data();
+  uint8_t* out = dst.MutableData();
   if (byte_count >= N) {
     for (; idx <= byte_count - N; idx += N) {
       const hn::Vec<D> v1 = hn::LoadU(d, left_in + idx);
@@ -124,7 +124,7 @@ size_t simd_vector_count_true_impl(Vector<Bit> src) {
     byte_count++;
   }
 
-  const uint8_t* src_in = src.GetVectorBuf().ReadableData<uint8_t>();
+  const uint8_t* src_in = src.Data();
   size_t n = 0;
   if (byte_count >= N) {
     for (; idx <= byte_count - N; idx += N) {

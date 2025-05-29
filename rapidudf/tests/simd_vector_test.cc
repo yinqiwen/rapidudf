@@ -271,7 +271,7 @@ TEST(JitCompiler, vector_filter) {
   }
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(ctx, ids, ctx.NewVector(citys));
+  auto result = f(ctx, {ids, false}, ctx.NewVector(citys));
   ASSERT_EQ(result.Size(), 2);
   ASSERT_EQ(result[0], 10);
   ASSERT_EQ(result[1], 87);

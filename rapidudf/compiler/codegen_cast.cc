@@ -86,6 +86,9 @@ absl::StatusOr<ValuePtr> CodeGen::CastTo(ValuePtr val, DType dst_dtype) {
   if (src_dtype == dst_dtype) {
     return val;
   }
+  if (src_dtype.IsSimdVector() && dst_dtype.IsSimdVectorAny()) {
+    return val;
+  }
   if (!src_dtype.CanCastTo(dst_dtype)) {
     RUDF_LOG_RETURN_FMT_ERROR("Can NOT cast from {} to {}", src_dtype, dst_dtype);
   }

@@ -24,7 +24,7 @@ namespace rapidudf {
 namespace table {
 void Rows::SetPointers(Vector<Pointer> new_pointers) {
   objs_.resize(new_pointers.Size());
-  memcpy(&objs_[0], new_pointers.GetVectorBuf().ReadableData<Pointer>(), new_pointers.Size() * sizeof(const uint8_t*));
+  memcpy(&objs_[0], new_pointers.Data(), new_pointers.Size() * sizeof(const uint8_t*));
 }
 void Rows::Reset(std::vector<const uint8_t*>&& objs) { objs_ = std::move(objs); }
 void Rows::Filter(Vector<Bit> bits) {
@@ -59,10 +59,7 @@ absl::Status Rows::Insert(size_t pos, const uint8_t* ptr) {
   objs_.insert(objs_.begin() + pos, ptr);
   return absl::OkStatus();
 }
-Vector<Pointer> Rows::GetRowPtrs() const {
-  VectorBuf vdata(objs_.data(), objs_.size());
-  return Vector<Pointer>(vdata);
-}
+Vector<Pointer> Rows::GetRowPtrs() const { return Vector<Pointer>(objs_); }
 }  // namespace table
 
 }  // namespace rapidudf

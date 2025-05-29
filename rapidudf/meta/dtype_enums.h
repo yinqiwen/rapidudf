@@ -31,24 +31,12 @@ enum CollectionType {
   COLLECTION_UNORDERED_SET,
   COLLECTION_ABSL_SPAN,
   COLLECTION_TUPLE,
-  COLLECTION_JAGGED_VECTORS,
-  COLLECTION_FIXEDSIZE_VECTORS,
   COLLECTION_SIMD_VECTOR,
   COLLECTION_END,
 };
 
-constexpr std::array<std::string_view, COLLECTION_END> kCollectionTypeStrs = {"",
-                                                                              "array",
-                                                                              "vector",
-                                                                              "map",
-                                                                              "set",
-                                                                              "unordered_map",
-                                                                              "unordered_set",
-                                                                              "absl_span",
-                                                                              "tuple",
-                                                                              "jagged_vectors",
-                                                                              "fixed_size_vectors",
-                                                                              "simd_vector"};
+constexpr std::array<std::string_view, COLLECTION_END> kCollectionTypeStrs = {
+    "", "array", "vector", "map", "set", "unordered_map", "unordered_set", "absl_span", "tuple", "simd_vector"};
 enum FundamentalType {
   DATA_INVALID = 0,
   DATA_VOID,
@@ -74,6 +62,7 @@ enum FundamentalType {
   DATA_CONTEXT,
   DATA_DYN_OBJECT,
   DATA_TABLE,
+  DATA_SIMD_VECTOR_ANY,
   DATA_BUILTIN_TYPE_END,
   // DATA_SIMD_COLUMN,
 
@@ -115,5 +104,6 @@ constexpr std::array<std::string_view, DATA_BUILTIN_TYPE_END> kFundamentalTypeSt
                                                                                       "json",
                                                                                       "Context",
                                                                                       "dyn_obj",
-                                                                                      "table"};
+                                                                                      "table",
+                                                                                      "simd_vector_any"};
 }  // namespace rapidudf

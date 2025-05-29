@@ -57,6 +57,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/vector.h"
 namespace rapidudf {
 namespace compiler {
 
@@ -265,6 +266,21 @@ absl::Status CodeGen::DeclareExternFunctions(
   auto& dylib = jit_->getMainJITDylib();
   ::llvm::orc::SymbolMap extern_func_map;
   ::llvm::orc::MangleAndInterner mangle(jit_->getExecutionSession(), jit_->getDataLayout());
+
+  FunctionDesc vector_size_func_desc;
+  vector_size_func_desc.name = std::string(kVectorGetSizeFuncName);
+  vector_size_func_desc.return_type = DATA_I32;
+  vector_size_func_desc.arg_types.emplace_back(get_dtype<VectorBase>());
+  vector_size_func_desc.func = reinterpret_cast<void*>(VectorBase::GetSize);
+  func_calls.emplace(vector_size_func_desc.name, &vector_size_func_desc);
+
+  FunctionDesc vector_data_func_desc;
+  vector_data_func_desc.name = std::string(kVectorGetDataFuncName);
+  vector_data_func_desc.return_type = get_dtype<const uint8_t*>();
+  vector_data_func_desc.arg_types.emplace_back(get_dtype<VectorBase>());
+  vector_data_func_desc.func = reinterpret_cast<void*>(VectorBase::GetData);
+  func_calls.emplace(vector_data_func_desc.name, &vector_data_func_desc);
+
   for (auto [_, desc] : func_calls) {
     auto exec_addr = ::llvm::orc::ExecutorAddr::fromPtr(desc->func);
     extern_func_map.insert({mangle(desc->name), {exec_addr, ::llvm::JITSymbolFlags::Callable}});
@@ -648,8 +664,9 @@ absl::StatusOr<ValuePtr> CodeGen::CallFunction(const std::string& name, const st
   if (return_type.IsPtr()) {
     auto ret_type_ptr_to = return_type.PtrTo();
     if (ret_type_ptr_to.IsInteger() || ret_type_ptr_to.IsFloat()) {
-      return_val_type = GetType(ret_type_ptr_to).value();
-      return_type = return_type.PtrTo();
+      // return_val_type = GetType(ret_type_ptr_to).value();
+      // return_type = return_type.PtrTo();
+      // return_val_type = nullptr;
     }
   } else if (return_type.IsSimdVector()) {
     return_val_type = GetType(return_type).value();

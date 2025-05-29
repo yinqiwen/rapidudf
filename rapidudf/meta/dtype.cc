@@ -296,6 +296,9 @@ bool DType::CanCastTo(DType other) const {
   if (IsVoid()) {
     return true;
   }
+  if (IsSimdVector() && other.IsSimdVectorAny()) {
+    return true;
+  }
   if (IsNumber() && other.IsNumber()) {
     return true;
   }

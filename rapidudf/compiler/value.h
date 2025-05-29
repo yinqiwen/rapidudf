@@ -51,7 +51,8 @@ class Value : public std::enable_shared_from_this<Value> {
 
   absl::StatusOr<::llvm::Value*> GetStructPtrValue();
   absl::StatusOr<::llvm::Value*> GetStructSizeValue();
-  absl::StatusOr<ValuePtr> GetVectorSizeValue();
+  absl::StatusOr<ValuePtr> GetRawVectorSizeValue();
+  absl::StatusOr<ValuePtr> GetVectorArrowFlag();
 
   DType GetDType() { return dtype_; }
   bool IsWritable() const;

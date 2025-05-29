@@ -48,7 +48,7 @@ TEST(JitCompiler, vector_add) {
   std::vector<float> f_right{1, -2.1, 3.2, -4, 4, 8.457, -1, 2.2};
 
   Context ctx;
-  JitCompiler compiler;
+  JitCompiler compiler({.print_asm = true});
   std::string expr = "x+y";
   auto rc0 = compiler.CompileExpression<Vector<int>, Context&, Vector<int>, Vector<int>>(expr, {"_", "x", "y"});
   ASSERT_TRUE(rc0.ok());

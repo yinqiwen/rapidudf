@@ -21,6 +21,7 @@
 #include "absl/strings/str_join.h"
 
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/types/vector.h"
 #include "x86simdsort.h"
 
 using namespace rapidudf;
@@ -57,7 +58,8 @@ TEST(JitCompiler, sort) {
   auto rc = compiler.CompileExpression<void, Context&, Vector<float>>(content, {"_", "x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  f(ctx, data);
+  // f(ctx, ctx.NewVector(data, {.readonly = false}));
+  f(ctx, {data, false});
   std::sort(data_clone.begin(), data_clone.end(), std::greater<float>());
   for (size_t i = 0; i < data_clone.size(); i++) {
     ASSERT_FLOAT_EQ(data[i], data_clone[i]);
@@ -82,14 +84,13 @@ TEST(JitCompiler, select) {
   auto rc = compiler.CompileExpression<void, Context&, Vector<double>>(content, {"_", "x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  f(ctx, data);
+  f(ctx, {data, false});
   std::nth_element(data_clone.begin(), data_clone.begin() + 10, data_clone.end(), std::greater<double>());
   for (size_t i = 0; i < 10; i++) {
     RUDF_INFO("{} {}", data[i], data_clone[i]);
     // ASSERT_FLOAT_EQ(data[i], data_clone[i]);
   }
-  const std::vector<double>& const_ref = data;
-  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
+  ASSERT_THROW(f(ctx, data), std::logic_error);
 }
 
 TEST(JitCompiler, topk) {
@@ -107,13 +108,13 @@ TEST(JitCompiler, topk) {
   auto rc = compiler.CompileExpression<void, Context&, Vector<double>>(content, {"_", "x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  f(ctx, data);
+  f(ctx, {data, false});
   for (size_t i = 0; i < 10; i++) {
     RUDF_INFO("{}", data[i]);
     // ASSERT_FLOAT_EQ(data[i], data_clone[i]);
   }
-  const std::vector<double>& const_ref = data;
-  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
+
+  ASSERT_THROW(f(ctx, data), std::logic_error);
 }
 
 TEST(JitCompiler, argsort) {
@@ -131,7 +132,7 @@ TEST(JitCompiler, argsort) {
   auto rc = compiler.CompileExpression<Vector<uint64_t>, Context&, Vector<double>>(content, {"_", "x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(ctx, data);
+  auto result = f(ctx, {data, false});
   for (size_t i = 0; i < result.Size(); i++) {
     RUDF_INFO("{}", result[i]);
     // ASSERT_FLOAT_EQ(data[i], data_clone[i]);
@@ -153,7 +154,7 @@ TEST(JitCompiler, argselect) {
   auto rc = compiler.CompileExpression<Vector<uint64_t>, Context&, Vector<double>>(content, {"_", "x"});
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto result = f(ctx, data);
+  auto result = f(ctx, {data, false});
   for (size_t i = 0; i < result.Size(); i++) {
     RUDF_INFO("[{}]:{}", i, result[i]);
     // ASSERT_FLOAT_EQ(data[i], data_clone[i]);
@@ -180,12 +181,12 @@ TEST(JitCompiler, sort_kv) {
   auto rc = compiler.CompileFunction<Vector<uint32_t>, Context&, Vector<double>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto ids = f(ctx, data);
+  auto ids = f(ctx, {data, false});
   for (size_t i = 0; i < ids.Size(); i++) {
     RUDF_INFO("[{}]:{}", ids[i], data[i]);
   }
-  const std::vector<double>& const_ref = data;
-  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
+
+  ASSERT_THROW(f(ctx, data), std::logic_error);
 }
 
 TEST(JitCompiler, select_kv) {
@@ -208,12 +209,11 @@ TEST(JitCompiler, select_kv) {
   auto rc = compiler.CompileFunction<Vector<uint32_t>, Context&, Vector<double>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto ids = f(ctx, data);
+  auto ids = f(ctx, {data, false});
   for (size_t i = 0; i < ids.Size(); i++) {
     RUDF_INFO("[{}]:{}", ids[i], data[i]);
   }
-  const std::vector<double>& const_ref = data;
-  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
+  ASSERT_THROW(f(ctx, data), std::logic_error);
 }
 
 TEST(JitCompiler, topk_kv) {
@@ -236,10 +236,9 @@ TEST(JitCompiler, topk_kv) {
   auto rc = compiler.CompileFunction<Vector<uint32_t>, Context&, Vector<double>>(content);
   ASSERT_TRUE(rc.ok());
   auto f = std::move(rc.value());
-  auto ids = f(ctx, data);
+  auto ids = f(ctx, {data, false});
   for (size_t i = 0; i < ids.Size(); i++) {
     RUDF_INFO("[{}]:{}", ids[i], data[i]);
   }
-  const std::vector<double>& const_ref = data;
-  ASSERT_THROW(f(ctx, const_ref), std::logic_error);
+  ASSERT_THROW(f(ctx, data), std::logic_error);
 }

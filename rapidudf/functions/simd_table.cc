@@ -78,7 +78,8 @@ struct SimdTableHelper {
 
   template <typename T>
   static Vector<T> get_column(table::Table* table, uint32_t offset) {
-    return Vector<T>(table->GetColumnByOffset(offset));
+    // return Vector<T>(table->GetColumnByOffset(offset));
+    return table->LoadColumnByOffset<T>(offset);
   }
 
   static void Init() {

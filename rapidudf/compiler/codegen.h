@@ -164,6 +164,9 @@ class CodeGen {
   absl::StatusOr<ValuePtr> NewArray(DType dtype, const std::vector<ValuePtr>& vals);
   absl::StatusOr<ValuePtr> GetStructField(ValuePtr obj, DType field_dtype, uint32_t offset);
 
+  absl::StatusOr<ValuePtr> GetVectorSizeValue(ValuePtr obj);
+  absl::StatusOr<ValuePtr> GetVectorDataValue(ValuePtr obj);
+
   absl::StatusOr<::llvm::Type*> GetType(DType dtype);
   absl::StatusOr<::llvm::FunctionType*> GetFunctionType(const FunctionDesc& desc);
 
@@ -178,6 +181,9 @@ class CodeGen {
   void PrintAsm();
 
  private:
+  static constexpr std::string_view kVectorGetSizeFuncName = "rapidudf_simd_vector_size";
+  static constexpr std::string_view kVectorGetDataFuncName = "rapidudf_simd_vector_data";
+
   uint32_t GetLabelCursor() { return label_cursor_++; }
   ::llvm::Type* GetElementType(::llvm::Type* t);
 

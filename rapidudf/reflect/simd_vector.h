@@ -27,7 +27,7 @@ template <typename T>
 struct SimdVectorHelper {
   static T get(Vector<T> v, size_t i) { return v[i]; }
   static size_t size(Vector<T> v) { return v.Size(); }
-  static Vector<T> subvector(Vector<T> v, uint32_t pos, uint32_t len) { return v.SubVector(pos, len); }
+  static Vector<T> slice(Vector<T> v, uint32_t pos, uint32_t len) { return v.Slice(pos, len); }
   static int find(Vector<T> vec, T v) { return vec.Find(v); }
   static int find_neq(Vector<T> vec, T v) { return vec.FindNeq(v); }
   static int find_gt(Vector<T> vec, T v) { return vec.FindGt(v); }
@@ -40,7 +40,7 @@ struct SimdVectorHelper {
   static T reduce_min(Vector<T> vec) { return vec.ReduceMin(); }
 
   static void Init() {
-    RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, subvector);
+    RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, get, size, slice);
     if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<StringView, T>) {
       RUDF_STRUCT_HELPER_METHODS_BIND(SimdVectorHelper<T>, find, find_neq, find_gt, find_ge, find_lt, find_le);
     }

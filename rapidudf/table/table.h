@@ -79,7 +79,8 @@ class Table : public DynObject {
     }
   }
 
-  VectorBuf GetColumnByOffset(uint32_t offset);
+  template <typename T>
+  Vector<T> LoadColumnByOffset(uint32_t offset);
 
   /**
   ** Unload loaded column(defined by protobuf/flatbuffers/struct)
@@ -267,8 +268,8 @@ class Table : public DynObject {
   Vector<Bit> Filter(typename VisitorSignatureHelper<bool, T...>::type f,
                      std::shared_ptr<ThreadPool> thread_pool = nullptr) {
     size_t count = Count();
-    Vector<Bit> filter_mask = ctx_.NewVectorBuf<Bit>(count);
-    memset(filter_mask.GetVectorBuf().MutableData<uint8_t>(), 0, filter_mask.BytesCapacity());
+    Vector<Bit> filter_mask = ctx_.NewEmptyVector<Bit>(count);
+    memset(filter_mask.MutableData(), 0, filter_mask.SizeByBytes());
     Foreach<void, T...>(
         [&](size_t idx, const T*... args) {
           if (f(idx, args...)) {
@@ -547,12 +548,13 @@ class Table : public DynObject {
       return result;
     }
     Vector<T> vec = std::move(result.value());
+
     if (vec.Data() == nullptr) {
-      return Vector<T>(GetColumnByOffset(offset));
+      return LoadColumnByOffset<T>(offset);
     }
     return vec;
   }
-  VectorBuf GetColumnVectorBuf(StringView name);
+
   template <typename T>
   RowSchema NewRowSchema() {
     if constexpr (std::is_base_of_v<::google::protobuf::Message, T>) {
@@ -629,9 +631,9 @@ class Table : public DynObject {
 
   Table* SubTable(std::vector<int32_t>& indices);
 
-  void SetColumn(uint32_t offset, VectorBuf vec);
+  void SetColumn(uint32_t offset, VectorBase vec);
 
-  absl::StatusOr<VectorBuf> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
+  absl::StatusOr<VectorBase> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
 
   template <typename T>
   absl::Status LoadProtobufColumn(const Vector<Pointer>& pb_vector, const Column& column);
@@ -684,6 +686,8 @@ class Table : public DynObject {
       GetRowSchemaFromTuple<TupleLike, I + 1>();
     }
   }
+
+  VectorBase LoadColumnBaseByOffset(uint32_t offset);
 
   template <typename T>
   const T* LoadRowElement(size_t i, size_t j) {

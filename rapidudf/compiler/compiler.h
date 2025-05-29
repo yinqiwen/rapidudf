@@ -172,6 +172,7 @@ class JitCompiler {
  private:
   struct RPNEvalNode {
     ValuePtr val;
+    ValuePtr vector_data_ptr;
     OpToken op = OP_INVALID;
     DType op_compute_dtype;
     ast::FuncInvocation func_invocation;
