@@ -40,6 +40,7 @@ struct TableColumnOptions {
   std::unordered_set<std::string> exclude_fields;
   std::string prefix;
   bool ignore_unsupported_fields = false;
+  bool write_back_updates = false;
   bool IsAllowed(const std::string& field) const;
 };
 
@@ -67,7 +68,8 @@ class TableSchema : public DynObjectSchema {
   bool ExistColumn(const std::string& name, const DType& dtype) const;
   bool ExistRow(const RowSchema& row) const;
 
-  const Column* GetColumnByIdx(uint32_t idx) const;
+  const ColumnField* GetColumnByIdx(uint32_t idx) const;
+  size_t GetColumnCount() const { return columns_.size(); }
 
   std::string ToString() const;
 
@@ -79,13 +81,14 @@ class TableSchema : public DynObjectSchema {
   }
 
   template <typename T>
-  absl::Status AddColumn(const std::string& name, const RowSchema* schema, uint32_t field_idx) {
+  absl::Status AddColumn(const std::string& name, const RowSchema* schema, uint32_t field_idx,
+                         const TableColumnOptions& opts) {
     if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T>) {
-      return AddColumn(name, get_dtype<Vector<StringView>>(), schema, field_idx);
+      return AddColumn(name, get_dtype<Vector<StringView>>(), schema, field_idx, opts);
     } else if constexpr (std::is_same_v<bool, T>) {
-      return AddColumn(name, get_dtype<Vector<Bit>>(), schema, field_idx);
+      return AddColumn(name, get_dtype<Vector<Bit>>(), schema, field_idx, opts);
     } else {
-      return AddColumn(name, get_dtype<Vector<T>>(), schema, field_idx);
+      return AddColumn(name, get_dtype<Vector<T>>(), schema, field_idx, opts);
     }
   }
 
@@ -94,10 +97,11 @@ class TableSchema : public DynObjectSchema {
   absl::Status AddColumns(const TableColumnOptions& opts, const ::google::protobuf::Message* msg);
   absl::Status AddColumns(const TableColumnOptions& opts, const flatbuffers::TypeTable* type_table);
   absl::Status AddColumns(const TableColumnOptions& opts, const DType& dtype);
-  absl::Status AddColumn(const std::string& name, const DType& dtype, const RowSchema* schema, uint32_t field_idx);
+  absl::Status AddColumn(const std::string& name, const DType& dtype, const RowSchema* schema, uint32_t field_idx,
+                         const TableColumnOptions& opts);
 
   std::vector<RowSchemaPtr> row_schemas_;
-  std::vector<Column> columns_;
+  std::vector<ColumnField> columns_;
 
   friend class Table;
 };

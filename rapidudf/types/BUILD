@@ -95,5 +95,6 @@ cc_library(
         "//rapidudf/memory:arena",
         "//rapidudf/meta:exception",
         "//rapidudf/meta:optype",
+        "//rapidudf/meta:type_traits",
     ],
 )

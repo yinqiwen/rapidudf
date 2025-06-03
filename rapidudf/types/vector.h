@@ -24,6 +24,7 @@
 
 #include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/meta/vector_type_traits.h"
 #include "rapidudf/types/bit.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
@@ -133,50 +134,6 @@ class VectorBase {
   const void* data_ = nullptr;
 };
 
-// class VectorBuf {
-//  public:
-//   explicit VectorBuf(const void* data = nullptr, size_t size = 0, size_t bytes_capacity = 0)
-//       : temporary_(0), size_(size), writable_(0), bytes_capacity_(bytes_capacity), data_(data) {}
-//   template <typename T>
-//   explicit VectorBuf(const std::vector<T>& vec) {
-//     if constexpr (std::is_same_v<T, Bit> || std::is_same_v<T, bool>) {
-//       static_assert(sizeof(T) == -1, "unsupported constructor");
-//     } else {
-//       temporary_ = 0;
-//       size_ = vec.size();
-//       data_ = vec.data();
-//       bytes_capacity_ = vec.capacity() * sizeof(T);
-//       writable_ = 0;
-//     }
-//   }
-//   inline size_t Size() const { return size_; }
-//   inline void SetSize(size_t n) { size_ = n; }
-//   inline size_t BytesCapacity() const { return bytes_capacity_; };
-//   inline const void* Data() const { return data_; }
-
-//   inline void SetReadonly(bool v) { writable_ = (v ? 0 : 1); }
-//   inline bool IsReadonly() const { return !writable_; };
-
-//   template <typename T>
-//   T* MutableData() {
-//     return reinterpret_cast<T*>(const_cast<void*>(data_));
-//   }
-//   template <typename T>
-//   const T* ReadableData() {
-//     return reinterpret_cast<const T*>(data_);
-//   }
-
-//  private:
-//   union {
-//     struct {
-//       uint64_t temporary_ : 1;
-//       uint64_t size_ : 31;  // corresponds to logical address
-//       uint64_t writable_ : 1;
-//       uint64_t bytes_capacity_ : 31;
-//     };
-//   };
-//   const void* data_ = nullptr;
-// };
 struct VectorBuildOptions {
   bool readonly = true;
   bool clone = false;
@@ -185,10 +142,10 @@ struct VectorBuildOptions {
 template <typename T>
 class Vector : public VectorBase {
  public:
-  using value_type = T;
-  Vector() : VectorBase((T*)nullptr) {}
-  Vector(const T* data, size_t size, size_t capacity = 0, bool readonly = true)
-      : VectorBase(data, size, capacity * sizeof(T), readonly) {}
+  using value_type = typename VectorTypeTraits<T>::ElementType;
+  Vector() : VectorBase((value_type*)nullptr) {}
+  Vector(const value_type* data, size_t size, size_t capacity = 0, bool readonly = true)
+      : VectorBase(data, size, capacity * sizeof(value_type), readonly) {}
 
   Vector(const std::vector<T>& vec, bool readonly = true) : VectorBase(vec, readonly) {}
   template <typename R, typename U = T, typename std::enable_if<std::is_same<U, Pointer>::value, int>::type = 0>
@@ -199,7 +156,7 @@ class Vector : public VectorBase {
 
   template <typename R>
   Vector(const Vector<R>& vec) : VectorBase((uint8_t*)nullptr, 0, 0, false) {
-    if constexpr (sizeof(T) != sizeof(R)) {
+    if constexpr (sizeof(value_type) != sizeof(typename VectorTypeTraits<R>::ElementType)) {
       static_assert(sizeof(T) == -1, "unsupported constructor from other simd vector");
     } else {
       CopyFrom(vec);
@@ -211,7 +168,7 @@ class Vector : public VectorBase {
     return v;
   }
 
-  inline T operator[](size_t idx) const {
+  inline auto operator[](size_t idx) const {
     if constexpr (std::is_same_v<Bit, T>) {
       size_t byte_idx = idx / 8;
       size_t bit_cursor = idx % 8;
@@ -296,8 +253,8 @@ class Vector : public VectorBase {
 
   Vector<T> Resize(size_t n) const { return Slice(0, n); }
 
-  auto Data() const { return VectorBase::Data<T>(); }
-  auto MutableData() { return VectorBase::MutableData<T>(); }
+  auto Data() const { return VectorBase::Data<value_type>(); }
+  auto MutableData() { return VectorBase::MutableData<value_type>(); }
 
   size_t Size() const { return static_cast<size_t>(VectorBase::Size()); }
   size_t SizeByBytes() const {
@@ -310,7 +267,7 @@ class Vector : public VectorBase {
       return bytes_n;
 
     } else {
-      return Size() * sizeof(T);
+      return Size() * sizeof(value_type);
     }
   }
 };

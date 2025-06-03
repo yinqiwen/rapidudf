@@ -588,4 +588,18 @@ uint64_t convert_to(uint64_t val, DType src_dtype, DType dst_type) {
   }
 }
 
+DType create_simd_vector_dtype(DType element_dtype) {
+  if (element_dtype.IsPrimitive()) {
+    return element_dtype.ToSimdVector();
+  }
+  DType complex(DATA_COMPLEX_OBJECT);
+  complex = complex.ToSimdVector();
+  auto span_element_dtype = element_dtype.Elem();
+  if (span_element_dtype.IsString() || span_element_dtype.IsStringPtr() || span_element_dtype.IsStdStringView()) {
+    span_element_dtype = DATA_STRING_VIEW;
+  }
+  complex.SetElement(0, span_element_dtype.ToAbslSpan());
+  return complex;
+}
+
 }  // namespace rapidudf

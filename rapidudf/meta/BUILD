@@ -14,14 +14,17 @@ cc_library(
 )
 
 cc_library(
-    name = "meta",
+    name = "type_traits",
     hdrs = [
         "type_traits.h",
+        "vector_type_traits.h",
     ],
     deps = [
         ":exception",
         "//rapidudf/log",
+        "//rapidudf/types:string_view",
         "@com_github_fmtlib//:fmt",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -65,7 +68,7 @@ cc_library(
     ],
     deps = [
         ":dtype_enums",
-        ":meta",
+        ":type_traits",
         "//rapidudf/context",
         "//rapidudf/log",
         "//rapidudf/types",

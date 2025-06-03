@@ -18,6 +18,7 @@
 
 #include <array>
 #include <functional>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -33,6 +34,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/type_traits.h"
+#include "rapidudf/meta/vector_type_traits.h"
 #include "rapidudf/table/column.h"
 #include "rapidudf/table/row.h"
 #include "rapidudf/table/visitor.h"
@@ -80,7 +82,42 @@ class Table : public DynObject {
   }
 
   template <typename T>
-  Vector<T> LoadColumnByOffset(uint32_t offset);
+  absl::Status Set(const std::string& name, Vector<T> new_column) {
+    uint32_t offset = 0;
+    auto result = DynObject::Get<Vector<T>>(name, &offset);
+    if (!result.ok()) {
+      return result.status();
+    }
+    uint32_t idx = GetIdxByOffset(offset);
+    // SetColumn(*columns_[idx], new_column, new_column.SizeByBytes());
+    auto& column = *columns_[idx];
+    if (new_column.Size() != Count()) {
+      RUDF_LOG_RETURN_FMT_ERROR("Vector size:{} not match with table count:{}", new_column.Size(), Count());
+    }
+    column.SetData(new_column, new_column.SizeByBytes(), false);
+    if (column.WriteBackUpdates()) {
+      if (column.HasStructScheme() && column.GetStructField()->HasField()) {
+        const Rows* rows = GetRowsBySchema(column.GetSchema());
+        const auto& ptrs = rows->GetRawRowPtrs();
+        size_t field_offset = column.GetStructField()->member_field_offset;
+        for (size_t i = 0; i < ptrs.size(); i++) {
+          auto field_ptr = const_cast<uint8_t*>(ptrs[i] + field_offset);
+          const T* new_data = new_column.Data() + i;
+          memcpy(const_cast<uint8_t*>(field_ptr), new_data, sizeof(T));
+        }
+
+      } else {
+        RUDF_WARN("Can NOT write back column without struct field scheme.");
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  template <typename T>
+  Vector<typename VectorTypeTraits<T>::ElementType> LoadColumnByOffset(uint32_t offset) {
+    VectorBase base = LoadColumnBaseByOffset(offset);
+    return *(reinterpret_cast<Vector<typename VectorTypeTraits<T>::ElementType>*>(&base));
+  }
 
   /**
   ** Unload loaded column(defined by protobuf/flatbuffers/struct)
@@ -536,18 +573,19 @@ class Table : public DynObject {
   absl::StatusOr<uint32_t> GetColumnOffset(const std::string& name);
 
   bool IsColumnLoaded(uint32_t offset);
-  uint8_t* GetColumnMemory(uint32_t offset, const DType& dtype);
-  size_t GetColumnMemorySize(const DType& dtype);
-  void SetColumnSize(const Column& column, void* p);
+  // uint8_t* GetColumnMemory(uint32_t offset, const DType& dtype);
+  // size_t GetColumnMemorySize(const DType& dtype);
+  void SetColumnSize(const Column& column, const void* p);
 
   template <typename T>
-  absl::StatusOr<Vector<T>> GetColumn(const std::string& name) {
+  absl::StatusOr<Vector<typename VectorTypeTraits<T>::ElementType>> GetColumn(const std::string& name) {
+    using element_type = typename VectorTypeTraits<T>::ElementType;
     uint32_t offset = 0;
-    auto result = DynObject::Get<Vector<T>>(name, &offset);
+    auto result = DynObject::Get<Vector<element_type>>(name, &offset);
     if (!result.ok()) {
       return result;
     }
-    Vector<T> vec = std::move(result.value());
+    auto vec = std::move(result.value());
 
     if (vec.Data() == nullptr) {
       return LoadColumnByOffset<T>(offset);
@@ -629,23 +667,11 @@ class Table : public DynObject {
   template <typename T>
   absl::Span<Table*> GroupBy(const T* by, size_t n);
 
-  Table* SubTable(std::vector<int32_t>& indices);
+  Table* GatherSubTable(std::vector<int32_t>& indices);
 
-  void SetColumn(uint32_t offset, VectorBase vec);
+  // absl::StatusOr<VectorBase> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
 
-  absl::StatusOr<VectorBase> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
-
-  template <typename T>
-  absl::Status LoadProtobufColumn(const Vector<Pointer>& pb_vector, const Column& column);
-  template <typename T>
-  absl::Status LoadFlatbuffersColumn(const Vector<Pointer>& fbs_vector, const Column& column);
-  template <typename T>
-  absl::Status LoadStructColumn(const Vector<Pointer>& struct_vector, const Column& column);
-
-  template <typename T>
-  absl::Status LoadColumn(const Vector<Pointer>& objs, const Column& column);
-
-  absl::Status LoadColumn(const Rows& rows, const Column& column);
+  absl::Status LoadColumn(const Rows& rows, Column& column);
   const RowSchema* GetRowSchema(const RowSchema& schema);
   int GetRowIdx(const RowSchema& schema);
   absl::Status Validate(const std::vector<RowSchema>& schemas);
@@ -653,10 +679,10 @@ class Table : public DynObject {
   template <typename T>
   Vector<Bit> Dedup(const T* data, size_t n, size_t k);
 
-  template <typename T>
-  absl::Status Set(const std::string& name, T&& v) {
-    return DynObject::Set(name, std::forward<T>(v));
-  }
+  // template <typename T>
+  // absl::Status Set(const std::string& name, T&& v) {
+  //   return DynObject::Set(name, std::forward<T>(v));
+  // }
 
   template <typename R>
   VisitStatusCode HandleIteratorValue(R v) {
@@ -715,9 +741,14 @@ class Table : public DynObject {
     return f(LoadMutableRowElement<T>(current_row_idx, Is)..., LoadRowElement<T>(merge_row_idx, Is)...);
   }
 
+  void ClearAllColumns();
+
+  const Rows* GetRowsBySchema(const RowSchema* schema) const;
+
   Context& ctx_;
   std::vector<int32_t> indices_;
   std::vector<Rows> rows_;
+  std::vector<std::unique_ptr<Column>> columns_;
   friend class TableSchema;
 };
 }  // namespace table

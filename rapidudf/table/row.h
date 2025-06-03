@@ -59,7 +59,7 @@ class Rows {
 
   const RowSchema& GetSchema() const { return schema_; }
   Vector<Pointer> GetRowPtrs() const;
-  const std::vector<const uint8_t*> GetRawRowPtrs() const { return objs_; }
+  const std::vector<const uint8_t*>& GetRawRowPtrs() const { return objs_; }
 
   size_t RowCount() const { return objs_.size(); }
 

@@ -24,10 +24,142 @@
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/rapidudf.h"
+#include "rapidudf/tests/fbs_table_schema_generated.h"
+#include "rapidudf/tests/pb_table_schema.pb.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
 
 using namespace rapidudf;
+
+struct StructSchema {
+  std::string city;
+  int id;
+  double score;
+  std::array<float, 64> embedding;
+  std::vector<int32_t> cats;
+  std::vector<std::string> tags;
+};
+RUDF_STRUCT_FIELDS(StructSchema, city, id, score, embedding, cats, tags)
+
+TEST(Table, create_by_struct_schema) {
+  auto schema = table::TableSchema::GetOrCreate(
+      "test_create_table0", [&](table::TableSchema* s) { std::ignore = s->AddColumns<StructSchema>(); });
+
+  size_t N = 100;
+  std::vector<std::string> candidate_citys{"sz", "sh", "bj", "gz"};
+  std::vector<StructSchema> items;
+  for (size_t i = 0; i < N; i++) {
+    StructSchema item;
+    item.city = candidate_citys[i % candidate_citys.size()];
+    item.id = i + 10;
+    item.score = 1.1 + i;
+    item.tags = {"hh"};
+    items.emplace_back(item);
+  }
+  Context ctx;
+  auto table = schema->NewTable(ctx);
+  std::ignore = table->AddRows(items);
+
+  auto x = table->Get<std::array<float, 64>>("embedding");
+  ASSERT_TRUE(x.ok());
+  Vector<absl::Span<float>> xx = std::move(x.value());
+  ASSERT_EQ(xx.Size(), table->Count());
+  ASSERT_EQ(xx[0].size(), 64);
+  auto y = table->Get<std::vector<int32_t>>("cats");
+  ASSERT_TRUE(y.ok());
+  Vector<absl::Span<int32_t>> yy = std::move(y.value());
+  ASSERT_EQ(yy.Size(), table->Count());
+  ASSERT_EQ(yy[0].size(), 0);
+
+  auto tags = table->Get<std::vector<std::string>>("tags");
+  ASSERT_TRUE(tags.ok());
+  Vector<absl::Span<StringView>> tagss = std::move(tags.value());
+  ASSERT_EQ(tagss.Size(), table->Count());
+  ASSERT_EQ(tagss[0].size(), 1);
+  ASSERT_EQ(tagss[0][0], "hh");
+}
+
+TEST(Table, create_by_fbs_schema) {
+  auto schema = table::TableSchema::GetOrCreate("test_create_table1", [&](table::TableSchema* s) {
+    auto status = s->AddColumns<test_fbs::Schema>();
+    if (!status.ok()) {
+      RUDF_ERROR("###{}", status.ToString());
+    }
+  });
+
+  size_t N = 100;
+  std::vector<const test_fbs::Schema*> items;
+  std::vector<std::unique_ptr<flatbuffers::FlatBufferBuilder>> fbs_buffers;
+  for (size_t i = 0; i < N; i++) {
+    test_fbs::SchemaT item;
+    auto builder = std::make_unique<flatbuffers::FlatBufferBuilder>();
+    item.id = i;
+    item.str = "hello_" + std::to_string(i);
+    item.tags = {"hello_" + std::to_string(i), "world"};
+    item.embedding = {1.1 + i, 1.2 + i, 1.3 + i, 1.4 + i};
+    builder->Finish(test_fbs::Schema::Pack(*builder, &item));
+    const test_fbs::Schema* fbs_ptr = test_fbs::GetSchema(builder->GetBufferPointer());
+    items.emplace_back(fbs_ptr);
+    fbs_buffers.emplace_back(std::move(builder));
+  }
+
+  Context ctx;
+  auto table = schema->NewTable(ctx);
+  std::ignore = table->AddRows(items);
+
+  auto embedding = table->Get<std::vector<float>>("embedding");
+  ASSERT_TRUE(embedding.ok());
+  Vector<absl::Span<float>> embedding_val = std::move(embedding.value());
+  ASSERT_EQ(embedding_val.Size(), table->Count());
+  ASSERT_EQ(embedding_val[0].size(), 4);
+
+  auto tags = table->Get<std::vector<std::string>>("tags");
+  ASSERT_TRUE(tags.ok());
+  Vector<absl::Span<StringView>> tagss = std::move(tags.value());
+  ASSERT_EQ(tagss.Size(), table->Count());
+  ASSERT_EQ(tagss[0].size(), 2);
+  ASSERT_EQ(tagss[0][0], "hello_0");
+}
+
+TEST(Table, create_by_pb_schema) {
+  auto schema = table::TableSchema::GetOrCreate("test_create_table2", [&](table::TableSchema* s) {
+    auto status = s->AddColumns<test::Schema>();
+    if (!status.ok()) {
+      RUDF_ERROR("###{}", status.ToString());
+    }
+  });
+
+  size_t N = 100;
+  std::vector<test::Schema> items;
+
+  for (size_t i = 0; i < N; i++) {
+    test::Schema item;
+    item.set_id(i);
+    item.set_str("hello_" + std::to_string(i));
+    item.add_tags("hello_" + std::to_string(i));
+    item.add_tags("world");
+    std::vector<float> embedding{1.1 + i, 1.2 + i, 1.3 + i, 1.4 + i};
+    item.mutable_embedding()->Assign(embedding.begin(), embedding.end());
+    items.emplace_back(std::move(item));
+  }
+
+  Context ctx;
+  auto table = schema->NewTable(ctx);
+  std::ignore = table->AddRows(items);
+
+  auto embedding = table->Get<std::vector<float>>("embedding");
+  ASSERT_TRUE(embedding.ok());
+  Vector<absl::Span<float>> embedding_val = std::move(embedding.value());
+  ASSERT_EQ(embedding_val.Size(), table->Count());
+  ASSERT_EQ(embedding_val[0].size(), 4);
+
+  auto tags = table->Get<std::vector<std::string>>("tags");
+  ASSERT_TRUE(tags.ok());
+  Vector<absl::Span<StringView>> tagss = std::move(tags.value());
+  ASSERT_EQ(tagss.Size(), table->Count());
+  ASSERT_EQ(tagss[0].size(), 2);
+  ASSERT_EQ(tagss[0][0], "hello_0");
+}
 
 struct SimpleStruct {
   std::string sv;
@@ -37,9 +169,10 @@ struct SimpleStruct {
 };
 RUDF_STRUCT_FIELDS(SimpleStruct, sv, fv, iv, bv)
 
-TEST(JitCompiler, table_simple) {
-  auto schema = table::TableSchema::GetOrCreate(
-      "mytable", [](table::TableSchema* s) { std::ignore = s->AddColumns<SimpleStruct>(); });
+TEST(Table, simple) {
+  auto schema = table::TableSchema::GetOrCreate("mytable", [](table::TableSchema* s) {
+    std::ignore = s->AddColumns<SimpleStruct>({.write_back_updates = true});
+  });
   Context ctx;
   auto table = schema->NewTable(ctx);
   std::vector<SimpleStruct> objs;
@@ -71,6 +204,17 @@ TEST(JitCompiler, table_simple) {
   ASSERT_EQ(bv_result.value().Size(), objs.size());
   for (size_t i = 0; i < objs.size(); i++) {
     ASSERT_EQ(bv_result.value()[i], Bit(objs[i].bv));
+  }
+
+  std::vector<float> new_fv = {100.1, 101.1, 102.2, 103.1};
+  status = table->Set("fv", ctx.NewVector(new_fv));
+  ASSERT_TRUE(status.ok());
+  fv_result = table->Get<float>("fv");
+  ASSERT_TRUE(fv_result.ok());
+  ASSERT_EQ(fv_result.value().Size(), new_fv.size());
+  for (size_t i = 0; i < new_fv.size(); i++) {
+    ASSERT_FLOAT_EQ(fv_result.value()[i], new_fv[i]);
+    ASSERT_FLOAT_EQ(objs[i].fv, new_fv[i]);
   }
 }
 
@@ -489,10 +633,6 @@ TEST(JitCompiler, distinct_merge) {
                                               });
   ASSERT_TRUE(s.ok());
   ASSERT_EQ(table3->Count(), 150);
-  for (size_t i = 0; i < table3->Count(); i++) {
-    RUDF_INFO("[{}] id:{},repeat:{}]", i, table3->SlowGetRow<TestUser>(i)->id,
-              table3->SlowGetRow<TestUser>(i)->repeate);
-  }
 }
 
 struct User1 {

@@ -26,7 +26,7 @@ cc_library(
     deps = [
         ":allocator",
         "//rapidudf/common:allign",
-        "//rapidudf/meta",
+        "//rapidudf/meta:type_traits",
         "@com_github_fmtlib//:fmt",
         "@com_google_absl//absl/base",
     ],

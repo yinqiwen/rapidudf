@@ -1,0 +1,12 @@
+namespace test_fbs;
+
+
+
+table Schema {
+  id:uint;
+  str:string;
+  tags:[string];
+  embedding:[float];
+}
+root_type Schema;
+

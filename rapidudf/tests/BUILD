@@ -71,6 +71,12 @@ flatbuffer_cc_library(
     gen_reflections = True,
 )
 
+flatbuffer_cc_library(
+    name = "fbs_table_schema",
+    srcs = ["fbs_table_schema.fbs"],
+    gen_reflections = True,
+)
+
 proto_library(
     name = "test_pb_proto",
     srcs = ["test_pb.proto"],
@@ -79,6 +85,16 @@ proto_library(
 cc_proto_library(
     name = "test_pb_cc_proto",
     deps = [":test_pb_proto"],
+)
+
+proto_library(
+    name = "pb_table_schema_proto",
+    srcs = ["pb_table_schema.proto"],
+)
+
+cc_proto_library(
+    name = "pb_table_schema_cc_proto",
+    deps = [":pb_table_schema_proto"],
 )
 
 cc_test(
@@ -367,18 +383,8 @@ cc_test(
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [
-        "//rapidudf",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "simd_table_test2",
-    size = "small",
-    srcs = ["simd_table_test2.cc"],
-    linkopts = RUDF_DEFAULT_LINKOPTS,
-    linkstatic = True,
-    deps = [
+        ":fbs_table_schema",
+        ":pb_table_schema_cc_proto",
         "//rapidudf",
         "@com_google_googletest//:gtest_main",
     ],

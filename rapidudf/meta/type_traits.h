@@ -17,8 +17,14 @@
 #pragma once
 #include <array>
 #include <functional>
+#include <map>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
+#include <vector>
+#include "absl/types/span.h"
+#include "rapidudf/types/string_view.h"
 
 namespace rapidudf {
 template <typename Test, template <typename...> class Ref>

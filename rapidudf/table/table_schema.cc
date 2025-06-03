@@ -17,8 +17,10 @@
 #include <fmt/format.h>
 #include <memory>
 #include "rapidudf/log/log.h"
+#include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/types/bit.h"
+#include "rapidudf/types/vector.h"
 namespace rapidudf {
 namespace table {
 bool TableColumnOptions::IsAllowed(const std::string& field) const {
@@ -42,7 +44,7 @@ TableSchema* TableSchema::GetMutable(const std::string& name) {
 
 const TableSchema* TableSchema::Get(const std::string& name) { return GetMutable(name); }
 
-const Column* TableSchema::GetColumnByIdx(uint32_t idx) const {
+const ColumnField* TableSchema::GetColumnByIdx(uint32_t idx) const {
   if (idx >= columns_.size()) {
     return nullptr;
   }
@@ -59,16 +61,18 @@ bool TableSchema::ExistRow(const RowSchema& row) const {
 }
 
 absl::Status TableSchema::AddColumn(const std::string& name, const DType& dtype, const RowSchema* schema,
-                                    uint32_t field_idx) {
+                                    uint32_t field_idx, const TableColumnOptions& opts) {
   auto result = Add(name, dtype);
   if (!result.ok()) {
     return result.status();
   }
-  Column column;
+  ColumnField column;
   column.name = name;
   column.schema = schema;
   column.field = result.value();
   column.field_idx = field_idx;
+  column.writ_back_updates = opts.write_back_updates;
+
   columns_.emplace_back(std::move(column));
   return absl::OkStatus();
 }
@@ -116,42 +120,75 @@ absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const ::goo
     absl::Status status;
     switch (field_desc->type()) {
       case ::google::protobuf::FieldDescriptor::TYPE_BOOL: {
-        status = AddColumn<bool>(column_name, schema.get(), i);
+        if (field_desc->is_repeated()) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<bool>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<bool>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_DOUBLE: {
-        status = AddColumn<double>(column_name, schema.get(), i);
+        if (field_desc->is_repeated()) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<double>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<double>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_FLOAT: {
-        status = AddColumn<float>(column_name, schema.get(), i);
+        if (field_desc->is_repeated()) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<float>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<float>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_SINT64:
       case ::google::protobuf::FieldDescriptor::TYPE_SFIXED64:
       case ::google::protobuf::FieldDescriptor::TYPE_INT64: {
-        status = AddColumn<int64_t>(column_name, schema.get(), i);
+        if (field_desc->is_repeated()) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<int64_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<int64_t>(column_name, schema.get(), i, opts);
+        }
+
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_FIXED64:
       case ::google::protobuf::FieldDescriptor::TYPE_UINT64: {
-        status = AddColumn<uint64_t>(column_name, schema.get(), i);
+        if (field_desc->is_repeated()) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<uint64_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<uint64_t>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_SINT32:
       case ::google::protobuf::FieldDescriptor::TYPE_SFIXED32:
       case ::google::protobuf::FieldDescriptor::TYPE_INT32: {
-        status = AddColumn<int32_t>(column_name, schema.get(), i);
+        if (field_desc->is_repeated()) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<int32_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<int32_t>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_FIXED32:
       case ::google::protobuf::FieldDescriptor::TYPE_UINT32: {
-        status = AddColumn<uint32_t>(column_name, schema.get(), i);
+        if (field_desc->is_repeated()) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<uint32_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<uint32_t>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case ::google::protobuf::FieldDescriptor::TYPE_STRING:
       case ::google::protobuf::FieldDescriptor::TYPE_BYTES: {
-        status = AddColumn<std::string>(column_name, schema.get(), i);
+        if (field_desc->is_repeated()) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<StringView>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<std::string>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       default: {
@@ -187,66 +224,117 @@ absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const flatb
     std::string column_name = opts.prefix.empty() ? name : opts.prefix + name;
 
     absl::Status status;
+    bool is_repeating = false;
 #if FLATBUFFERS_VERSION_MAJOR == 1
     if (type_table->type_codes[i].is_vector) {
 #else
     if (type_table->type_codes[i].is_repeating) {
 #endif
-
-      if (opts.ignore_unsupported_fields) {
-        continue;
-      }
-      status = absl::UnimplementedError(fmt::format("Not supported field:{} with repeating base_type:{}", name,
-                                                    static_cast<int>(type_table->type_codes[i].base_type)));
-      return status;
+      is_repeating = true;
     }
+
     switch (type_table->type_codes[i].base_type) {
       case flatbuffers::ET_BOOL: {
-        status = AddColumn<bool>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<bool>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<bool>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case flatbuffers::ET_CHAR: {
-        status = AddColumn<int8_t>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<int8_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<int8_t>(column_name, schema.get(), i, opts);
+        }
+
         break;
       }
       case flatbuffers::ET_UCHAR: {
-        status = AddColumn<uint8_t>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<uint8_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<uint8_t>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case flatbuffers::ET_SHORT: {
-        status = AddColumn<int16_t>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<int16_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<int16_t>(column_name, schema.get(), i, opts);
+        }
+
         break;
       }
       case flatbuffers::ET_USHORT: {
-        status = AddColumn<uint16_t>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<uint16_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<uint16_t>(column_name, schema.get(), i, opts);
+        }
+
         break;
       }
       case flatbuffers::ET_INT: {
-        status = AddColumn<int32_t>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<int32_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<int32_t>(column_name, schema.get(), i, opts);
+        }
+
         break;
       }
       case flatbuffers::ET_UINT: {
-        status = AddColumn<uint32_t>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<uint32_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<uint32_t>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case flatbuffers::ET_LONG: {
-        status = AddColumn<int64_t>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<int64_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<int64_t>(column_name, schema.get(), i, opts);
+        }
+
         break;
       }
       case flatbuffers::ET_ULONG: {
-        status = AddColumn<uint64_t>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<uint64_t>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<uint64_t>(column_name, schema.get(), i, opts);
+        }
+
         break;
       }
       case flatbuffers::ET_FLOAT: {
-        status = AddColumn<float>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<float>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<float>(column_name, schema.get(), i, opts);
+        }
+
         break;
       }
       case flatbuffers::ET_DOUBLE: {
-        status = AddColumn<double>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<double>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<double>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       case flatbuffers::ET_STRING: {
-        status = AddColumn<std::string>(column_name, schema.get(), i);
+        if (is_repeating) {
+          status = AddColumn(column_name, get_dtype<Vector<absl::Span<StringView>>>(), schema.get(), i, opts);
+        } else {
+          status = AddColumn<std::string>(column_name, schema.get(), i, opts);
+        }
         break;
       }
       default: {
@@ -301,6 +389,14 @@ absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const DType
     if (!member_dtype.IsFundamental() || !member_dtype.IsPrimitive()) {
       if (member_dtype.IsString() || member_dtype.IsStringPtr()) {
         valid_dtype = true;
+      } else if (member_dtype.IsArray() || member_dtype.IsVector()) {
+        auto member_element_dtype = member_dtype.Elem();
+        if (member_element_dtype.IsPrimitive() || member_element_dtype.IsString() ||
+            member_element_dtype.IsStringPtr()) {
+          valid_dtype = true;
+        } else {
+          valid_dtype = false;
+        }
       } else {
         valid_dtype = false;
       }
@@ -314,64 +410,69 @@ absl::Status TableSchema::AddColumns(const TableColumnOptions& opts, const DType
       RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", column_name, member_dtype);
     }
 
-    switch (member_dtype.GetFundamentalType()) {
-      case DATA_I8: {
-        status = AddColumn<int8_t>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_U8: {
-        status = AddColumn<uint8_t>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_I16: {
-        status = AddColumn<int16_t>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_U16: {
-        status = AddColumn<uint16_t>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_I32: {
-        status = AddColumn<int32_t>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_U32: {
-        status = AddColumn<uint32_t>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_I64: {
-        status = AddColumn<int64_t>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_U64: {
-        status = AddColumn<uint64_t>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_F32: {
-        status = AddColumn<float>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_F64: {
-        status = AddColumn<double>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_STRING:
-      case DATA_STD_STRING_VIEW:
-      case DATA_STRING_VIEW: {
-        status = AddColumn<std::string>(column_name, schema.get(), i);
-        break;
-      }
-      case DATA_BIT: {
-        status = AddColumn<bool>(column_name, schema.get(), i);
-        break;
-      }
-      default: {
-        if (opts.ignore_unsupported_fields) {
-          continue;
-        } else {
-          RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", column_name, member_dtype);
+    if (member_dtype.IsArray() || member_dtype.IsVector()) {
+      auto column_dtype = create_simd_vector_dtype(member_dtype);
+      status = AddColumn(column_name, column_dtype, schema.get(), i, opts);
+    } else {
+      switch (member_dtype.GetFundamentalType()) {
+        case DATA_I8: {
+          status = AddColumn<int8_t>(column_name, schema.get(), i, opts);
+          break;
         }
-        break;
+        case DATA_U8: {
+          status = AddColumn<uint8_t>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_I16: {
+          status = AddColumn<int16_t>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_U16: {
+          status = AddColumn<uint16_t>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_I32: {
+          status = AddColumn<int32_t>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_U32: {
+          status = AddColumn<uint32_t>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_I64: {
+          status = AddColumn<int64_t>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_U64: {
+          status = AddColumn<uint64_t>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_F32: {
+          status = AddColumn<float>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_F64: {
+          status = AddColumn<double>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_STRING:
+        case DATA_STD_STRING_VIEW:
+        case DATA_STRING_VIEW: {
+          status = AddColumn<std::string>(column_name, schema.get(), i, opts);
+          break;
+        }
+        case DATA_BIT: {
+          status = AddColumn<bool>(column_name, schema.get(), i, opts);
+          break;
+        }
+        default: {
+          if (opts.ignore_unsupported_fields) {
+            continue;
+          } else {
+            RUDF_LOG_RETURN_FMT_ERROR("Not supported field:{} with dtype:{}", column_name, member_dtype);
+          }
+          break;
+        }
       }
     }
 

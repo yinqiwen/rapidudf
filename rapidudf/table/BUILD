@@ -5,6 +5,7 @@ package(
 cc_library(
     name = "table",
     srcs = [
+        "column.cc",
         "row.cc",
         "table.cc",
         "table_schema.cc",
@@ -16,6 +17,7 @@ cc_library(
         "table_schema.h",
         "visitor.h",
     ],
+    copts = ["-Wno-deprecated-declarations"],
     deps = [
         "//rapidudf/common:variadic_template_helper",
         "//rapidudf/context",

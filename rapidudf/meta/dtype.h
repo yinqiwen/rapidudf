@@ -131,6 +131,8 @@ class DType {
   bool IsFlatbuffersStringPtr() const { return IsPtr() && (PtrTo().IsFlatbuffersString()); }
   bool CanCastTo(DType other) const;
 
+  size_t FixedArraySize() const { return ctrl_.fixed_array_size_; }
+
   size_t Hash(const uint8_t* data) const;
   bool Equal(const uint8_t* left, const uint8_t* right) const;
 
@@ -564,6 +566,8 @@ template <typename T>
 std::vector<DType> get_dtypes() {
   return get_dtypes_helper<T>::get();
 }
+
+DType create_simd_vector_dtype(DType element_dtype);
 
 uint64_t convert_to(uint64_t val, DType src_dtype, DType dst_type);
 
