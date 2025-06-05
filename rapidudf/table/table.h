@@ -34,6 +34,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/exception.h"
 #include "rapidudf/meta/type_traits.h"
+#include "rapidudf/meta/typeid.h"
 #include "rapidudf/meta/vector_type_traits.h"
 #include "rapidudf/table/column.h"
 #include "rapidudf/table/row.h"
@@ -114,6 +115,11 @@ class Table : public DynObject {
   }
 
   template <typename T>
+  absl::Status Set(const std::string& name, const std::vector<T>& data, const VectorBuildOptions& options = {}) {
+    return Set<T>(name, ctx_.NewVector(data, options));
+  }
+
+  template <typename T>
   Vector<typename VectorTypeTraits<T>::ElementType> LoadColumnByOffset(uint32_t offset) {
     VectorBase base = LoadColumnBaseByOffset(offset);
     return *(reinterpret_cast<Vector<typename VectorTypeTraits<T>::ElementType>*>(&base));
@@ -166,7 +172,7 @@ class Table : public DynObject {
   }
 
   template <typename T>
-  const T* SlowGetRow(size_t idx) {
+  const T* GetRow(size_t idx) {
     const RowSchema* schema = GetRowSchema<T>();
     if (schema == nullptr) {
       THROW_LOGIC_ERR("Invalid row object type to get schema");
@@ -609,8 +615,11 @@ class Table : public DynObject {
 
   template <typename T>
   const RowSchema* GetRowSchema() {
-    return GetRowSchema(NewRowSchema<T>());
+    return GetRowSchemaByTypeID(TypeID::Get<T>());
   }
+
+  const RowSchema* GetRowSchemaByTypeID(uint32_t id) const;
+
   template <typename T>
   absl::StatusOr<PartialRows> GetPartialRows(const std::vector<T>& rows) {
     if (rows.empty()) {
@@ -652,19 +661,6 @@ class Table : public DynObject {
   }
 
   template <typename T>
-  RowSchema GetRowSchema(const T* obj) {
-    if constexpr (std::is_base_of_v<::google::protobuf::Message, T>) {
-      const ::google::protobuf::Descriptor* desc = obj->GetDescriptor();
-      return RowSchema(desc);
-    } else if constexpr (std::is_base_of_v<::flatbuffers::Table, T>) {
-      auto* type_table = T::MiniReflectTypeTable();
-      return RowSchema(type_table);
-    } else {
-      return RowSchema(get_dtype<T>());
-    }
-  }
-
-  template <typename T>
   absl::Span<Table*> GroupBy(const T* by, size_t n);
 
   Table* GatherSubTable(std::vector<int32_t>& indices);
@@ -672,7 +668,7 @@ class Table : public DynObject {
   // absl::StatusOr<VectorBase> GatherField(uint8_t* vec_ptr, const DType& dtype, Vector<int32_t> indices);
 
   absl::Status LoadColumn(const Rows& rows, Column& column);
-  const RowSchema* GetRowSchema(const RowSchema& schema);
+  // const RowSchema* GetRowSchema(const RowSchema& schema);
   int GetRowIdx(const RowSchema& schema);
   absl::Status Validate(const std::vector<RowSchema>& schemas);
 

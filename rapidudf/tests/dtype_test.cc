@@ -109,11 +109,11 @@ TEST(DType, simple1) {
 TEST(DType, vector_array) {
   auto dtype = get_dtype<Vector<std::array<float, 6>>>();
   ASSERT_TRUE(dtype.IsSimdVector());
+
   ASSERT_TRUE(dtype.Elem().IsArray(6));
   ASSERT_TRUE(dtype.Elem().Elem().IsF32());
 
   auto dtype1 = get_dtype<VectorBase>();
-
   ASSERT_TRUE(dtype1.IsSimdVector());
 }
 

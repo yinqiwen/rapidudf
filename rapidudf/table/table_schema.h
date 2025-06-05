@@ -25,6 +25,7 @@
 
 #include "rapidudf/context/context.h"
 #include "rapidudf/meta/dtype.h"
+#include "rapidudf/meta/typeid.h"
 #include "rapidudf/table/column.h"
 #include "rapidudf/table/row.h"
 #include "rapidudf/table/table.h"
@@ -55,14 +56,27 @@ class TableSchema : public DynObjectSchema {
 
   template <typename T>
   absl::Status AddColumns(const TableColumnOptions& opts = {}) {
+    uint32_t id = TypeID::Get<T>();
     if constexpr (std::is_base_of_v<::google::protobuf::Message, T>) {
       static T msg;
-      return AddColumns(opts, &msg);
-    } else if constexpr (std::is_base_of_v<::flatbuffers::Table, T>) {
-      return AddColumns(opts, T::MiniReflectTypeTable());
+      return AddColumns(id, opts, &msg);
+    } else if constexpr (id, std::is_base_of_v<::flatbuffers::Table, T>) {
+      return AddColumns(id, opts, T::MiniReflectTypeTable());
     } else {
-      return AddColumns(opts, get_dtype<T>());
+      return AddColumns(id, opts, get_dtype<T>());
     }
+  }
+  template <typename T>
+  const RowSchema* GetRowSchema() const {
+    return GetRowSchemaByTypeID(TypeID::Get<T>());
+  }
+
+  const RowSchema* GetRowSchemaByTypeID(uint32_t id) const {
+    auto found = row_schema_index_.find(id);
+    if (found == row_schema_index_.end()) {
+      return nullptr;
+    }
+    return found->second;
   }
 
   bool ExistColumn(const std::string& name, const DType& dtype) const;
@@ -81,27 +95,29 @@ class TableSchema : public DynObjectSchema {
   }
 
   template <typename T>
-  absl::Status AddColumn(const std::string& name, const RowSchema* schema, uint32_t field_idx,
+  absl::Status AddColumn(const std::string& name, uint32_t tid, const RowSchema* schema, uint32_t field_idx,
                          const TableColumnOptions& opts) {
     if constexpr (std::is_same_v<std::string, T> || std::is_same_v<std::string_view, T>) {
-      return AddColumn(name, get_dtype<Vector<StringView>>(), schema, field_idx, opts);
+      return AddColumn(name, tid, get_dtype<Vector<StringView>>(), schema, field_idx, opts);
     } else if constexpr (std::is_same_v<bool, T>) {
-      return AddColumn(name, get_dtype<Vector<Bit>>(), schema, field_idx, opts);
+      return AddColumn(name, tid, get_dtype<Vector<Bit>>(), schema, field_idx, opts);
     } else {
-      return AddColumn(name, get_dtype<Vector<T>>(), schema, field_idx, opts);
+      return AddColumn(name, tid, get_dtype<Vector<T>>(), schema, field_idx, opts);
     }
   }
 
   typename DynObject::SmartPtr NewObject() const { return nullptr; }
 
-  absl::Status AddColumns(const TableColumnOptions& opts, const ::google::protobuf::Message* msg);
-  absl::Status AddColumns(const TableColumnOptions& opts, const flatbuffers::TypeTable* type_table);
-  absl::Status AddColumns(const TableColumnOptions& opts, const DType& dtype);
-  absl::Status AddColumn(const std::string& name, const DType& dtype, const RowSchema* schema, uint32_t field_idx,
-                         const TableColumnOptions& opts);
+  absl::Status AddColumns(uint32_t tid, const TableColumnOptions& opts, const ::google::protobuf::Message* msg);
+  absl::Status AddColumns(uint32_t tid, const TableColumnOptions& opts, const flatbuffers::TypeTable* type_table);
+  absl::Status AddColumns(uint32_t tid, const TableColumnOptions& opts, const DType& dtype);
+  absl::Status AddColumn(const std::string& name, uint32_t tid, const DType& dtype, const RowSchema* schema,
+                         uint32_t field_idx, const TableColumnOptions& opts);
+  void AddRowSchemaIndex(uint32_t id, const RowSchema* schema);
 
   std::vector<RowSchemaPtr> row_schemas_;
   std::vector<ColumnField> columns_;
+  absl::flat_hash_map<uint32_t, const RowSchema*> row_schema_index_;
 
   friend class Table;
 };

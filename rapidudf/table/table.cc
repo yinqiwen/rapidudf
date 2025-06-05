@@ -727,14 +727,8 @@ void Table::ClearAllColumns() {
   }
 }
 
-const RowSchema* Table::GetRowSchema(const RowSchema& schema) {
-  for (auto& s : GetTableSchema()->row_schemas_) {
-    if (*s == schema) {
-      return s.get();
-    }
-  }
-  return nullptr;
-}
+const RowSchema* Table::GetRowSchemaByTypeID(uint32_t id) const { return GetTableSchema()->GetRowSchemaByTypeID(id); }
+
 int Table::GetRowIdx(const RowSchema& schema) {
   for (size_t i = 0; i < rows_.size(); i++) {
     if (rows_[i].GetSchema() == schema) {

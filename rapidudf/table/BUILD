@@ -23,6 +23,7 @@ cc_library(
         "//rapidudf/context",
         "//rapidudf/executors:thread_pool",
         "//rapidudf/functions/simd:vector",
+        "//rapidudf/meta:typeid",
         "//rapidudf/reflect",
         "//rapidudf/types:dyn_object_impl",
         "@com_github_google_flatbuffers//:flatbuffers",

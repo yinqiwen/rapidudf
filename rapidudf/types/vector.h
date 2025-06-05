@@ -142,10 +142,11 @@ struct VectorBuildOptions {
 template <typename T>
 class Vector : public VectorBase {
  public:
-  using value_type = typename VectorTypeTraits<T>::ElementType;
-  Vector() : VectorBase((value_type*)nullptr) {}
-  Vector(const value_type* data, size_t size, size_t capacity = 0, bool readonly = true)
-      : VectorBase(data, size, capacity * sizeof(value_type), readonly) {}
+  using value_type = T;
+  using element_type = typename VectorTypeTraits<T>::ElementType;
+  Vector() : VectorBase((element_type*)nullptr) {}
+  Vector(const element_type* data, size_t size, size_t capacity = 0, bool readonly = true)
+      : VectorBase(data, size, capacity * sizeof(element_type), readonly) {}
 
   Vector(const std::vector<T>& vec, bool readonly = true) : VectorBase(vec, readonly) {}
   template <typename R, typename U = T, typename std::enable_if<std::is_same<U, Pointer>::value, int>::type = 0>
@@ -156,7 +157,7 @@ class Vector : public VectorBase {
 
   template <typename R>
   Vector(const Vector<R>& vec) : VectorBase((uint8_t*)nullptr, 0, 0, false) {
-    if constexpr (sizeof(value_type) != sizeof(typename VectorTypeTraits<R>::ElementType)) {
+    if constexpr (sizeof(element_type) != sizeof(typename VectorTypeTraits<R>::ElementType)) {
       static_assert(sizeof(T) == -1, "unsupported constructor from other simd vector");
     } else {
       CopyFrom(vec);
@@ -253,8 +254,8 @@ class Vector : public VectorBase {
 
   Vector<T> Resize(size_t n) const { return Slice(0, n); }
 
-  auto Data() const { return VectorBase::Data<value_type>(); }
-  auto MutableData() { return VectorBase::MutableData<value_type>(); }
+  auto Data() const { return VectorBase::Data<element_type>(); }
+  auto MutableData() { return VectorBase::MutableData<element_type>(); }
 
   size_t Size() const { return static_cast<size_t>(VectorBase::Size()); }
   size_t SizeByBytes() const {
@@ -267,7 +268,7 @@ class Vector : public VectorBase {
       return bytes_n;
 
     } else {
-      return Size() * sizeof(value_type);
+      return Size() * sizeof(element_type);
     }
   }
 };

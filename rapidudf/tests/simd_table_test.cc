@@ -230,7 +230,7 @@ struct ComplexStruct {
 };
 RUDF_STRUCT_FIELDS(ComplexStruct, Click, Like, Join, Inter, TimeV1, PostComment, PositiveCommentV1, ExpoTimeV1)
 
-TEST(JitCompiler, table_func1) {
+TEST(Table, table_func1) {
   auto schema = table::TableSchema::GetOrCreate(
       "score_table", [](table::TableSchema* s) { std::ignore = s->AddColumns<ComplexStruct>(); });
 
@@ -275,7 +275,7 @@ struct TestFilterStruct {
 };
 RUDF_STRUCT_FIELDS(TestFilterStruct, id, city)
 
-TEST(JitCompiler, table_filter) {
+TEST(Table, filter) {
   auto schema = table::TableSchema::GetOrCreate(
       "test_filter_table", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestFilterStruct>(); });
 
@@ -319,7 +319,7 @@ struct TestUser {
   int repeate = 0;
 };
 RUDF_STRUCT_FIELDS(TestUser, id, score, city, repeate)
-TEST(JitCompiler, table_order_by) {
+TEST(Table, order_by) {
   auto schema = table::TableSchema::GetOrCreate(
       "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
@@ -353,12 +353,12 @@ TEST(JitCompiler, table_order_by) {
   ASSERT_EQ(new_id_column.Size(), new_city_column.Size());
 
   for (size_t i = 0; i < N; i++) {
-    ASSERT_EQ(new_id_column[i], new_table->SlowGetRow<TestUser>(i)->id);
-    ASSERT_DOUBLE_EQ(new_score_column[i], new_table->SlowGetRow<TestUser>(i)->score);
+    ASSERT_EQ(new_id_column[i], new_table->GetRow<TestUser>(i)->id);
+    ASSERT_DOUBLE_EQ(new_score_column[i], new_table->GetRow<TestUser>(i)->score);
   }
 }
 
-TEST(JitCompiler, table_topk) {
+TEST(Table, topk) {
   auto schema = table::TableSchema::GetOrCreate(
       "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
@@ -396,7 +396,7 @@ TEST(JitCompiler, table_topk) {
   }
 }
 
-TEST(JitCompiler, table_take) {
+TEST(Table, head) {
   auto schema = table::TableSchema::GetOrCreate(
       "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
@@ -439,7 +439,7 @@ TEST(JitCompiler, table_take) {
   }
 }
 
-TEST(JitCompiler, group_by) {
+TEST(Table, group_by) {
   auto schema = table::TableSchema::GetOrCreate(
       "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
@@ -485,7 +485,7 @@ struct FilterStruct {
 };
 RUDF_STRUCT_FIELDS(FilterStruct, city, id, score)
 
-TEST(JitCompiler, filter) {
+TEST(Table, filter1) {
   auto schema = table::TableSchema::GetOrCreate(
       "test_filter_table1", [&](table::TableSchema* s) { std::ignore = s->AddColumns<FilterStruct>(); });
 
@@ -513,7 +513,7 @@ struct TransformStruct {
   double score;
 };
 RUDF_STRUCT_FIELDS(TransformStruct, city, id, score)
-TEST(JitCompiler, map) {
+TEST(Table, map) {
   auto tranform_schema = table::TableSchema::GetOrCreate(
       "test_map_transform", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TransformStruct>(); });
   auto schema = table::TableSchema::GetOrCreate(
@@ -579,7 +579,7 @@ TEST(JitCompiler, flat_map) {
   ASSERT_EQ(transform_table->Count(), N * 3);
 }
 
-TEST(JitCompiler, distinct) {
+TEST(Table, distinct) {
   auto schema = table::TableSchema::GetOrCreate(
       "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
@@ -605,7 +605,7 @@ TEST(JitCompiler, distinct) {
   ASSERT_EQ(table3->Count(), 150);
 }
 
-TEST(JitCompiler, distinct_merge) {
+TEST(Table, distinct_merge) {
   auto schema = table::TableSchema::GetOrCreate(
       "TestUser", [&](table::TableSchema* s) { std::ignore = s->AddColumns<TestUser>(); });
 
@@ -645,7 +645,7 @@ struct User2 {
   int id2;
 };
 RUDF_STRUCT_FIELDS(User2, name2, id2)
-TEST(JitCompiler, multi_schema) {
+TEST(Table, multi_schema) {
   auto schema = table::TableSchema::GetOrCreate("test_multi_schmea_table", [&](table::TableSchema* s) {
     std::ignore = s->AddColumns<User1>();
     std::ignore = s->AddColumns<User2>();

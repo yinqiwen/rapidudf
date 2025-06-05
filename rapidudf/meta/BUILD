@@ -14,6 +14,13 @@ cc_library(
 )
 
 cc_library(
+    name = "typeid",
+    hdrs = [
+        "typeid.h",
+    ],
+)
+
+cc_library(
     name = "type_traits",
     hdrs = [
         "type_traits.h",
