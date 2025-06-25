@@ -24,7 +24,6 @@ namespace ast {
 
 class Symbols {
  public:
-  static boost::parser::symbols<std::pair<DType, DTypeAttr>> kDtypeSymbols;
   static boost::parser::symbols<DType> kNumberSymbols;
   static boost::parser::symbols<OpToken> kAssignOpSymbols;
   static boost::parser::symbols<OpToken> kLogicOpSymbols;
@@ -37,10 +36,23 @@ class Symbols {
   static boost::parser::symbols<uint32_t> kBreakSymbols;
 
   static void Init();
+  static boost::parser::symbols<std::pair<DType, DTypeAttr>>& GetDtypeSymbols() { return kDtypeSymbols; }
+
+  template <typename Context>
+  static bool IsDTypeExist(Context const& c, const std::string& id) {
+    std::lock_guard<std::mutex> guard(GetDtypeSymbolsMutex());
+    auto v = kDtypeSymbols.find(c, id);
+    if (v) {
+      return true;
+    }
+    return false;
+  }
   Symbols();
 
  private:
+  static boost::parser::symbols<std::pair<DType, DTypeAttr>> kDtypeSymbols;
   static void Add(const std::string& name, DType dtype, DTypeAttr attr);
+  static std::mutex& GetDtypeSymbolsMutex();
 };
 
 }  // namespace ast

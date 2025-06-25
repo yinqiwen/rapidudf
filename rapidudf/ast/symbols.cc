@@ -80,6 +80,11 @@ boost::parser::symbols<uint32_t> Symbols::kContinueSymbols = {{"continue", 0}};
 boost::parser::symbols<uint32_t> Symbols::kBreakSymbols = {{"break", 0}};
 // void Symbols::AddDType(const std::string& name, DType dtype) { kDtypeSymbols.insert_for_next_parse(name, dtype); }
 
+std::mutex& Symbols::GetDtypeSymbolsMutex() {
+  static std::mutex mutex;
+  return mutex;
+};
+
 void Symbols::Add(const std::string& name, DType dtype, DTypeAttr attr) {
   std::string_view name_view;
   auto& symbol_cache = get_symbol_token_cache();
@@ -102,9 +107,9 @@ void Symbols::Add(const std::string& name, DType dtype, DTypeAttr attr) {
     kDtypeSymbols.insert_for_next_parse(name_view, {reg_dtype, attr});
   }
 }
+
 void Symbols::Init() {
-  static std::mutex mutex;
-  std::lock_guard<std::mutex> guard(mutex);
+  std::lock_guard<std::mutex> guard(GetDtypeSymbolsMutex());
   DTypeFactory::Visit([](const std::string& name, DType dtype) {
     std::string_view name_view;
     auto& symbol_cache = get_symbol_token_cache();

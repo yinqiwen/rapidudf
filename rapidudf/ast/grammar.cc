@@ -35,8 +35,8 @@ static std::unordered_set<std::string> g_keywords = {"return", "if", "elif", "el
 
 auto identifier_func = [](auto& ctx) {
   const std::string& id = _attr(ctx);
-  auto found = Symbols::kDtypeSymbols.find(ctx, id);
-  if (found) {
+  // auto found = Symbols::kDtypeSymbols.find(ctx, id);
+  if (!Symbols::IsDTypeExist(ctx, id)) {
     std::string err_msg = fmt::format("invalid identiier:{} which is reserved dtype name.", id);
     _report_error(ctx, err_msg);
     _pass(ctx) = false;
@@ -261,12 +261,12 @@ auto const ifelse_statement_def = ("if" > choice_statement > *("elif" > choice_s
 auto const block_def = '{' > statements > '}';
 
 bp::rule<struct func_arg, FunctionArg> func_arg = "func_arg";
-auto const func_arg_def = (Symbols::kDtypeSymbols > identifier)[func_arg_func];
+auto const func_arg_def = (Symbols::GetDtypeSymbols() > identifier)[func_arg_func];
 bp::rule<struct func_args, std::vector<FunctionArg>> func_args = "func_args";
 auto const func_args_def = func_arg % ',';
 bp::rule<struct func, Function> func = "func";
 bp::rule<struct funcs, std::vector<Function>> funcs = "funcs";
-auto const func_def = (Symbols::kDtypeSymbols > identifier > '(' > -func_args >> ')' > block)[func_convert];
+auto const func_def = (Symbols::GetDtypeSymbols() > identifier > '(' > -func_args >> ')' > block)[func_convert];
 auto const funcs_def = +func;
 BOOST_PARSER_DEFINE_RULES(comment, block, func_arg, func_args, func, funcs, return_statement, statements,
                           expr_statement, while_statement, choice_statement, ifelse_statement, break_statement,
