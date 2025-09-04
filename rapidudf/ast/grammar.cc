@@ -36,7 +36,7 @@ static std::unordered_set<std::string> g_keywords = {"return", "if", "elif", "el
 auto identifier_func = [](auto& ctx) {
   const std::string& id = _attr(ctx);
   // auto found = Symbols::kDtypeSymbols.find(ctx, id);
-  if (!Symbols::IsDTypeExist(ctx, id)) {
+  if (Symbols::IsDTypeExist(ctx, id)) {
     std::string err_msg = fmt::format("invalid identiier:{} which is reserved dtype name.", id);
     _report_error(ctx, err_msg);
     _pass(ctx) = false;
