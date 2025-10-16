@@ -131,3 +131,38 @@ TEST(JitCompiler, vector_logic_or) {
     ASSERT_EQ(result0[i], left[i] || right[i]);
   }
 }
+
+TEST(JitCompiler, VectorBitOptionTest) {
+  using namespace rapidudf;
+  spdlog::set_level(spdlog::level::debug);
+  size_t count = 129;
+
+  std::vector<bool> test_flags;
+  for (size_t i = 0; i < count; ++i) {
+    if (i % 2 == 0) {
+      test_flags.push_back(true);
+    } else {
+      test_flags.push_back(false);
+    }
+  }
+
+  Context ctx;
+  auto origin = ctx.NewVector(test_flags);
+  const std::string expr = R"(flags && flags)";
+  std::vector<rapidudf::compiler::JitCompiler::Arg> arg_descs{rapidudf::compiler::JitCompiler::Arg{.name = "_"},
+                                                              rapidudf::compiler::JitCompiler::Arg{.name = "flags"}};
+
+  auto rc =
+      rapidudf::exec::eval_expression<rapidudf::Vector<rapidudf::Bit>, rapidudf::Context&,
+                                      rapidudf::Vector<rapidudf::Bit>>(expr, arg_descs, ctx, ctx.NewVector(test_flags));
+  if (!rc.ok()) {
+    std::cout << rc.status().ToString() << std::endl;
+  }
+  ASSERT_TRUE(rc.ok());
+  auto filtered_table = rc.value();
+  // std::cout << "result size: " << filtered_table.Size() << std::endl;
+  for (size_t i = 0; i < filtered_table.Size(); ++i) {
+    // std::cout << "i: " << i << ", result: " << (filtered_table[i]) << ", origin: " << test_flags[i] << std::endl;
+    ASSERT_EQ((filtered_table[i]), origin[i]);
+  }
+}

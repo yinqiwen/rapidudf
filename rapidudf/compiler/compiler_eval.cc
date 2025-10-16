@@ -159,6 +159,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(DType dtype, const std::vector<RPN
 absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode>& nodes, ValuePtr cursor,
                                             ValuePtr remaining, ::llvm::Value* output) {
   using Operand = std::pair<::llvm::Value*, ::llvm::Value*>;
+
   std::vector<Operand> operands;
   for (size_t i = 0; i < nodes.size(); i++) {
     RPNEvalNode& node = nodes[i];

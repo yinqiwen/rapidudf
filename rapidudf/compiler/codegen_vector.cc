@@ -157,7 +157,12 @@ absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> CodeGen::LoadVector(DT
                                                                               ::llvm::Value* idx) {
   auto ele_type = get_type(builder_->getContext(), dtype.Elem());
   auto vector_type = get_vector_type(builder_->getContext(), dtype);
-  auto offset_ptr = builder_->CreateInBoundsGEP(ele_type, ptr, {idx});
+  ::llvm::Value* offset_ptr = nullptr;
+  if (ele_type->getScalarSizeInBits() == 1) {
+    offset_ptr = builder_->CreateGEP(builder_->getInt8Ty(), ptr, {builder_->CreateUDiv(idx, builder_->getInt32(8))});
+  } else {
+    offset_ptr = builder_->CreateInBoundsGEP(ele_type, ptr, {idx});
+  }
   auto* load = builder_->CreateLoad(vector_type, offset_ptr);
   ::llvm::Align align(1);
   load->setAlignment(align);
@@ -168,7 +173,12 @@ absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> CodeGen::LoadNVector(D
                                                                                ::llvm::Value* idx, ::llvm::Value* n) {
   auto ele_type = get_type(builder_->getContext(), dtype.Elem());
   auto vector_type = get_vector_type(builder_->getContext(), dtype);
-  auto offset_ptr = builder_->CreateGEP(ele_type, ptr, {idx});
+  ::llvm::Value* offset_ptr = nullptr;
+  if (ele_type->getScalarSizeInBits() == 1) {
+    offset_ptr = builder_->CreateGEP(builder_->getInt8Ty(), ptr, {builder_->CreateUDiv(idx, builder_->getInt32(8))});
+  } else {
+    offset_ptr = builder_->CreateGEP(ele_type, ptr, {idx});
+  }
 
   auto vector_ptr_value = builder_->CreateAlloca(vector_type);
   ::llvm::Constant* fill_v = nullptr;

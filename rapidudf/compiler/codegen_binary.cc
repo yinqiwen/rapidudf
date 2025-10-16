@@ -36,6 +36,7 @@ namespace rapidudf {
 namespace compiler {
 absl::StatusOr<::llvm::Value*> CodeGen::VectorBinaryOp(OpToken op, DType dtype, ::llvm::Value* left,
                                                        ::llvm::Value* right, ::llvm::Value* output) {
+  printf("#########################\n");
   std::string fname = GetFunctionName(op, dtype.ToSimdVector());
   auto result_dtype = dtype;
   if (is_compare_op(op)) {
