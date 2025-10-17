@@ -11,6 +11,7 @@ table FBSStruct {
   strs:[string];
   items:[Item];
   ints:[uint];
+  flag:bool;
 }
 root_type FBSStruct;
 

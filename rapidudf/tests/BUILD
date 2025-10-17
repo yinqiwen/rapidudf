@@ -385,6 +385,7 @@ cc_test(
     deps = [
         ":fbs_table_schema",
         ":pb_table_schema_cc_proto",
+        ":test_fbs",
         "//rapidudf",
         "@com_google_googletest//:gtest_main",
     ],

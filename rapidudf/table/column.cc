@@ -90,9 +90,12 @@ bool Column::GetBool(const uint8_t* obj) const {
     return reflect->GetBool(*msg, GetProtobufField());
   } else if (field_->schema->fbs_table != nullptr) {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
-    const uint8_t* ptr =
-        fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
-    return flatbuffers::ReadScalar<bool>(ptr);
+    auto offset = flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx));
+    const uint8_t* ptr = fbs->GetAddressOf(offset);
+    if (ptr == nullptr) {
+      return false;
+    }
+    return flatbuffers::ReadScalar<uint8_t>(ptr);
   }
   return false;
 }
@@ -113,8 +116,11 @@ uint8_t Column::GetU8(const uint8_t* obj) const {
     return 0;
   } else if (field_->schema->fbs_table != nullptr) {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
-    const uint8_t* ptr =
-        fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    auto offset = flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx));
+    const uint8_t* ptr = fbs->GetAddressOf(offset);
+    if (ptr == nullptr) {
+      return 0;
+    }
     return flatbuffers::ReadScalar<uint8_t>(ptr);
   }
   return 0;
@@ -138,6 +144,9 @@ uint16_t Column::GetU16(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0;
+    }
     return flatbuffers::ReadScalar<uint16_t>(ptr);
   }
   return 0;
@@ -163,6 +172,9 @@ uint32_t Column::GetU32(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0;
+    }
     return flatbuffers::ReadScalar<uint32_t>(ptr);
   }
   return 0;
@@ -188,6 +200,9 @@ uint64_t Column::GetU64(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0;
+    }
     return flatbuffers::ReadScalar<uint64_t>(ptr);
   }
   return 0;
@@ -211,6 +226,9 @@ int8_t Column::GetI8(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0;
+    }
     return flatbuffers::ReadScalar<int8_t>(ptr);
   }
   return 0;
@@ -234,6 +252,9 @@ int16_t Column::GetI16(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0;
+    }
     return flatbuffers::ReadScalar<int16_t>(ptr);
   }
   return 0;
@@ -259,6 +280,9 @@ int32_t Column::GetI32(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0;
+    }
     return flatbuffers::ReadScalar<int32_t>(ptr);
   }
   return 0;
@@ -284,6 +308,9 @@ int64_t Column::GetI64(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0;
+    }
     return flatbuffers::ReadScalar<int64_t>(ptr);
   }
   return 0;
@@ -367,6 +394,9 @@ float Column::GetF32(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0.0;
+    }
     return flatbuffers::ReadScalar<float>(ptr);
   }
   return 0;
@@ -393,6 +423,9 @@ double Column::GetF64(const uint8_t* obj) const {
     const flatbuffers::Table* fbs = reinterpret_cast<const flatbuffers::Table*>(obj);
     const uint8_t* ptr =
         fbs->GetAddressOf(flatbuffers::FieldIndexToOffset(static_cast<flatbuffers::voffset_t>(field_->field_idx)));
+    if (ptr == nullptr) {
+      return 0.0;
+    }
     return flatbuffers::ReadScalar<double>(ptr);
   }
   return 0;

@@ -26,6 +26,7 @@
 #include "rapidudf/rapidudf.h"
 #include "rapidudf/tests/fbs_table_schema_generated.h"
 #include "rapidudf/tests/pb_table_schema.pb.h"
+#include "rapidudf/tests/test_fbs_generated.h"
 #include "rapidudf/types/pointer.h"
 #include "rapidudf/types/string_view.h"
 
@@ -38,8 +39,9 @@ struct StructSchema {
   std::array<float, 64> embedding;
   std::vector<int32_t> cats;
   std::vector<std::string> tags;
+  bool flag;
 };
-RUDF_STRUCT_FIELDS(StructSchema, city, id, score, embedding, cats, tags)
+RUDF_STRUCT_FIELDS(StructSchema, city, id, score, embedding, cats, tags, flag)
 
 TEST(Table, create_by_struct_schema) {
   auto schema = table::TableSchema::GetOrCreate(
@@ -54,6 +56,7 @@ TEST(Table, create_by_struct_schema) {
     item.id = i + 10;
     item.score = 1.1 + i;
     item.tags = {"hh"};
+    item.flag = (i % 2 == 0);
     items.emplace_back(item);
   }
   Context ctx;
@@ -671,4 +674,86 @@ TEST(Table, multi_schema) {
   ASSERT_EQ(visit_count.load(), table->Count());
 
   RUDF_INFO("{}", schema->ToString());
+}
+
+TEST(JitCompiler, TableBitOptionTest) {
+  using namespace rapidudf;
+  spdlog::set_level(spdlog::level::debug);
+  size_t count = 500;
+
+  // 原始数据生成
+  std::vector<test_fbs::FBSStruct*> objs;
+  std::vector<std::unique_ptr<flatbuffers::FlatBufferBuilder>> fbs_buffers;
+  for (size_t i = 0; i < count; ++i) {
+    test_fbs::FBSStructT header;
+    header.id = 101 + i;
+    if (i % 3 == 0) {
+      header.str = "hello,world";
+      header.flag = true;
+    } else if (i % 3 == 1) {
+      header.str = "";
+      header.flag = false;
+    } else {
+      header.str = "hello";
+      header.flag = true;
+    }
+    auto builder = std::make_unique<flatbuffers::FlatBufferBuilder>();
+    // builder->ForceDefaults(true);
+    builder->Finish(test_fbs::FBSStruct::Pack(*builder, &header));
+    const test_fbs::FBSStruct* fbs_ptr = test_fbs::GetFBSStruct(builder->GetBufferPointer());
+    objs.push_back(const_cast<test_fbs::FBSStruct*>(fbs_ptr));
+    fbs_buffers.emplace_back(std::move(builder));
+  }
+
+  // 列式数据生成, 获取table
+  Context ctx;
+  auto start = std::chrono::high_resolution_clock::now();
+  const rapidudf::table::TableColumnOptions options{.ignore_unsupported_fields = true};
+  auto schema = rapidudf::table::TableSchema::GetOrCreate("schema", [&options](rapidudf::table::TableSchema* s) {
+    std::ignore = s->AddColumns<test_fbs::FBSStruct>(options);
+  });
+  auto table_rc = schema->NewTable(ctx);
+  auto status = table_rc->AddRows(objs);
+  if (!status.ok()) {
+    std::cout << "AddRows err: " << status.ToString() << std::endl;
+  }
+  ASSERT_TRUE(status.ok());
+
+  auto end = std::chrono::high_resolution_clock::now();
+  std::cout << "rapidudf_utils get table cost: "
+            << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << std::endl;
+
+  // 生成另一个Bit向量操作数
+  std::vector<bool> test_flags;
+  for (size_t i = 0; i < count; ++i) {
+    if (i % 2 == 0) {
+      test_flags.push_back(true);
+    } else {
+      test_flags.push_back(false);
+    }
+  }
+
+  // 第一次执行
+  {
+    auto start = std::chrono::high_resolution_clock::now();
+    const std::string expr = R"(table.flag && flags)";
+    std::vector<JitCompiler::Arg> arg_descs{JitCompiler::Arg{.name = "_"},
+                                            JitCompiler::Arg{.name = "table", .schema = "schema"},
+                                            JitCompiler::Arg{.name = "flags"}};
+    auto rc = rapidudf::exec::eval_expression<Vector<Bit>, Context&, table::Table*, Vector<Bit>>(
+        expr, arg_descs, ctx, table_rc.get(), ctx.NewVector(test_flags));
+    ASSERT_TRUE(rc.ok());
+    auto filtered_table = rc.value();
+    auto end = std::chrono::high_resolution_clock::now();
+    // std::cout << "rapidudf_utils code first cost: "
+    //           << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << std::endl;
+
+    // // 验证结果
+    // std::cout << "result size: " << filtered_table.Size() << std::endl;
+    for (size_t i = 0; i < filtered_table.Size(); ++i) {
+      // std::cout << "i: " << i << ", result: " << (filtered_table[i]) << ", origin1: " << objs[i]->flag()
+      //           << ", origin2: " << test_flags[i] << std::endl;
+      ASSERT_EQ((filtered_table[i]), (objs[i]->flag() && test_flags[i]));
+    }
+  }
 }
