@@ -135,7 +135,7 @@ TEST(JitCompiler, vector_logic_or) {
 TEST(JitCompiler, VectorBitOptionTest) {
   using namespace rapidudf;
   spdlog::set_level(spdlog::level::debug);
-  size_t count = 129;
+  size_t count = 500;
 
   std::vector<bool> test_flags;
   for (size_t i = 0; i < count; ++i) {

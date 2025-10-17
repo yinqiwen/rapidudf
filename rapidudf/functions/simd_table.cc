@@ -111,6 +111,7 @@ struct SimdTableHelper {
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i64", group_by<int64_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_string_view", group_by<StringView>);
 
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_F32), get_column<Bit>);
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_F32), get_column<float>);
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_F64), get_column<double>);
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U8), get_column<uint32_t>);
