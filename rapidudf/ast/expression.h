@@ -72,6 +72,11 @@ using RPNNode = std::variant<OpToken, bool, ConstantNumber, std::string, VarDefi
 struct RPN {
   std::vector<RPNNode> nodes;
   DType dtype;
+  explicit RPN(size_t reserve_nodes = 0) {
+    if (reserve_nodes > 0) {
+      nodes.reserve(reserve_nodes);
+    }
+  }
   void SetDType(ParseContext& ctx, DType dtype);
   void Print();
 };

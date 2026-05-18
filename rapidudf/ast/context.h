@@ -47,7 +47,7 @@ struct VarTag {
 
 class ParseContext {
  public:
-  using FunctionCallMap = std::unordered_map<std::string, const FunctionDesc*>;
+  using FunctionCallMap = absl::flat_hash_map<std::string, const FunctionDesc*, TransparentStringHash, TransparentStringEq>;
   using MemberFuncCallMap = std::unordered_map<DType, std::unordered_map<std::string, FunctionDesc>>;
   void Clear();
 
@@ -66,6 +66,7 @@ class ParseContext {
 
   int GetLineNo() const;
   std::string GetSourceLine(int line) const;
+  void EnsureSourceLines() const;
 
   bool AddLocalVar(std::string_view name, DType dtype, const DynObjectSchema* schema);
 
@@ -129,7 +130,8 @@ class ParseContext {
   }
 
   std::string source_;
-  std::vector<std::string_view> source_lines_;
+  mutable std::vector<std::string_view> source_lines_;
+  mutable bool source_lines_computed_ = false;
   std::vector<FunctionParseContext> function_parse_ctxs_;
   uint32_t current_function_cursor_ = 0;
   bool vector_expr_flag_ = false;

@@ -57,6 +57,7 @@ void ParseContext::SetSource(const std::string& src, bool clear_vars) {
   ast_pool_.Reset();
   source_ = src;
   source_lines_.clear();
+  source_lines_computed_ = false;
   if (clear_vars) {
     function_parse_ctxs_.clear();
   } else {
@@ -68,7 +69,6 @@ void ParseContext::SetSource(const std::string& src, bool clear_vars) {
   }
   ast_err_.clear();
   validate_posistion_ = 0;
-  source_lines_ = absl::StrSplit(absl::string_view(source_), '\n');
 }
 
 absl::StatusOr<VarTag> ParseContext::IsVarExist(std::string_view name, bool error_on_exist) {
@@ -90,7 +90,15 @@ absl::StatusOr<VarTag> ParseContext::IsVarExist(std::string_view name, bool erro
   }
   return DType(DATA_VOID);
 }
+void ParseContext::EnsureSourceLines() const {
+  if (!source_lines_computed_) {
+    const_cast<ParseContext*>(this)->source_lines_ = absl::StrSplit(absl::string_view(source_), '\n');
+    const_cast<ParseContext*>(this)->source_lines_computed_ = true;
+  }
+}
+
 std::string ParseContext::GetSourceLine(int line) const {
+  EnsureSourceLines();
   int idx = line - 1;
   if (idx >= 0 && idx < source_lines_.size()) {
     return std::string(source_lines_[idx]);
@@ -98,6 +106,7 @@ std::string ParseContext::GetSourceLine(int line) const {
   return "";
 }
 int ParseContext::GetLineNo() const {
+  EnsureSourceLines();
   uint32_t cursor = 0;
   uint32_t lineno = 1;
   for (auto line : source_lines_) {
@@ -110,6 +119,7 @@ int ParseContext::GetLineNo() const {
   return lineno;
 }
 std::string ParseContext::GetErrorLine() const {
+  EnsureSourceLines();
   uint32_t cursor = 0;
   uint32_t lineno = 1;
   for (auto line : source_lines_) {

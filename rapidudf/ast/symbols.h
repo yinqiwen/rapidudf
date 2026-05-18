@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include "absl/container/flat_hash_map.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 
@@ -47,8 +48,19 @@ class Symbols {
   static void Add(const std::string& name, DType dtype, DTypeAttr attr);
 
  private:
-  static std::unordered_map<std::string, std::pair<DType, DTypeAttr>>& GetDtypeSymbols();
+  struct StringHash {
+    using is_transparent = void;
+    size_t operator()(std::string_view sv) const { return absl::Hash<std::string_view>()(sv); }
+  };
+  struct StringEq {
+    using is_transparent = void;
+    bool operator()(std::string_view a, std::string_view b) const { return a == b; }
+  };
+  using DtypeMap = absl::flat_hash_map<std::string, std::pair<DType, DTypeAttr>, StringHash, StringEq>;
+
+  static DtypeMap& GetDtypeSymbols();
   static std::mutex& GetDtypeSymbolsMutex();
+  static std::once_flag& GetInitFlag();
 };
 
 }  // namespace ast

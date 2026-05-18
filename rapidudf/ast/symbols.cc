@@ -103,30 +103,31 @@ const std::unordered_map<std::string_view, OpToken>& Symbols::GetUnaryOpSymbols(
   return m;
 }
 
+Symbols::DtypeMap& Symbols::GetDtypeSymbols() {
+  static DtypeMap m;
+  return m;
+}
+
 std::mutex& Symbols::GetDtypeSymbolsMutex() {
   static std::mutex mutex;
   return mutex;
 }
 
-std::unordered_map<std::string, std::pair<DType, DTypeAttr>>& Symbols::GetDtypeSymbols() {
-  static std::unordered_map<std::string, std::pair<DType, DTypeAttr>> m;
-  return m;
+std::once_flag& Symbols::GetInitFlag() {
+  static std::once_flag flag;
+  return flag;
 }
 
 bool Symbols::IsDTypeExist(std::string_view id) {
-  std::lock_guard<std::mutex> guard(GetDtypeSymbolsMutex());
-  // std::unordered_map doesn't support heterogeneous lookup in C++17,
-  // so we construct a std::string key for the lookup. The string_view
-  // parameter at least eliminates the need for callers to pre-construct
-  // a std::string when they already have a string_view.
-  return GetDtypeSymbols().count(std::string(id)) > 0;
+  // Ensure Init() has been called (lock-free after first call)
+  std::call_once(GetInitFlag(), Init);
+  return GetDtypeSymbols().contains(id);
 }
 
 std::optional<std::pair<DType, DTypeAttr>> Symbols::FindDType(std::string_view id) {
-  std::lock_guard<std::mutex> guard(GetDtypeSymbolsMutex());
-  auto& m = GetDtypeSymbols();
-  auto it = m.find(std::string(id));
-  if (it != m.end()) {
+  std::call_once(GetInitFlag(), Init);
+  auto it = GetDtypeSymbols().find(id);
+  if (it != GetDtypeSymbols().end()) {
     return it->second;
   }
   return std::nullopt;
