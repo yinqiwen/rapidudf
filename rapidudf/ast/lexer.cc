@@ -17,6 +17,7 @@
 #include "rapidudf/ast/lexer.h"
 
 #include <unordered_map>
+#include "fmt/core.h"
 
 namespace rapidudf {
 namespace ast {
@@ -30,6 +31,58 @@ static const std::unordered_map<std::string_view, TokenType> kKeywords = {
     {"return", TOKEN_RETURN}, {"auto", TOKEN_AUTO},   {"break", TOKEN_BREAK}, {"continue", TOKEN_CONTINUE},
     {"true", TOKEN_BOOL},   {"false", TOKEN_BOOL},
 };
+
+static const char* TokenTypeToString(TokenType t) {
+  switch (t) {
+    case TOKEN_IDENTIFIER:      return "identifier";
+    case TOKEN_NUMBER:          return "number";
+    case TOKEN_STRING:          return "string";
+    case TOKEN_BOOL:            return "bool";
+    case TOKEN_IF:              return "'if'";
+    case TOKEN_ELIF:            return "'elif'";
+    case TOKEN_ELSE:            return "'else'";
+    case TOKEN_WHILE:           return "'while'";
+    case TOKEN_RETURN:          return "'return'";
+    case TOKEN_AUTO:            return "'auto'";
+    case TOKEN_BREAK:           return "'break'";
+    case TOKEN_CONTINUE:        return "'continue'";
+    case TOKEN_PLUS:            return "'+'";
+    case TOKEN_MINUS:           return "'-'";
+    case TOKEN_STAR:            return "'*'";
+    case TOKEN_SLASH:           return "'/'";
+    case TOKEN_PERCENT:         return "'%'";
+    case TOKEN_CARET:           return "'^'";
+    case TOKEN_ASSIGN:          return "'='";
+    case TOKEN_PLUS_ASSIGN:     return "'+='";
+    case TOKEN_MINUS_ASSIGN:    return "'-='";
+    case TOKEN_STAR_ASSIGN:     return "'*='";
+    case TOKEN_SLASH_ASSIGN:    return "'/='";
+    case TOKEN_PERCENT_ASSIGN:  return "'%='";
+    case TOKEN_EQ:              return "'=='";
+    case TOKEN_NE:              return "'!='";
+    case TOKEN_LT:              return "'<'";
+    case TOKEN_LE:              return "'<='";
+    case TOKEN_GT:              return "'>'";
+    case TOKEN_GE:              return "'>='";
+    case TOKEN_AND:             return "'&&'";
+    case TOKEN_OR:              return "'||'";
+    case TOKEN_NOT:             return "'!'";
+    case TOKEN_QUESTION:        return "'?'";
+    case TOKEN_COLON:           return "':'";
+    case TOKEN_LPAREN:          return "'('";
+    case TOKEN_RPAREN:          return "')'";
+    case TOKEN_LBRACE:          return "'{'";
+    case TOKEN_RBRACE:          return "'}'";
+    case TOKEN_LBRACKET:        return "'['";
+    case TOKEN_RBRACKET:        return "']'";
+    case TOKEN_COMMA:           return "','";
+    case TOKEN_SEMICOLON:       return "';'";
+    case TOKEN_DOT:             return "'.'";
+    case TOKEN_EOF:             return "end of input";
+    case TOKEN_ERROR:           return "error";
+    default:                    return "unknown";
+  }
+}
 
 Lexer::Lexer(std::string_view source) : source_(source) {}
 
@@ -271,7 +324,8 @@ bool Lexer::PeekIs(TokenType type) { return Peek().type == type; }
 Token Lexer::Expect(TokenType type) {
   Token t = Next();
   if (t.type != type) {
-    SetError(std::string("expected token type ") + std::to_string(type) + " but got " + std::to_string(t.type));
+    std::string got_text = t.text.empty() ? TokenTypeToString(t.type) : std::string(t.text);
+    SetError(fmt::format("expected {} but got '{}'", TokenTypeToString(type), got_text));
     return Token{TOKEN_ERROR, t.text, t.position};
   }
   return t;

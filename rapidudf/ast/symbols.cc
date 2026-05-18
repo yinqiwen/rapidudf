@@ -44,55 +44,62 @@ static const std::string& intern(const std::string& name) {
   }
   auto p = std::make_unique<std::string>(name);
   const std::string& ref = *p;
-  cache.emplace(name, std::move(p));
+  auto [it, inserted] = cache.emplace(name, std::move(p));
+  if (!inserted) {
+    // Another thread or re-entrant call already inserted this key; use that entry
+    return *it->second;
+  }
   return ref;
 }
 
-const std::unordered_map<std::string, DType>& Symbols::GetNumberSymbols() {
-  static const std::unordered_map<std::string, DType> m = {
+const std::unordered_map<std::string_view, DType>& Symbols::GetNumberSymbols() {
+  static const std::unordered_map<std::string_view, DType> m = {
       {"u8", DType(DATA_U8)},   {"i8", DType(DATA_I8)},   {"u16", DType(DATA_U16)}, {"i16", DType(DATA_I16)},
-      {"u32", DType(DATA_U32)}, {"i32", DType(DATA_U32)}, {"u64", DType(DATA_U64)}, {"i64", DType(DATA_I64)},
+      {"u32", DType(DATA_U32)}, {"i32", DType(DATA_I32)}, {"u64", DType(DATA_U64)}, {"i64", DType(DATA_I64)},
       {"f32", DType(DATA_F32)}, {"f64", DType(DATA_F64)}, {"f80", DType(DATA_F80)}};
   return m;
 }
 
-const std::unordered_map<std::string, OpToken>& Symbols::GetAssignOpSymbols() {
-  static const std::unordered_map<std::string, OpToken> m = {{"=", OP_ASSIGN},         {"+=", OP_PLUS_ASSIGN},
-                                                              {"-=", OP_MINUS_ASSIGN},  {"*=", OP_MULTIPLY_ASSIGN},
-                                                              {"/=", OP_DIVIDE_ASSIGN}, {"%=", OP_MOD_ASSIGN}};
+// Note: The old Boost.Parser code had a bug where "+=" was listed twice
+// (once for OP_PLUS_ASSIGN and once for OP_MOD_ASSIGN), causing the second
+// entry to be silently ignored. This has been corrected: "%=" now maps to OP_MOD_ASSIGN.
+const std::unordered_map<std::string_view, OpToken>& Symbols::GetAssignOpSymbols() {
+  static const std::unordered_map<std::string_view, OpToken> m = {{"=", OP_ASSIGN},         {"+=", OP_PLUS_ASSIGN},
+                                                                   {"-=", OP_MINUS_ASSIGN},  {"*=", OP_MULTIPLY_ASSIGN},
+                                                                   {"/=", OP_DIVIDE_ASSIGN}, {"%=", OP_MOD_ASSIGN}};
   return m;
 }
 
-const std::unordered_map<std::string, OpToken>& Symbols::GetLogicOpSymbols() {
-  static const std::unordered_map<std::string, OpToken> m = {{"||", OP_LOGIC_OR}, {"&&", OP_LOGIC_AND}};
+const std::unordered_map<std::string_view, OpToken>& Symbols::GetLogicOpSymbols() {
+  static const std::unordered_map<std::string_view, OpToken> m = {{"||", OP_LOGIC_OR}, {"&&", OP_LOGIC_AND}};
   return m;
 }
 
-const std::unordered_map<std::string, OpToken>& Symbols::GetCmpOpSymbols() {
-  static const std::unordered_map<std::string, OpToken> m = {{"==", OP_EQUAL},         {"!=", OP_NOT_EQUAL},
-                                                              {">=", OP_GREATER_EQUAL}, {"<=", OP_LESS_EQUAL},
-                                                              {">", OP_GREATER},        {"<", OP_LESS}};
+const std::unordered_map<std::string_view, OpToken>& Symbols::GetCmpOpSymbols() {
+  static const std::unordered_map<std::string_view, OpToken> m = {{"==", OP_EQUAL},         {"!=", OP_NOT_EQUAL},
+                                                                    {">=", OP_GREATER_EQUAL}, {"<=", OP_LESS_EQUAL},
+                                                                    {">", OP_GREATER},        {"<", OP_LESS}};
   return m;
 }
 
-const std::unordered_map<std::string, OpToken>& Symbols::GetAdditiveOpSymbols() {
-  static const std::unordered_map<std::string, OpToken> m = {{"+", OP_PLUS}, {"-", OP_MINUS}};
+const std::unordered_map<std::string_view, OpToken>& Symbols::GetAdditiveOpSymbols() {
+  static const std::unordered_map<std::string_view, OpToken> m = {{"+", OP_PLUS}, {"-", OP_MINUS}};
   return m;
 }
 
-const std::unordered_map<std::string, OpToken>& Symbols::GetMultiplicativeOpSymbols() {
-  static const std::unordered_map<std::string, OpToken> m = {
+const std::unordered_map<std::string_view, OpToken>& Symbols::GetMultiplicativeOpSymbols() {
+  static const std::unordered_map<std::string_view, OpToken> m = {
       {"*", OP_MULTIPLY}, {"/", OP_DIVIDE}, {"%", OP_MOD}};
   return m;
 }
 
-const std::unordered_map<std::string, OpToken>& Symbols::GetPowerOpSymbols() {
-  static const std::unordered_map<std::string, OpToken> m = {{"^", OP_POW}};
+const std::unordered_map<std::string_view, OpToken>& Symbols::GetPowerOpSymbols() {
+  static const std::unordered_map<std::string_view, OpToken> m = {{"^", OP_POW}};
   return m;
 }
 
-const std::unordered_map<std::string, OpToken>& Symbols::GetUnaryOpSymbols() {
-  static const std::unordered_map<std::string, OpToken> m = {{"-", OP_NEGATIVE}, {"!", OP_NOT}};
+const std::unordered_map<std::string_view, OpToken>& Symbols::GetUnaryOpSymbols() {
+  static const std::unordered_map<std::string_view, OpToken> m = {{"-", OP_NEGATIVE}, {"!", OP_NOT}};
   return m;
 }
 
@@ -106,15 +113,19 @@ std::unordered_map<std::string, std::pair<DType, DTypeAttr>>& Symbols::GetDtypeS
   return m;
 }
 
-bool Symbols::IsDTypeExist(const std::string& id) {
+bool Symbols::IsDTypeExist(std::string_view id) {
   std::lock_guard<std::mutex> guard(GetDtypeSymbolsMutex());
-  return GetDtypeSymbols().count(id) > 0;
+  // std::unordered_map doesn't support heterogeneous lookup in C++17,
+  // so we construct a std::string key for the lookup. The string_view
+  // parameter at least eliminates the need for callers to pre-construct
+  // a std::string when they already have a string_view.
+  return GetDtypeSymbols().count(std::string(id)) > 0;
 }
 
-std::optional<std::pair<DType, DTypeAttr>> Symbols::FindDType(const std::string& id) {
+std::optional<std::pair<DType, DTypeAttr>> Symbols::FindDType(std::string_view id) {
   std::lock_guard<std::mutex> guard(GetDtypeSymbolsMutex());
   auto& m = GetDtypeSymbols();
-  auto it = m.find(id);
+  auto it = m.find(std::string(id));
   if (it != m.end()) {
     return it->second;
   }

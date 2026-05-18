@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include <memory>
 #include <optional>
 #include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
 
+#include "rapidudf/ast/ast_ptr.h"
 #include "rapidudf/ast/context.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
@@ -34,13 +34,13 @@ namespace ast {
 
 struct VarDefine {
   // DType dtype;
-  std::string name;
+  std::string_view name;
   uint32_t position = 0;
   absl::StatusOr<VarTag> Validate(ParseContext& ctx);
 };
 
 struct VarRef {
-  std::string name;
+  std::string_view name;
   uint32_t position = 0;
   absl::StatusOr<VarTag> Validate(ParseContext& ctx);
 };
@@ -63,10 +63,9 @@ struct FuncInvoke;
 struct VarAccessor;
 struct Array;
 struct SelectRPNNode;
-using BinaryExprPtr = std::shared_ptr<BinaryExpr>;
-using UnaryExprPtr = std::shared_ptr<UnaryExpr>;
-using SelectExprPtr = std::shared_ptr<SelectExpr>;
-using SelectRPNNodePtr = std::shared_ptr<SelectRPNNode>;
+using BinaryExprPtr = AstPtr<BinaryExpr>;
+using UnaryExprPtr = AstPtr<UnaryExpr>;
+using SelectExprPtr = AstPtr<SelectExpr>;
 
 using RPNNode = std::variant<OpToken, bool, ConstantNumber, std::string, VarDefine, Array, VarAccessor, FuncInvocation>;
 
@@ -141,13 +140,15 @@ struct SelectExpr {
 struct BinaryExpr {
   Operand left;
   // std::optional<std::tuple<OpToken, Operand>> right;
-  std::vector<std::tuple<OpToken, Operand>> right;
+  AstVector<std::tuple<OpToken, Operand>> right;
   uint32_t position = 0;
-  static BinaryExprPtr New(Operand operand, uint32_t pos) {
-    auto p = std::make_shared<BinaryExpr>();
-    p->left = operand;
+  explicit BinaryExpr(AstAlloc<std::tuple<OpToken, Operand>> alloc)
+      : right(alloc) {}
+  static BinaryExprPtr New(AstPool& pool, Operand operand, uint32_t pos) {
+    auto* p = pool.New<BinaryExpr>();
+    p->left = std::move(operand);
     p->position = pos;
-    return p;
+    return BinaryExprPtr(p);
   }
   void SetRight(std::optional<std::tuple<rapidudf::OpToken, BinaryExprPtr>> operand) {
     if (operand.has_value()) {

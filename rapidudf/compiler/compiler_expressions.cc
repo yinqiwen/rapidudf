@@ -38,11 +38,11 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::Array& expr) {
 }
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::VarDefine& expr) {
   ast_ctx_.SetPosition(expr.position);
-  return codegen_->NewVoid(expr.name);
+  return codegen_->NewVoid(std::string(expr.name));
 }
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::VarRef& key) {
   ast_ctx_.SetPosition(key.position);
-  return codegen_->GetLocalVar(key.name);
+  return codegen_->GetLocalVar(std::string(key.name));
 }
 
 absl::StatusOr<ValuePtr> JitCompiler::BuildIR(ValuePtr obj, const ast::FieldAccess& field) {

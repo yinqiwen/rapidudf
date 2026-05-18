@@ -23,6 +23,7 @@
 #include <unordered_set>
 #include "fmt/core.h"
 
+#include "rapidudf/ast/ast_pool.h"
 #include "rapidudf/ast/block.h"
 #include "rapidudf/ast/expression.h"
 #include "rapidudf/ast/function.h"
@@ -32,6 +33,24 @@
 
 namespace rapidudf {
 namespace ast {
+
+// ---- Identifier validation ----
+
+static const std::unordered_set<std::string_view>& GetReservedKeywords() {
+  static const std::unordered_set<std::string_view> keywords = {
+      "return", "if", "elif", "else", "while", "auto", "break", "continue"};
+  return keywords;
+}
+
+static bool IsValidIdentifier(std::string_view name) {
+  if (Symbols::IsDTypeExist(name)) {
+    return false;
+  }
+  if (GetReservedKeywords().count(name) > 0) {
+    return false;
+  }
+  return true;
+}
 
 // ---- Operator mapping helpers ----
 
@@ -111,7 +130,7 @@ struct Parser {
         num_len = i;
         std::string_view suffix = text.substr(i + 1);
         auto& num_syms = Symbols::GetNumberSymbols();
-        auto it = num_syms.find(std::string(suffix));
+        auto it = num_syms.find(suffix);
         if (it != num_syms.end()) {
           dtype = it->second;
         } else {
@@ -175,8 +194,12 @@ struct Parser {
       if (name_tok.Is(TOKEN_ERROR)) {
         return absl::InvalidArgumentError("expected identifier after 'auto'");
       }
+      if (!IsValidIdentifier(name_tok.text)) {
+        return absl::InvalidArgumentError(
+            fmt::format("invalid identifier: '{}' is a reserved name", name_tok.text));
+      }
       VarDefine vd;
-      vd.name = std::string(name_tok.text);
+      vd.name = name_tok.text;
       vd.position = Pos(name_tok);
       return Operand(vd);
     }
@@ -235,6 +258,10 @@ struct Parser {
   // var_accessor = identifier [ member_access | func_invoke_args ]
   absl::StatusOr<Operand> parse_var_accessor() {
     Token name_tok = lex.Next();  // identifier
+    if (!IsValidIdentifier(name_tok.text)) {
+      return absl::InvalidArgumentError(
+          fmt::format("invalid identifier: '{}' is a reserved name", name_tok.text));
+    }
     VarAccessor va;
     va.name = std::string(name_tok.text);
     va.position = Pos(name_tok);
@@ -311,7 +338,7 @@ struct Parser {
     } else if (tok.Is(TOKEN_IDENTIFIER)) {
       lex.Next();
       VarRef vr;
-      vr.name = std::string(tok.text);
+      vr.name = tok.text;
       vr.position = Pos(tok);
       dpa = vr;
     } else {
@@ -364,15 +391,18 @@ struct Parser {
     auto operand = parse_operand();
     if (!operand.ok()) return operand.status();
 
-    auto ue = std::make_shared<UnaryExpr>();
+    auto* ue = ctx.GetAstPool().New<UnaryExpr>();
     ue->op = unop;
-    ue->operand = *operand;
+    ue->operand = std::move(*operand);
     ue->position = unop.has_value() ? Pos(peek) : 0;
-    return ue;
+    return UnaryExprPtr(ue);
   }
 
   // power_expr = unary_expr { '^' unary_expr }  (right-associative)
   // Since power is right-associative, we parse: unary_expr '^' power_expr | unary_expr
+  // Note: The old Boost.Parser implementation used left-associative parsing for '^',
+  // which was mathematically incorrect. This hand-written parser intentionally uses
+  // right-associativity so that a^b^c = a^(b^c), which is the standard convention.
   absl::StatusOr<BinaryExprPtr> parse_power_expr() {
     auto left_ue = parse_unary_expr();
     if (!left_ue.ok()) return left_ue.status();
@@ -383,13 +413,13 @@ struct Parser {
       auto right = parse_power_expr();
       if (!right.ok()) return right.status();
 
-      auto be = BinaryExpr::New(*left_ue, Pos(op_tok));
+      auto be = BinaryExpr::New(ctx.GetAstPool(), std::move(*left_ue), Pos(op_tok));
       be->right.emplace_back(OP_POW, *right);
       return be;
     }
 
     // No power op, wrap unary as binary
-    return BinaryExpr::New(*left_ue, 0);
+    return BinaryExpr::New(ctx.GetAstPool(), std::move(*left_ue), 0);
   }
 
   // Helper: parse left-associative binary ops at a given precedence level
@@ -409,8 +439,8 @@ struct Parser {
       auto right = parse_next();
       if (!right.ok()) return right.status();
 
-      auto be = BinaryExpr::New(*left, Pos(peek));
-      be->right.emplace_back(*op, *right);
+      auto be = BinaryExpr::New(ctx.GetAstPool(), std::move(*left), Pos(peek));
+      be->right.emplace_back(*op, std::move(*right));
       left = be;
     }
     return left;
@@ -464,13 +494,13 @@ struct Parser {
       auto false_expr = parse_expression();
       if (!false_expr.ok()) return false_expr.status();
 
-      auto se = std::make_shared<SelectExpr>();
-      se->cond = *left;
-      se->true_false_operands = std::make_tuple(Operand(*true_expr), Operand(*false_expr));
+      auto* se = ctx.GetAstPool().New<SelectExpr>();
+      se->cond = std::move(*left);
+      se->true_false_operands = std::make_tuple(Operand(std::move(*true_expr)), Operand(std::move(*false_expr)));
       se->position = 0;
 
       // Wrap ternary in binary
-      auto be = BinaryExpr::New(se, 0);
+      auto be = BinaryExpr::New(ctx.GetAstPool(), SelectExprPtr(se), 0);
 
       // Check for assign after ternary
       Token peek = lex.Peek();
@@ -492,8 +522,8 @@ struct Parser {
       auto rhs = parse_expression();
       if (!rhs.ok()) return rhs.status();
 
-      auto be = BinaryExpr::New(*left, Pos(peek));
-      be->right.emplace_back(*assign_op, *rhs);
+      auto be = BinaryExpr::New(ctx.GetAstPool(), std::move(*left), Pos(peek));
+      be->right.emplace_back(*assign_op, std::move(*rhs));
       return be;
     }
 
@@ -561,6 +591,7 @@ struct Parser {
     }
 
     auto stmts = parse_statements();
+    if (!stmts.ok()) return stmts.status();
 
     Token rbrace = lex.Expect(TOKEN_RBRACE);
     if (rbrace.Is(TOKEN_ERROR)) {
@@ -569,7 +600,7 @@ struct Parser {
 
     ChoiceStatement cs;
     cs.expr = *expr;
-    cs.statements = std::move(stmts);
+    cs.statements = std::move(*stmts);
     return cs;
   }
 
@@ -612,19 +643,20 @@ struct Parser {
       }
 
       auto else_stmts = parse_statements();
+      if (!else_stmts.ok()) return else_stmts.status();
 
       Token rbrace = lex.Expect(TOKEN_RBRACE);
       if (rbrace.Is(TOKEN_ERROR)) {
         return absl::InvalidArgumentError("expected '}'");
       }
-      ies.else_statements = std::move(else_stmts);
+      ies.else_statements = std::move(*else_stmts);
     }
 
     return ies;
   }
 
   // statements = { statement }
-  std::vector<Statement> parse_statements() {
+  absl::StatusOr<std::vector<Statement>> parse_statements() {
     std::vector<Statement> result;
 
     while (true) {
@@ -632,46 +664,40 @@ struct Parser {
 
       if (peek.Is(TOKEN_CONTINUE)) {
         lex.Next();
-        lex.Expect(TOKEN_SEMICOLON);
+        Token semi = lex.Expect(TOKEN_SEMICOLON);
+        if (semi.Is(TOKEN_ERROR)) {
+          break;
+        }
         ContinueStatement cs;
         cs.position = Pos(peek);
         result.push_back(cs);
       } else if (peek.Is(TOKEN_BREAK)) {
         lex.Next();
-        lex.Expect(TOKEN_SEMICOLON);
+        Token semi = lex.Expect(TOKEN_SEMICOLON);
+        if (semi.Is(TOKEN_ERROR)) {
+          break;
+        }
         BreakStatement bs;
         bs.position = Pos(peek);
         result.push_back(bs);
       } else if (peek.Is(TOKEN_RETURN)) {
         auto rs = parse_return_statement();
-        if (rs.ok()) {
-          result.push_back(*rs);
-        } else {
-          break;
-        }
+        if (!rs.ok()) return rs.status();
+        result.push_back(*rs);
       } else if (peek.Is(TOKEN_WHILE)) {
         auto ws = parse_while_statement();
-        if (ws.ok()) {
-          result.push_back(*ws);
-        } else {
-          break;
-        }
+        if (!ws.ok()) return ws.status();
+        result.push_back(*ws);
       } else if (peek.Is(TOKEN_IF)) {
         auto ies = parse_ifelse_statement();
-        if (ies.ok()) {
-          result.push_back(*ies);
-        } else {
-          break;
-        }
+        if (!ies.ok()) return ies.status();
+        result.push_back(*ies);
       } else if (peek.Is(TOKEN_IDENTIFIER) || peek.Is(TOKEN_NUMBER) || peek.Is(TOKEN_STRING) ||
                  peek.Is(TOKEN_BOOL) || peek.Is(TOKEN_AUTO) || peek.Is(TOKEN_LPAREN) ||
                  peek.Is(TOKEN_LBRACKET) || peek.Is(TOKEN_MINUS) || peek.Is(TOKEN_NOT)) {
         auto es = parse_expr_statement();
-        if (es.ok()) {
-          result.push_back(*es);
-        } else {
-          break;
-        }
+        if (!es.ok()) return es.status();
+        result.push_back(*es);
       } else {
         break;
       }
@@ -687,6 +713,7 @@ struct Parser {
     }
 
     auto stmts = parse_statements();
+    if (!stmts.ok()) return stmts.status();
 
     Token rbrace = lex.Expect(TOKEN_RBRACE);
     if (rbrace.Is(TOKEN_ERROR)) {
@@ -694,12 +721,12 @@ struct Parser {
     }
 
     Block block;
-    block.statements = std::move(stmts);
+    block.statements = std::move(*stmts);
     return block;
   }
 
   // Read a full type name including template args, e.g. "simd_vector<f32>"
-  std::string read_type_name() {
+  absl::StatusOr<std::string> read_type_name() {
     Token dtype_tok = lex.Next();
     std::string name(dtype_tok.text);
     // Handle template types like simd_vector<f32>, dyn_obj<schema_name>, table<schema_name>
@@ -709,6 +736,9 @@ struct Parser {
       // Read inner type args (identifiers, commas, colons, etc. until '>')
       while (!lex.PeekIs(TOKEN_GT) && !lex.PeekIs(TOKEN_EOF)) {
         Token t = lex.Next();
+        if (t.Is(TOKEN_ERROR)) {
+          return absl::InvalidArgumentError(fmt::format("unexpected token in template type: {}", name));
+        }
         name.append(t.text);
         if (lex.PeekIs(TOKEN_COMMA)) {
           lex.Next();
@@ -718,6 +748,9 @@ struct Parser {
       if (lex.PeekIs(TOKEN_GT)) {
         lex.Next();  // consume '>'
         name.push_back('>');
+      } else {
+        return absl::InvalidArgumentError(
+            fmt::format("expected '>' to close template type, got end of input in: {}", name));
       }
     }
     return name;
@@ -725,7 +758,9 @@ struct Parser {
 
   // func_arg = dtype identifier
   absl::StatusOr<FunctionArg> parse_func_arg() {
-    std::string type_name = read_type_name();
+    auto type_name_result = read_type_name();
+    if (!type_name_result.ok()) return type_name_result.status();
+    std::string type_name = *type_name_result;
 
     auto dtype_found = Symbols::FindDType(type_name);
     if (!dtype_found.has_value()) {
@@ -735,6 +770,10 @@ struct Parser {
     Token name_tok = lex.Expect(TOKEN_IDENTIFIER);
     if (name_tok.Is(TOKEN_ERROR)) {
       return absl::InvalidArgumentError("expected argument name");
+    }
+    if (!IsValidIdentifier(name_tok.text)) {
+      return absl::InvalidArgumentError(
+          fmt::format("invalid argument name: '{}' is a reserved name", name_tok.text));
     }
 
     FunctionArg fa;
@@ -747,7 +786,9 @@ struct Parser {
   // func = dtype identifier '(' [ func_arg { ',' func_arg } ] ')' block
   absl::StatusOr<Function> parse_func() {
     uint32_t func_pos = static_cast<uint32_t>(lex.Position());
-    std::string ret_type_name = read_type_name();
+    auto ret_type_name_result = read_type_name();
+    if (!ret_type_name_result.ok()) return ret_type_name_result.status();
+    std::string ret_type_name = *ret_type_name_result;
 
     auto ret_type = Symbols::FindDType(ret_type_name);
     if (!ret_type.has_value()) {
@@ -757,6 +798,10 @@ struct Parser {
     Token name_tok = lex.Expect(TOKEN_IDENTIFIER);
     if (name_tok.Is(TOKEN_ERROR)) {
       return absl::InvalidArgumentError("expected function name");
+    }
+    if (!IsValidIdentifier(name_tok.text)) {
+      return absl::InvalidArgumentError(
+          fmt::format("invalid function name: '{}' is a reserved name", name_tok.text));
     }
 
     Token lparen = lex.Expect(TOKEN_LPAREN);

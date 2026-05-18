@@ -6,11 +6,14 @@ cc_library(
     name = "context",
     srcs = ["context.cc"],
     hdrs = [
+        "ast_pool.h",
+        "ast_ptr.h",
         "context.h",
     ],
     deps = [
         "//rapidudf/functions:names",
         "//rapidudf/log",
+        "//rapidudf/memory:arena",
         "//rapidudf/meta:constants",
         "//rapidudf/meta:dtype",
         "//rapidudf/meta:function",

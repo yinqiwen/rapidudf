@@ -89,19 +89,19 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v, RP
         using T = std::decay_t<decltype(arg)>;
         absl::StatusOr<VarTag> result;
         if constexpr (std::is_same_v<T, bool>) {
-          rpn.nodes.emplace_back(arg);
+          rpn.nodes.emplace_back(std::move(arg));
           return absl::StatusOr<VarTag>(get_dtype<T>());
         } else if constexpr (std::is_same_v<T, std::string>) {
-          rpn.nodes.emplace_back(arg);
+          rpn.nodes.emplace_back(std::move(arg));
           return absl::StatusOr<VarTag>(DATA_STRING_VIEW);
         } else if constexpr (std::is_same_v<T, VarDefine>) {
           result = arg.Validate(ctx);
-          rpn.nodes.emplace_back(arg);
+          rpn.nodes.emplace_back(std::move(arg));
         } else if constexpr (std::is_same_v<T, VarAccessor>) {
           bool as_rpn_node = false;
           result = arg.Validate(ctx, rpn, as_rpn_node);
           if (!as_rpn_node) {
-            rpn.nodes.emplace_back(arg);
+            rpn.nodes.emplace_back(std::move(arg));
           }
         } else if constexpr (std::is_same_v<T, BinaryExprPtr> || std::is_same_v<T, UnaryExprPtr>) {
           result = arg->Validate(ctx, rpn);
@@ -109,12 +109,14 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v, RP
           result = arg->Validate(ctx, rpn);
           // rpn.nodes.emplace_back(arg);
         } else if constexpr (std::is_same_v<T, ConstantNumber>) {
-          rpn.nodes.emplace_back(arg);
-          if (arg.dtype.has_value()) {
-            return absl::StatusOr<VarTag>(*arg.dtype);
+          auto dtype_opt = arg.dtype;
+          double dv = arg.dv;
+          rpn.nodes.emplace_back(std::move(arg));
+          if (dtype_opt.has_value()) {
+            return absl::StatusOr<VarTag>(*dtype_opt);
           }
-          int64_t iv = static_cast<int64_t>(arg.dv);
-          if (static_cast<double>(iv) == arg.dv) {
+          int64_t iv = static_cast<int64_t>(dv);
+          if (static_cast<double>(iv) == dv) {
             if (iv <= INT32_MAX) {
               return absl::StatusOr<VarTag>(get_dtype<int32_t>());
             }
@@ -123,7 +125,7 @@ static absl::StatusOr<VarTag> validate_operand(ParseContext& ctx, Operand& v, RP
           return absl::StatusOr<VarTag>(get_dtype<double>());
         } else if constexpr (std::is_same_v<T, Array>) {
           result = arg.Validate(ctx);
-          rpn.nodes.emplace_back(arg);
+          rpn.nodes.emplace_back(std::move(arg));
         } else {
           static_assert(sizeof(arg) == -1, "No avaialble!");
           return absl::InvalidArgumentError("No avaialble");
@@ -162,7 +164,7 @@ absl::StatusOr<VarTag> Array::Validate(ParseContext& ctx) {
 
 absl::StatusOr<VarTag> VarRef::Validate(ParseContext& ctx) {
   ctx.SetPosition(position);
-  auto result = ctx.IsVarExist(name, false);
+  auto result = ctx.IsVarExist(std::string(name), false);
   if (!result.ok()) {
     return result;
   }
@@ -174,17 +176,17 @@ absl::StatusOr<VarTag> VarRef::Validate(ParseContext& ctx) {
 }
 absl::StatusOr<VarTag> VarDefine::Validate(ParseContext& ctx) {
   ctx.SetPosition(position);
-  auto result = ctx.IsVarExist(name, true);
+  auto result = ctx.IsVarExist(std::string(name), true);
   if (!result.ok()) {
     return result.status();
   }
-  ctx.AddLocalVar(name, DType(DATA_VOID), nullptr);
-  return VarTag(DATA_VOID, name);
+  ctx.AddLocalVar(std::string(name), DType(DATA_VOID), nullptr);
+  return VarTag(DATA_VOID, std::string(name));
 }
 absl::StatusOr<std::vector<VarTag>> FuncInvokeArgs::Validate(ParseContext& ctx, RPN* rpn) {
   std::vector<VarTag> arg_dtypes;
   if (args.has_value()) {
-    for (auto expr : *args) {
+    for (const auto& expr : *args) {
       RPN arg_rpn;
       auto result = expr->Validate(ctx, rpn == nullptr ? arg_rpn : *rpn);
       if (!result.ok()) {
@@ -351,7 +353,7 @@ absl::StatusOr<VarTag> BinaryExpr::Validate(ParseContext& ctx, RPN& rpn) {
     return left_result.status();
   }
   VarTag left_var = left_result.value();
-  for (auto [op, right_operand] : right) {
+  for (auto& [op, right_operand] : right) {
     auto right_result = validate_operand(ctx, right_operand, rpn);
     if (!right_result.ok()) {
       return right_result.status();
@@ -782,7 +784,7 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
     // prcess args
     std::vector<VarTag> arg_tag_dtypes = validate_result.value();
     std::vector<DType> arg_dtypes;
-    for (auto arg_dtype : arg_tag_dtypes) {
+    for (const auto& arg_dtype : arg_tag_dtypes) {
       if (!has_simd_vector && need_compute_dtype && arg_dtype.dtype > compute_dtype) {
         compute_dtype = arg_dtype.dtype;
       }

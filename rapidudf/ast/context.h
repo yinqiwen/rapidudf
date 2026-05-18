@@ -26,6 +26,7 @@
 #include "absl/status/statusor.h"
 #include "fmt/format.h"
 
+#include "rapidudf/ast/ast_pool.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
@@ -68,10 +69,7 @@ class ParseContext {
 
   bool AddLocalVar(const std::string& name, DType dtype, const DynObjectSchema* schema);
 
-  absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name, bool implicit = false);
-  absl::StatusOr<const FunctionDesc*> CheckFuncExist(std::string_view name, bool implicit = false) {
-    return CheckFuncExist(std::string(name), implicit);
-  }
+  absl::StatusOr<const FunctionDesc*> CheckFuncExist(std::string_view name, bool implicit = false);
   void AddMemberFuncCall(DType dtype, const std::string& name, FunctionDesc desc);
 
   DType GetFuncReturnDType(uint32_t idx = 0) { return GetFunctionParseContext(idx).desc.return_type; }
@@ -107,6 +105,8 @@ class ParseContext {
   bool IsVectorExpression() const { return vector_expr_flag_; }
   void SetVectorExressionFlag(bool v = true) { vector_expr_flag_ = v; }
 
+  AstPool& GetAstPool() { return ast_pool_; }
+
  private:
   using LocalVarMap = std::unordered_map<std::string, VarTag>;
 
@@ -139,6 +139,8 @@ class ParseContext {
 
   std::chrono::microseconds parse_cost_;
   std::chrono::microseconds parse_validate_cost_;
+
+  AstPool ast_pool_;
 };
 
 }  // namespace ast

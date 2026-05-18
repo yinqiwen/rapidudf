@@ -155,13 +155,6 @@ else()
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${nlohmann_json_INCLUDE_DIRS})
 endif()
 
-FetchContent_Declare(
-  boost_parser
-  GIT_REPOSITORY https://github.com/boostorg/parser
-  GIT_TAG        bb0fb885b8f996545cdc5eac67aab8c9bb6a2ce3)
-FetchContent_Populate(boost_parser)
-list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${boost_parser_SOURCE_DIR}/include)
-
 message("RAPIDUDF_LINK_LIBRARIES: ${RAPIDUDF_LINK_LIBRARIES}")
 message("RAPIDUDF_INCLUDE_DIRECTORIES: ${RAPIDUDF_INCLUDE_DIRECTORIES}")
 

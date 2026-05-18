@@ -30,19 +30,19 @@ namespace ast {
 
 class Symbols {
  public:
-  static const std::unordered_map<std::string, DType>& GetNumberSymbols();
-  static const std::unordered_map<std::string, OpToken>& GetAssignOpSymbols();
-  static const std::unordered_map<std::string, OpToken>& GetLogicOpSymbols();
-  static const std::unordered_map<std::string, OpToken>& GetCmpOpSymbols();
-  static const std::unordered_map<std::string, OpToken>& GetAdditiveOpSymbols();
-  static const std::unordered_map<std::string, OpToken>& GetMultiplicativeOpSymbols();
-  static const std::unordered_map<std::string, OpToken>& GetPowerOpSymbols();
-  static const std::unordered_map<std::string, OpToken>& GetUnaryOpSymbols();
+  static const std::unordered_map<std::string_view, DType>& GetNumberSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetAssignOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetLogicOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetCmpOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetAdditiveOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetMultiplicativeOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetPowerOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetUnaryOpSymbols();
 
   static void Init();
 
-  static bool IsDTypeExist(const std::string& id);
-  static std::optional<std::pair<DType, DTypeAttr>> FindDType(const std::string& id);
+  static bool IsDTypeExist(std::string_view id);
+  static std::optional<std::pair<DType, DTypeAttr>> FindDType(std::string_view id);
 
   static void Add(const std::string& name, DType dtype, DTypeAttr attr);
 

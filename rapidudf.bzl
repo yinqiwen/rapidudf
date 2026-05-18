@@ -72,24 +72,6 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
         ],
     )
 
-    _BOOST_PARSER_BUILD_FILE = """
-cc_library(
-    name = "parser",
-    hdrs = glob([
-        "include/**/*.hpp",
-    ]),
-    includes = ["include"],
-    visibility = ["//visibility:public"],
-)
-"""
-
-    new_git_repository(
-        name = "boost_parser",
-        remote = "https://github.com/boostorg/parser.git",
-        commit = "bb0fb885b8f996545cdc5eac67aab8c9bb6a2ce3",
-        build_file_content = _BOOST_PARSER_BUILD_FILE,
-    )
-
     fbs_ver = kwargs.get("fbs_ver", "2.0.0")
     fbs_name = "flatbuffers-{ver}".format(ver = fbs_ver)
     maybe(

@@ -27,6 +27,7 @@ namespace rapidudf {
 namespace ast {
 
 void ParseContext::Clear() {
+  ast_pool_.Reset();
   source_.clear();
   source_lines_.clear();
   function_parse_ctxs_.clear();
@@ -53,6 +54,7 @@ bool ParseContext::IsInLoop() { return GetFunctionParseContext(current_function_
 void ParseContext::ExitLoop() { GetFunctionParseContext(current_function_cursor_).in_loop--; }
 
 void ParseContext::SetSource(const std::string& src, bool clear_vars) {
+  ast_pool_.Reset();
   source_ = src;
   source_lines_.clear();
   if (clear_vars) {
@@ -70,8 +72,9 @@ void ParseContext::SetSource(const std::string& src, bool clear_vars) {
 }
 
 absl::StatusOr<VarTag> ParseContext::IsVarExist(const std::string& name, bool error_on_exist) {
-  auto found = GetFunctionParseContext(current_function_cursor_).local_vars.find(name);
-  if (found != GetFunctionParseContext(current_function_cursor_).local_vars.end()) {
+  auto& local_vars = GetFunctionParseContext(current_function_cursor_).local_vars;
+  auto found = local_vars.find(name);
+  if (found != local_vars.end()) {
     if (error_on_exist) {
       return absl::AlreadyExistsError(fmt::format("var:{} already exist at {}", name, GetErrorLine()));
     }
@@ -151,18 +154,19 @@ bool ParseContext::CanCastTo(DType from_dtype, DType to_dtype) {
   return v;
 }
 
-absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::string& name, bool implicit) {
+absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(std::string_view name, bool implicit) {
   const FunctionDesc* desc = nullptr;
   bool local_func = false;
   for (uint32_t i = 0; i <= current_function_cursor_; i++) {
-    if (GetFunctionParseContext(i).desc.name == name) {
-      desc = &(GetFunctionParseContext(i).desc);
+    auto& func_ctx = GetFunctionParseContext(i);
+    if (func_ctx.desc.name == name) {
+      desc = &func_ctx.desc;
       local_func = true;
       break;
     }
   }
   if (nullptr == desc) {
-    desc = FunctionFactory::GetFunction(name);
+    desc = FunctionFactory::GetFunction(std::string(name));
   }
   if (desc == nullptr) {
     return absl::NotFoundError(fmt::format("func:{} not exist at `{}`", name, GetErrorLine()));
@@ -172,10 +176,11 @@ absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(const std::stri
         "Function:{} need `rapidudf::Context` arg, missing in expression/udf args, at `{}`", name, GetErrorLine()));
   }
   if (!local_func) {
+    std::string name_str(name);
     if (implicit) {
-      GetFunctionParseContext(current_function_cursor_).implicit_func_calls.emplace(name, desc);
+      GetFunctionParseContext(current_function_cursor_).implicit_func_calls.emplace(std::move(name_str), desc);
     } else {
-      GetFunctionParseContext(current_function_cursor_).func_calls.emplace(name, desc);
+      GetFunctionParseContext(current_function_cursor_).func_calls.emplace(std::move(name_str), desc);
     }
   }
   return desc;

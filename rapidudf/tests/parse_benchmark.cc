@@ -65,7 +65,30 @@ int main() {
               << " parses/sec, Avg: " << static_cast<double>(elapsed.count()) / total << " us/parse" << std::endl;
   }
 
-  // Benchmark 2: Lexer only (tokenize without parsing)
+  // Benchmark 2: Reuse ParseContext (isolate parse performance from context creation)
+  {
+    ParseContext reuse_ctx;
+    reuse_ctx.AddLocalVar("x", DType(DATA_F64), nullptr);
+    reuse_ctx.AddLocalVar("y", DType(DATA_F64), nullptr);
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int round = 0; round < kRounds; ++round) {
+      for (size_t i = 0; i < kNumExpressions; ++i) {
+        auto result = parse_expression_ast(reuse_ctx, kTestExpressions[i], FunctionDesc{});
+        if (!result.ok()) {
+          std::cerr << "Parse failed: " << result.status().message() << std::endl;
+          return 1;
+        }
+      }
+    }
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now() - start);
+    size_t total = kRounds * kNumExpressions;
+    std::cout << "[ReuseCtx] Parsed " << total << " expressions in " << elapsed.count() / 1000 << " ms" << std::endl;
+    std::cout << "[ReuseCtx] Rate: " << static_cast<int>(static_cast<double>(total) / (elapsed.count() / 1e6))
+              << " parses/sec, Avg: " << static_cast<double>(elapsed.count()) / total << " us/parse" << std::endl;
+  }
+
+  // Benchmark 3: Lexer only (tokenize without parsing)
   {
     auto start = std::chrono::high_resolution_clock::now();
     for (int round = 0; round < kRounds; ++round) {
