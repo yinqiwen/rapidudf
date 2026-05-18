@@ -99,7 +99,8 @@ struct FuncInvokeArgs {
 };
 
 struct FieldAccess {
-  std::string field;
+  std::string_view field;
+  std::optional<std::string> resolved_field;  // set during Validate when field is mutated
   std::optional<FuncInvokeArgs> func_args;
   uint32_t position = 0;
 
@@ -111,7 +112,8 @@ using DynamicParamAccess = std::variant<std::string, uint32_t, VarRef>;
 using MemberAccess = std::variant<FieldAccess, DynamicParamAccess>;
 
 struct VarAccessor {
-  std::string name;
+  std::string_view name;
+  std::optional<std::string> resolved_name;  // set during Validate when name is mutated
   std::optional<std::vector<MemberAccess>> access_args;
   std::optional<FuncInvokeArgs> func_args;
 

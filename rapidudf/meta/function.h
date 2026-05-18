@@ -75,7 +75,7 @@ class FunctionFactory {
   }
 
   static bool Register(FunctionDesc&& desc);
-  static const FunctionDesc* GetFunction(const std::string& name);
+  static const FunctionDesc* GetFunction(std::string_view name);
 
   template <typename... Args>
   static absl::Status RegisterVectorFunction(std::string_view name, void (*f)(Args...)) {

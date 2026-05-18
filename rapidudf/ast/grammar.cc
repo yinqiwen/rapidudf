@@ -15,6 +15,7 @@
  */
 
 #include "rapidudf/ast/grammar.h"
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -141,12 +142,11 @@ struct Parser {
       }
     }
 
-    // Parse the numeric part
-    std::string num_str(text.substr(0, num_len));
-    char* end = nullptr;
-    val = std::strtod(num_str.c_str(), &end);
-    if (end != num_str.c_str() + num_len) {
-      lex.SetError(fmt::format("invalid number: {}", num_str));
+    // Parse the numeric part using from_chars (no std::string allocation)
+    std::string_view num_part = text.substr(0, num_len);
+    auto [ptr, ec] = std::from_chars(num_part.data(), num_part.data() + num_part.size(), val);
+    if (ec != std::errc() || ptr != num_part.data() + num_part.size()) {
+      lex.SetError(fmt::format("invalid number: {}", num_part));
       return false;
     }
     return true;
@@ -263,7 +263,7 @@ struct Parser {
           fmt::format("invalid identifier: '{}' is a reserved name", name_tok.text));
     }
     VarAccessor va;
-    va.name = std::string(name_tok.text);
+    va.name = name_tok.text;
     va.position = Pos(name_tok);
 
     // Check for member access or function invoke args
@@ -309,7 +309,7 @@ struct Parser {
       return absl::InvalidArgumentError("expected identifier after '.'");
     }
     FieldAccess fa;
-    fa.field = std::string(name_tok.text);
+    fa.field = name_tok.text;
     fa.position = Pos(name_tok);
 
     if (lex.PeekIs(TOKEN_LPAREN)) {
@@ -332,8 +332,10 @@ struct Parser {
       dpa = std::string(tok.text.substr(1, tok.text.size() - 2));
     } else if (tok.Is(TOKEN_NUMBER)) {
       lex.Next();
-      char* end = nullptr;
-      uint32_t idx = std::strtoul(std::string(tok.text).c_str(), &end, 10);
+      uint32_t idx = 0;
+      auto [ptr, ec] = std::from_chars(tok.text.data(), tok.text.data() + tok.text.size(), idx);
+      (void)ptr;
+      (void)ec;
       dpa = idx;
     } else if (tok.Is(TOKEN_IDENTIFIER)) {
       lex.Next();

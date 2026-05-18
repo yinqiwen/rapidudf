@@ -68,7 +68,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(ValuePtr obj, const ast::FieldAcce
         arg_values.emplace_back(arg_val.value());
       }
     }
-    std::string member_func_name = GetMemberFuncName(obj->GetDType().PtrTo(), field.field);
+    std::string member_func_name = GetMemberFuncName(obj->GetDType().PtrTo(), field.resolved_field.has_value() ? *field.resolved_field : std::string(field.field));
     return codegen_->CallFunction(member_func_name, arg_values);
   } else {
     if (!obj->GetDType().IsPtr()) {
@@ -97,7 +97,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::VarAccessor& expr) {
   ast_ctx_.SetPosition(expr.position);
   if (expr.func_args.has_value()) {
     // // name is func name
-    std::string func_name = expr.name;
+    std::string func_name(expr.resolved_name.has_value() ? *expr.resolved_name : std::string(expr.name));
     std::vector<ValuePtr> arg_values;
     // bool is_simd_func = false;
     if (expr.func_args->args.has_value()) {
@@ -112,7 +112,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::VarAccessor& expr) {
     return codegen_->CallFunction(func_name, arg_values);
   } else if (expr.access_args.has_value()) {
     // name is var name
-    auto var_result = codegen_->GetLocalVar(expr.name);
+    auto var_result = codegen_->GetLocalVar(std::string(expr.name));
     if (!var_result.ok()) {
       return var_result.status();
     }
@@ -149,7 +149,7 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildIR(const ast::VarAccessor& expr) {
     return var;
   } else {
     // name is var name
-    return codegen_->GetLocalVar(expr.name);
+    return codegen_->GetLocalVar(std::string(expr.name));
   }
 }
 }  // namespace compiler

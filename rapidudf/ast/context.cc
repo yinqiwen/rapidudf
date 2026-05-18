@@ -71,7 +71,7 @@ void ParseContext::SetSource(const std::string& src, bool clear_vars) {
   source_lines_ = absl::StrSplit(absl::string_view(source_), '\n');
 }
 
-absl::StatusOr<VarTag> ParseContext::IsVarExist(const std::string& name, bool error_on_exist) {
+absl::StatusOr<VarTag> ParseContext::IsVarExist(std::string_view name, bool error_on_exist) {
   auto& local_vars = GetFunctionParseContext(current_function_cursor_).local_vars;
   auto found = local_vars.find(name);
   if (found != local_vars.end()) {
@@ -122,7 +122,7 @@ std::string ParseContext::GetErrorLine() const {
   return fmt::format("cursor:{}, source lines:'{}'", validate_posistion_, source_lines_.size());
 }
 
-bool ParseContext::AddLocalVar(const std::string& name, DType dtype, const DynObjectSchema* schema) {
+bool ParseContext::AddLocalVar(std::string_view name, DType dtype, const DynObjectSchema* schema) {
   auto [iter, success] =
       GetFunctionParseContext(current_function_cursor_).local_vars.emplace(name, VarTag{dtype, name, schema});
   if (!success && iter->second.dtype.IsVoid()) {
@@ -166,7 +166,7 @@ absl::StatusOr<const FunctionDesc*> ParseContext::CheckFuncExist(std::string_vie
     }
   }
   if (nullptr == desc) {
-    desc = FunctionFactory::GetFunction(std::string(name));
+    desc = FunctionFactory::GetFunction(name);
   }
   if (desc == nullptr) {
     return absl::NotFoundError(fmt::format("func:{} not exist at `{}`", name, GetErrorLine()));

@@ -54,8 +54,8 @@ void init_builtin() {
   });
 }
 
-OpToken get_buitin_func_op(const std::string& name) {
-  auto found = get_builtin_func_op_mapping().find(name);
+OpToken get_buitin_func_op(std::string_view name) {
+  auto found = get_builtin_func_op_mapping().find(std::string(name));
   if (found != get_builtin_func_op_mapping().end()) {
     return found->second;
   }

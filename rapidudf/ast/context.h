@@ -35,10 +35,10 @@ namespace rapidudf {
 namespace ast {
 
 struct VarTag {
-  std::string name;
+  std::string_view name;
   DType dtype;
   const DynObjectSchema* schema = nullptr;
-  VarTag(DType d, const std::string& n = "", const DynObjectSchema* s = nullptr) {
+  VarTag(DType d, std::string_view n = "", const DynObjectSchema* s = nullptr) {
     dtype = d;
     name = n;
     schema = s;
@@ -60,14 +60,14 @@ class ParseContext {
     return absl::InvalidArgumentError(fmt::format("{} at {}", err, GetErrorLine()));
   }
 
-  absl::StatusOr<VarTag> IsVarExist(const std::string& name, bool error_on_exist);
+  absl::StatusOr<VarTag> IsVarExist(std::string_view name, bool error_on_exist);
 
   std::string GetErrorLine() const;
 
   int GetLineNo() const;
   std::string GetSourceLine(int line) const;
 
-  bool AddLocalVar(const std::string& name, DType dtype, const DynObjectSchema* schema);
+  bool AddLocalVar(std::string_view name, DType dtype, const DynObjectSchema* schema);
 
   absl::StatusOr<const FunctionDesc*> CheckFuncExist(std::string_view name, bool implicit = false);
   void AddMemberFuncCall(DType dtype, const std::string& name, FunctionDesc desc);
@@ -108,7 +108,7 @@ class ParseContext {
   AstPool& GetAstPool() { return ast_pool_; }
 
  private:
-  using LocalVarMap = std::unordered_map<std::string, VarTag>;
+  using LocalVarMap = std::unordered_map<std::string_view, VarTag>;
 
   using BuiltinFuncationCallSet = std::unordered_set<std::string>;
 

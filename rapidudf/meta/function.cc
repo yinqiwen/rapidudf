@@ -186,11 +186,11 @@ absl::Status FunctionFactory::RegisterVectorFunction(FunctionDesc&& desc) {
   return absl::OkStatus();
 }
 
-const FunctionDesc* FunctionFactory::GetFunction(const std::string& name) {
+const FunctionDesc* FunctionFactory::GetFunction(std::string_view name) {
   if (!g_regs) {
     return nullptr;
   }
-  auto found = g_regs->find(name);
+  auto found = g_regs->find(std::string(name));
   if (found == g_regs->end()) {
     return nullptr;
   }
