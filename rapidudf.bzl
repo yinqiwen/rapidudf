@@ -122,6 +122,7 @@ cmake(
         "-DCMAKE_BUILD_TYPE=Release",
         "-DFMT_TEST=OFF",
         "-DFMT_DOC=OFF",
+        "-DCMAKE_INSTALL_LIBDIR=lib64",
     ],
     lib_source = ":all_srcs",
     out_lib_dir = "lib64",
@@ -216,6 +217,9 @@ make(
         remote = "https://github.com/intel/x86-simd-sort.git",
         commit = "d62f656ba1e7bef04a0e1ba6e908a5aa1b0ff745",
         build_file_content = _X86_SIMD_SORT_BUILD_FILE,
+        patch_cmds = [
+            "sed -i 's/meson setup /meson setup --libdir lib64 /g' Makefile",
+        ],
     )
 
     _SLEEF_BUILD_FILE = """
@@ -231,6 +235,7 @@ cmake(
     generate_args = [
         "-DCMAKE_BUILD_TYPE=Release",
         "-DSLEEF_BUILD_TESTS=OFF",
+        "-DCMAKE_INSTALL_LIBDIR=lib64",
     ],
     lib_source = ":all_srcs",
     out_lib_dir = "lib64",

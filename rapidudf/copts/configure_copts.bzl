@@ -12,5 +12,6 @@ RUDF_DEFAULT_LINKOPTS = [
     # "-lLLVM",
     "-ldl",
     "-lrt",
-    "-lboost_thread",
+    "-lboost_thread-mt",
+    "-lboost_system-mt",
 ]

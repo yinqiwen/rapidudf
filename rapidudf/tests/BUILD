@@ -11,6 +11,16 @@ package(
 )
 
 cc_binary(
+    name = "parse_benchmark",
+    srcs = ["parse_benchmark.cc"],
+    linkopts = RUDF_DEFAULT_LINKOPTS,
+    linkstatic = True,
+    deps = [
+        "//rapidudf/ast",
+    ],
+)
+
+cc_binary(
     name = "fib_bench",
     srcs = ["fib_bench.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
