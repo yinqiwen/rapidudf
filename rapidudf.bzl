@@ -195,7 +195,7 @@ make(
     maybe(
         new_git_repository,
         name = "x86_simd_sort",
-        remote = "https://github.com/intel/x86-simd-sort.git",
+        remote = "https://github.com/numpy/x86-simd-sort.git",
         tag = "v7.0",
         build_file_content = _X86_SIMD_SORT_BUILD_FILE,
         patch_cmds = [

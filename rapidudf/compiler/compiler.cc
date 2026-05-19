@@ -19,7 +19,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/hash/hash.h"
 #include "rapidudf/ast/grammar.h"
 #include "rapidudf/ast/symbols.h"
 #include "rapidudf/compiler/codegen.h"
@@ -136,69 +135,6 @@ void JitCompiler::NewCodegen() {
   parsed_ast_funcs_.clear();
 }
 
-uint64_t JitCompiler::ComputeCompileCacheKey(std::string_view source, DType return_type,
-                                             const std::vector<DType>& arg_types,
-                                             const std::vector<Arg>* dyn_args) const {
-  if (dyn_args == nullptr || dyn_args->empty()) {
-    return absl::HashOf(source, opts_.optimize_level, opts_.fast_math, opts_.skip_auto_vectorize_passes,
-                        opts_.enable_compile_cache, return_type, arg_types);
-  }
-  std::vector<std::pair<std::string_view, std::string_view>> dyn_arg_views;
-  dyn_arg_views.reserve(dyn_args->size());
-  for (const Arg& arg : *dyn_args) {
-    dyn_arg_views.emplace_back(arg.name, std::string_view(arg.schema));
-  }
-  return absl::HashOf(source, opts_.optimize_level, opts_.fast_math, opts_.skip_auto_vectorize_passes,
-                      opts_.enable_compile_cache, return_type, arg_types, dyn_arg_views);
-}
-
-void JitCompiler::StoreCompileCache(std::string_view source, DType return_type, const std::vector<DType>& arg_types,
-                                    const std::vector<Arg>* dyn_args, const std::string& function_name) {
-  if (!opts_.enable_compile_cache || codegen_ == nullptr) {
-    return;
-  }
-  CompileCacheEntry entry;
-  entry.codegen = codegen_;
-  entry.parsed_ast_funcs = parsed_ast_funcs_;
-  entry.stat = stat_;
-  entry.function_name = function_name;
-  compile_cache_[ComputeCompileCacheKey(source, return_type, arg_types, dyn_args)] = std::move(entry);
-}
-
-bool JitCompiler::LookupCompileCache(uint64_t key, DType return_type, const std::vector<DType>& arg_types,
-                                     CachedJitTarget* out) {
-  if (!opts_.enable_compile_cache || out == nullptr) {
-    return false;
-  }
-  auto found = compile_cache_.find(key);
-  if (found == compile_cache_.end()) {
-    return false;
-  }
-  CompileCacheEntry& entry = found->second;
-  parsed_ast_funcs_ = entry.parsed_ast_funcs;
-  stat_ = entry.stat;
-  codegen_ = entry.codegen;
-
-  std::string err;
-  for (auto& func : parsed_ast_funcs_) {
-    if (func.name != entry.function_name) {
-      continue;
-    }
-    if (!func.CompareSignature(return_type, arg_types, err)) {
-      return false;
-    }
-    auto func_ptr_result = entry.codegen->GetFunctionPtr(entry.function_name);
-    if (!func_ptr_result.ok()) {
-      return false;
-    }
-    out->func_ptr = func_ptr_result.value();
-    out->codegen = entry.codegen;
-    out->stat = entry.stat;
-    out->function_name = entry.function_name;
-    return true;
-  }
-  return false;
-}
 absl::Status JitCompiler::Compile() { return codegen_->Finish(); }
 
 absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {

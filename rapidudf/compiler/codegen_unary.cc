@@ -227,7 +227,7 @@ absl::StatusOr<::llvm::Value*> CodeGen::UnaryOp(OpToken op, DType dtype, ::llvm:
   return absl::InvalidArgumentError(fmt::format("Unsupported op:{} for dtype:{}", op, dtype));
 }
 
-absl::StatusOr<ValuePtr> CodeGen::UnaryOp(OpToken op, ValuePtr val) {
+absl::StatusOr<ValuePtr> CodeGen::UnaryOp(OpToken op, const ValuePtr& val) {
   auto result = UnaryOp(op, val->GetDType(), val->LoadValue());
   if (!result.ok()) {
     std::string extern_func_name = GetFunctionName(op, val->GetDType());

@@ -45,6 +45,7 @@
 #include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Scalar/PartiallyInlineLibCalls.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
+#include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Scalar/TailRecursionElimination.h"
 #include "llvm/Transforms/Vectorize/LoadStoreVectorizer.h"
@@ -138,22 +139,30 @@ CodeGen::CodeGen(const Options& opts) : opts_(opts), label_cursor_(0) {
 
   func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>();
   if (!opts_.skip_auto_vectorize_passes) {
+    // The standard simplification pipeline already runs SROA/InstCombine/
+    // Reassociate/NewGVN/SimplifyCFG (multiple iterations) plus
+    // PartiallyInlineLibCalls / MergedLoadStoreMotion / TailCallElim. Reuse it
+    // and avoid running those passes a second time below.
     auto func_pass_manager =
         pass_builder.buildFunctionSimplificationPipeline(opt_level, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
     func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
-  }
-  func_pass_manager_->addPass(::llvm::InstCombinePass());
-  func_pass_manager_->addPass(::llvm::ReassociatePass());
-  func_pass_manager_->addPass(llvm::NewGVNPass());
-  func_pass_manager_->addPass(::llvm::SimplifyCFGPass());
-  func_pass_manager_->addPass(::llvm::PartiallyInlineLibCallsPass());
-  func_pass_manager_->addPass(::llvm::MergedLoadStoreMotionPass());
-  func_pass_manager_->addPass(::llvm::TailCallElimPass());
-  if (!opts_.skip_auto_vectorize_passes) {
     func_pass_manager_->addPass(::llvm::LoadStoreVectorizerPass());
     func_pass_manager_->addPass(::llvm::SLPVectorizerPass());
     func_pass_manager_->addPass(::llvm::VectorCombinePass());
     func_pass_manager_->addPass(::llvm::LoopVectorizePass());
+  } else {
+    // Lightweight default pipeline. Promote alloca'd locals/parameters to SSA
+    // registers (SROA / mem2reg) before the rest of the simplification passes;
+    // without it the per-variable CreateAlloca + load/store IR emitted by the
+    // codegen stays in the final machine code as real stack traffic.
+    func_pass_manager_->addPass(::llvm::SROAPass(::llvm::SROAOptions::ModifyCFG));
+    func_pass_manager_->addPass(::llvm::InstCombinePass());
+    func_pass_manager_->addPass(::llvm::ReassociatePass());
+    func_pass_manager_->addPass(llvm::NewGVNPass());
+    func_pass_manager_->addPass(::llvm::SimplifyCFGPass());
+    func_pass_manager_->addPass(::llvm::PartiallyInlineLibCallsPass());
+    func_pass_manager_->addPass(::llvm::MergedLoadStoreMotionPass());
+    func_pass_manager_->addPass(::llvm::TailCallElimPass());
   }
 }
 
@@ -263,15 +272,11 @@ absl::StatusOr<ValuePtr> CodeGen::GetLocalVar(const std::string& name) {
 bool CodeGen::IsExternFunctionExist(const std::string& name) { return extern_funcs_.find(name) != extern_funcs_.end(); }
 
 ExternFunctionPtr CodeGen::GetFunction(const std::string& name) {
-  auto local_found = funcs_.find(name);
-  if (local_found != funcs_.end()) {
-    //
-  }
   auto found = extern_funcs_.find(name);
   if (found == extern_funcs_.end()) {
     return nullptr;
   }
-  return found->second;
+  return &found->second;
 }
 
 void CodeGen::PrintAsm() {
@@ -309,25 +314,23 @@ absl::Status CodeGen::DeclareExternFunctions(
     if (!func_type_result.ok()) {
       return func_type_result.status();
     }
-    ExternFunctionPtr extern_func = std::make_shared<ExternFunction>();
-    extern_func->desc = *desc;
+    ExternFunction& extern_func = extern_funcs_[desc->name];
+    extern_func.desc = *desc;
     auto func_type = func_type_result.value();
-    extern_func->func =
-        ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, extern_func->desc.name, *module_);
-    extern_func->func_type = func_type;
+    extern_func.func =
+        ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, extern_func.desc.name, *module_);
+    extern_func.func_type = func_type;
 
-    if (!extern_func->func->arg_empty()) {
-      for (size_t i = 0; i < extern_func->func->arg_size(); i++) {
+    if (!extern_func.func->arg_empty()) {
+      for (size_t i = 0; i < extern_func.func->arg_size(); i++) {
         if (desc->PassArgByValue(i)) {
           auto* arg_type = get_type(*context_, desc->arg_types[i]);
-          extern_func->func->addParamAttr(i, ::llvm::Attribute::getWithByValType(*context_, arg_type));
-          extern_func->func->addParamAttr(i, ::llvm::Attribute::getWithAlignment(*context_, ::llvm::Align(8)));
-          extern_func->func->addParamAttr(i, ::llvm::Attribute::AttrKind::NoUndef);
+          extern_func.func->addParamAttr(i, ::llvm::Attribute::getWithByValType(*context_, arg_type));
+          extern_func.func->addParamAttr(i, ::llvm::Attribute::getWithAlignment(*context_, ::llvm::Align(8)));
+          extern_func.func->addParamAttr(i, ::llvm::Attribute::AttrKind::NoUndef);
         }
       }
     }
-
-    extern_funcs_[desc->name] = extern_func;
   }
 
   for (const auto& [dtype, func_calls] : member_func_calls) {
@@ -340,12 +343,11 @@ absl::Status CodeGen::DeclareExternFunctions(
       if (!func_type_result.ok()) {
         return func_type_result.status();
       }
-      ExternFunctionPtr extern_func = std::make_shared<ExternFunction>();
-      extern_func->desc = desc;
+      ExternFunction& extern_func = extern_funcs_[fname];
+      extern_func.desc = desc;
       auto func_type = func_type_result.value();
-      extern_func->func = ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, fname, *module_);
-      extern_func->func_type = func_type;
-      extern_funcs_[fname] = extern_func;
+      extern_func.func = ::llvm::Function::Create(func_type, ::llvm::Function::ExternalLinkage, fname, *module_);
+      extern_func.func_type = func_type;
     }
   }
 
@@ -640,12 +642,22 @@ absl::StatusOr<ValuePtr> CodeGen::CallFunction(const std::string& name, const st
   if (!found_func) {
     RUDF_LOG_RETURN_FMT_ERROR("CallFunction:No func:{} found", name);
   }
-  std::vector<ValuePtr> arg_values = const_arg_values;
-  if (found_func_desc.context_arg_idx >= 0 && arg_values.size() == found_func_desc.arg_types.size() - 1) {
-    if (current_func_->context_arg_value) {
-      arg_values.insert(arg_values.begin() + found_func_desc.context_arg_idx, current_func_->context_arg_value);
-    }
+  // Only materialize a local copy of the argument vector when we actually need
+  // to inject the implicit context argument; the common case (no injection)
+  // operates directly on the caller's vector and avoids the per-call vector
+  // allocation + N atomic shared_ptr increments.
+  const bool need_inject_context = found_func_desc.context_arg_idx >= 0 &&
+                                   const_arg_values.size() == found_func_desc.arg_types.size() - 1 &&
+                                   current_func_->context_arg_value;
+  std::vector<ValuePtr> mutable_arg_values;
+  const std::vector<ValuePtr>* arg_values_ptr = &const_arg_values;
+  if (need_inject_context) {
+    mutable_arg_values = const_arg_values;
+    mutable_arg_values.insert(mutable_arg_values.begin() + found_func_desc.context_arg_idx,
+                              current_func_->context_arg_value);
+    arg_values_ptr = &mutable_arg_values;
   }
+  const std::vector<ValuePtr>& arg_values = *arg_values_ptr;
 
   if (arg_values.size() != found_func_desc.arg_types.size()) {
     RUDF_LOG_RETURN_FMT_ERROR("Func:{} expect {} args, while {} given", name, found_func_desc.arg_types.size(),

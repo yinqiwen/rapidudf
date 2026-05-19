@@ -79,7 +79,13 @@ absl::StatusOr<::llvm::Value*> CodeGen::TernaryOp(OpToken op, DType dtype, ::llv
   }
   return absl::InvalidArgumentError(fmt::format("Unsupported op:{} for dtype:{}", op, dtype));
 }
-absl::StatusOr<ValuePtr> CodeGen::TernaryOp(OpToken op, ValuePtr a, ValuePtr b, ValuePtr c) {
+absl::StatusOr<ValuePtr> CodeGen::TernaryOp(OpToken op, const ValuePtr& in_a, const ValuePtr& in_b,
+                                            const ValuePtr& in_c) {
+  // Casts below may rebind the operands; keep mutable locals while still
+  // letting callers pass by const reference (cheap when no cast is required).
+  ValuePtr a = in_a;
+  ValuePtr b = in_b;
+  ValuePtr c = in_c;
   DType compute_dtype;
   if (op == OP_CONDITIONAL) {
     if (!a->GetDType().IsBit()) {

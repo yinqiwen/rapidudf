@@ -20,9 +20,7 @@
 #include <string_view>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/container/inlined_vector.h"
-#include "absl/hash/hash.h"
 #include "absl/status/statusor.h"
 #include "fmt/format.h"
 
@@ -85,14 +83,6 @@ class JitCompiler {
     std::vector<DType> arg_types;
     (arg_types.emplace_back(get_dtype<Args>()), ...);
 
-    if (opts_.enable_compile_cache) {
-      CachedJitTarget cached;
-      if (LookupCompileCache(ComputeCompileCacheKey(source, return_type, arg_types, nullptr), return_type,
-                             arg_types, &cached)) {
-        return JitFunction<RET, Args...>(cached.function_name, cached.func_ptr, cached.codegen, cached.stat, true);
-      }
-    }
-
     NewCodegen();
     auto status = CompileFunction(source);
     if (!status.ok()) {
@@ -108,7 +98,6 @@ class JitCompiler {
     if (!func_ptr_result.ok()) {
       return func_ptr_result.status();
     }
-    StoreCompileCache(source, return_type, arg_types, nullptr, fname);
     return JitFunction<RET, Args...>(fname, func_ptr_result.value(), codegen_, stat_);
   }
 
@@ -119,14 +108,6 @@ class JitCompiler {
     const DType return_type = get_dtype<RET>();
     std::vector<DType> arg_types;
     (arg_types.emplace_back(get_dtype<Args>()), ...);
-
-    if (opts_.enable_compile_cache) {
-      CachedJitTarget cached;
-      if (LookupCompileCache(ComputeCompileCacheKey(source, return_type, arg_types, &args), return_type, arg_types,
-                             &cached)) {
-        return JitFunction<RET, Args...>(cached.function_name, cached.func_ptr, cached.codegen, cached.stat, true);
-      }
-    }
 
     NewCodegen();
     if (args.size() != arg_types.size()) {
@@ -170,7 +151,6 @@ class JitCompiler {
     if (!func_ptr_result.ok()) {
       return func_ptr_result.status();
     }
-    StoreCompileCache(source, return_type, arg_types, &args, gen_func_ast.name);
     return JitFunction<RET, Args...>(gen_func_ast.name, func_ptr_result.value(), codegen_, stat_);
   }
   template <typename RET, typename... Args>
@@ -203,29 +183,6 @@ class JitCompiler {
     explicit RPNEvalNode(const ast::FuncInvocation& f) : func_invocation(&f) {}
     bool HasFuncInvocation() const { return func_invocation != nullptr; }
   };
-
-  struct CompileCacheEntry {
-    std::shared_ptr<CodeGen> codegen;
-    std::vector<ast::Function> parsed_ast_funcs;
-    JitFunctionStat stat;
-    std::string function_name;
-  };
-
-  struct CachedJitTarget {
-    void* func_ptr = nullptr;
-    std::shared_ptr<CodeGen> codegen;
-    JitFunctionStat stat;
-    std::string function_name;
-  };
-
-  uint64_t ComputeCompileCacheKey(std::string_view source, DType return_type,
-                                  const std::vector<DType>& arg_types, const std::vector<Arg>* dyn_args) const;
-
-  bool LookupCompileCache(uint64_t key, DType return_type, const std::vector<DType>& arg_types,
-                          CachedJitTarget* out);
-
-  void StoreCompileCache(std::string_view source, DType return_type, const std::vector<DType>& arg_types,
-                         const std::vector<Arg>* dyn_args, const std::string& function_name);
 
   void NewCodegen();
   absl::Status Compile();
@@ -280,7 +237,6 @@ class JitCompiler {
   std::shared_ptr<CodeGen> codegen_;
   std::mutex jit_mutex_;
   JitFunctionStat stat_;
-  absl::flat_hash_map<uint64_t, CompileCacheEntry> compile_cache_;
 };
 
 }  // namespace compiler

@@ -174,7 +174,7 @@ absl::Status JitCompiler::BuildVectorEvalIR(DType dtype, RPNEvalNodeList& nodes,
       DType compute_dtype = node.op_compute_dtype;
       absl::StatusOr<::llvm::Value*> result;
       bool use_vector_call = functions::has_vector_buitin_func(op, compute_dtype);
-      if (use_vector_call && !codegen_->IsExternFunctionExist(GetFunctionName(op, compute_dtype.ToSimdVector()))) {
+      if (use_vector_call && !codegen_->IsExternFunctionExist(GetCachedFunctionName(op, compute_dtype.ToSimdVector()))) {
         use_vector_call = false;
       }
 
@@ -279,7 +279,9 @@ absl::StatusOr<ValuePtr> JitCompiler::BuildVectorIR(DType result_dtype, RPNEvalN
   switch (last_op) {
     case OP_ASSIGN: {
       assign_to = nodes.front().val;
-      // nodes.pop_front();
+      // One-time removal of the assignment LHS from the RPN list (not inside a
+      // loop). InlinedVector<RPNEvalNode, 16> size is bounded so the O(n)
+      // shift is negligible.
       nodes.erase(nodes.begin());
       nodes.pop_back();
       break;

@@ -24,8 +24,6 @@ struct Options {
   bool print_asm = false;
   // Skip LLVM auto-vectorization passes; UDF vector ops use hand-written SIMD builtins.
   bool skip_auto_vectorize_passes = true;
-  // Reuse JIT code for identical compile requests (source + signature + options).
-  bool enable_compile_cache = true;
 };
 }  // namespace compiler
 }  // namespace rapidudf

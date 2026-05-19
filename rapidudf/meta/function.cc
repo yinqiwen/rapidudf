@@ -63,6 +63,32 @@ std::string GetFunctionName(OpToken op, DType dtype0, DType dtype1) {
   return GetFunctionName(kOpTokenStrs[op], dtype0, dtype1);
 }
 
+// Hot path: BuildVectorIR / unary / binary / ternary codegen calls this
+// repeatedly with a small set of (op, dtype) pairs. Cache the formatted name
+// per thread to avoid the per-call heap allocation in GetFunctionName above.
+namespace {
+struct OpDTypeKey {
+  int op;
+  uint64_t dtype_ctrl;
+  bool operator==(const OpDTypeKey& other) const { return op == other.op && dtype_ctrl == other.dtype_ctrl; }
+  template <typename H>
+  friend H AbslHashValue(H h, const OpDTypeKey& k) {
+    return H::combine(std::move(h), k.op, k.dtype_ctrl);
+  }
+};
+}  // namespace
+
+const std::string& GetCachedFunctionName(OpToken op, DType dtype) {
+  thread_local absl::flat_hash_map<OpDTypeKey, std::string> cache;
+  OpDTypeKey k{static_cast<int>(op), dtype.Control()};
+  auto it = cache.find(k);
+  if (it != cache.end()) {
+    return it->second;
+  }
+  auto [ins_it, _] = cache.emplace(k, GetFunctionName(op, dtype));
+  return ins_it->second;
+}
+
 void FunctionDesc::Init() {
   for (size_t i = 0; i < arg_types.size(); i++) {
     if (arg_types[i].IsContextPtr()) {

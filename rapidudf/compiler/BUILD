@@ -73,6 +73,7 @@ cc_library(
         "//rapidudf/meta:function",
         "//rapidudf/meta:operand",
         "//rapidudf/meta:optype",
+        "//rapidudf/types:string_view",
         "@local_llvm//:libllvm",
     ],
 )

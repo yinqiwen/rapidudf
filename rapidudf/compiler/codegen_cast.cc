@@ -61,8 +61,8 @@ absl::StatusOr<::llvm::Value*> CodeGen::CastTo(::llvm::Value* val, DType src_dty
       }
     } else {
       if (dst_dtype.Bits() > src_dtype.Bits()) {
-        if (dst_dtype.IsSigned()) {
-          new_val = builder_->CreateZExt(val, dst_type);
+        if (src_dtype.IsSigned()) {
+          new_val = builder_->CreateSExt(val, dst_type);
         } else {
           new_val = builder_->CreateZExt(val, dst_type);
         }
@@ -81,7 +81,7 @@ absl::StatusOr<::llvm::Value*> CodeGen::CastTo(::llvm::Value* val, DType src_dty
 //   return absl::UnimplementedError("####CastTo");
 // }
 
-absl::StatusOr<ValuePtr> CodeGen::CastTo(ValuePtr val, DType dst_dtype) {
+absl::StatusOr<ValuePtr> CodeGen::CastTo(const ValuePtr& val, DType dst_dtype) {
   DType src_dtype = val->GetDType();
   if (src_dtype == dst_dtype) {
     return val;
