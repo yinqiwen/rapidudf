@@ -36,7 +36,6 @@ namespace rapidudf {
 namespace compiler {
 absl::StatusOr<::llvm::Value*> CodeGen::VectorBinaryOp(OpToken op, DType dtype, ::llvm::Value* left,
                                                        ::llvm::Value* right, ::llvm::Value* output) {
-  printf("#########################\n");
   std::string fname = GetFunctionName(op, dtype.ToSimdVector());
   auto result_dtype = dtype;
   if (is_compare_op(op)) {
@@ -259,7 +258,11 @@ absl::StatusOr<::llvm::Value*> CodeGen::BinaryOp(OpToken op, DType dtype, ::llvm
   return absl::InvalidArgumentError(fmt::format("Unsupported op:{} for dtype:{}", op, dtype));
 }
 
-absl::StatusOr<ValuePtr> CodeGen::BinaryOp(OpToken op, ValuePtr left, ValuePtr right) {
+absl::StatusOr<ValuePtr> CodeGen::BinaryOp(OpToken op, const ValuePtr& in_left, const ValuePtr& in_right) {
+  // Casts below may rebind the operands; keep mutable locals while still
+  // letting callers pass by const reference (cheap when no cast is required).
+  ValuePtr left = in_left;
+  ValuePtr right = in_right;
   bool need_assign = false;
   switch (op) {
     case OP_ASSIGN: {

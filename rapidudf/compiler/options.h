@@ -22,6 +22,8 @@ struct Options {
   uint8_t optimize_level = 2;
   bool fast_math = false;
   bool print_asm = false;
+  // Skip LLVM auto-vectorization passes; UDF vector ops use hand-written SIMD builtins.
+  bool skip_auto_vectorize_passes = true;
 };
 }  // namespace compiler
 }  // namespace rapidudf

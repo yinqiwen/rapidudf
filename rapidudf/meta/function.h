@@ -138,6 +138,12 @@ std::string GetFunctionName(OpToken op, DType dtype);
 std::string GetFunctionName(OpToken op, DType dtype0, DType dtype1);
 std::string GetFunctionName(std::string_view op, DType dtype);
 
+// Cached version of GetFunctionName(OpToken, DType). Returns a reference into
+// a thread-local cache; the result is valid for the lifetime of the current
+// thread. Use this in hot codegen paths (per-RPN-node lookups) to avoid the
+// repeated heap allocation of the formatted name.
+const std::string& GetCachedFunctionName(OpToken op, DType dtype);
+
 template <uint64_t, uint32_t, uint64_t, typename F>
 struct MemberFunctionWrapper;
 

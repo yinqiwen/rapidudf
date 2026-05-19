@@ -16,9 +16,14 @@
 
 #include "rapidudf/compiler/codegen.h"
 
+#include <cstdint>
+#include <cstring>
+
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -32,6 +37,7 @@
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/dtype_enums.h"
 #include "rapidudf/meta/optype.h"
+#include "rapidudf/types/string_view.h"
 namespace rapidudf {
 namespace compiler {
 ValuePtr CodeGen::NewValue(DType dtype, ::llvm::Value* val, ::llvm::Type* type) {
@@ -78,42 +84,70 @@ ValuePtr CodeGen::NewF64(double v) {
   return NewValue(DATA_F64, val);
 }
 ValuePtr CodeGen::NewStringView(const std::string& v) {
-  std::string* str = nullptr;
-  for (auto& exist_constant_str : const_strings_) {
-    if (*exist_constant_str == v) {
-      str = exist_constant_str.get();
-      break;
-    }
-  }
-  if (str == nullptr) {
-    auto p = std::make_unique<std::string>(v);
-    str = p.get();
-    const_strings_.emplace_back(std::move(p));
-  }
-  StringView view(*str);
-  uint64_t* uv = reinterpret_cast<uint64_t*>(&view);
-
+  // StringView layout (16 bytes total, little-endian on x86-64):
+  //   [0..3]  uint32_t size_
+  //   [4..7]  char     prefix_[4]
+  //   [8..15] union { char inlined[8]; const char* data; } value_
+  //
+  // For inline strings (size <= kInlineSize == 12) the payload is fully
+  // contained in prefix_ + value_.inlined; we materialize the 16 bytes as a
+  // single i128 immediate constant so neither the host process nor any global
+  // is referenced from the JIT'd code.
+  //
+  // For non-inline strings we emit a private constant [N x i8] global into
+  // the JIT module (linked into the JIT-managed memory by ORC), then build
+  // the StringView at runtime: the low 8 bytes (size + prefix) are an
+  // immediate, the high 8 bytes are a runtime pointer obtained via GEP on
+  // that global.
   ::llvm::IntegerType* string_view_type = static_cast<::llvm::IntegerType*>(GetType(DATA_STRING_VIEW).value());
   auto* str_val = builder_->CreateAlloca(string_view_type);
-  ::llvm::APInt str_ints(128, {uv[0], uv[1]});
-  builder_->CreateStore(::llvm::ConstantInt::get(string_view_type, str_ints), str_val);
+
+  if (StringView::isInline(v.size())) {
+    StringView view(v.data(), static_cast<int32_t>(v.size()));
+    static_assert(sizeof(StringView) == 16, "StringView must be 16 bytes");
+    uint64_t words[2];
+    std::memcpy(words, &view, sizeof(view));
+    ::llvm::APInt sv_bits(128, ::llvm::ArrayRef<uint64_t>(words, 2));
+    builder_->CreateStore(::llvm::ConstantInt::get(string_view_type, sv_bits), str_val);
+    return NewValue(DATA_STRING_VIEW, str_val, string_view_type);
+  }
+
+  // Long path: dedup by content; emit one private global per distinct literal.
+  ::llvm::GlobalVariable* gv = nullptr;
+  auto it = string_globals_.find(v);
+  if (it != string_globals_.end()) {
+    gv = it->second;
+  } else {
+    auto* str_const = ::llvm::ConstantDataArray::getString(*context_, v, /*AddNull=*/false);
+    gv = new ::llvm::GlobalVariable(*module_, str_const->getType(), /*isConstant=*/true,
+                                    ::llvm::GlobalValue::PrivateLinkage, str_const, ".rudf_str");
+    gv->setUnnamedAddr(::llvm::GlobalValue::UnnamedAddr::Global);
+    string_globals_.emplace(v, gv);
+  }
+
+  // Compose the StringView in-place via two stores. After SROA + InstCombine
+  // this collapses to a single i128 store sequence, but the data pointer
+  // remains a relocation against the in-module global rather than a host
+  // immediate.
+  //
+  // Low 8 bytes: { uint32 size, char prefix[4] } known at compile time.
+  uint64_t low = static_cast<uint64_t>(static_cast<uint32_t>(v.size()));
+  uint64_t prefix_bits = 0;
+  std::memcpy(&prefix_bits, v.data(), StringView::kPrefixSize);
+  low |= prefix_bits << 32;
+
+  auto* i64_ty = builder_->getInt64Ty();
+  auto* low_ptr = builder_->CreateBitCast(str_val, i64_ty->getPointerTo());
+  builder_->CreateStore(::llvm::ConstantInt::get(i64_ty, low), low_ptr);
+
+  auto* high_ptr = builder_->CreateConstInBoundsGEP1_32(i64_ty, low_ptr, 1);
+  // GEP to first byte of the global → const char* equivalent. Sized to i64.
+  auto* zero32 = builder_->getInt32(0);
+  auto* data_ptr = builder_->CreateInBoundsGEP(gv->getValueType(), gv, {zero32, zero32});
+  auto* data_as_int = builder_->CreatePtrToInt(data_ptr, i64_ty);
+  builder_->CreateStore(data_as_int, high_ptr);
+
   return NewValue(DATA_STRING_VIEW, str_val, string_view_type);
-
-  //   ::llvm::StructType* string_view_type = static_cast<::llvm::StructType*>(GetType(DATA_STRING_VIEW).value());
-  //   auto* str_val = builder_->CreateAlloca(string_view_type);
-  //   ::llvm::Value* zero = builder_->getInt32(0);
-  //   ::llvm::Value* offset = builder_->getInt32(0);
-  //   auto size_field_ptr =
-  //       builder_->CreateInBoundsGEP(string_view_type, str_val, std::vector<::llvm::Value*>{zero, offset});
-  //   auto size_val = builder_->getInt64(uv[0]);
-  //   builder_->CreateStore(size_val, size_field_ptr);
-
-  //   offset = builder_->getInt32(1);
-  //   auto ptr_field_ptr =
-  //       builder_->CreateInBoundsGEP(string_view_type, str_val, std::vector<::llvm::Value*>{zero, offset});
-  //   auto ptr_val = builder_->getInt64(uv[1]);
-  //   builder_->CreateStore(ptr_val, ptr_field_ptr);
-  //   return NewValue(DATA_STRING_VIEW, builder_->CreateLoad(string_view_type, str_val));
 }
 
 ValuePtr CodeGen::NewVoid(const std::string& name) {

@@ -51,6 +51,32 @@ TEST(JitCompiler, string_starts_with) {
   ASSERT_EQ(f("he"), false);
 }
 
+// Regression: long (>12 char) string literals must be emitted into the JIT
+// module itself (LLVM global constant) so the compiled function does not
+// dangle on host-side std::string memory. We exercise both equality and
+// contains over a 32-char literal that would overflow StringView's inline
+// storage.
+TEST(JitCompiler, long_string_literal_eq) {
+  JitCompiler compiler;
+  std::string content = R"(str == "abcdefghijklmnopqrstuvwxyz0123")";
+  auto rc = compiler.CompileExpression<bool, StringView>(content, {{"str"}});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(StringView("abcdefghijklmnopqrstuvwxyz0123")));
+  ASSERT_FALSE(f(StringView("abcdefghijklmnopqrstuvwxyz0124")));
+  ASSERT_FALSE(f(StringView("short")));
+}
+
+TEST(JitCompiler, long_string_literal_contains) {
+  JitCompiler compiler;
+  std::string content = R"(str.contains("abcdefghijklmnopqrstuvwxyz0123"))";
+  auto rc = compiler.CompileExpression<bool, StringView>(content, {{"str"}});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_TRUE(f(StringView("xx_abcdefghijklmnopqrstuvwxyz0123_yy")));
+  ASSERT_FALSE(f(StringView("abcdefghijklmnopqrstuvwxyz0124")));
+}
+
 TEST(JitCompiler, split_by_str) {
   std::string str = "abc;;cde;;eed;;";
   auto ss = functions::simd_string_split_by_string(str, ";;");

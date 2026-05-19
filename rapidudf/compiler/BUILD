@@ -73,6 +73,7 @@ cc_library(
         "//rapidudf/meta:function",
         "//rapidudf/meta:operand",
         "//rapidudf/meta:optype",
+        "//rapidudf/types:string_view",
         "@local_llvm//:libllvm",
     ],
 )
@@ -96,5 +97,7 @@ cc_library(
         "//rapidudf/ast",
         # "//rapidudf/common:lru_cache",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/hash",
     ],
 )

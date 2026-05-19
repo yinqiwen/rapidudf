@@ -65,6 +65,9 @@ absl::StatusOr<ValuePtr> CodeGen::GetVectorSizeValue(ValuePtr obj) {
   // EndElse(condition);
   // FinishCondition(condition);
   // return final_size_val;
+  if (obj->GetPtrElementType() != nullptr) {
+    return obj->GetRawVectorSizeValue();
+  }
   return CallFunction(std::string(kVectorGetSizeFuncName), {obj});
 }
 absl::StatusOr<ValuePtr> CodeGen::GetVectorDataValue(ValuePtr obj) {
@@ -181,6 +184,11 @@ absl::StatusOr<std::pair<::llvm::Value*, ::llvm::Value*>> CodeGen::LoadNVector(D
   }
 
   auto vector_ptr_value = builder_->CreateAlloca(vector_type);
+  // The loaded SIMD vector still has all lanes computed by downstream ops; only
+  // the first `n` lanes are written back via StoreNVector. The unused tail
+  // lanes are pre-filled with the multiplicative identity (1), not 0, so that
+  // div / mod / log / sqrt / etc. on those lanes do not raise FP exceptions
+  // or produce NaN that pollute reductions.
   ::llvm::Constant* fill_v = nullptr;
   switch (dtype.GetFundamentalType()) {
     case DATA_F64: {

@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 #include "rapidudf/compiler/compiler.h"
+
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include "rapidudf/ast/grammar.h"
 #include "rapidudf/ast/symbols.h"
 #include "rapidudf/compiler/codegen.h"
@@ -129,6 +134,7 @@ void JitCompiler::NewCodegen() {
   stat_.Clear();
   parsed_ast_funcs_.clear();
 }
+
 absl::Status JitCompiler::Compile() { return codegen_->Finish(); }
 
 absl::StatusOr<void*> JitCompiler::GetFunctionPtr(const std::string& name) {

@@ -36,6 +36,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 #include "rapidudf/ast/context.h"
 #include "rapidudf/compiler/macros.h"
@@ -52,7 +53,10 @@ struct ExternFunction {
   ::llvm::FunctionType* func_type = nullptr;
   ::llvm::Function* func = nullptr;
 };
-using ExternFunctionPtr = std::shared_ptr<ExternFunction>;
+// ExternFunctionPtr is owned by `CodeGen::extern_funcs_`; callers receive a
+// non-owning raw pointer that is valid for the lifetime of CodeGen and as long
+// as the map is not mutated after function declaration is finished.
+using ExternFunctionPtr = ExternFunction*;
 using LoopBlocks = std::pair<::llvm::BasicBlock*, ::llvm::BasicBlock*>;
 struct FunctionValue {
   FunctionDesc desc;
@@ -61,7 +65,7 @@ struct FunctionValue {
   ValuePtr return_value = nullptr;
   ::llvm::BasicBlock* exit_block = nullptr;
   ValuePtr context_arg_value;
-  std::unordered_map<std::string, ValuePtr> named_values;
+  absl::flat_hash_map<std::string, ValuePtr> named_values;
   std::vector<LoopBlocks> loop_blocks;
 };
 using FunctionValuePtr = std::shared_ptr<FunctionValue>;
@@ -131,15 +135,15 @@ class CodeGen {
   void Store(::llvm::Value* val, ::llvm::Value* ptr);
   ::llvm::Value* Load(::llvm::Type* typ, ::llvm::Value* ptr);
 
-  absl::StatusOr<ValuePtr> CastTo(ValuePtr val, DType dst_dtype);
+  absl::StatusOr<ValuePtr> CastTo(const ValuePtr& val, DType dst_dtype);
   absl::StatusOr<::llvm::Value*> CastTo(::llvm::Value* val, DType src_dtype, DType dst_dtype);
   absl::StatusOr<::llvm::Value*> UnaryOp(OpToken op, DType dtype, ::llvm::Value* val);
   absl::StatusOr<::llvm::Value*> BinaryOp(OpToken op, DType dtype, ::llvm::Value* left, ::llvm::Value* right);
   absl::StatusOr<::llvm::Value*> TernaryOp(OpToken op, DType dtype, ::llvm::Value* a, ::llvm::Value* b,
                                            ::llvm::Value* c);
-  absl::StatusOr<ValuePtr> UnaryOp(OpToken op, ValuePtr val);
-  absl::StatusOr<ValuePtr> BinaryOp(OpToken op, ValuePtr left, ValuePtr right);
-  absl::StatusOr<ValuePtr> TernaryOp(OpToken op, ValuePtr a, ValuePtr b, ValuePtr c);
+  absl::StatusOr<ValuePtr> UnaryOp(OpToken op, const ValuePtr& val);
+  absl::StatusOr<ValuePtr> BinaryOp(OpToken op, const ValuePtr& left, const ValuePtr& right);
+  absl::StatusOr<ValuePtr> TernaryOp(OpToken op, const ValuePtr& a, const ValuePtr& b, const ValuePtr& c);
 
   absl::StatusOr<::llvm::Value*> VectorUnaryOp(OpToken op, DType dtype, ::llvm::Value* input, ::llvm::Value* output);
   absl::StatusOr<::llvm::Value*> VectorBinaryOp(OpToken op, DType dtype, ::llvm::Value* left, ::llvm::Value* right,
@@ -199,9 +203,13 @@ class CodeGen {
 
   Options opts_;
 
-  std::vector<std::unique_ptr<std::string>> const_strings_;
-  std::unordered_map<std::string, ExternFunctionPtr> extern_funcs_;
-  std::unordered_map<std::string, FunctionValuePtr> funcs_;
+  // Long string-literal payloads (>StringView::kInlineSize) are emitted as
+  // private LLVM global constants in the JIT module so the compiled function
+  // does not depend on host-side memory. This map dedups identical literals
+  // by content within a single CodeGen / module.
+  absl::flat_hash_map<std::string, ::llvm::GlobalVariable*> string_globals_;
+  absl::flat_hash_map<std::string, ExternFunction> extern_funcs_;
+  absl::flat_hash_map<std::string, FunctionValuePtr> funcs_;
   FunctionValuePtr current_func_;
 
   std::unique_ptr<::llvm::orc::LLJIT> jit_;
@@ -218,6 +226,8 @@ class CodeGen {
   std::unique_ptr<::llvm::StandardInstrumentations> std_insts_;
 
   uint32_t label_cursor_;
+
+  std::unordered_map<uint64_t, ::llvm::Type*> llvm_type_cache_;
 };
 }  // namespace compiler
 }  // namespace rapidudf

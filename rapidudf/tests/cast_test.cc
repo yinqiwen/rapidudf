@@ -41,3 +41,39 @@ TEST(JitCompiler, f64_u64) {
   ASSERT_EQ(f(11.1), 11);
   ASSERT_EQ(f(12121.2), 12121);
 }
+
+// Regression: signed integer extension must use sext, not zext.
+// e.g. int8_t(-1) widened to int32_t should remain -1, not 255.
+TEST(JitCompiler, i8_to_i32_signed_extension) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  std::string content = "x";
+  auto rc = compiler.CompileExpression<int32_t, int8_t>(content, {"x"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(static_cast<int8_t>(-1)), -1);
+  ASSERT_EQ(f(static_cast<int8_t>(-128)), -128);
+  ASSERT_EQ(f(static_cast<int8_t>(127)), 127);
+}
+
+TEST(JitCompiler, i16_to_i64_signed_extension) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  std::string content = "x";
+  auto rc = compiler.CompileExpression<int64_t, int16_t>(content, {"x"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(static_cast<int16_t>(-1)), -1LL);
+  ASSERT_EQ(f(static_cast<int16_t>(-32768)), -32768LL);
+}
+
+TEST(JitCompiler, u8_to_u32_zero_extension) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  std::string content = "x";
+  auto rc = compiler.CompileExpression<uint32_t, uint8_t>(content, {"x"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_EQ(f(static_cast<uint8_t>(255)), 255U);
+  ASSERT_EQ(f(static_cast<uint8_t>(0)), 0U);
+}
