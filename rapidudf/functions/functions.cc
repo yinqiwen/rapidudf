@@ -15,13 +15,12 @@
  */
 #include "rapidudf/functions/functions.h"
 #include <mutex>
-#include <unordered_map>
 #include "rapidudf/meta/function.h"
 namespace rapidudf {
 namespace functions {
 
-static std::unordered_map<std::string, OpToken>& get_builtin_func_op_mapping() {
-  static std::unordered_map<std::string, OpToken> mapping;
+static absl::flat_hash_map<std::string, OpToken, TransparentStringHash, TransparentStringEq>& get_builtin_func_op_mapping() {
+  static absl::flat_hash_map<std::string, OpToken, TransparentStringHash, TransparentStringEq> mapping;
   return mapping;
 }
 
@@ -54,7 +53,7 @@ void init_builtin() {
   });
 }
 
-OpToken get_buitin_func_op(const std::string& name) {
+OpToken get_buitin_func_op(std::string_view name) {
   auto found = get_builtin_func_op_mapping().find(name);
   if (found != get_builtin_func_op_mapping().end()) {
     return found->second;

@@ -1,0 +1,16 @@
+rapidudf_add_sources(
+  rapidudf/compiler/codegen.cc
+  rapidudf/compiler/codegen_binary.cc
+  rapidudf/compiler/codegen_cast.cc
+  rapidudf/compiler/codegen_ternary.cc
+  rapidudf/compiler/codegen_unary.cc
+  rapidudf/compiler/codegen_value.cc
+  rapidudf/compiler/codegen_vector.cc
+  rapidudf/compiler/compiler.cc
+  rapidudf/compiler/compiler_constants.cc
+  rapidudf/compiler/compiler_eval.cc
+  rapidudf/compiler/compiler_expressions.cc
+  rapidudf/compiler/compiler_statements.cc
+  rapidudf/compiler/type.cc
+  rapidudf/compiler/value.cc
+)

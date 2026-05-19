@@ -67,6 +67,7 @@ cc_library(
         ":options",
         ":type",
         ":value",
+        "//rapidudf/ast:context",
         "//rapidudf/functions:names",
         "//rapidudf/meta:constants",
         "//rapidudf/meta:function",

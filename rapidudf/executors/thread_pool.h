@@ -15,14 +15,40 @@
  */
 
 #pragma once
+#include <condition_variable>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include "boost/asio/post.hpp"
 #include "boost/asio/thread_pool.hpp"
 #include "hwy/contrib/thread_pool/thread_pool.h"
 namespace rapidudf {
 
 class ThreadPool {
+  class PoolBarrier {
+   public:
+    void Reset() {
+      std::lock_guard<std::mutex> lock(mu_);
+      arrived_ = 0;
+    }
+
+    void WorkerArrive(size_t /*thread*/) {
+      std::lock_guard<std::mutex> lock(mu_);
+      ++arrived_;
+      cv_.notify_one();
+    }
+
+    void WaitAll(size_t num_workers) {
+      std::unique_lock<std::mutex> lock(mu_);
+      cv_.wait(lock, [&] { return arrived_ >= num_workers; });
+    }
+
+   private:
+    std::mutex mu_;
+    std::condition_variable cv_;
+    size_t arrived_ = 0;
+  };
+
  public:
   static constexpr size_t kDefaultThreadNum = 8;
   using AnyClosure = std::function<void(void)>;
@@ -45,7 +71,7 @@ class ThreadPool {
    */
   template <class Closure>
   void Run(uint64_t begin, uint64_t end, const Closure& closure, size_t num_workers = 0) {
-    hwy::PoolBarrier barrier;
+    PoolBarrier barrier;
     barrier.Reset();
     if (HWY_LIKELY(num_workers == 0)) {
       num_workers = num_workers_;
@@ -60,7 +86,7 @@ class ThreadPool {
 
  private:
   template <class Closure>
-  size_t Plan(uint64_t begin, uint64_t end, size_t num_workers, const Closure& closure, hwy::PoolBarrier& barrier) {
+  size_t Plan(uint64_t begin, uint64_t end, size_t num_workers, const Closure& closure, PoolBarrier& barrier) {
     // If there are no tasks, we are done.
     HWY_DASSERT(begin <= end);
     const size_t num_tasks = static_cast<size_t>(end - begin);

@@ -14,35 +14,43 @@
  * limitations under the License.
  */
 #include "rapidudf/meta/function.h"
+#include "absl/container/flat_hash_map.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
-using FuncRegMap = std::unordered_map<std::string, FunctionDesc>;
+
+using FuncRegMap = absl::flat_hash_map<std::string, FunctionDesc, TransparentStringHash, TransparentStringEq>;
 static std::unique_ptr<FuncRegMap> g_regs = nullptr;
 
 // static inline uint32_t allgin_n(uint32_t x, uint32_t n) { return (x + n - 1) & ~(n - 1); }
 
 std::string GetFunctionName(std::string_view op, DType dtype) {
-  std::string fname(op);
+  std::string fname;
+  fname.reserve(op.size() + 1 + 8);  // typical: op_elemType
+  fname.append(op);
+  fname.push_back('_');
+  fname.append(dtype.Elem().GetTypeString());
   if (dtype.IsSimdVector()) {
-    fname = fname + "_" + dtype.Elem().GetTypeString();
-    return std::string(FunctionFactory::kSimdVectorFuncPrefix) + "_" + fname;
-  } else {
-    fname = fname + "_" + dtype.Elem().GetTypeString();
-    return fname;
+    fname.insert(0, 1, '_');
+    fname.insert(0, FunctionFactory::kSimdVectorFuncPrefix);
   }
+  return fname;
 }
 std::string GetFunctionName(std::string_view op, DType dtype0, DType dtype1) {
-  std::string fname(op);
+  std::string fname;
+  fname.reserve(op.size() + 1 + 8 + 1 + 8);  // typical: op_elemType_elemType
+  fname.append(op);
+  fname.push_back('_');
+  fname.append(dtype0.Elem().GetTypeString());
+  fname.push_back('_');
+  fname.append(dtype1.Elem().GetTypeString());
   if (dtype0.IsSimdVector() || dtype1.IsSimdVector()) {
-    fname = fname + "_" + dtype0.Elem().GetTypeString() + "_" + dtype1.Elem().GetTypeString();
-    return std::string(FunctionFactory::kSimdVectorFuncPrefix) + "_" + fname;
-  } else {
-    fname = fname + "_" + dtype0.Elem().GetTypeString() + "_" + dtype1.Elem().GetTypeString();
-    return fname;
+    fname.insert(0, 1, '_');
+    fname.insert(0, FunctionFactory::kSimdVectorFuncPrefix);
   }
+  return fname;
 }
 
 std::string GetMemberFuncName(DType dtype, const std::string& member) {
@@ -186,7 +194,7 @@ absl::Status FunctionFactory::RegisterVectorFunction(FunctionDesc&& desc) {
   return absl::OkStatus();
 }
 
-const FunctionDesc* FunctionFactory::GetFunction(const std::string& name) {
+const FunctionDesc* FunctionFactory::GetFunction(std::string_view name) {
   if (!g_regs) {
     return nullptr;
   }

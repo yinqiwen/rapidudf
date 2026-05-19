@@ -26,6 +26,7 @@
 #include "absl/status/statusor.h"
 #include "fmt/format.h"
 
+#include "rapidudf/ast/ast_pool.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/function.h"
 #include "rapidudf/meta/optype.h"
@@ -34,10 +35,10 @@ namespace rapidudf {
 namespace ast {
 
 struct VarTag {
-  std::string name;
+  std::string_view name;
   DType dtype;
   const DynObjectSchema* schema = nullptr;
-  VarTag(DType d, const std::string& n = "", const DynObjectSchema* s = nullptr) {
+  VarTag(DType d, std::string_view n = "", const DynObjectSchema* s = nullptr) {
     dtype = d;
     name = n;
     schema = s;
@@ -46,7 +47,7 @@ struct VarTag {
 
 class ParseContext {
  public:
-  using FunctionCallMap = std::unordered_map<std::string, const FunctionDesc*>;
+  using FunctionCallMap = absl::flat_hash_map<std::string, const FunctionDesc*, TransparentStringHash, TransparentStringEq>;
   using MemberFuncCallMap = std::unordered_map<DType, std::unordered_map<std::string, FunctionDesc>>;
   void Clear();
 
@@ -59,19 +60,17 @@ class ParseContext {
     return absl::InvalidArgumentError(fmt::format("{} at {}", err, GetErrorLine()));
   }
 
-  absl::StatusOr<VarTag> IsVarExist(const std::string& name, bool error_on_exist);
+  absl::StatusOr<VarTag> IsVarExist(std::string_view name, bool error_on_exist);
 
   std::string GetErrorLine() const;
 
   int GetLineNo() const;
   std::string GetSourceLine(int line) const;
+  void EnsureSourceLines() const;
 
-  bool AddLocalVar(const std::string& name, DType dtype, const DynObjectSchema* schema);
+  bool AddLocalVar(std::string_view name, DType dtype, const DynObjectSchema* schema);
 
-  absl::StatusOr<const FunctionDesc*> CheckFuncExist(const std::string& name, bool implicit = false);
-  absl::StatusOr<const FunctionDesc*> CheckFuncExist(std::string_view name, bool implicit = false) {
-    return CheckFuncExist(std::string(name), implicit);
-  }
+  absl::StatusOr<const FunctionDesc*> CheckFuncExist(std::string_view name, bool implicit = false);
   void AddMemberFuncCall(DType dtype, const std::string& name, FunctionDesc desc);
 
   DType GetFuncReturnDType(uint32_t idx = 0) { return GetFunctionParseContext(idx).desc.return_type; }
@@ -107,8 +106,10 @@ class ParseContext {
   bool IsVectorExpression() const { return vector_expr_flag_; }
   void SetVectorExressionFlag(bool v = true) { vector_expr_flag_ = v; }
 
+  AstPool& GetAstPool() { return ast_pool_; }
+
  private:
-  using LocalVarMap = std::unordered_map<std::string, VarTag>;
+  using LocalVarMap = std::unordered_map<std::string_view, VarTag>;
 
   using BuiltinFuncationCallSet = std::unordered_set<std::string>;
 
@@ -129,7 +130,8 @@ class ParseContext {
   }
 
   std::string source_;
-  std::vector<std::string_view> source_lines_;
+  mutable std::vector<std::string_view> source_lines_;
+  mutable bool source_lines_computed_ = false;
   std::vector<FunctionParseContext> function_parse_ctxs_;
   uint32_t current_function_cursor_ = 0;
   bool vector_expr_flag_ = false;
@@ -139,6 +141,8 @@ class ParseContext {
 
   std::chrono::microseconds parse_cost_;
   std::chrono::microseconds parse_validate_cost_;
+
+  AstPool ast_pool_;
 };
 
 }  // namespace ast

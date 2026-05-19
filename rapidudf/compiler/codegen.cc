@@ -261,8 +261,8 @@ void CodeGen::PrintAsm() {
 }
 
 absl::Status CodeGen::DeclareExternFunctions(
-    std::unordered_map<std::string, const FunctionDesc*>& func_calls,
-    std::unordered_map<DType, std::unordered_map<std::string, FunctionDesc>>& member_func_calls) {
+    FuncCallMap& func_calls,
+    MemberFuncCallMap& member_func_calls) {
   auto& dylib = jit_->getMainJITDylib();
   ::llvm::orc::SymbolMap extern_func_map;
   ::llvm::orc::MangleAndInterner mangle(jit_->getExecutionSession(), jit_->getDataLayout());

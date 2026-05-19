@@ -1,0 +1,9 @@
+rapidudf_add_sources(
+  rapidudf/functions/simd/bits.cc
+  rapidudf/functions/simd/string.cc
+  rapidudf/functions/simd/vector_binary.cc
+  rapidudf/functions/simd/vector_misc.cc
+  rapidudf/functions/simd/vector_sort.cc
+  rapidudf/functions/simd/vector_ternary.cc
+  rapidudf/functions/simd/vector_unary.cc
+)

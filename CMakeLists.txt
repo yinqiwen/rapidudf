@@ -28,14 +28,14 @@ set(TOP_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(RAPIDUDF_DIR "${CMAKE_CURRENT_SOURCE_DIR}/rapidudf")
 include(GNUInstallDirs)
 
-file(GLOB_RECURSE rapidudf_srcs
-    LIST_DIRECTORIES false 
-    RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
-    CONFIGURE_DEPENDS 
-    rapidudf/*.cc
-)
-list(FILTER rapidudf_srcs EXCLUDE REGEX "^rapidudf/tests/")
-list(FILTER rapidudf_srcs EXCLUDE REGEX "^rapidudf/examples/")
+function(rapidudf_add_sources)
+  foreach(SOURCE IN LISTS ARGN)
+    set_property(GLOBAL APPEND PROPERTY RAPIDUDF_SOURCES "${SOURCE}")
+  endforeach()
+endfunction()
+
+add_subdirectory(rapidudf)
+get_property(rapidudf_srcs GLOBAL PROPERTY RAPIDUDF_SOURCES)
 
 foreach(SOURCE IN LISTS rapidudf_srcs)
     message(STATUS "Including source file: ${SOURCE}")
@@ -49,13 +49,9 @@ add_library(rapidudf_core OBJECT ${rapidudf_srcs})
 
 target_include_directories(rapidudf_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_include_directories(rapidudf_core
-  PUBLIC
-    $<TARGET_PROPERTY:rapidudf_deps,INTERFACE_INCLUDE_DIRECTORIES>
-)
-target_include_directories(rapidudf_core
-  PUBLIC
-    $<TARGET_PROPERTY:rapidudf_local_deps,INTERFACE_INCLUDE_DIRECTORIES>
+target_link_libraries(rapidudf_core PUBLIC
+  $<BUILD_INTERFACE:rapidudf_deps>
+  $<BUILD_INTERFACE:rapidudf_local_deps>
 )
 target_include_directories(rapidudf_core
   BEFORE

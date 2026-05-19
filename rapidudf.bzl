@@ -16,11 +16,10 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
     )
     http_archive(
         name = "rules_cc",
-        sha256 = "35f2fb4ea0b3e61ad64a369de284e4fbbdcdba71836a5555abb5e194cf119509",
-        strip_prefix = "rules_cc-624b5d59dfb45672d4239422fa1e3de1822ee110",
+        sha256 = "b8b918a85f9144c01f6cfe0f45e4f2838c7413961a8ff23bc0c6cdf8bb07a3b6",
+        strip_prefix = "rules_cc-0.1.5",
         urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/rules_cc/archive/624b5d59dfb45672d4239422fa1e3de1822ee110.tar.gz",
-            "https://github.com/bazelbuild/rules_cc/archive/624b5d59dfb45672d4239422fa1e3de1822ee110.tar.gz",
+            "https://github.com/bazelbuild/rules_cc/releases/download/0.1.5/rules_cc-0.1.5.tar.gz",
         ],
     )
 
@@ -72,24 +71,6 @@ def rapidudf_workspace(path_prefix = "", tf_repo_name = "", **kwargs):
         ],
     )
 
-    _BOOST_PARSER_BUILD_FILE = """
-cc_library(
-    name = "parser",
-    hdrs = glob([
-        "include/**/*.hpp",
-    ]),
-    includes = ["include"],
-    visibility = ["//visibility:public"],
-)
-"""
-
-    new_git_repository(
-        name = "boost_parser",
-        remote = "https://github.com/boostorg/parser.git",
-        commit = "bb0fb885b8f996545cdc5eac67aab8c9bb6a2ce3",
-        build_file_content = _BOOST_PARSER_BUILD_FILE,
-    )
-
     fbs_ver = kwargs.get("fbs_ver", "2.0.0")
     fbs_name = "flatbuffers-{ver}".format(ver = fbs_ver)
     maybe(
@@ -122,6 +103,7 @@ cmake(
         "-DCMAKE_BUILD_TYPE=Release",
         "-DFMT_TEST=OFF",
         "-DFMT_DOC=OFF",
+        "-DCMAKE_INSTALL_LIBDIR=lib64",
     ],
     lib_source = ":all_srcs",
     out_lib_dir = "lib64",
@@ -171,7 +153,7 @@ cc_library(
         build_file_content = _SPDLOG_BUILD_FILE,
     )
 
-    abseil_ver = kwargs.get("abseil_ver", "20240116.2")
+    abseil_ver = kwargs.get("abseil_ver", "20250512.2")
     abseil_name = "abseil-cpp-{ver}".format(ver = abseil_ver)
     maybe(
         http_archive,
@@ -186,7 +168,7 @@ cc_library(
         git_repository,
         name = "com_google_highway",
         remote = "https://github.com/google/highway.git",
-        tag = "1.2.0",
+        tag = "1.4.0",
     )
 
     _X86_SIMD_SORT_BUILD_FILE = """
@@ -214,8 +196,11 @@ make(
         new_git_repository,
         name = "x86_simd_sort",
         remote = "https://github.com/intel/x86-simd-sort.git",
-        commit = "d62f656ba1e7bef04a0e1ba6e908a5aa1b0ff745",
+        tag = "v7.0",
         build_file_content = _X86_SIMD_SORT_BUILD_FILE,
+        patch_cmds = [
+            "sed -i 's/meson setup /meson setup --libdir lib64 /g' Makefile",
+        ],
     )
 
     _SLEEF_BUILD_FILE = """
@@ -231,6 +216,7 @@ cmake(
     generate_args = [
         "-DCMAKE_BUILD_TYPE=Release",
         "-DSLEEF_BUILD_TESTS=OFF",
+        "-DCMAKE_INSTALL_LIBDIR=lib64",
     ],
     lib_source = ":all_srcs",
     out_lib_dir = "lib64",
@@ -245,7 +231,7 @@ cmake(
     new_git_repository(
         name = "sleef",
         remote = "https://github.com/shibatch/sleef.git",
-        tag = "3.7",
+        tag = "3.9.0",
         build_file_content = _SLEEF_BUILD_FILE,
     )
 

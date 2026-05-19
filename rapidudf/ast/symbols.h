@@ -15,44 +15,52 @@
  */
 
 #pragma once
+#include <mutex>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
-#include "boost/parser/parser.hpp"
+
+#include "absl/container/flat_hash_map.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
+
 namespace rapidudf {
 namespace ast {
 
 class Symbols {
  public:
-  static boost::parser::symbols<DType> kNumberSymbols;
-  static boost::parser::symbols<OpToken> kAssignOpSymbols;
-  static boost::parser::symbols<OpToken> kLogicOpSymbols;
-  static boost::parser::symbols<OpToken> kCmpOpSymbols;
-  static boost::parser::symbols<OpToken> kAdditiveOpSymbols;
-  static boost::parser::symbols<OpToken> kMultiplicativeOpSymbols;
-  static boost::parser::symbols<OpToken> kPowerOpSymbols;
-  static boost::parser::symbols<OpToken> kUnaryOpSymbols;
-  static boost::parser::symbols<uint32_t> kContinueSymbols;
-  static boost::parser::symbols<uint32_t> kBreakSymbols;
+  static const std::unordered_map<std::string_view, DType>& GetNumberSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetAssignOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetLogicOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetCmpOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetAdditiveOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetMultiplicativeOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetPowerOpSymbols();
+  static const std::unordered_map<std::string_view, OpToken>& GetUnaryOpSymbols();
 
   static void Init();
-  static boost::parser::symbols<std::pair<DType, DTypeAttr>>& GetDtypeSymbols() { return kDtypeSymbols; }
 
-  template <typename Context>
-  static bool IsDTypeExist(Context const& c, const std::string& id) {
-    std::lock_guard<std::mutex> guard(GetDtypeSymbolsMutex());
-    auto v = kDtypeSymbols.find(c, id);
-    if (v) {
-      return true;
-    }
-    return false;
-  }
-  Symbols();
+  static bool IsDTypeExist(std::string_view id);
+  static std::optional<std::pair<DType, DTypeAttr>> FindDType(std::string_view id);
+
+  static void Add(const std::string& name, DType dtype, DTypeAttr attr);
 
  private:
-  static boost::parser::symbols<std::pair<DType, DTypeAttr>> kDtypeSymbols;
-  static void Add(const std::string& name, DType dtype, DTypeAttr attr);
+  struct StringHash {
+    using is_transparent = void;
+    size_t operator()(std::string_view sv) const { return absl::Hash<std::string_view>()(sv); }
+  };
+  struct StringEq {
+    using is_transparent = void;
+    bool operator()(std::string_view a, std::string_view b) const { return a == b; }
+  };
+  using DtypeMap = absl::flat_hash_map<std::string, std::pair<DType, DTypeAttr>, StringHash, StringEq>;
+
+  static DtypeMap& GetDtypeSymbols();
   static std::mutex& GetDtypeSymbolsMutex();
+  static std::once_flag& GetInitFlag();
 };
 
 }  // namespace ast

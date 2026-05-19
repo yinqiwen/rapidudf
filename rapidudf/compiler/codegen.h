@@ -37,6 +37,7 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 
 #include "absl/status/statusor.h"
+#include "rapidudf/ast/context.h"
 #include "rapidudf/compiler/macros.h"
 #include "rapidudf/compiler/options.h"
 #include "rapidudf/compiler/value.h"
@@ -88,9 +89,12 @@ class CodeGen {
 
   explicit CodeGen(const Options& opts);
 
+  using FuncCallMap = ast::ParseContext::FunctionCallMap;
+  using MemberFuncCallMap = ast::ParseContext::MemberFuncCallMap;
+
   absl::Status DeclareExternFunctions(
-      std::unordered_map<std::string, const FunctionDesc*>& func_calls,
-      std::unordered_map<DType, std::unordered_map<std::string, FunctionDesc>>& member_func_calls);
+      FuncCallMap& func_calls,
+      MemberFuncCallMap& member_func_calls);
   absl::Status DefineFunction(const FunctionDesc& desc, const std::vector<std::string>& arg_names);
 
   Loop NewLoop();

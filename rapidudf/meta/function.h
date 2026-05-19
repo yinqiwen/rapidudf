@@ -20,11 +20,23 @@
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
 
+#include "absl/container/flat_hash_map.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/dtype.h"
 #include "rapidudf/meta/optype.h"
 
 namespace rapidudf {
+
+// Transparent hash and equal for heterogeneous string/string_view lookup
+// in absl::flat_hash_map. Allows find(string_view) without std::string construction.
+struct TransparentStringHash {
+  using is_transparent = void;
+  size_t operator()(std::string_view sv) const { return absl::Hash<std::string_view>()(sv); }
+};
+struct TransparentStringEq {
+  using is_transparent = void;
+  bool operator()(std::string_view a, std::string_view b) const { return a == b; }
+};
 
 constexpr uint64_t fnv1a_hash(const char* str) {
   uint64_t hash = 14695981039346656037ULL;
@@ -75,7 +87,7 @@ class FunctionFactory {
   }
 
   static bool Register(FunctionDesc&& desc);
-  static const FunctionDesc* GetFunction(const std::string& name);
+  static const FunctionDesc* GetFunction(std::string_view name);
 
   template <typename... Args>
   static absl::Status RegisterVectorFunction(std::string_view name, void (*f)(Args...)) {

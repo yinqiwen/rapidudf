@@ -23,7 +23,7 @@ namespace functions {
 
 void init_builtin();
 
-OpToken get_buitin_func_op(const std::string& name);
+OpToken get_buitin_func_op(std::string_view name);
 bool has_vector_buitin_func(OpToken op, DType dtype);
 
 }  // namespace functions
