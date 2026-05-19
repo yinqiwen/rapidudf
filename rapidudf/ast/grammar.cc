@@ -272,12 +272,12 @@ struct Parser {
       // member_access
       auto ma = parse_member_access();
       if (!ma.ok()) return ma.status();
-      va.access_args = *ma;
+      va.access_args = std::move(*ma);
     } else if (peek.Is(TOKEN_LPAREN)) {
       // func_invoke_args
       auto fia = parse_func_invoke_args();
       if (!fia.ok()) return fia.status();
-      va.func_args = *fia;
+      va.func_args = std::move(*fia);
     }
 
     return Operand(va);
@@ -291,11 +291,11 @@ struct Parser {
       if (lex.PeekIs(TOKEN_DOT)) {
         auto fa = parse_field_access();
         if (!fa.ok()) return fa.status();
-        result.push_back(*fa);
+        result.emplace_back(std::move(*fa));
       } else {
         auto dpa = parse_dynamic_param_access();
         if (!dpa.ok()) return dpa.status();
-        result.push_back(*dpa);
+        result.emplace_back(std::move(*dpa));
       }
     }
     return result;
@@ -315,7 +315,7 @@ struct Parser {
     if (lex.PeekIs(TOKEN_LPAREN)) {
       auto fia = parse_func_invoke_args();
       if (!fia.ok()) return fia.status();
-      fa.func_args = *fia;
+      fa.func_args = std::move(*fia);
     }
     return fa;
   }
@@ -614,7 +614,7 @@ struct Parser {
     if (!cs.ok()) return cs.status();
 
     WhileStatement ws;
-    ws.body = *cs;
+    ws.body = std::move(*cs);
     return ws;
   }
 
@@ -626,14 +626,14 @@ struct Parser {
     if (!if_cs.ok()) return if_cs.status();
 
     IfElseStatement ies;
-    ies.if_statement = *if_cs;
+    ies.if_statement = std::move(*if_cs);
 
     // elif branches
     while (lex.PeekIs(TOKEN_ELIF)) {
       lex.Next();  // consume 'elif'
       auto elif_cs = parse_choice_statement();
       if (!elif_cs.ok()) return elif_cs.status();
-      ies.elif_statements.push_back(*elif_cs);
+      ies.elif_statements.emplace_back(std::move(*elif_cs));
     }
 
     // else branch
@@ -672,7 +672,7 @@ struct Parser {
         }
         ContinueStatement cs;
         cs.position = Pos(peek);
-        result.push_back(cs);
+        result.emplace_back(cs);
       } else if (peek.Is(TOKEN_BREAK)) {
         lex.Next();
         Token semi = lex.Expect(TOKEN_SEMICOLON);
@@ -681,25 +681,25 @@ struct Parser {
         }
         BreakStatement bs;
         bs.position = Pos(peek);
-        result.push_back(bs);
+        result.emplace_back(bs);
       } else if (peek.Is(TOKEN_RETURN)) {
         auto rs = parse_return_statement();
         if (!rs.ok()) return rs.status();
-        result.push_back(*rs);
+        result.emplace_back(std::move(*rs));
       } else if (peek.Is(TOKEN_WHILE)) {
         auto ws = parse_while_statement();
         if (!ws.ok()) return ws.status();
-        result.push_back(*ws);
+        result.emplace_back(std::move(*ws));
       } else if (peek.Is(TOKEN_IF)) {
         auto ies = parse_ifelse_statement();
         if (!ies.ok()) return ies.status();
-        result.push_back(*ies);
+        result.emplace_back(std::move(*ies));
       } else if (peek.Is(TOKEN_IDENTIFIER) || peek.Is(TOKEN_NUMBER) || peek.Is(TOKEN_STRING) ||
                  peek.Is(TOKEN_BOOL) || peek.Is(TOKEN_AUTO) || peek.Is(TOKEN_LPAREN) ||
                  peek.Is(TOKEN_LBRACKET) || peek.Is(TOKEN_MINUS) || peek.Is(TOKEN_NOT)) {
         auto es = parse_expr_statement();
         if (!es.ok()) return es.status();
-        result.push_back(*es);
+        result.emplace_back(std::move(*es));
       } else {
         break;
       }
@@ -762,7 +762,7 @@ struct Parser {
   absl::StatusOr<FunctionArg> parse_func_arg() {
     auto type_name_result = read_type_name();
     if (!type_name_result.ok()) return type_name_result.status();
-    std::string type_name = *type_name_result;
+    std::string type_name = std::move(*type_name_result);
 
     auto dtype_found = Symbols::FindDType(type_name);
     if (!dtype_found.has_value()) {
@@ -790,7 +790,7 @@ struct Parser {
     uint32_t func_pos = static_cast<uint32_t>(lex.Position());
     auto ret_type_name_result = read_type_name();
     if (!ret_type_name_result.ok()) return ret_type_name_result.status();
-    std::string ret_type_name = *ret_type_name_result;
+    std::string ret_type_name = std::move(*ret_type_name_result);
 
     auto ret_type = Symbols::FindDType(ret_type_name);
     if (!ret_type.has_value()) {
@@ -816,12 +816,12 @@ struct Parser {
       std::vector<FunctionArg> arg_list;
       auto arg = parse_func_arg();
       if (!arg.ok()) return arg.status();
-      arg_list.push_back(*arg);
+      arg_list.emplace_back(std::move(*arg));
 
       while (lex.ConsumeIf(TOKEN_COMMA)) {
         arg = parse_func_arg();
         if (!arg.ok()) return arg.status();
-        arg_list.push_back(*arg);
+        arg_list.emplace_back(std::move(*arg));
       }
       args = std::move(arg_list);
     }
@@ -838,7 +838,7 @@ struct Parser {
     func.return_type = ret_type->first;
     func.name = std::string(name_tok.text);
     func.args = std::move(args);
-    func.body = *body;
+    func.body = std::move(*body);
     func.position = func_pos;
     return func;
   }
@@ -878,7 +878,7 @@ absl::StatusOr<Function> parse_function_ast(ParseContext& ctx, const std::string
   ctx.SetParseValidateCost(
       std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time));
 
-  return *result;
+  return std::move(*result);
 }
 
 absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, const std::string& source) {
@@ -903,7 +903,7 @@ absl::StatusOr<std::vector<Function>> parse_functions_ast(ParseContext& ctx, con
       }
       return absl::InvalidArgumentError(fmt::format("parse {} failed with ast_error:{}", source, err_detail));
     }
-    funcs.push_back(*func);
+    funcs.emplace_back(std::move(*func));
   }
 
   ctx.SetParseCost(
@@ -956,6 +956,7 @@ absl::StatusOr<Expression> parse_expression_ast(ParseContext& ctx, const std::st
   Expression expr;
   ctx.SetFuncDesc(desc);
   expr.expr = *result;
+  expr.rpn_expr = RPN(8);
   auto rc = (*result)->Validate(ctx, expr.rpn_expr);
   if (!rc.ok()) {
     return rc.status();

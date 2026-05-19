@@ -146,6 +146,7 @@ absl::StatusOr<VarTag> Array::Validate(ParseContext& ctx) {
   if (elements.empty()) {
     return absl::InvalidArgumentError("array can not be empty");
   }
+  rpns.reserve(elements.size());
   for (size_t i = 0; i < elements.size(); i++) {
     RPN rpn;
     auto result = elements[i]->Validate(ctx, rpn);
@@ -157,7 +158,7 @@ absl::StatusOr<VarTag> Array::Validate(ParseContext& ctx) {
     if (i == 0) {
       dtype = result->dtype.ToAbslSpan();
     }
-    rpns.emplace_back(rpn);
+    rpns.emplace_back(std::move(rpn));
   }
   return dtype;
 }
@@ -186,18 +187,28 @@ absl::StatusOr<VarTag> VarDefine::Validate(ParseContext& ctx) {
 absl::StatusOr<std::vector<VarTag>> FuncInvokeArgs::Validate(ParseContext& ctx, RPN* rpn) {
   std::vector<VarTag> arg_dtypes;
   if (args.has_value()) {
+    arg_dtypes.reserve(args->size());
+    if (rpn == nullptr) {
+      rpns.reserve(args->size());
+    }
     for (const auto& expr : *args) {
-      RPN arg_rpn;
-      auto result = expr->Validate(ctx, rpn == nullptr ? arg_rpn : *rpn);
-      if (!result.ok()) {
-        return result.status();
-      }
-      // rpn.dtype = result->dtype;
-      if (nullptr == rpn) {
+      if (rpn == nullptr) {
+        RPN arg_rpn;
+        auto result = expr->Validate(ctx, arg_rpn);
+        if (!result.ok()) {
+          return result.status();
+        }
+        // rpn.dtype = result->dtype;
         arg_rpn.SetDType(ctx, result->dtype);
-        rpns.emplace_back(arg_rpn);
+        rpns.emplace_back(std::move(arg_rpn));
+        arg_dtypes.emplace_back(result.value());
+      } else {
+        auto result = expr->Validate(ctx, *rpn);
+        if (!result.ok()) {
+          return result.status();
+        }
+        arg_dtypes.emplace_back(result.value());
       }
-      arg_dtypes.emplace_back(result.value());
     }
   }
   return arg_dtypes;
@@ -782,8 +793,9 @@ absl::StatusOr<VarTag> VarAccessor::Validate(ParseContext& ctx, RPN& rpn, bool& 
     }
 
     // prcess args
-    std::vector<VarTag> arg_tag_dtypes = validate_result.value();
+    std::vector<VarTag> arg_tag_dtypes = std::move(validate_result.value());
     std::vector<DType> arg_dtypes;
+    arg_dtypes.reserve(arg_tag_dtypes.size());
     for (const auto& arg_dtype : arg_tag_dtypes) {
       if (!has_simd_vector && need_compute_dtype && arg_dtype.dtype > compute_dtype) {
         compute_dtype = arg_dtype.dtype;
