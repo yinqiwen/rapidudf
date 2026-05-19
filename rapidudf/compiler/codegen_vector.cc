@@ -65,6 +65,9 @@ absl::StatusOr<ValuePtr> CodeGen::GetVectorSizeValue(ValuePtr obj) {
   // EndElse(condition);
   // FinishCondition(condition);
   // return final_size_val;
+  if (obj->GetPtrElementType() != nullptr) {
+    return obj->GetRawVectorSizeValue();
+  }
   return CallFunction(std::string(kVectorGetSizeFuncName), {obj});
 }
 absl::StatusOr<ValuePtr> CodeGen::GetVectorDataValue(ValuePtr obj) {

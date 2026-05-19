@@ -17,8 +17,12 @@
 #pragma once
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/hash/hash.h"
 #include "absl/status/statusor.h"
 #include "fmt/format.h"
 
@@ -77,38 +81,54 @@ class JitCompiler {
   template <typename RET, typename... Args>
   absl::StatusOr<JitFunction<RET, Args...>> CompileFunction(const std::string& source) {
     std::lock_guard<std::mutex> guard(jit_mutex_);
+    const DType return_type = get_dtype<RET>();
+    std::vector<DType> arg_types;
+    (arg_types.emplace_back(get_dtype<Args>()), ...);
+
+    if (opts_.enable_compile_cache) {
+      CachedJitTarget cached;
+      if (LookupCompileCache(ComputeCompileCacheKey(source, return_type, arg_types, nullptr), return_type,
+                             arg_types, &cached)) {
+        return JitFunction<RET, Args...>(cached.function_name, cached.func_ptr, cached.codegen, cached.stat, true);
+      }
+    }
+
     NewCodegen();
     auto status = CompileFunction(source);
     if (!status.ok()) {
       return status;
     }
 
-    auto return_type = get_dtype<RET>();
-    std::vector<DType> arg_types;
-    (arg_types.emplace_back(get_dtype<Args>()), ...);
-
     auto verify_result = VerifyFunctionSignature(return_type, arg_types);
     if (!verify_result.ok()) {
       return verify_result.status();
     }
-    std::string fname = verify_result.value();
+    const std::string& fname = verify_result.value();
     auto func_ptr_result = GetFunctionPtr(fname);
     if (!func_ptr_result.ok()) {
       return func_ptr_result.status();
     }
-    auto func_ptr = func_ptr_result.value();
-
-    return JitFunction<RET, Args...>(fname, func_ptr, codegen_, stat_);
+    StoreCompileCache(source, return_type, arg_types, nullptr, fname);
+    return JitFunction<RET, Args...>(fname, func_ptr_result.value(), codegen_, stat_);
   }
 
   template <typename RET, typename... Args>
   absl::StatusOr<JitFunction<RET, Args...>> CompileDynObjExpression(const std::string& source,
                                                                     const std::vector<Arg>& args) {
     std::lock_guard<std::mutex> guard(jit_mutex_);
-    NewCodegen();
-    auto return_type = get_dtype<RET>();
+    const DType return_type = get_dtype<RET>();
     std::vector<DType> arg_types;
     (arg_types.emplace_back(get_dtype<Args>()), ...);
+
+    if (opts_.enable_compile_cache) {
+      CachedJitTarget cached;
+      if (LookupCompileCache(ComputeCompileCacheKey(source, return_type, arg_types, &args), return_type, arg_types,
+                             &cached)) {
+        return JitFunction<RET, Args...>(cached.function_name, cached.func_ptr, cached.codegen, cached.stat, true);
+      }
+    }
+
+    NewCodegen();
     if (args.size() != arg_types.size()) {
       return absl::InvalidArgumentError(
           fmt::format("need {} arg names, while only {} provided", arg_types.size(), args.size()));
@@ -150,9 +170,8 @@ class JitCompiler {
     if (!func_ptr_result.ok()) {
       return func_ptr_result.status();
     }
-    auto func_ptr = func_ptr_result.value();
-
-    return JitFunction<RET, Args...>(gen_func_ast.name, func_ptr, codegen_, stat_);
+    StoreCompileCache(source, return_type, arg_types, &args, gen_func_ast.name);
+    return JitFunction<RET, Args...>(gen_func_ast.name, func_ptr_result.value(), codegen_, stat_);
   }
   template <typename RET, typename... Args>
   absl::StatusOr<JitFunction<RET, Args...>> CompileExpression(const std::string& source,
@@ -175,14 +194,38 @@ class JitCompiler {
     ValuePtr vector_data_ptr;
     OpToken op = OP_INVALID;
     DType op_compute_dtype;
-    ast::FuncInvocation func_invocation;
+    const ast::FuncInvocation* func_invocation = nullptr;
     ::llvm::Value* op_temp_val = nullptr;
     ::llvm::Value* constant_vector_val = nullptr;
     ::llvm::Value* constant_vector_val_ptr = nullptr;
     explicit RPNEvalNode(OpToken v) : op(v) {}
     explicit RPNEvalNode(ValuePtr v) : val(v) {}
-    explicit RPNEvalNode(const ast::FuncInvocation& f) : func_invocation(f) {}
+    explicit RPNEvalNode(const ast::FuncInvocation& f) : func_invocation(&f) {}
+    bool HasFuncInvocation() const { return func_invocation != nullptr; }
   };
+
+  struct CompileCacheEntry {
+    std::shared_ptr<CodeGen> codegen;
+    std::vector<ast::Function> parsed_ast_funcs;
+    JitFunctionStat stat;
+    std::string function_name;
+  };
+
+  struct CachedJitTarget {
+    void* func_ptr = nullptr;
+    std::shared_ptr<CodeGen> codegen;
+    JitFunctionStat stat;
+    std::string function_name;
+  };
+
+  uint64_t ComputeCompileCacheKey(std::string_view source, DType return_type,
+                                  const std::vector<DType>& arg_types, const std::vector<Arg>* dyn_args) const;
+
+  bool LookupCompileCache(uint64_t key, DType return_type, const std::vector<DType>& arg_types,
+                          CachedJitTarget* out);
+
+  void StoreCompileCache(std::string_view source, DType return_type, const std::vector<DType>& arg_types,
+                         const std::vector<Arg>* dyn_args, const std::string& function_name);
 
   void NewCodegen();
   absl::Status Compile();
@@ -209,9 +252,11 @@ class JitCompiler {
   absl::Status BuildIR(const ast::BreakStatement& statement);
 
   absl::StatusOr<ValuePtr> BuildIR(const ast::RPN& rpn);
-  absl::StatusOr<ValuePtr> BuildIR(DType dtype, const std::vector<RPNEvalNode>& nodes);
-  absl::StatusOr<ValuePtr> BuildVectorIR(DType dtype, std::vector<RPNEvalNode>& nodes);
-  absl::Status BuildVectorEvalIR(DType dtype, std::vector<RPNEvalNode>& nodes, ValuePtr curosr, ValuePtr remaining,
+  using RPNEvalNodeList = absl::InlinedVector<RPNEvalNode, 16>;
+
+  absl::StatusOr<ValuePtr> BuildIR(DType dtype, const RPNEvalNodeList& nodes);
+  absl::StatusOr<ValuePtr> BuildVectorIR(DType dtype, RPNEvalNodeList& nodes);
+  absl::Status BuildVectorEvalIR(DType dtype, RPNEvalNodeList& nodes, ValuePtr curosr, ValuePtr remaining,
                                  ::llvm::Value* output);
 
   absl::StatusOr<ValuePtr> BuildIR(const ast::ConstantNumber& expr);
@@ -235,6 +280,7 @@ class JitCompiler {
   std::shared_ptr<CodeGen> codegen_;
   std::mutex jit_mutex_;
   JitFunctionStat stat_;
+  absl::flat_hash_map<uint64_t, CompileCacheEntry> compile_cache_;
 };
 
 }  // namespace compiler

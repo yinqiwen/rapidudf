@@ -218,6 +218,8 @@ class CodeGen {
   std::unique_ptr<::llvm::StandardInstrumentations> std_insts_;
 
   uint32_t label_cursor_;
+
+  std::unordered_map<uint64_t, ::llvm::Type*> llvm_type_cache_;
 };
 }  // namespace compiler
 }  // namespace rapidudf

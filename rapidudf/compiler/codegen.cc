@@ -15,6 +15,8 @@
  */
 #include "rapidudf/compiler/codegen.h"
 
+#include <mutex>
+
 #include "fmt/format.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -61,10 +63,19 @@
 namespace rapidudf {
 namespace compiler {
 
+namespace {
+void EnsureNativeTargetInitialized() {
+  static std::once_flag once;
+  std::call_once(once, []() {
+    ::llvm::InitializeNativeTarget();
+    ::llvm::InitializeNativeTargetAsmPrinter();
+    ::llvm::InitializeNativeTargetAsmParser();
+  });
+}
+}  // namespace
+
 CodeGen::CodeGen(const Options& opts) : opts_(opts), label_cursor_(0) {
-  ::llvm::InitializeNativeTarget();
-  ::llvm::InitializeNativeTargetAsmPrinter();
-  ::llvm::InitializeNativeTargetAsmParser();
+  EnsureNativeTargetInitialized();
 
   auto JTMB = ::llvm::orc::JITTargetMachineBuilder::detectHost();
   // RUDF_INFO("features:{}", JTMB->getFeatures().getString());
@@ -125,22 +136,25 @@ CodeGen::CodeGen(const Options& opts) : opts_(opts), label_cursor_(0) {
     }
   }
 
-  auto func_pass_manager =
-      pass_builder.buildFunctionSimplificationPipeline(opt_level, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
-
-  func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
+  func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>();
+  if (!opts_.skip_auto_vectorize_passes) {
+    auto func_pass_manager =
+        pass_builder.buildFunctionSimplificationPipeline(opt_level, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
+    func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
+  }
   func_pass_manager_->addPass(::llvm::InstCombinePass());
   func_pass_manager_->addPass(::llvm::ReassociatePass());
-  // func_pass_manager_->addPass(::llvm::GVNPass());
   func_pass_manager_->addPass(llvm::NewGVNPass());
   func_pass_manager_->addPass(::llvm::SimplifyCFGPass());
   func_pass_manager_->addPass(::llvm::PartiallyInlineLibCallsPass());
   func_pass_manager_->addPass(::llvm::MergedLoadStoreMotionPass());
   func_pass_manager_->addPass(::llvm::TailCallElimPass());
-  func_pass_manager_->addPass(::llvm::LoadStoreVectorizerPass());
-  func_pass_manager_->addPass(::llvm::SLPVectorizerPass());
-  func_pass_manager_->addPass(::llvm::VectorCombinePass());
-  func_pass_manager_->addPass(::llvm::LoopVectorizePass());
+  if (!opts_.skip_auto_vectorize_passes) {
+    func_pass_manager_->addPass(::llvm::LoadStoreVectorizerPass());
+    func_pass_manager_->addPass(::llvm::SLPVectorizerPass());
+    func_pass_manager_->addPass(::llvm::VectorCombinePass());
+    func_pass_manager_->addPass(::llvm::LoopVectorizePass());
+  }
 }
 
 absl::Status CodeGen::Finish() {
@@ -193,11 +207,17 @@ absl::StatusOr<DType> CodeGen::NormalizeDType(const std::vector<DType>& dtypes) 
 }
 
 absl::StatusOr<::llvm::Type*> CodeGen::GetType(DType dtype) {
+  const uint64_t cache_key = dtype.Control();
+  auto found = llvm_type_cache_.find(cache_key);
+  if (found != llvm_type_cache_.end()) {
+    return found->second;
+  }
   auto type = get_type(*context_, dtype);
   if (nullptr == type) {
     // abort();
     RUDF_LOG_ERROR_STATUS(absl::InvalidArgumentError(fmt::format("get type failed for:{}", dtype)));
   }
+  llvm_type_cache_.emplace(cache_key, type);
   return type;
 }
 
@@ -381,6 +401,9 @@ absl::Status CodeGen::DefineFunction(const FunctionDesc& desc, const std::vector
           builder_->CreateStore(load_val, arg_val);
           val = NewValue(dtype, arg_val, arg_type);
           f->addParamAttr(i, ::llvm::Attribute::getWithByValType(*context_, arg_type));
+        } else if (arg->getType()->isPointerTy() &&
+                   (dtype.IsSimdVector() || dtype.IsStringView() || dtype.IsStdStringView() || dtype.IsAbslSpan())) {
+          val = NewValue(dtype, arg, arg_type);
         } else {
           auto* arg_val = builder_->CreateAlloca(arg->getType());
           builder_->CreateStore(arg, arg_val);

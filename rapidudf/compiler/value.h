@@ -55,6 +55,7 @@ class Value : public std::enable_shared_from_this<Value> {
   absl::StatusOr<ValuePtr> GetVectorArrowFlag();
 
   DType GetDType() { return dtype_; }
+  ::llvm::Type* GetPtrElementType() const { return ptr_element_type_; }
   bool IsWritable() const;
 
   absl::Status CopyFrom(ValuePtr other);
