@@ -56,7 +56,7 @@ set(SLEEF_BUILD_TESTS OFF CACHE INTERNAL "Turn off tests")
 FetchContent_Declare(
   sleef
   GIT_REPOSITORY https://github.com/shibatch/sleef
-  GIT_TAG        3.7
+  GIT_TAG        3.9.0
   FIND_PACKAGE_ARGS sleef
 )
 FetchContent_MakeAvailable(sleef)
@@ -73,7 +73,7 @@ set(ABSL_ENABLE_INSTALL ON CACHE INTERNAL "")
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp
-  GIT_TAG        20240722.0
+  GIT_TAG        20250512.2
   OVERRIDE_FIND_PACKAGE
 )
 FetchContent_MakeAvailable(absl)
@@ -91,7 +91,7 @@ set(HWY_ENABLE_TESTS OFF CACHE INTERNAL "Turn off tests")
 FetchContent_Declare(
   hwy
   GIT_REPOSITORY https://github.com/google/highway
-  GIT_TAG        1.2.0
+  GIT_TAG        1.4.0
   # FIND_PACKAGE_ARGS NAMES hwy
   OVERRIDE_FIND_PACKAGE
 )

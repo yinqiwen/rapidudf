@@ -37,6 +37,7 @@ TEST(SIMD, mask) {
   m2 = hn::DemoteMaskTo(D2{}, D3{}, m3);
 
   M m = hn::CombineMasks(d, m2, m2);
+  (void)m;
 
   RUDF_INFO("{} {}", hn::Lanes(D{}), hn::Lanes(D2{}));
 }
@@ -53,7 +54,7 @@ TEST(SIMD, rebind) {
   }
 
   const D d;
-  constexpr auto lanes = hn::Lanes(d);
+  const size_t lanes = hn::Lanes(d);
 
   size_t idx = 0;
   for (; (idx + lanes) <= 32; idx += lanes) {
