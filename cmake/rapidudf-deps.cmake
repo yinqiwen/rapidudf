@@ -8,11 +8,7 @@ add_definitions(${LLVM_DEFINITIONS_LIST})
 llvm_map_components_to_libnames(llvm_libs support core target orcjit x86codegen x86asmparser)
 list(APPEND RAPIDUDF_LINK_LIBRARIES ${llvm_libs})
 
-find_package(Boost 1.51.0 MODULE
-  COMPONENTS
-    headers
-  REQUIRED
-)
+find_package(Boost 1.51.0 REQUIRED)
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS})
 
 find_package(PkgConfig)
@@ -20,7 +16,7 @@ pkg_check_modules(x86simdsortcpp REQUIRED IMPORTED_TARGET x86simdsortcpp)
 list(APPEND RAPIDUDF_LINK_LIBRARIES PkgConfig::x86simdsortcpp)
 
 
-find_package(fmt)
+find_package(fmt 9.0)
 if(NOT fmt_FOUND)
 FetchContent_Declare(
   fmt
@@ -57,9 +53,11 @@ FetchContent_Declare(
   sleef
   GIT_REPOSITORY https://github.com/shibatch/sleef
   GIT_TAG        3.9.0
-  FIND_PACKAGE_ARGS sleef
 )
 FetchContent_MakeAvailable(sleef)
+if(TARGET sleef AND NOT TARGET sleef::sleef)
+  add_library(sleef::sleef ALIAS sleef)
+endif()
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${sleef_BINARY_DIR}/include)
 else()
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${sleef_INCLUDE_DIRS})
@@ -98,6 +96,12 @@ FetchContent_Declare(
 # FetchContent_Populate(hwy)
 # add_subdirectory(${hwy_SOURCE_DIR} ${hwy_BINARY_DIR})
 FetchContent_MakeAvailable(hwy)
+if(TARGET hwy AND NOT TARGET hwy::hwy)
+  add_library(hwy::hwy ALIAS hwy)
+endif()
+if(TARGET hwy_contrib AND NOT TARGET hwy::hwy_contrib)
+  add_library(hwy::hwy_contrib ALIAS hwy_contrib)
+endif()
 install(TARGETS hwy EXPORT rapidudfTargets)
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${hwy_SOURCE_DIR})
 else()
@@ -133,6 +137,9 @@ FetchContent_Declare(
     GIT_TAG        v2.0.5 # 选择合适的版本
 )
 FetchContent_MakeAvailable(flatbuffers)
+if(TARGET flatbuffers AND NOT TARGET flatbuffers::flatbuffers)
+  add_library(flatbuffers::flatbuffers ALIAS flatbuffers)
+endif()
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${flatbuffers_SOURCE_DIR}/include)
 else()
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${flatbuffers_INCLUDE_DIRS})

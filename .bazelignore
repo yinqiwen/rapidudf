@@ -1,0 +1,2 @@
+# CMake build tree (FetchContent deps ship their own BUILD/BUILD.bazel files).
+build

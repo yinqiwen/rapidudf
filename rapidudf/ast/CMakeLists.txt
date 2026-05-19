@@ -1,0 +1,9 @@
+rapidudf_add_sources(
+  rapidudf/ast/context.cc
+  rapidudf/ast/expression.cc
+  rapidudf/ast/function.cc
+  rapidudf/ast/grammar.cc
+  rapidudf/ast/lexer.cc
+  rapidudf/ast/statement.cc
+  rapidudf/ast/symbols.cc
+)
