@@ -91,7 +91,7 @@ CodeGen::CodeGen(const Options& opts) : opts_(opts), label_cursor_(0) {
   module_analysis_manager_ = std::make_unique<::llvm::ModuleAnalysisManager>();
   pass_inst_callbacks_ = std::make_unique<::llvm::PassInstrumentationCallbacks>();
   std_insts_ = std::make_unique<::llvm::StandardInstrumentations>(*context_,
-                                                                  /*DebugLogging*/ true);
+                                                                  /*DebugLogging*/ false);
   std_insts_->registerCallbacks(*pass_inst_callbacks_, module_analysis_manager_.get());
 
   // Add transform passes.
@@ -416,15 +416,19 @@ absl::Status CodeGen::FinishFunction() {
   //   ir_builder->CreateRetVoid();
   // }
 
+#ifndef NDEBUG
   // Validate the generated code, checking for consistency.
-  std::string err_str;
-  ::llvm::raw_string_ostream err_stream(err_str);
-  bool r = ::llvm::verifyFunction(*current_func_->func, &err_stream);
-  if (r) {
-    RUDF_ERROR("verify failed:{}", err_str);
-    module_->print(::llvm::errs(), nullptr);
-    return absl::InvalidArgumentError(err_str);
+  {
+    std::string err_str;
+    ::llvm::raw_string_ostream err_stream(err_str);
+    bool r = ::llvm::verifyFunction(*current_func_->func, &err_stream);
+    if (r) {
+      RUDF_ERROR("verify failed:{}", err_str);
+      module_->print(::llvm::errs(), nullptr);
+      return absl::InvalidArgumentError(err_str);
+    }
   }
+#endif
 
   // Run the optimizer on the function.
   if (opts_.optimize_level > 0) {
