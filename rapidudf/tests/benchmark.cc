@@ -174,59 +174,81 @@ BENCHMARK(expr::BM_expr_vector_jit)->Setup(expr::SetupVector);
 // ===========================================================================
 // SCENARIO 2 -- Wilson CTR
 //   ctr(exp, clk) = log10(exp) * (... clk/exp ... sqrt ...) / (...)
+//
+// Benchmarked with both f64 and f32 element types. The f32 JIT scalar source
+// uses typed literals (e.g. `1.96_f32`) because mixing untyped double literals
+// with f32 scalar variables otherwise tickles a JIT FPTrunc/FPExt typing bug;
+// the vector code path doesn't have that problem and accepts plain literals.
 // ===========================================================================
 
 namespace wilson {
 
-std::vector<double> g_exp;
-std::vector<double> g_clk;
-JitFunction<double, double, double> g_jit_scalar;
-JitFunction<Vector<double>, Context&, Vector<double>, Vector<double>> g_jit_vector;
+// Shared inline kernel parameterised on element type. T(1.96) etc. avoids
+// any unwanted f64 promotion during the float computation.
+template <typename T>
+inline T InlineKernel(T exp_cnt, T clk_cnt) {
+  return std::log10(exp_cnt) *
+         (clk_cnt / exp_cnt + T(1.96) * T(1.96) / (T(2) * exp_cnt) -
+          T(1.96) / (T(2) * exp_cnt) *
+              std::sqrt(T(4) * exp_cnt * (T(1) - clk_cnt / exp_cnt) * clk_cnt / exp_cnt +
+                        T(1.96) * T(1.96))) /
+         (T(1) + T(1.96) * T(1.96) / exp_cnt);
+}
+
+// noinline so each call is a real function call -- prevents the outer
+// benchmark loop from being auto-vectorized over the scalar baseline.
+double __attribute__((noinline)) NativeScalarF64(double e, double c) {
+  return InlineKernel<double>(e, c);
+}
+float __attribute__((noinline)) NativeScalarF32(float e, float c) {
+  return InlineKernel<float>(e, c);
+}
+
+// Inlinable buffer-loop kernels: compiler is free to auto-vectorise.
+void __attribute__((noinline))
+NativeVectorF64(const double* exp_cnt, const double* clk_cnt, double* out, size_t n) {
+  for (size_t i = 0; i < n; ++i) out[i] = InlineKernel<double>(exp_cnt[i], clk_cnt[i]);
+}
+void __attribute__((noinline))
+NativeVectorF32(const float* exp_cnt, const float* clk_cnt, float* out, size_t n) {
+  for (size_t i = 0; i < n; ++i) out[i] = InlineKernel<float>(exp_cnt[i], clk_cnt[i]);
+}
+
+// Inputs (same logical values, materialised as both f32 and f64).
+std::vector<double> g_exp_f64;
+std::vector<double> g_clk_f64;
+std::vector<float> g_exp_f32;
+std::vector<float> g_clk_f32;
 
 void InitInputs() {
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<int> distr(1, 100);
-  g_exp.clear();
-  g_clk.clear();
-  g_exp.reserve(kBatchSize);
-  g_clk.reserve(kBatchSize);
+  g_exp_f64.clear();
+  g_clk_f64.clear();
+  g_exp_f32.clear();
+  g_clk_f32.clear();
+  g_exp_f64.reserve(kBatchSize);
+  g_clk_f64.reserve(kBatchSize);
+  g_exp_f32.reserve(kBatchSize);
+  g_clk_f32.reserve(kBatchSize);
   for (size_t i = 0; i < kBatchSize; ++i) {
     int clk = distr(gen);
     int exp = clk + 10;
-    g_clk.push_back(static_cast<double>(clk));
-    g_exp.push_back(static_cast<double>(exp));
+    g_clk_f64.push_back(static_cast<double>(clk));
+    g_exp_f64.push_back(static_cast<double>(exp));
+    g_clk_f32.push_back(static_cast<float>(clk));
+    g_exp_f32.push_back(static_cast<float>(exp));
   }
 }
 
-// noinline so the scalar baseline is a real function call per element
-// (prevents the outer benchmark loop from being auto-vectorized).
-double __attribute__((noinline)) NativeScalar(double exp_cnt, double clk_cnt) {
-  return std::log10(exp_cnt) *
-         (clk_cnt / exp_cnt + 1.96 * 1.96 / (2 * exp_cnt) -
-          1.96 / (2 * exp_cnt) *
-              std::sqrt(4 * exp_cnt * (1 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96 * 1.96)) /
-         (1 + 1.96 * 1.96 / exp_cnt);
-}
+// JIT functions per element type.
+JitFunction<double, double, double> g_jit_scalar_f64;
+JitFunction<float, float, float> g_jit_scalar_f32;
+JitFunction<Vector<double>, Context&, Vector<double>, Vector<double>> g_jit_vector_f64;
+JitFunction<Vector<float>, Context&, Vector<float>, Vector<float>> g_jit_vector_f32;
 
-// Plain-loop native vector baseline: same arithmetic, but inlinable so the
-// compiler can vectorize the whole loop.
-inline double InlineKernel(double exp_cnt, double clk_cnt) {
-  return std::log10(exp_cnt) *
-         (clk_cnt / exp_cnt + 1.96 * 1.96 / (2 * exp_cnt) -
-          1.96 / (2 * exp_cnt) *
-              std::sqrt(4 * exp_cnt * (1 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96 * 1.96)) /
-         (1 + 1.96 * 1.96 / exp_cnt);
-}
-
-void __attribute__((noinline))
-NativeVector(const double* exp_cnt, const double* clk_cnt, double* out, size_t n) {
-  for (size_t i = 0; i < n; ++i) {
-    out[i] = InlineKernel(exp_cnt[i], clk_cnt[i]);
-  }
-}
-
-constexpr const char* kScalarSource = R"(
+constexpr const char* kScalarSourceF64 = R"(
   f64 wilson_ctr(f64 exp_cnt, f64 clk_cnt) {
     return log10(exp_cnt) *
            (clk_cnt / exp_cnt + 1.96 * 1.96 / (2 * exp_cnt) -
@@ -236,7 +258,18 @@ constexpr const char* kScalarSource = R"(
   }
 )";
 
-constexpr const char* kVectorSource = R"(
+constexpr const char* kScalarSourceF32 = R"(
+  f32 wilson_ctr(f32 exp_cnt, f32 clk_cnt) {
+    return log10(exp_cnt) *
+           (clk_cnt / exp_cnt + 1.96_f32 * 1.96_f32 / (2_f32 * exp_cnt) -
+            1.96_f32 / (2_f32 * exp_cnt) *
+              sqrt(4_f32 * exp_cnt * (1_f32 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt +
+                   1.96_f32 * 1.96_f32)) /
+           (1_f32 + 1.96_f32 * 1.96_f32 / exp_cnt);
+  }
+)";
+
+constexpr const char* kVectorSourceF64 = R"(
   simd_vector<f64> wilson_ctr(Context ctx, simd_vector<f64> exp_cnt, simd_vector<f64> clk_cnt) {
     return log10(exp_cnt) *
            (clk_cnt / exp_cnt + 1.96 * 1.96 / (2 * exp_cnt) -
@@ -246,52 +279,103 @@ constexpr const char* kVectorSource = R"(
   }
 )";
 
-void SetupScalar(const benchmark::State&) {
+constexpr const char* kVectorSourceF32 = R"(
+  simd_vector<f32> wilson_ctr(Context ctx, simd_vector<f32> exp_cnt, simd_vector<f32> clk_cnt) {
+    return log10(exp_cnt) *
+           (clk_cnt / exp_cnt + 1.96_f32 * 1.96_f32 / (2_f32 * exp_cnt) -
+            1.96_f32 / (2_f32 * exp_cnt) *
+              sqrt(4_f32 * exp_cnt * (1_f32 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt +
+                   1.96_f32 * 1.96_f32)) /
+           (1_f32 + 1.96_f32 * 1.96_f32 / exp_cnt);
+  }
+)";
+
+void SetupF64Scalar(const benchmark::State&) {
   InitInputs();
-  g_jit_scalar = CompileOrDie<double, double, double>(kScalarSource);
+  g_jit_scalar_f64 = CompileOrDie<double, double, double>(kScalarSourceF64);
+}
+void SetupF64Vector(const benchmark::State&) {
+  InitInputs();
+  g_jit_vector_f64 =
+      CompileOrDie<Vector<double>, Context&, Vector<double>, Vector<double>>(kVectorSourceF64);
+}
+void SetupF32Scalar(const benchmark::State&) {
+  InitInputs();
+  g_jit_scalar_f32 = CompileOrDie<float, float, float>(kScalarSourceF32);
+}
+void SetupF32Vector(const benchmark::State&) {
+  InitInputs();
+  g_jit_vector_f32 =
+      CompileOrDie<Vector<float>, Context&, Vector<float>, Vector<float>>(kVectorSourceF32);
 }
 
-void SetupVector(const benchmark::State&) {
-  InitInputs();
-  g_jit_vector = CompileOrDie<Vector<double>, Context&, Vector<double>, Vector<double>>(kVectorSource);
-}
+// f64 ----------------------------------------------------------------------
 
-void BM_wilson_ctr_scalar_native(benchmark::State& state) {
+void BM_wilson_ctr_f64_scalar_native(benchmark::State& state) {
   for (auto _ : state) {
     double sink = 0;
-    for (size_t i = 0; i < kBatchSize; ++i) {
-      sink += NativeScalar(g_exp[i], g_clk[i]);
-    }
+    for (size_t i = 0; i < kBatchSize; ++i) sink += NativeScalarF64(g_exp_f64[i], g_clk_f64[i]);
     benchmark::DoNotOptimize(sink);
   }
   state.SetItemsProcessed(state.iterations() * kBatchSize);
 }
-
-void BM_wilson_ctr_scalar_jit(benchmark::State& state) {
+void BM_wilson_ctr_f64_scalar_jit(benchmark::State& state) {
   for (auto _ : state) {
     double sink = 0;
-    for (size_t i = 0; i < kBatchSize; ++i) {
-      sink += g_jit_scalar(g_exp[i], g_clk[i]);
-    }
+    for (size_t i = 0; i < kBatchSize; ++i) sink += g_jit_scalar_f64(g_exp_f64[i], g_clk_f64[i]);
     benchmark::DoNotOptimize(sink);
   }
   state.SetItemsProcessed(state.iterations() * kBatchSize);
 }
-
-void BM_wilson_ctr_vector_native(benchmark::State& state) {
+void BM_wilson_ctr_f64_vector_native(benchmark::State& state) {
   std::vector<double> out(kBatchSize);
   for (auto _ : state) {
-    NativeVector(g_exp.data(), g_clk.data(), out.data(), kBatchSize);
+    NativeVectorF64(g_exp_f64.data(), g_clk_f64.data(), out.data(), kBatchSize);
+    benchmark::DoNotOptimize(out);
+  }
+  state.SetItemsProcessed(state.iterations() * kBatchSize);
+}
+void BM_wilson_ctr_f64_vector_jit(benchmark::State& state) {
+  Context ctx;
+  for (auto _ : state) {
+    ctx.Reset();
+    auto out = g_jit_vector_f64(ctx, g_exp_f64, g_clk_f64);
     benchmark::DoNotOptimize(out);
   }
   state.SetItemsProcessed(state.iterations() * kBatchSize);
 }
 
-void BM_wilson_ctr_vector_jit(benchmark::State& state) {
+// f32 ----------------------------------------------------------------------
+
+void BM_wilson_ctr_f32_scalar_native(benchmark::State& state) {
+  for (auto _ : state) {
+    float sink = 0;
+    for (size_t i = 0; i < kBatchSize; ++i) sink += NativeScalarF32(g_exp_f32[i], g_clk_f32[i]);
+    benchmark::DoNotOptimize(sink);
+  }
+  state.SetItemsProcessed(state.iterations() * kBatchSize);
+}
+void BM_wilson_ctr_f32_scalar_jit(benchmark::State& state) {
+  for (auto _ : state) {
+    float sink = 0;
+    for (size_t i = 0; i < kBatchSize; ++i) sink += g_jit_scalar_f32(g_exp_f32[i], g_clk_f32[i]);
+    benchmark::DoNotOptimize(sink);
+  }
+  state.SetItemsProcessed(state.iterations() * kBatchSize);
+}
+void BM_wilson_ctr_f32_vector_native(benchmark::State& state) {
+  std::vector<float> out(kBatchSize);
+  for (auto _ : state) {
+    NativeVectorF32(g_exp_f32.data(), g_clk_f32.data(), out.data(), kBatchSize);
+    benchmark::DoNotOptimize(out);
+  }
+  state.SetItemsProcessed(state.iterations() * kBatchSize);
+}
+void BM_wilson_ctr_f32_vector_jit(benchmark::State& state) {
   Context ctx;
   for (auto _ : state) {
     ctx.Reset();
-    auto out = g_jit_vector(ctx, g_exp, g_clk);
+    auto out = g_jit_vector_f32(ctx, g_exp_f32, g_clk_f32);
     benchmark::DoNotOptimize(out);
   }
   state.SetItemsProcessed(state.iterations() * kBatchSize);
@@ -299,10 +383,14 @@ void BM_wilson_ctr_vector_jit(benchmark::State& state) {
 
 }  // namespace wilson
 
-BENCHMARK(wilson::BM_wilson_ctr_scalar_native)->Setup(wilson::SetupScalar);
-BENCHMARK(wilson::BM_wilson_ctr_scalar_jit)->Setup(wilson::SetupScalar);
-BENCHMARK(wilson::BM_wilson_ctr_vector_native)->Setup(wilson::SetupScalar);
-BENCHMARK(wilson::BM_wilson_ctr_vector_jit)->Setup(wilson::SetupVector);
+BENCHMARK(wilson::BM_wilson_ctr_f64_scalar_native)->Setup(wilson::SetupF64Scalar);
+BENCHMARK(wilson::BM_wilson_ctr_f64_scalar_jit)->Setup(wilson::SetupF64Scalar);
+BENCHMARK(wilson::BM_wilson_ctr_f64_vector_native)->Setup(wilson::SetupF64Scalar);
+BENCHMARK(wilson::BM_wilson_ctr_f64_vector_jit)->Setup(wilson::SetupF64Vector);
+BENCHMARK(wilson::BM_wilson_ctr_f32_scalar_native)->Setup(wilson::SetupF32Scalar);
+BENCHMARK(wilson::BM_wilson_ctr_f32_scalar_jit)->Setup(wilson::SetupF32Scalar);
+BENCHMARK(wilson::BM_wilson_ctr_f32_vector_native)->Setup(wilson::SetupF32Scalar);
+BENCHMARK(wilson::BM_wilson_ctr_f32_vector_jit)->Setup(wilson::SetupF32Vector);
 
 // ===========================================================================
 // SCENARIO 3 -- Branchy order-rule classification (scalar only)
