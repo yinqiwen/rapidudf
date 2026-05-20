@@ -41,10 +41,12 @@
 #include <chrono>
 #include <cmath>
 #include <functional>
+#include <numeric>
 #include <random>
 #include <type_traits>
 #include <vector>
 
+#include "rapidudf/functions/simd/vector_misc.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/rapidudf.h"
 
@@ -745,7 +747,67 @@ TEST(MathComplex, BoostScores_Feeds_Struct) {
 }
 
 // ===========================================================================
-// SECTION 8 -- Misc (random builtin)
+// SECTION 8 -- Distance / inner-product C++ library APIs
+//   `dot_distance`, `l2_distance`, `cos_distance` are exposed as templated
+//   C++ APIs in `rapidudf::functions::simd_vector_*`. They have OP_* enums
+//   in optype.h but are not yet wired up as JIT builtins under those names
+//   (the JIT-side mangled symbol differs from the actual function name --
+//   tracked separately).
+// ===========================================================================
+
+namespace {
+
+float NativeDot(const std::vector<float>& a, const std::vector<float>& b) {
+  return std::inner_product(a.begin(), a.end(), b.begin(), 0.0f);
+}
+
+float NativeL2Norm(const std::vector<float>& v) { return std::sqrt(NativeDot(v, v)); }
+
+float NativeL2Distance(const std::vector<float>& a, const std::vector<float>& b) {
+  float s = 0;
+  for (size_t i = 0; i < a.size(); ++i) s += (a[i] - b[i]) * (a[i] - b[i]);
+  return std::sqrt(s);
+}
+
+float NativeCosineDistance(const std::vector<float>& a, const std::vector<float>& b) {
+  float dot = NativeDot(a, b);
+  float na = NativeL2Norm(a);
+  float nb = NativeL2Norm(b);
+  if (na == 0.0f || nb == 0.0f) return 0.0f;
+  return 1.0f - dot / (na * nb);
+}
+
+}  // namespace
+
+TEST(MathDistance, Dot_LibAPI_F32) {
+  std::vector<float> a, b;
+  for (size_t i = 0; i < 100; ++i) {
+    a.push_back(i + 1.1f);
+    b.push_back(i + 0.5f);
+  }
+  EXPECT_FLOAT_EQ(rapidudf::functions::simd_vector_dot_distance<float>(a, b), NativeDot(a, b));
+}
+
+TEST(MathDistance, L2Distance_LibAPI_F32) {
+  std::vector<float> a, b;
+  for (size_t i = 0; i < 100; ++i) {
+    a.push_back(i + 1.1f);
+    b.push_back(i + 1.88f);
+  }
+  EXPECT_FLOAT_EQ(rapidudf::functions::simd_vector_l2_distance<float>(a, b), NativeL2Distance(a, b));
+}
+
+TEST(MathDistance, CosineDistance_LibAPI_F32) {
+  std::vector<float> a, b;
+  for (size_t i = 0; i < 124; ++i) {
+    a.push_back(i + 1.1f);
+    b.push_back(i + 1.58f);
+  }
+  EXPECT_FLOAT_EQ(rapidudf::functions::simd_vector_cosine_distance<float>(a, b), NativeCosineDistance(a, b));
+}
+
+// ===========================================================================
+// SECTION 9 -- Misc (random builtin)
 // ===========================================================================
 
 TEST(MathMisc, Random_Smoke) {

@@ -15,68 +15,20 @@
  */
 
 // SIMD-vector-specific structural tests: comparison, ternary, string compare,
-// filter / gather / find search ops, custom user vector functions, and the
-// distance-function library APIs.
+// filter / gather / find search ops, custom user vector functions.
 //
-// Pure math operator/function correctness lives in math_test.cc.
+// Math operator/function correctness (including dot / l2_distance /
+// cos_distance) lives in math_test.cc.
 
 #include <gtest/gtest.h>
-#include <cmath>
-#include <functional>
-#include <numeric>
 #include <vector>
 
 #include "rapidudf/context/context.h"
-#include "rapidudf/functions/simd/vector_misc.h"
 #include "rapidudf/log/log.h"
 #include "rapidudf/meta/function.h"
-#include "rapidudf/meta/optype.h"
 #include "rapidudf/rapidudf.h"
 
 using namespace rapidudf;
-
-static float l2_distance(const std::vector<float>& vec1, const std::vector<float>& vec2) {
-  if (vec1.size() != vec2.size()) {
-    throw std::invalid_argument("Vectors must have the same length.");
-  }
-
-  float sum_of_squares = std::inner_product(vec1.begin(), vec1.end(), vec2.begin(), 0.0f, std::plus<>(),
-                                            [](float a, float b) { return (a - b) * (a - b); });
-
-  return std::sqrt(sum_of_squares);
-}
-static float dot_product(const std::vector<float>& vec1, const std::vector<float>& vec2) {
-  if (vec1.size() != vec2.size()) {
-    throw std::invalid_argument("Vectors must have the same length.");
-  }
-  return std::inner_product(vec1.begin(), vec1.end(), vec2.begin(), 0.0f);
-}
-
-static float l2_norm(const std::vector<float>& vec) {
-  float sum_of_squares = std::inner_product(vec.begin(), vec.end(), vec.begin(), 0.0f, std::plus<>(),
-                                            [](float a, float b) { return a * b; });
-  return std::sqrt(sum_of_squares);
-}
-
-static float cosine_similarity(const std::vector<float>& vec1, const std::vector<float>& vec2) {
-  if (vec1.size() != vec2.size()) {
-    throw std::invalid_argument("Vectors must have the same length.");
-  }
-
-  float dot = dot_product(vec1, vec2);
-
-  float norm1 = l2_norm(vec1);
-  float norm2 = l2_norm(vec2);
-
-  if (norm1 == 0.0f || norm2 == 0.0f) {
-    return 0.0f;
-  }
-  return dot / (norm1 * norm2);
-}
-
-static float cosine_distance(const std::vector<float>& vec1, const std::vector<float>& vec2) {
-  return 1.0f - cosine_similarity(vec1, vec2);
-}
 
 TEST(JitCompiler, vector_cmp) {
   std::vector<int> vec{1, 2, 3};
@@ -241,22 +193,6 @@ TEST(JitCompiler, find_gt) {
   ASSERT_EQ(n, 101);
 }
 
-TEST(JitCompiler, example) {
-  std::string source = R"(
-     x*y + sin(z)
-  )";
-
-  rapidudf::JitCompiler compiler({.print_asm = true});
-  using simd_vector_f32 = rapidudf::Vector<float>;
-  auto result =
-      compiler.CompileExpression<simd_vector_f32, Context&, simd_vector_f32, simd_vector_f32, simd_vector_f32>(
-          source, {"_", "x", "y", "z"});
-  if (!result.ok()) {
-    RUDF_ERROR("{}", result.status().ToString());
-  }
-  ASSERT_TRUE(result.ok());
-}
-
 struct TestParams {
   int boost = 2;
 };
@@ -304,26 +240,4 @@ TEST(JitCompiler, user_vector_func) {
   for (size_t i = 0; i < test_x.size(); i++) {
     ASSERT_EQ(z[i], test_z[i]);
   }
-}
-
-TEST(JitCompiler, vector_l2_distance) {
-  std::vector<float> vec1, vec2;
-  for (size_t i = 0; i < 100; i++) {
-    vec1.emplace_back(i + 1.1);
-    vec2.emplace_back(i + 1.88);
-  }
-  float score = l2_distance(vec1, vec2);
-  float score1 = functions::simd_vector_l2_distance<float>(vec1, vec2);
-  ASSERT_FLOAT_EQ(score, score1);
-}
-
-TEST(JitCompiler, vector_cos_distance) {
-  std::vector<float> vec1, vec2;
-  for (size_t i = 0; i < 124; i++) {
-    vec1.emplace_back(i + 1.1);
-    vec2.emplace_back(i + 1.58);
-  }
-  float score = cosine_distance(vec1, vec2);
-  float score1 = functions::simd_vector_cosine_distance<float>(vec1, vec2);
-  ASSERT_FLOAT_EQ(score, score1);
 }
