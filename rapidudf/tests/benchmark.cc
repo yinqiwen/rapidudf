@@ -175,10 +175,8 @@ BENCHMARK(expr::BM_expr_vector_jit)->Setup(expr::SetupVector);
 // SCENARIO 2 -- Wilson CTR
 //   ctr(exp, clk) = log10(exp) * (... clk/exp ... sqrt ...) / (...)
 //
-// Benchmarked with both f64 and f32 element types. The f32 JIT scalar source
-// uses typed literals (e.g. `1.96_f32`) because mixing untyped double literals
-// with f32 scalar variables otherwise tickles a JIT FPTrunc/FPExt typing bug;
-// the vector code path doesn't have that problem and accepts plain literals.
+// Benchmarked with both f64 and f32 element types so the SIMD speedup at
+// narrower lane widths is visible.
 // ===========================================================================
 
 namespace wilson {
@@ -261,11 +259,10 @@ constexpr const char* kScalarSourceF64 = R"(
 constexpr const char* kScalarSourceF32 = R"(
   f32 wilson_ctr(f32 exp_cnt, f32 clk_cnt) {
     return log10(exp_cnt) *
-           (clk_cnt / exp_cnt + 1.96_f32 * 1.96_f32 / (2_f32 * exp_cnt) -
-            1.96_f32 / (2_f32 * exp_cnt) *
-              sqrt(4_f32 * exp_cnt * (1_f32 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt +
-                   1.96_f32 * 1.96_f32)) /
-           (1_f32 + 1.96_f32 * 1.96_f32 / exp_cnt);
+           (clk_cnt / exp_cnt + 1.96 * 1.96 / (2 * exp_cnt) -
+            1.96 / (2 * exp_cnt) *
+              sqrt(4 * exp_cnt * (1 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96 * 1.96)) /
+           (1 + 1.96 * 1.96 / exp_cnt);
   }
 )";
 
@@ -282,11 +279,10 @@ constexpr const char* kVectorSourceF64 = R"(
 constexpr const char* kVectorSourceF32 = R"(
   simd_vector<f32> wilson_ctr(Context ctx, simd_vector<f32> exp_cnt, simd_vector<f32> clk_cnt) {
     return log10(exp_cnt) *
-           (clk_cnt / exp_cnt + 1.96_f32 * 1.96_f32 / (2_f32 * exp_cnt) -
-            1.96_f32 / (2_f32 * exp_cnt) *
-              sqrt(4_f32 * exp_cnt * (1_f32 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt +
-                   1.96_f32 * 1.96_f32)) /
-           (1_f32 + 1.96_f32 * 1.96_f32 / exp_cnt);
+           (clk_cnt / exp_cnt + 1.96 * 1.96 / (2 * exp_cnt) -
+            1.96 / (2 * exp_cnt) *
+              sqrt(4 * exp_cnt * (1 - clk_cnt / exp_cnt) * clk_cnt / exp_cnt + 1.96 * 1.96)) /
+           (1 + 1.96 * 1.96 / exp_cnt);
   }
 )";
 

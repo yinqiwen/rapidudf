@@ -46,10 +46,18 @@ absl::StatusOr<::llvm::Value*> CodeGen::CastTo(::llvm::Value* val, DType src_dty
         new_val = builder_->CreateUIToFP(val, dst_type);
       }
     } else {
+      // Both src and dst are floating-point: pick FPTrunc when narrowing
+      // (src bits > dst bits) and FPExt when widening. The previous version
+      // had these branches swapped, producing IR like
+      //   `fptrunc float to double` / `fpext double to float`
+      // which the LLVM IRBuilder rejects ("DestTy too big for FPTrunc" /
+      // "DestTy too small for FPExt"). The bug only triggered on scalar
+      // float-to-float conversions (e.g. an f32 variable mixed with an
+      // f64 literal in arithmetic); SIMD/vector code paths were unaffected.
       if (src_dtype.Bits() > dst_dtype.Bits()) {
-        new_val = builder_->CreateFPExt(val, dst_type);
-      } else {
         new_val = builder_->CreateFPTrunc(val, dst_type);
+      } else {
+        new_val = builder_->CreateFPExt(val, dst_type);
       }
     }
   } else {
