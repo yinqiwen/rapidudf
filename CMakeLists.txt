@@ -35,6 +35,8 @@ function(rapidudf_add_sources)
 endfunction()
 
 add_subdirectory(rapidudf)
+enable_testing()
+add_subdirectory(rapidudf/tests)
 get_property(rapidudf_srcs GLOBAL PROPERTY RAPIDUDF_SOURCES)
 
 foreach(SOURCE IN LISTS rapidudf_srcs)
@@ -65,6 +67,13 @@ target_include_directories(rapidudf_core
 # )
 add_library(rapidudf $<TARGET_OBJECTS:rapidudf_core>)
 target_link_libraries(rapidudf PUBLIC ${RAPIDUDF_LINK_LIBRARIES})
+target_include_directories(rapidudf
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${RAPIDUDF_INCLUDE_DIRECTORIES}>
+    $<BUILD_INTERFACE:${RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 target_include_directories(rapidudf  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>"
                                             "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 

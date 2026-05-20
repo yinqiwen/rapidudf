@@ -8,26 +8,44 @@ add_definitions(${LLVM_DEFINITIONS_LIST})
 llvm_map_components_to_libnames(llvm_libs support core target orcjit x86codegen x86asmparser)
 list(APPEND RAPIDUDF_LINK_LIBRARIES ${llvm_libs})
 
-find_package(Boost 1.51.0 REQUIRED)
+find_package(Boost 1.51.0 REQUIRED COMPONENTS system thread)
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS})
+list(APPEND RAPIDUDF_LINK_LIBRARIES Boost::system Boost::thread)
 
 find_package(PkgConfig)
 pkg_check_modules(x86simdsortcpp REQUIRED IMPORTED_TARGET x86simdsortcpp)
 list(APPEND RAPIDUDF_LINK_LIBRARIES PkgConfig::x86simdsortcpp)
 
 
-find_package(fmt 9.0)
-if(NOT fmt_FOUND)
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt
-  GIT_TAG        e69e5f977d458f2650bb346dadf2ad30c5320281
-  OVERRIDE_FIND_PACKAGE
-) 
-FetchContent_MakeAvailable(fmt)
-list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${fmt_SOURCE_DIR}/include)
+# Check system fmt headers before deciding to fetch
+# (avoid find_package + FetchContent target conflict)
+set(RAPIDUDF_FETCH_FMT OFF)
+find_path(_FMT_CORE_H fmt/core.h HINTS /usr/local/include /usr/include)
+if(_FMT_CORE_H)
+  file(STRINGS "${_FMT_CORE_H}/fmt/core.h" _fmt_ver_line REGEX "^#define FMT_VERSION ")
+  if(_fmt_ver_line)
+    string(REGEX MATCH "[0-9]+" _fmt_hdr_ver "${_fmt_ver_line}")
+    if(_fmt_hdr_ver LESS 70000)
+      message(STATUS "System fmt headers version ${_fmt_hdr_ver} is too old, fetching fresh copy")
+      set(RAPIDUDF_FETCH_FMT ON)
+    endif()
+  endif()
 else()
-list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${fmt_INCLUDE_DIRS})
+  set(RAPIDUDF_FETCH_FMT ON)
+endif()
+
+if(RAPIDUDF_FETCH_FMT)
+  FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt
+    GIT_TAG        e69e5f977d458f2650bb346dadf2ad30c5320281
+    OVERRIDE_FIND_PACKAGE
+  )
+  FetchContent_MakeAvailable(fmt)
+  list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${fmt_SOURCE_DIR}/include)
+else()
+  find_package(fmt REQUIRED)
+  list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${fmt_INCLUDE_DIRS})
 endif()
 list(APPEND RAPIDUDF_LINK_LIBRARIES fmt::fmt)
 
@@ -131,6 +149,10 @@ list(APPEND RAPIDUDF_LINK_LIBRARIES protobuf::libprotobuf)
 find_package(Flatbuffers)
 if(NOT Flatbuffers_FOUND)
 set(FLATBUFFERS_BUILD_TESTS OFF CACHE INTERNAL "Turn off tests")
+# GCC 13+ triggers -Werror=stringop-overflow in flatbuffers reflection.cpp
+# Add -Wno-error=stringop-overflow to prevent this from being fatal
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=stringop-overflow")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=stringop-overflow")
 FetchContent_Declare(
     flatbuffers
     GIT_REPOSITORY https://github.com/google/flatbuffers.git
@@ -160,6 +182,28 @@ FetchContent_MakeAvailable(nlohmann_json)
 list(APPEND RAPIDUDF_LOCAL_INCLUDE_DIRECTORIES ${nlohmann_json_SOURCE_DIR}/include)
 else()
 list(APPEND RAPIDUDF_INCLUDE_DIRECTORIES ${nlohmann_json_INCLUDE_DIRS})
+endif()
+
+# Prefer /usr/local/lib over system path to avoid header/library version mismatch
+find_package(GTest HINTS /usr/local/lib/cmake/GTest /usr/local)
+if(NOT GTest_FOUND)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest
+  GIT_TAG        v1.14.0
+)
+FetchContent_MakeAvailable(googletest)
+endif()
+
+find_package(benchmark)
+if(NOT benchmark_FOUND)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE INTERNAL "Turn off tests")
+FetchContent_Declare(
+  benchmark
+  GIT_REPOSITORY https://github.com/google/benchmark
+  GIT_TAG        v1.8.3
+)
+FetchContent_MakeAvailable(benchmark)
 endif()
 
 message("RAPIDUDF_LINK_LIBRARIES: ${RAPIDUDF_LINK_LIBRARIES}")
