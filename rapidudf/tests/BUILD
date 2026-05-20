@@ -21,16 +21,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "fib_bench",
-    srcs = ["fib_bench.cc"],
-    linkopts = RUDF_DEFAULT_LINKOPTS,
-    deps = [
-        "//rapidudf",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-cc_binary(
     name = "benchmark",
     srcs = ["benchmark.cc"],
     copts = ["-O2"],
@@ -329,18 +319,6 @@ cc_test(
     name = "array_test",
     size = "small",
     srcs = ["array_test.cc"],
-    linkopts = RUDF_DEFAULT_LINKOPTS,
-    linkstatic = True,
-    deps = [
-        "//rapidudf",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "arithmetic_test",
-    size = "small",
-    srcs = ["arithmetic_test.cc"],
     linkopts = RUDF_DEFAULT_LINKOPTS,
     linkstatic = True,
     deps = [

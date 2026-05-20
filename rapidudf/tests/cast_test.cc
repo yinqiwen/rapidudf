@@ -77,3 +77,38 @@ TEST(JitCompiler, u8_to_u32_zero_extension) {
   ASSERT_EQ(f(static_cast<uint8_t>(255)), 255U);
   ASSERT_EQ(f(static_cast<uint8_t>(0)), 0U);
 }
+
+// Regression: scalar floating-point widening must use fpext (not fptrunc).
+TEST(JitCompiler, f32_to_f64_widen) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  auto rc = compiler.CompileExpression<double, float>("x", {"x"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_DOUBLE_EQ(f(1.5f), 1.5);
+  ASSERT_DOUBLE_EQ(f(-3.25f), -3.25);
+}
+
+// Regression: scalar floating-point narrowing must use fptrunc (not fpext).
+TEST(JitCompiler, f64_to_f32_narrow) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  auto rc = compiler.CompileExpression<float, double>("x", {"x"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_FLOAT_EQ(f(2.5), 2.5f);
+  ASSERT_FLOAT_EQ(f(-7.125), -7.125f);
+}
+
+// Regression: mixing an f32 variable with f64 literals should compile and
+// run correctly. Previously this triggered "DestTy too big for FPTrunc"
+// during JIT codegen because the FPExt/FPTrunc branches were swapped.
+TEST(JitCompiler, f32_var_with_f64_literal) {
+  spdlog::set_level(spdlog::level::debug);
+  JitCompiler compiler;
+  auto rc = compiler.CompileExpression<float, float>("x * 1.5 + 2.25", {"x"});
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  ASSERT_FLOAT_EQ(f(2.0f), 2.0f * 1.5f + 2.25f);
+  ASSERT_FLOAT_EQ(f(-4.0f), -4.0f * 1.5f + 2.25f);
+}
