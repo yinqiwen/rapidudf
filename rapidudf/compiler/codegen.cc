@@ -138,31 +138,28 @@ CodeGen::CodeGen(const Options& opts) : opts_(opts), label_cursor_(0) {
   }
 
   func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>();
-  if (!opts_.skip_auto_vectorize_passes) {
-    // The standard simplification pipeline already runs SROA/InstCombine/
-    // Reassociate/NewGVN/SimplifyCFG (multiple iterations) plus
-    // PartiallyInlineLibCalls / MergedLoadStoreMotion / TailCallElim. Reuse it
-    // and avoid running those passes a second time below.
+  // Always run LLVM's standard function simplification pipeline. It iterates
+  // SROA / InstCombine / SimplifyCFG / JumpThreading / CorrelatedValuePropagation
+  // multiple times, which is essential for branchy scalar code -- e.g. an
+  // if/elif/else chain with overlapping range checks (`amount >= 100 &&
+  // amount < 500`) only collapses to a single bounds compare after JumpThreading
+  // proves the lower-bound from the earlier branch and CVP simplifies the
+  // remaining comparison. The cost is minor for typical UDF script sizes.
+  //
+  // `skip_auto_vectorize_passes` only skips the explicit vectorizer passes
+  // (LoadStoreVectorizer / SLPVectorizer / VectorCombine / LoopVectorize) on
+  // top, since UDF SIMD ops are emitted as hand-written intrinsics and don't
+  // need LLVM auto-vectorization on top.
+  {
     auto func_pass_manager =
         pass_builder.buildFunctionSimplificationPipeline(opt_level, ::llvm::ThinOrFullLTOPhase::ThinLTOPostLink);
     func_pass_manager_ = std::make_unique<::llvm::FunctionPassManager>(std::move(func_pass_manager));
+  }
+  if (!opts_.skip_auto_vectorize_passes) {
     func_pass_manager_->addPass(::llvm::LoadStoreVectorizerPass());
     func_pass_manager_->addPass(::llvm::SLPVectorizerPass());
     func_pass_manager_->addPass(::llvm::VectorCombinePass());
     func_pass_manager_->addPass(::llvm::LoopVectorizePass());
-  } else {
-    // Lightweight default pipeline. Promote alloca'd locals/parameters to SSA
-    // registers (SROA / mem2reg) before the rest of the simplification passes;
-    // without it the per-variable CreateAlloca + load/store IR emitted by the
-    // codegen stays in the final machine code as real stack traffic.
-    func_pass_manager_->addPass(::llvm::SROAPass(::llvm::SROAOptions::ModifyCFG));
-    func_pass_manager_->addPass(::llvm::InstCombinePass());
-    func_pass_manager_->addPass(::llvm::ReassociatePass());
-    func_pass_manager_->addPass(llvm::NewGVNPass());
-    func_pass_manager_->addPass(::llvm::SimplifyCFGPass());
-    func_pass_manager_->addPass(::llvm::PartiallyInlineLibCallsPass());
-    func_pass_manager_->addPass(::llvm::MergedLoadStoreMotionPass());
-    func_pass_manager_->addPass(::llvm::TailCallElimPass());
   }
 }
 
