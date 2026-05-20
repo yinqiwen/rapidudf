@@ -76,6 +76,7 @@ cc_library(
     name = "vector",
     srcs = [
         "bits.cc",
+        "sleef_dispatch-inl.h",
         "vector_binary.cc",
         "vector_ternary.cc",
         "vector_unary.cc",

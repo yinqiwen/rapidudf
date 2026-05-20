@@ -30,18 +30,10 @@
 #include "hwy/contrib/math/math-inl.h"
 #include "hwy/highway.h"
 
-#include <x86intrin.h>
-
-extern "C" {
-extern __m128 Sleef_powf4_u10(__m128, __m128);
-extern __m256 Sleef_powf8_u10(__m256, __m256);
-extern __m512 Sleef_powf16_u10(__m512, __m512);
-
-extern __m128d Sleef_powd2_u10(__m128d, __m128d);
-extern __m256d Sleef_powd4_u10(__m256d, __m256d);
-extern __m512d Sleef_powd8_u10(__m512d, __m512d);
-}
-#include "sleef.h"
+// Pulls in extern "C" SLEEF declarations and per-target RUDF_SLEEF_F /
+// RUDF_SLEEF_D macros. Re-processed per target via the HWY_TARGET_TOGGLE
+// guard inside the header.
+#include "rapidudf/functions/simd/sleef_dispatch-inl.h"
 
 HWY_BEFORE_NAMESPACE();
 namespace rapidudf {
@@ -50,7 +42,7 @@ namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
 
 template <class D, OpToken op, typename V = hn::VFromD<D>>
-HWY_INLINE auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
+static HWY_INLINE auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
   if constexpr (op == OP_HYPOT) {
     return hn::Hypot(d, lv, rv);
   } else if constexpr (op == OP_ABS_DIFF) {
@@ -58,37 +50,23 @@ HWY_INLINE auto do_simd_binary_op([[maybe_unused]] D d, V lv, V rv) {
   } else if constexpr (op == OP_ATAN2) {
     return hn::Atan2(d, lv, rv);
   } else if constexpr (op == OP_MULTIPLY) {
+    // Reserved: no DEFINE_SIMD_BINARY_OP(OP_MULTIPLY, ...) is currently emitted,
+    // so this branch is not instantiated. Kept for future use.
     return hn::Mul(lv, rv);
   } else if constexpr (op == OP_DIVIDE) {
+    // Reserved (see OP_MULTIPLY note).
     return hn::Div(lv, rv);
   } else if constexpr (op == OP_POW) {
+    // Highway has no Pow; SLEEF is required.
+#if !defined(RUDF_SLEEF_NO_SIMD)
     if constexpr (std::is_same_v<hn::TFromV<V>, float>) {
-#if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
-      auto val = Sleef_powf16_u10(lv.raw, rv.raw);
-      return V{val};
-#elif HWY_TARGET == HWY_AVX2
-      auto val = Sleef_powf8_u10(lv.raw, rv.raw);
-      return V{val};
-#elif HWY_TARGET == HWY_SSE4 || HWY_TARGET == HWY_SSSE3 || HWY_TARGET == HWY_SSE2
-      auto val = Sleef_powf4_u10(lv.raw, rv.raw);
-      return V{val};
-#else
-      static_assert(sizeof(lv.raw) == -1, "unsupported type");
-#endif
+      return V{RUDF_SLEEF_F(pow, _u10)(lv.raw, rv.raw)};
     } else {
-#if HWY_TARGET == HWY_AVX3 || HWY_TARGET == HWY_AVX3_ZEN4 || HWY_TARGET == HWY_AVX3_DL || HWY_TARGET == HWY_AVX3_SPR
-      auto val = Sleef_powd8_u10(lv.raw, rv.raw);
-      return V{val};
-#elif HWY_TARGET == HWY_AVX2
-      auto val = Sleef_powd4_u10(lv.raw, rv.raw);
-      return V{val};
-#elif HWY_TARGET == HWY_SSE4 || HWY_TARGET == HWY_SSE2 || HWY_TARGET == HWY_SSSE3
-      auto val = Sleef_powd2_u10(lv.raw, rv.raw);
-      return V{val};
-#else
-      static_assert(sizeof(lv.raw) == -1, "unsupported target");
-#endif
+      return V{RUDF_SLEEF_D(pow, _u10)(lv.raw, rv.raw)};
     }
+#else
+    static_assert(sizeof(V) == -1, "OP_POW requires SLEEF (x86 or ARM NEON)");
+#endif
   } else {
     static_assert(sizeof(V) == -1, "unsupported op");
   }
