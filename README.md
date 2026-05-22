@@ -11,11 +11,11 @@
 - **Easy to Use**:
   - Provides support for conventional expression syntax
   - For more complex logic, supports a C-like DSL including if-elif-else* conditional control, while loop control, auto temporary variables, etc.;
-  - For columnar memory data (vector<T>), provides dynamic Table APIs similar to Spark's DataFrame and operations like filter/order_by/topk/take;
+  - For columnar memory data (vector<T>), provides dynamic Table APIs similar to Spark's DataFrame and operations like filter/order_by/topk/take/group_by/concat/distinct/map/flatmap/merge;
 - **High Performance**:
   - Based on LLVM JIT compilation, startup and execution performance comparable to native cpp implementation;
   - For columnar memory data (vector<T>), provides SIMD vectorization acceleration implementation
-- **Thread Safe**: 
+- **Thread Safe**:
   - State-less JIT-generated C methods are naturally thread-safe
 - **FFI**:
   - Supports zero-cost access to C++ defined class objects (custom classes/stl/protobufs/flatbuffers/...) in expressions/UDFs
@@ -24,6 +24,8 @@
   - [built-in data types](docs/dtype.md)
   - [built-in operators](docs/operator.md)
   - [built-in functions](docs/builtin_function.md)
+- **Configurable Compilation**:
+  - Supports configurable LLVM optimization level, fast-math, and other compilation options
 
 ## Compilation and Installation
 Compilation requires a compiler that supports C++17
@@ -52,7 +54,7 @@ cc_library(
 )
 ```
 ### CMake
-First, compile and instal `rapidudf` 
+First, compile and install `rapidudf`
 ```bash
 cd <rapidudf src dir>
 mkdir build; cd build;
@@ -109,14 +111,14 @@ int main() {
   //   rapidudf::set_default_logger(mylogger);
   // 2. UDF string
   std::string source = R"(
-    int fib(int n) 
-    { 
+    int fib(int n)
+    {
        if (n <= 1){
-         return n; 
+         return n;
        }
        // Supports cpp // comments
        return fib(n - 1) + fib(n - 2);  // Recursive call
-    } 
+    }
   )";
   // 3. Compile to generate Function, the generated Function object can be saved for subsequent repeated execution; compilation usually takes between 10ms-100ms;
   rapidudf::JitCompiler compiler;
@@ -144,11 +146,11 @@ using namespace rapidudf;
 int main() {
   // 2. UDF string
   std::string source = R"(
-    simd_vector<f32> boost_scores(Context ctx, simd_vector<string_view> location, simd_vector<f32> score) 
-    { 
+    simd_vector<f32> boost_scores(Context ctx, simd_vector<string_view> location, simd_vector<f32> score)
+    {
       auto boost=(location=="home"?2.0_f32:0_f32);
       return score*boost;
-    } 
+    }
   )";
 
   // 3. Compile to generate Function, the generated Function object can be saved for subsequent use
@@ -156,7 +158,7 @@ int main() {
   // CompileFunction's template parameters support multiple types, the first template parameter is the return type, the rest are function parameter types
   // 'rapidudf::Context' is a mandatory parameter involved in arena memory allocation in the simd implementation
   auto result =
-      compiler.CompileFunction<simd::Vector<float>, rapidudf::Context&, simd::Vector<StringView>, simd::Vector<float>>(
+      compiler.CompileFunction<Vector<float>, rapidudf::Context&, Vector<StringView>, Vector<float>>(
           source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
@@ -174,9 +176,13 @@ int main() {
   // 5. Execute function
   rapidudf::Context ctx;
   auto f = std::move(result.value());
-  auto new_scores = f(ctx, ctx.NewSimdVector(locations), ctx.NewSimdVector(scores));
-  for (size_t i = 0; i < new_scores.Size(); i++) {
-    // RUDF_INFO("{}", new_scores[i]);
+  try {
+    auto new_scores = f(ctx, ctx.NewVector(locations), ctx.NewVector(scores));
+    for (size_t i = 0; i < new_scores.Size(); i++) {
+      // RUDF_INFO("{}", new_scores[i]);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
   return 0;
 };
@@ -185,9 +191,14 @@ int main() {
 ### Dynamic Vector Table
 **RapidUDF** supports dynamically creating vector tables, allowing arbitrary computational operations on table columns (accelerated through SIMD) in expressions/UDFs;
 The table class also provides operations similar to Spark DataFrame, such as:
-- `.filter(simd::Vector<Bit>)`   returns a new table instance filtered by condition
-- `.order_by(simd::Vector<T> column, bool descending)`   returns a new table instance sorted by condition
-- `.topk(simd::Vector<T> column, uint32_t k, bool descending)`  returns a new table instance with top k entries
+- `.filter(Vector<Bit>)`   returns a new table instance filtered by condition
+- `.order_by(Vector<T> column, bool descending)`   returns a new table instance sorted by condition
+- `.topk(Vector<T> column, uint32_t k, bool descending)`  returns a new table instance with top k entries
+- `.group_by(Vector<T> column)`   returns grouped table instances
+- `.concat(Table* other)`   returns a new table instance concatenated with another table
+- `.distinct(columns)`   removes duplicate rows by specified columns
+- `.map(schema, func)` / `.flatmap(schema, func)`   row-wise transformation
+- `.merge(other, columns, func)`   merge with conflict resolution
 ```cpp
 #include "rapidudf/rapidudf.h"
 
@@ -202,23 +213,23 @@ RUDF_STRUCT_FIELDS(Student, name, age, score, gender)
 int main() {
   // 1. Create table schema
   auto schema =
-      simd::TableSchema::GetOrCreate("Student", [](simd::TableSchema* s) { std::ignore = s->AddColumns<Student>(); });
+      table::TableSchema::GetOrCreate("Student", [](table::TableSchema* s) { std::ignore = s->AddColumns<Student>(); });
 
   // 2. UDF string, table<TABLE_NAME> generic format where TABLE_NAME must match the previously created table schema name
-  // table supports filter/order_by/topk/take, etc. operations
+  // table supports filter/order_by/topk/take/group_by/concat/distinct/map/flatmap/merge, etc. operations
   std::string source = R"(
-    table<Student> select_students(Context ctx, table<Student> x) 
-    { 
+    table<Student> select_students(Context ctx, table<Student> x)
+    {
        auto filtered = x.filter(x.score >90 && x.age<10);
        // Sort by score in descending order and take top 10
-       return filtered.topk(filtered.score,10,true); 
-    } 
+       return filtered.topk(filtered.score,10,true);
+    }
   )";
 
   // 3. Compile to generate Function, the generated Function object can be saved for subsequent use
   rapidudf::JitCompiler compiler;
   // CompileFunction's template parameters support multiple types, the first template parameter is the return type, the rest are function parameter types
-  auto result = compiler.CompileFunction<simd::Table*, Context&, simd::Table*>(source);
+  auto result = compiler.CompileFunction<table::Table*, Context&, table::Table*>(source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;
@@ -239,14 +250,18 @@ int main() {
   std::ignore = table->AddRows(students);
 
   // 5. Execute function
-  auto result_table = f(ctx, table.get());
-  auto result_scores = result_table->Get<float>("score").value();
-  auto result_names = result_table->Get<StringView>("name").value();
-  auto result_ages = result_table->Get<uint16_t>("age").value();
-  auto result_genders = result_table->Get<Bit>("gender").value();
-  for (size_t i = 0; i < result_scores.Size(); i++) {
-    RUDF_INFO("name:{},score:{},age:{},gender:{}", result_names[i], result_scores[i], result_ages[i],
-              result_genders[i] ? true : false);
+  try {
+    auto result_table = f(ctx, table.get());
+    auto result_scores = result_table->Get<float>("score").value();
+    auto result_names = result_table->Get<StringView>("name").value();
+    auto result_ages = result_table->Get<uint16_t>("age").value();
+    auto result_genders = result_table->Get<Bit>("gender").value();
+    for (size_t i = 0; i < result_scores.Size(); i++) {
+      RUDF_INFO("name:{},score:{},age:{},gender:{}", result_names[i], result_scores[i], result_ages[i],
+                result_genders[i] ? true : false);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
   return 0;
 };
@@ -255,9 +270,9 @@ int main() {
 ### Dynamic Vector Table Based on Protobuf/Flatbuffers/Struct
 **RapidUDF** can also create a table from Protobuf/Flatbuffers, avoiding the tedious process of creating a TableSchema. Building table instances can be done directly from arrays of Protobuf objects such as `std::vector<T>, std::vector<const T*>, std::vector<T*>`.
 
-Here is an example of creating a vector table based on Protobuf;  
-Examples based on flatbuffers can be found in [fbs_vector_table_udf](rapidudf/examples/fbs_vector_table_udf.cc);    
-Examples based on struct can be found in [struct_vector_table_udf](rapidudf/examples/struct_vector_table_udf.cc);    
+Here is an example of creating a vector table based on Protobuf;
+Examples based on flatbuffers can be found in [fbs_vector_table_udf](rapidudf/examples/fbs_vector_table_udf.cc);
+Examples based on struct can be found in [struct_vector_table_udf](rapidudf/examples/struct_vector_table_udf.cc);
 ```cpp
 #include "rapidudf/examples/student.pb.h"
 #include "rapidudf/rapidudf.h"
@@ -265,22 +280,22 @@ Examples based on struct can be found in [struct_vector_table_udf](rapidudf/exam
 using namespace rapidudf;
 int main() {
   // 1. Create table schema
-  auto schema = simd::TableSchema::GetOrCreate(
-      "Student", [](simd::TableSchema* s) { std::ignore = s->AddColumns<examples::Student>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "Student", [](table::TableSchema* s) { std::ignore = s->AddColumns<examples::Student>(); });
 
   // 2. UDF string
   std::string source = R"(
-    table<Student> select_students(Context ctx, table<Student> x) 
-    { 
+    table<Student> select_students(Context ctx, table<Student> x)
+    {
        auto filtered = x.filter(x.score >90 && x.age<10);
        // Sort in descending order
-       return filtered.topk(filtered.score,10, true); 
-    } 
+       return filtered.topk(filtered.score,10, true);
+    }
   )";
 
   // 3. Compile to generate Function, the generated Function object can be saved for subsequent use
   rapidudf::JitCompiler compiler;
-  auto result = compiler.CompileFunction<simd::Table*, Context&, simd::Table*>(source);
+  auto result = compiler.CompileFunction<table::Table*, Context&, table::Table*>(source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;
@@ -302,24 +317,30 @@ int main() {
   std::ignore = table->AddRows(students);
 
   // 5. Execute function
-  auto result_table = f(ctx, table.get());
-  // 5.1 Fetch columns
-  auto result_scores = result_table->Get<float>("score").value();
-  auto result_names = result_table->Get<StringView>("name").value();
-  auto result_ages = result_table->Get<int32_t>("age").value();
+  try {
+    auto result_table = f(ctx, table.get());
+    // 5.1 Fetch columns
+    auto result_scores = result_table->Get<float>("score").value();
+    auto result_names = result_table->Get<StringView>("name").value();
+    auto result_ages = result_table->Get<int32_t>("age").value();
 
-  for (size_t i = 0; i < result_scores.Size(); i++) {
-    RUDF_INFO("name:{},score:{},age:{}", result_names[i], result_scores[i], result_ages[i]);
+    for (size_t i = 0; i < result_scores.Size(); i++) {
+      RUDF_INFO("name:{},score:{},age:{}", result_names[i], result_scores[i], result_ages[i]);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
   return 0;
 };
 ```
 
 ### Compilation Cache
-**RapidUDF** incorporates an LRU cache with keys as the string of expressions/UDFs. Users can retrieve compiled JitFunction objects from the cache to avoid parse/compile overhead each time they are used:
+**RapidUDF** incorporates an LRU cache with keys as the string of expressions/UDFs. Users can use `eval_function`/`eval_expression` to compile (or cache-hit) and execute in one call, avoiding parse/compile overhead each time:
 ```cpp
-std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
+#include "rapidudf/rapidudf.h"
+
+using namespace rapidudf;
+int main() {
   JsonObject json;
   json["key"] = 123;
 
@@ -328,17 +349,50 @@ std::vector<int> vec{1, 2, 3};
       return x["key"] == 123;
     }
   )";
-  auto rc = GlobalJitCompiler::GetFunction<bool, const JsonObject&>(content);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-  ASSERT_FALSE(f.IsFromCache());  // 第一次编译
+  // eval_function compiles on first call, then caches for subsequent calls
+  auto rc = exec::eval_function<bool, const JsonObject&>(content, json);
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+    return -1;
+  }
+  bool v = rc.value();  // true
 
-  rc = GlobalJitCompiler::GetFunction<bool, const JsonObject&>(content);
-  ASSERT_TRUE(rc.ok());
-  f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-  ASSERT_TRUE(f.IsFromCache());  //后续从cache中获取
+  // Second call hits the cache, no re-compilation
+  rc = exec::eval_function<bool, const JsonObject&>(content, json);
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+    return -1;
+  }
+  v = rc.value();  // true (from cache)
+  return 0;
+}
+```
+
+### Compiler Options
+**RapidUDF** supports configurable compilation options via the `Options` struct:
+```cpp
+rapidudf::Options opts;
+opts.optimize_level = 2;              // LLVM optimization level (0-3, default 2)
+opts.fast_math = false;               // Enable fast-math optimizations
+opts.print_asm = false;               // Print generated assembly
+opts.skip_auto_vectorize_passes = true; // Skip LLVM auto-vectorization (default true, UDF uses hand-written SIMD)
+rapidudf::JitCompiler compiler(opts);
+```
+
+### Multi-Function Compilation
+**RapidUDF** supports compiling source containing multiple function definitions, then loading individual functions by name:
+```cpp
+std::string source = R"(
+  int add(int a, int b) { return a + b; }
+  int mul(int a, int b) { return a * b; }
+)";
+rapidudf::JitCompiler compiler;
+auto result = compiler.CompileSource(source);
+if (!result.ok()) { ... }
+
+// Load individual functions by name
+auto add_func = compiler.LoadFunction<int, int, int>("add");
+auto mul_func = compiler.LoadFunction<int, int, int>("mul");
 ```
 
 ### More Examples and Usage
@@ -348,7 +402,7 @@ std::vector<int> vec{1, 2, 3};
 - [Using FlatBuffers Objects in Expressions/UDFs](docs/ffi.md)
 - [Using STL Objects in Expressions/UDFs](docs/ffi.md)
 
-There are more examples for different scenarios in the [tests](rapidudf/tests/) code directory.
+There are more examples for different scenarios in the [examples](rapidudf/examples/) and [tests](rapidudf/tests/) code directories.
 
 ## Performance
 
@@ -372,7 +426,7 @@ Note: The Jit implementation currently uses the same jit compilation logic under
 ### Vectorized Acceleration Scenarios
 The following tests were run on a CPU that supports `AVX2`, with the compilation optimization flag `O2`, and an array length of `4099`.
 #### Complex Trigonometric Expression
-The calculation is to execute the double array `x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y`; theoretically, the acceleration ratio should be the multiple of the `AVX2` register width to the `double` width, which is `4`.    
+The calculation is to execute the double array `x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y`; theoretically, the acceleration ratio should be the multiple of the `AVX2` register width to the `double` width, which is `4`.
 Actual results are as follows, showing that the acceleration ratio has exceeded `4` times, reaching **6.09**:
 ```
 Benchmark                               Time             CPU   Iterations
@@ -402,7 +456,7 @@ Corresponding vector UDF script implementation:
          (1 + 1.96 * 1.96 / exp_cnt);
     }
 ```
-Theoretically, the acceleration ratio should be the multiple of the `AVX2` register width to the float width, which is `8`;     
+Theoretically, the acceleration ratio should be the multiple of the `AVX2` register width to the float width, which is `8`;
 Actual results are as follows, showing that the acceleration ratio has exceeded `8` times, reaching **10.5**:
 ```
 Benchmark                               Time             CPU   Iterations
@@ -414,18 +468,16 @@ BM_rapidudf_vector_wilson_ctr       6661 ns         6659 ns       105270
 
 ## Dependencies
 
-- [LLVM](https://llvm.org/)
-- [highway](https://github.com/google/highway)
+- [LLVM](https://llvm.org/) 18+
+- [highway](https://github.com/google/highway) 1.4.0
 - [x86-simd-sort](https://github.com/intel/x86-simd-sort)
-- [sleef](https://github.com/shibatch/sleef)
-- [fmtlib](https://github.com/fmtlib/fmt)
-- [spdlog](https://github.com/gabime/spdlog)
-- [abseil-cpp](https://github.com/abseil/abseil-cpp)
+- [sleef](https://github.com/shibatch/sleef) 3.9.0
+- [fmtlib](https://github.com/fmtlib/fmt) 11.0.2
+- [spdlog](https://github.com/gabime/spdlog) 1.14.1
+- [abseil-cpp](https://github.com/abseil/abseil-cpp) 20250512.2
 - boost
   - [preprocessor](http://boost.org/libs/preprocessor)
   - [parser](https://github.com/tzlaine/parser)
-- [protobuf](https://github.com/protocolbuffers)
-- [flatbuffers](https://github.com/google/flatbuffers)
-- [json](https://github.com/nlohmann/json)
-
-
+- [protobuf](https://github.com/protocolbuffers) 3.19.2
+- [flatbuffers](https://github.com/google/flatbuffers) 2.0.5
+- [json](https://github.com/nlohmann/json) 3.11.3

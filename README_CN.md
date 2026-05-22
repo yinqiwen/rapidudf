@@ -4,11 +4,11 @@
 
 ## 特性
 
-- **易于使用**: 
+- **易于使用**:
   - 提供常规表达式语法支持
   - 针对较复杂逻辑, 提供类C的DSL支持，包含**if-elif*-else** 条件控制，**while**循环控制，**auto**临时变量等能力；
-  - 针对列式内存数据（`vector<T>`）,提供类spark的DataFrame的动态Table API以及 `filter/order_by/topk/take`等操作;
-- **高性能**: 
+  - 针对列式内存数据（`vector<T>`）,提供类spark的DataFrame的动态Table API以及 `filter/order_by/topk/take/group_by/concat/distinct/map/flatmap/merge`等操作;
+- **高性能**:
   - 基于LLVM JIT编译，启动和执行性能相当于native cpp实现；
   - 针对列式内存数据（`vector<T>`）, 提供**SIMD向量化加速**实现
 - **线程安全**: 无状态的JIT生成的C方法天然线程安全
@@ -19,6 +19,8 @@
   - [内置数据类型](docs/dtype.md)
   - [内置运算符](docs/operator.md)
   - [内置函数](docs/builtin_function.md)
+- **可配置编译选项**:
+  - 支持配置LLVM优化级别、fast-math等编译选项
 
 ## 编译与安装
 编译需要**C++17**支持的编译器
@@ -27,7 +29,7 @@
 ```python
     git_repository(
         name = "rapidudf",
-        remote = "https://git.woa.com/qiyingwang/rapidudf.git",
+        remote = "https://github.com/yinqiwen/rapidudf.git",
         commit = "...",
     )
     load("@rapidudf//:rapidudf.bzl", "rapidudf_workspace")
@@ -47,7 +49,22 @@ cc_library(
 )
 ```
 
-### CMake(todo)
+### CMake
+首先编译安装`rapidudf`
+```bash
+cd <rapidudf src dir>
+mkdir build; cd build;
+cmake ..
+make install
+```
+在相关项目的CMake配置中添加：
+```cmake
+find_package(rapidudf REQUIRED)
+....
+# link rapidudf
+target_link_libraries(mylib PRIVATE rapidudf::rapidudf)
+```
+[示例](rapidudf/examples/CMakeLists.txt)
 
 ## 用法一览
 
@@ -59,7 +76,7 @@ int main() {
   // 1. 如果需要, 可以设置rapidudf logger
   //   std::shared_ptr<spdlog::logger> mylogger;
   //   rapidudf::set_default_logger(mylogger);
-  // 2. expression string
+  // 2. 表达式字符串
   std::string expression = "x >= 1 && y < 10";
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行; 编译耗时一般在10ms-100ms之间;
   rapidudf::JitCompiler compiler;
@@ -79,7 +96,7 @@ int main() {
 ```
 
 ### 简单UDF
-简单fibonacci函数 
+简单fibonacci函数
 ```cpp
 #include "rapidudf/rapidudf.h"
 
@@ -87,16 +104,16 @@ int main() {
   // 1. 如果需要, 可以设置rapidudf logger
   //   std::shared_ptr<spdlog::logger> mylogger;
   //   rapidudf::set_default_logger(mylogger);
-  // 2. UDF string
+  // 2. UDF字符串
   std::string source = R"(
-    int fib(int n) 
-    { 
+    int fib(int n)
+    {
        if (n <= 1){
-         return n; 
+         return n;
        }
        // 支持cpp的//注释
        return fib(n - 1) + fib(n - 2);  //递归调用
-    } 
+    }
   )";
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行; 编译耗时一般在10ms-100ms之间;
   rapidudf::JitCompiler compiler;
@@ -122,13 +139,13 @@ int main() {
 
 using namespace rapidudf;
 int main() {
-  // 2. UDF string
+  // 2. UDF字符串
   std::string source = R"(
-    simd_vector<f32> boost_scores(Context ctx, simd_vector<string_view> location, simd_vector<f32> score) 
-    { 
+    simd_vector<f32> boost_scores(Context ctx, simd_vector<string_view> location, simd_vector<f32> score)
+    {
       auto boost=(location=="home"?2.0_f32:0_f32);
       return score*boost;
-    } 
+    }
   )";
 
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
@@ -136,14 +153,14 @@ int main() {
   // CompileFunction的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
   // 'rapidudf::Context' 是在simd 实现中必须携带的参数，涉及arena内存分配
   auto result =
-      compiler.CompileFunction<simd::Vector<float>, rapidudf::Context&, simd::Vector<StringView>, simd::Vector<float>>(
+      compiler.CompileFunction<Vector<float>, rapidudf::Context&, Vector<StringView>, Vector<float>>(
           source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;
   }
 
-  // 4.1 测试数据， 需要将原始数据转成列式数据
+  // 4.1 测试数据，需要将原始数据转成列式数据
   std::vector<float> scores;
   std::vector<std::string> locations;
   for (size_t i = 0; i < 4096; i++) {
@@ -154,20 +171,29 @@ int main() {
   // 5. 执行function
   rapidudf::Context ctx;
   auto f = std::move(result.value());
-  auto new_scores = f(ctx, ctx.NewSimdVector(locations), ctx.NewSimdVector(scores));
-  for (size_t i = 0; i < new_scores.Size(); i++) {
-    // RUDF_INFO("{}", new_scores[i]);
+  try {
+    auto new_scores = f(ctx, ctx.NewVector(locations), ctx.NewVector(scores));
+    for (size_t i = 0; i < new_scores.Size(); i++) {
+      // RUDF_INFO("{}", new_scores[i]);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
   return 0;
 };
 ```
 
 ### 动态Vector Table
-**RapidUDF**支持动态创建vector table, 在expression/UDFs里可以针对table的column进行任意计算操作(经过simd加速)；  
+**RapidUDF**支持动态创建vector table, 在expression/UDFs里可以针对table的column进行任意计算操作(经过simd加速)；
 table类也提供一些类Spark DataFrame的操作，如：
-- `.filter(simd::Vector<Bit>)`   返回按条件过滤后的新table实例
-- `.order_by(simd::Vector<T> column, bool descending)`   返回按条件排序后的新table实例
-- `.topk(simd::Vector<T> column, uint32_t k, bool descending)`    返回topk后的新table实例
+- `.filter(Vector<Bit>)`   返回按条件过滤后的新table实例
+- `.order_by(Vector<T> column, bool descending)`   返回按条件排序后的新table实例
+- `.topk(Vector<T> column, uint32_t k, bool descending)`    返回topk后的新table实例
+- `.group_by(Vector<T> column)`   返回按列分组后的table实例
+- `.concat(Table* other)`   返回与另一个table拼接后的新table实例
+- `.distinct(columns)`   按指定列去重
+- `.map(schema, func)` / `.flatmap(schema, func)`   行级转换
+- `.merge(other, columns, func)`   带冲突解决的合并
 ```cpp
 #include "rapidudf/rapidudf.h"
 
@@ -182,9 +208,10 @@ RUDF_STRUCT_FIELDS(Student, name, age, score, gender)
 int main() {
   // 1. 创建table schema
   auto schema =
-      simd::TableSchema::GetOrCreate("Student", [](simd::TableSchema* s) { std::ignore = s->AddColumns<Student>(); });
+      table::TableSchema::GetOrCreate("Student", [](table::TableSchema* s) { std::ignore = s->AddColumns<Student>(); });
 
-  // 2. UDF string
+  // 2. UDF字符串，table<TABLE_NAME>泛型格式中TABLE_NAME必须与之前创建的table schema名称一致
+  // table支持filter/order_by/topk/take/group_by/concat/distinct/map/flatmap/merge等操作
   std::string source = R"(
     table<Student> select_students(Context ctx, table<Student> x)
     {
@@ -197,14 +224,14 @@ int main() {
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
   rapidudf::JitCompiler compiler;
   // CompileFunction的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
-  auto result = compiler.CompileFunction<simd::Table*, Context&, simd::Table*>(source);
+  auto result = compiler.CompileFunction<table::Table*, Context&, table::Table*>(source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;
   }
   auto f = std::move(result.value());
 
-  // 4.1 测试数据， 需要将原始数据转成列式数据
+  // 4.1 测试数据，需要将原始数据转成列式数据
   std::vector<Student> students;
   for (size_t i = 0; i < 128; i++) {
     float score = (i + 1) % 150;
@@ -238,10 +265,10 @@ int main() {
 ```
 
 ### 基于Protobuf/Flatbuffers/Struct的动态Vector Table
-**RapidUDF**也可以从Protobuf/Flatbuffers创建table，避免繁琐的`TableSchema`创建过程；构建table实例也可以从Protobuf数组`std::vector<T>` `std::vector<const T*>` `std::vector<T*>` 直接构建；   
-以下是基于Protobuf构建vector table样例; 
-基于flatbuffers的样例可参考[fbs_vector_table_udf](rapidudf/examples/fbs_vector_table_udf.cc)   
-基于struct的样例可参考[struct_vector_table_udf](rapidudf/examples/struct_vector_table_udf.cc)   
+**RapidUDF**也可以从Protobuf/Flatbuffers创建table，避免繁琐的`TableSchema`创建过程；构建table实例也可以从Protobuf数组`std::vector<T>` `std::vector<const T*>` `std::vector<T*>` 直接构建；
+以下是基于Protobuf构建vector table样例;
+基于flatbuffers的样例可参考[fbs_vector_table_udf](rapidudf/examples/fbs_vector_table_udf.cc)
+基于struct的样例可参考[struct_vector_table_udf](rapidudf/examples/struct_vector_table_udf.cc)
 ```cpp
 #include "rapidudf/examples/student.pb.h"
 #include "rapidudf/rapidudf.h"
@@ -249,23 +276,23 @@ int main() {
 using namespace rapidudf;
 int main() {
   // 1. 创建table schema
-  auto schema = simd::TableSchema::GetOrCreate(
-      "Student", [](simd::TableSchema* s) { std::ignore = s->BuildFromProtobuf<examples::Student>(); });
+  auto schema = table::TableSchema::GetOrCreate(
+      "Student", [](table::TableSchema* s) { std::ignore = s->AddColumns<examples::Student>(); });
 
-  // 2. UDF string
+  // 2. UDF字符串
   std::string source = R"(
-    table<Student> select_students(Context ctx, table<Student> x) 
-    { 
+    table<Student> select_students(Context ctx, table<Student> x)
+    {
        auto filtered = x.filter(x.score >90 && x.age<10);
        // 降序排列
-       return filtered.topk(filtered.score,10, true); 
-    } 
+       return filtered.topk(filtered.score,10, true);
+    }
   )";
 
   // 3. 编译生成Function,这里生成的Function对象可以保存以供后续重复执行
   rapidudf::JitCompiler compiler;
   // CompileFunction的模板参数支持多个，第一个模板参数为返回值类型，其余为function参数类型
-  auto result = compiler.CompileFunction<simd::Table*, Context&, simd::Table*>(source);
+  auto result = compiler.CompileFunction<table::Table*, Context&, table::Table*>(source);
   if (!result.ok()) {
     RUDF_ERROR("{}", result.status().ToString());
     return -1;
@@ -281,30 +308,36 @@ int main() {
     student.set_age(i % 5 + 8);
     students.emplace_back(std::move(student));
   }
-  // 4.2创建table实例并填充数据
+  // 4.2 创建table实例并填充数据
   rapidudf::Context ctx;
   auto table = schema->NewTable(ctx);
-  std::ignore = table->BuildFromProtobufVector(students);
+  std::ignore = table->AddRows(students);
 
   // 5. 执行function
-  auto result_table = f(ctx, table.get());
-  // 5.1 获取列
-  auto result_scores = result_table->Get<float>("score").value();
-  auto result_names = result_table->Get<StringView>("name").value();
-  auto result_ages = result_table->Get<int32_t>("age").value();
+  try {
+    auto result_table = f(ctx, table.get());
+    // 5.1 获取列
+    auto result_scores = result_table->Get<float>("score").value();
+    auto result_names = result_table->Get<StringView>("name").value();
+    auto result_ages = result_table->Get<int32_t>("age").value();
 
-  for (size_t i = 0; i < result_scores.Size(); i++) {
-    RUDF_INFO("name:{},score:{},age:{}", result_names[i], result_scores[i], result_ages[i]);
+    for (size_t i = 0; i < result_scores.Size(); i++) {
+      RUDF_INFO("name:{},score:{},age:{}", result_names[i], result_scores[i], result_ages[i]);
+    }
+  } catch (rapidudf::UDFRuntimeException& ex) {
+    // handle exception
   }
   return 0;
 };
 ```
 
 ### 编译Cache
-**RapidUDF**内置一个lru cache, key为expression/UDFs的字符串； 使用者可以通过cache获取编译的JitFunction对象，避免每次使用时parse/compile开销；  
+**RapidUDF**内置一个LRU cache, key为expression/UDFs的字符串；使用者可以通过`eval_function`/`eval_expression`一次性完成编译（或命中缓存）并执行，避免每次使用时parse/compile开销：
 ```cpp
-  std::vector<int> vec{1, 2, 3};
-  JitCompiler compiler;
+#include "rapidudf/rapidudf.h"
+
+using namespace rapidudf;
+int main() {
   JsonObject json;
   json["key"] = 123;
 
@@ -313,20 +346,51 @@ int main() {
       return x["key"] == 123;
     }
   )";
-  auto rc = GlobalJitCompiler::GetFunction<bool, const JsonObject&>(content);
-  ASSERT_TRUE(rc.ok());
-  auto f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-  ASSERT_FALSE(f.IsFromCache());  // 第一次编译
+  // eval_function首次调用时编译，后续调用命中缓存
+  auto rc = exec::eval_function<bool, const JsonObject&>(content, json);
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+    return -1;
+  }
+  bool v = rc.value();  // true
 
-  rc = GlobalJitCompiler::GetFunction<bool, const JsonObject&>(content);
-  ASSERT_TRUE(rc.ok());
-  f = std::move(rc.value());
-  ASSERT_TRUE(f(json));
-  ASSERT_TRUE(f.IsFromCache());  //后续从cache中获取
-
+  // 第二次调用命中缓存，无需重新编译
+  rc = exec::eval_function<bool, const JsonObject&>(content, json);
+  if (!rc.ok()) {
+    RUDF_ERROR("{}", rc.status().ToString());
+    return -1;
+  }
+  v = rc.value();  // true (来自缓存)
+  return 0;
+}
 ```
 
+### 编译选项
+**RapidUDF**支持通过`Options`结构体配置编译选项：
+```cpp
+rapidudf::Options opts;
+opts.optimize_level = 2;              // LLVM优化级别 (0-3, 默认2)
+opts.fast_math = false;               // 启用fast-math优化
+opts.print_asm = false;               // 打印生成的汇编代码
+opts.skip_auto_vectorize_passes = true; // 跳过LLVM自动向量化 (默认true, UDF使用手写SIMD)
+rapidudf::JitCompiler compiler(opts);
+```
+
+### 多函数编译
+**RapidUDF**支持编译包含多个函数定义的源码，然后按名称加载单个函数：
+```cpp
+std::string source = R"(
+  int add(int a, int b) { return a + b; }
+  int mul(int a, int b) { return a * b; }
+)";
+rapidudf::JitCompiler compiler;
+auto result = compiler.CompileSource(source);
+if (!result.ok()) { ... }
+
+// 按名称加载单个函数
+auto add_func = compiler.LoadFunction<int, int, int>("add");
+auto mul_func = compiler.LoadFunction<int, int, int>("mul");
+```
 
 ### 更多的例子与用法
 - [在expression/UDFs中使用自定义的c++类](docs/ffi.md)
@@ -335,11 +399,12 @@ int main() {
 - [在expression/UDFs中使用flatbuffers对象](docs/ffi.md)
 - [在expression/UDFs中使用stl对象](docs/ffi.md)
 
+更多场景的示例可以在[examples](rapidudf/examples/)和[tests](rapidudf/tests/)目录中找到。
 
 ## 性能
- 
+
 ### 与native cpp比较
-由于RapidUDF实现基于LLVM Jit，理论上可以实现非常接近原生cpp代码性能；   
+由于RapidUDF实现基于LLVM Jit，理论上可以实现非常接近原生cpp代码性能；
 fibonacci方法O0编译对比结果
 ```
 Benchmark                     Time             CPU   Iterations
@@ -360,8 +425,8 @@ BM_native_fib_func        19246 ns        19239 ns        36395
 ### 向量化加速计算场景
 以下测试在支持avx2的cpu上运行，编译优化开关`-O2`，数组长度为`4099`;
 #### 复杂三角函数表达式
-计算为执行double数组的`x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y`; 理论上加速比应该为avx2寄存器位宽对于double位宽的倍数4;    
-实际运行结果如下，可以看到加速比已经超过了4倍，达到了`6.09` 
+计算为执行double数组的`x + (cos(y - sin(2 / x * pi)) - sin(x - cos(2 * y / pi))) - y`; 理论上加速比应该为avx2寄存器位宽对于double位宽的倍数4;
+实际运行结果如下，可以看到加速比已经超过了4倍，达到了`6.09`
 ```
 Benchmark                               Time             CPU   Iterations
 -------------------------------------------------------------------------
@@ -391,8 +456,8 @@ float  wilson_ctr(float exp_cnt, float clk_cnt) {
          (1 + 1.96 * 1.96 / exp_cnt);
     }
 ```
-理论上加速比应该为avx2寄存器位宽对于float位宽的倍数8;    
-实际运行结果如下，可以看到加速比也已经超过了8倍，达到了`10.5` 
+理论上加速比应该为avx2寄存器位宽对于float位宽的倍数8;
+实际运行结果如下，可以看到加速比也已经超过了8倍，达到了`10.5`
 ```
 Benchmark                               Time             CPU   Iterations
 -------------------------------------------------------------------------
@@ -403,16 +468,16 @@ BM_rapidudf_vector_wilson_ctr       6661 ns         6659 ns       105270
 
 
 ## 依赖
-- [LLVM](https://llvm.org/)
-- [highway](https://github.com/google/highway)
+- [LLVM](https://llvm.org/) 18+
+- [highway](https://github.com/google/highway) 1.4.0
 - [x86-simd-sort](https://github.com/intel/x86-simd-sort)
-- [sleef](https://github.com/shibatch/sleef)
-- [fmtlib](https://github.com/fmtlib/fmt)
-- [spdlog](https://github.com/gabime/spdlog)
-- [abseil-cpp](https://github.com/abseil/abseil-cpp)
+- [sleef](https://github.com/shibatch/sleef) 3.9.0
+- [fmtlib](https://github.com/fmtlib/fmt) 11.0.2
+- [spdlog](https://github.com/gabime/spdlog) 1.14.1
+- [abseil-cpp](https://github.com/abseil/abseil-cpp) 20250512.2
 - boost
   - [preprocessor](http://boost.org/libs/preprocessor)
   - [parser](https://github.com/tzlaine/parser)
-- [protobuf](https://github.com/protocolbuffers)
-- [flatbuffers](https://github.com/google/flatbuffers)
-- [json](https://github.com/nlohmann/json)
+- [protobuf](https://github.com/protocolbuffers) 3.19.2
+- [flatbuffers](https://github.com/google/flatbuffers) 2.0.5
+- [json](https://github.com/nlohmann/json) 3.11.3
