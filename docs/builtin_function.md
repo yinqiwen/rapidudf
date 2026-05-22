@@ -383,7 +383,7 @@ JitCompiler compiler;
 auto result = compiler.CompileExpression<float, float>("sin(x)", {"x"});
 ```
 
-### [`sin`](https://en.cppreference.com/w/cpp/numeric/math/cos)
+### [`cos`](https://en.cppreference.com/w/cpp/numeric/math/cos)
 #### Format
 ```cpp
 cos(x)
@@ -602,7 +602,7 @@ Returns the sum of all
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<float, simd::Vector<float>>("sum(x)", {"x"});
+auto result = compiler.CompileExpression<float, Vector<float>>("sum(x)", {"x"});
 ```
 
 ### `dot`
@@ -621,7 +621,7 @@ Returns sum{x[i] * y[i]} for floating-point inputs
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<float, simd::Vector<float>,simd::Vector<float>>("dot(x,y)", {"x", "y"});
+auto result = compiler.CompileExpression<float, Vector<float>,Vector<float>>("dot(x,y)", {"x", "y"});
 ```
 
 ### `iota`
@@ -638,7 +638,7 @@ Returns vector with size `N` where the index i has the given value of `Start+i`
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<simd::Vector<uint32_t>>("iota(1_u32,100)", {});
+auto result = compiler.CompileExpression<Vector<uint32_t>>("iota(1_u32,100)", {});
 ```
 
 ### [`clamp`](https://en.cppreference.com/w/cpp/algorithm/clamp)
@@ -750,7 +750,7 @@ void
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<void, simd::Vector<float>>("sort(x,true)", {"x"});
+auto result = compiler.CompileExpression<void, Vector<float>>("sort(x,true)", {"x"});
 ```
 
 ### `select`
@@ -769,7 +769,7 @@ void
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<void, simd::Vector<float>>("select(x,5,true)", {"x"});
+auto result = compiler.CompileExpression<void, Vector<float>>("select(x,5,true)", {"x"});
 ```
 
 ### `topk`
@@ -788,7 +788,7 @@ void
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<void, simd::Vector<float>>("topk(x,5,true)", {"x"});
+auto result = compiler.CompileExpression<void, Vector<float>>("topk(x,5,true)", {"x"});
 ```
 
 ### `argsort`
@@ -797,7 +797,7 @@ auto result = compiler.CompileExpression<void, simd::Vector<float>>("topk(x,5,tr
 argsort(vec, descending)
 ```
 #### Return Value
-`simd::Vector<uint64_t>`
+`Vector<uint64_t>`
 #### Throws
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
@@ -806,7 +806,7 @@ argsort(vec, descending)
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<simd::Vector<uint64_t>, simd::Vector<float>>("argsort(x,true)", {"x"});
+auto result = compiler.CompileExpression<Vector<uint64_t>, Vector<float>>("argsort(x,true)", {"x"});
 ```
 
 ### `argselect`
@@ -815,7 +815,7 @@ auto result = compiler.CompileExpression<simd::Vector<uint64_t>, simd::Vector<fl
 argselect(vec, k, descending)
 ```
 #### Return Value
-`simd::Vector<uint64_t>`
+`Vector<uint64_t>`
 #### Throws
 #### Supported Parameter Types:
 -  `simd_vector<f32>` `simd_vector<f64>`
@@ -824,7 +824,7 @@ argselect(vec, k, descending)
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<simd::Vector<uint64_t>, simd::Vector<float>>("argselect(x,3, true)", {"x"});
+auto result = compiler.CompileExpression<Vector<uint64_t>, Vector<float>>("argselect(x,3, true)", {"x"});
 ```
 
 ### `sort_kv`
@@ -833,7 +833,7 @@ auto result = compiler.CompileExpression<simd::Vector<uint64_t>, simd::Vector<fl
 sort_kv(key_vec,value_vec, descending)
 ```
 #### Return Value
-`simd::Vector<uint64_t>`
+`Vector<uint64_t>`
 #### Throws
 - throw `rapidudf::ReadonlyException` when key/value vector is readonly
 #### Supported Parameter Types:
@@ -843,7 +843,7 @@ sort_kv(key_vec,value_vec, descending)
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vector<float>>("sort_kv(x,y, true)", {"x"});
+auto result = compiler.CompileExpression<void, Vector<uint64_t>, Vector<float>>("sort_kv(x,y, true)", {"x"});
 ```
 
 ### `select_kv`
@@ -852,7 +852,7 @@ auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vec
 select_kv(key_vec,value_vec,k,descending)
 ```
 #### Return Value
-`simd::Vector<uint64_t>`
+`Vector<uint64_t>`
 #### Throws
 - throw `rapidudf::ReadonlyException` when key/value vector is readonly
 #### Supported Parameter Types:
@@ -862,7 +862,7 @@ select_kv(key_vec,value_vec,k,descending)
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vector<float>>("select_kv(x,y,10,true)", {"x"});
+auto result = compiler.CompileExpression<void, Vector<uint64_t>, Vector<float>>("select_kv(x,y,10,true)", {"x"});
 ```
 
 ### `topk_kv`
@@ -871,7 +871,7 @@ auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vec
 topk_kv(key_vec,value_vec,k,descending)
 ```
 #### Return Value
-`simd::Vector<uint64_t>`
+`Vector<uint64_t>`
 #### Throws
 - throw `rapidudf::ReadonlyException` when key/value vector is readonly
 #### Supported Parameter Types:
@@ -881,7 +881,7 @@ topk_kv(key_vec,value_vec,k,descending)
 #### Examples
 ```cpp
 JitCompiler compiler;
-auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vector<float>>("topk_kv(x,y,10,true)", {"x"});
+auto result = compiler.CompileExpression<void, Vector<uint64_t>, Vector<float>>("topk_kv(x,y,10,true)", {"x"});
 ```
 
 
@@ -930,7 +930,7 @@ auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vec
 - `.get(idx)`  get element by index
 - `.size()`    return container size
 
-## Vector(`rapidudf::simd::Vector`)
+## Vector(`rapidudf::Vector<T>`)
 - `.find(T v)`    return first position for given value, return -1 when failed
 - `.find_neq(T v)`    return first value's position not equal given value, return -1 when failed
 - `.find_gt(T v)`    return first value's position greater than given value, return -1 when failed
@@ -938,10 +938,15 @@ auto result = compiler.CompileExpression<void, simd::Vector<uint64_t>, simd::Vec
 - `.find_lt(T v)`    return first value's position less than given value, return -1 when failed
 - `.find_le(T v)`    return first value's position less equal than given value, return -1 when failed
 
-## Vector Table
-- `.filter(simd::Vector<Bit>)`   return new table after filter
-- `.order_by(simd::Vector<T> column, bool descending)`   return new table after order_by
-- `.topk(simd::Vector<T> column, uint32_t k, bool descending)`    return new table after topk
-- `.group_by(simd::Vector<T> column)`    return tables after group_by
+## Vector Table(`rapidudf::table::Table`)
+- `.filter(Vector<Bit>)`   return new table after filter
+- `.order_by(Vector<T> column, bool descending)`   return new table after order_by
+- `.topk(Vector<T> column, uint32_t k, bool descending)`    return new table after topk
+- `.group_by(Vector<T> column)`    return tables after group_by
+- `.concat(Table* other)`   return new table after concatenation
+- `.distinct(columns)`   remove duplicate rows by specified columns
+- `.map(schema, func)`   return new table after row-wise transformation
+- `.flatmap(schema, func)`   return new table after row-wise flat transformation
+- `.merge(other, columns, func)`   merge tables with conflict resolution
 
 

@@ -10,9 +10,9 @@
 |/    | division        | Y     | Y      | N           | N     | Y                   | Y                     |N                  |N
 |%    | mod             | Y     | Y      | N           | N     | Y                   | Y                     |N                  |N
 |^    | power           | Y     | Y      | N           | N     | Y                   | Y                     |N                  |N
-|>    | greater than    | Y     | Y      | Y           | N     | Y                   | Y                     |N                  |N
-|<    | greater or equal| Y     | Y      | Y           | N     | Y                   | Y                     |N                  |Y
-|>=   | less than       | Y     | Y      | Y           | N     | Y                   | Y                     |N                  |Y
+|>    | greater than    | Y     | Y      | Y           | N     | Y                   | Y                     |N                  |Y
+|<    | less than       | Y     | Y      | Y           | N     | Y                   | Y                     |N                  |Y
+|>=   | greater or equal| Y     | Y      | Y           | N     | Y                   | Y                     |N                  |Y
 |<=   | less or equal   | Y     | Y      | Y           | N     | Y                   | Y                     |N                  |Y
 |==   | equal           | Y     | Y      | Y           | N     | Y                   | Y                     |N                  |Y
 |!=   | not equal       | Y     | Y      | Y           | N     | Y                   | Y                     |N                  |Y

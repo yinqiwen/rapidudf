@@ -234,7 +234,7 @@ RUDF_STRUCT_MEMBER_METHODS(::test_fbs::FBSStruct, id, str, item, strs, items, in
 
 ### Use fbs functions in expression/UDFs
 ```cpp
-// include pb header
+// include fbs header
 #include "rapidudf/rapidudf.h"
 
 JitCompiler compiler;
