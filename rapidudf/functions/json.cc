@@ -47,7 +47,7 @@ static bool json_cmp(uint32_t op, T left, T right, bool reverse) {
     }
     case OP_GREATER: {
       if (reverse) {
-        return right > left;
+        result = right > left;
       } else {
         result = left > right;
       }
@@ -55,26 +55,26 @@ static bool json_cmp(uint32_t op, T left, T right, bool reverse) {
     }
     case OP_GREATER_EQUAL: {
       if (reverse) {
-        result = left >= right;
-      } else {
         result = right >= left;
+      } else {
+        result = left >= right;
       }
 
       break;
     }
     case OP_LESS: {
       if (reverse) {
-        result = left < right;
-      } else {
         result = right < left;
+      } else {
+        result = left < right;
       }
       break;
     }
     case OP_LESS_EQUAL: {
       if (reverse) {
-        result = left <= right;
-      } else {
         result = right <= left;
+      } else {
+        result = left <= right;
       }
       break;
     }

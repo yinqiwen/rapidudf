@@ -102,3 +102,52 @@ TEST(JitCompiler, json_array_get) {
   auto f = std::move(rc.value());
   ASSERT_TRUE(f(json));
 }
+
+// Regression: json comparison operators must not swap left/right operands.
+TEST(JitCompiler, json_cmp_greater_equal) {
+  JitCompiler compiler;
+  JsonObject json;
+  json["val"] = 5;
+
+  std::string content = R"(
+    bool test_func(json x){
+      return x["val"] >= 3;
+    }
+  )";
+  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  EXPECT_TRUE(f(json));
+}
+
+TEST(JitCompiler, json_cmp_less) {
+  JitCompiler compiler;
+  JsonObject json;
+  json["val"] = 5;
+
+  std::string content = R"(
+    bool test_func(json x){
+      return x["val"] < 10;
+    }
+  )";
+  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  EXPECT_TRUE(f(json));
+}
+
+TEST(JitCompiler, json_cmp_less_equal) {
+  JitCompiler compiler;
+  JsonObject json;
+  json["val"] = 5;
+
+  std::string content = R"(
+    bool test_func(json x){
+      return x["val"] <= 5;
+    }
+  )";
+  auto rc = compiler.CompileFunction<bool, const JsonObject&>(content);
+  ASSERT_TRUE(rc.ok());
+  auto f = std::move(rc.value());
+  EXPECT_TRUE(f(json));
+}

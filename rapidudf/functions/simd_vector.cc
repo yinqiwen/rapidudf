@@ -168,9 +168,6 @@ static void register_simd_vector_key_value_sort() {
 #define REGISTER_SIMD_VECTOR_BINARY_FUNC_WITH_TYPE(r, op, i, type) register_binary_simd_vector_op<type, op>();
 #define REGISTER_SIMD_VECTOR_BINARY_FUNCS(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_BINARY_FUNC_WITH_TYPE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
-#define REGISTER_SIMD_VECTOR_UNARY_FUNC_WITH_TYPE(r, op, i, type) register_unary_simd_vector_op<type, op>();
-#define REGISTER_SIMD_VECTOR_UNARY_FUNCS(op, ...) \
-  BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_UNARY_FUNC_WITH_TYPE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 #define REGISTER_SIMD_VECTOR_TERNARY_FUNC_WITH_TYPE(r, op, i, type) register_ternary_simd_vector_op<type, op>();
 #define REGISTER_SIMD_VECTOR_TERNARY_FUNCS(op, ...) \
   BOOST_PP_SEQ_FOR_EACH_I(REGISTER_SIMD_VECTOR_TERNARY_FUNC_WITH_TYPE, op, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))

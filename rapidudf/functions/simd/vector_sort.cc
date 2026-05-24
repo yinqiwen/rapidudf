@@ -58,7 +58,23 @@ Vector<size_t> simd_vector_argsort(Context& ctx, Vector<T> data, bool descending
 template <typename T>
 Vector<size_t> simd_vector_argselect(Context& ctx, Vector<T> data, size_t k, bool descending) {
   if (descending) {
-    return simd_vector_argsort(ctx, data, descending);
+    // x86simdsort::argselect doesn't support descending directly.
+    // Select the largest k elements by selecting (size - k) ascending, then the
+    // remaining elements (indices k..size-1 in ascending order) are the top-k in
+    // descending terms.
+    size_t n = data.Size();
+    if (k >= n) {
+      return simd_vector_argsort(ctx, data, descending);
+    }
+    auto idxs = x86simdsort::argselect(const_cast<T*>(data.Data()), n - k, n, ctx.HasNan());
+    // The elements at indices [n-k, n) are the largest k elements (unordered).
+    // Rotate so that the top-k portion comes first.
+    std::vector<size_t> result(idxs.begin() + static_cast<ptrdiff_t>(n - k), idxs.end());
+    result.insert(result.end(), idxs.begin(), idxs.begin() + static_cast<ptrdiff_t>(n - k));
+    auto p = std::make_unique<std::vector<size_t>>(std::move(result));
+    Vector<size_t> ret(*p);
+    ctx.Own(std::move(p));
+    return ret;
   } else {
     auto idxs = x86simdsort::argselect(const_cast<T*>(data.Data()), k, data.Size(), ctx.HasNan());
     auto p = std::make_unique<std::vector<size_t>>(std::move(idxs));
@@ -72,8 +88,11 @@ template <typename K, typename V>
 void simd_vector_sort_key_value(Context& ctx, Vector<K> key, Vector<V> value, bool descending) {
   if (key.IsReadonly() || value.IsReadonly()) {
     THROW_READONLY_ERR(
-        fmt::format("can NOT sort_key_value on readonly vector, key vector readobt:{}, value vector readonly:{}",
+        fmt::format("can NOT sort_key_value on readonly vector, key vector readonly:{}, value vector readonly:{}",
                     key.IsReadonly(), value.IsReadonly()));
+  }
+  if (key.Size() != value.Size()) {
+    THROW_LOGIC_ERR(fmt::format("sort_key_value size mismatch: key.size={}, value.size={}", key.Size(), value.Size()));
   }
 
   x86simdsort::keyvalue_qsort(const_cast<K*>(key.Data()), const_cast<V*>(value.Data()), key.Size(), ctx.HasNan(),
@@ -84,6 +103,9 @@ void simd_vector_topk_key_value(Context& ctx, Vector<K> key, Vector<V> value, si
   if (key.IsReadonly() || value.IsReadonly()) {
     THROW_READONLY_ERR("can NOT topk_key_value on readonly vector");
   }
+  if (key.Size() != value.Size()) {
+    THROW_LOGIC_ERR(fmt::format("topk_key_value size mismatch: key.size={}, value.size={}", key.Size(), value.Size()));
+  }
   x86simdsort::keyvalue_partial_sort(const_cast<K*>(key.Data()), const_cast<V*>(value.Data()), k, key.Size(),
                                      ctx.HasNan(), descending);
 }
@@ -91,6 +113,10 @@ template <typename K, typename V>
 void simd_vector_select_key_value(Context& ctx, Vector<K> key, Vector<V> value, size_t k, bool descending) {
   if (key.IsReadonly() || value.IsReadonly()) {
     THROW_READONLY_ERR("can NOT select_key_value on readonly vector");
+  }
+  if (key.Size() != value.Size()) {
+    THROW_LOGIC_ERR(
+        fmt::format("select_key_value size mismatch: key.size={}, value.size={}", key.Size(), value.Size()));
   }
   x86simdsort::keyvalue_select(const_cast<K*>(key.Data()), const_cast<V*>(value.Data()), k, key.Size(), ctx.HasNan(),
                                descending);

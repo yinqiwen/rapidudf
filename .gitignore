@@ -3,3 +3,23 @@ a.out
 *.pb.cc
 *.pb.h
 bazel-*
+
+# CMake build outputs
+build/
+_deps/
+submodules/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+*.pc
+CPackConfig.cmake
+CPackSourceConfig.cmake
+options-pinned.h
+rapidudfConfig.cmake
+rapidudfConfigVersion.cmake
+lib/
+
+# CMake-generated test artifacts
+rapidudf/tests/*_generated.h

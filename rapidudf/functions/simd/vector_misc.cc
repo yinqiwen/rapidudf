@@ -100,9 +100,12 @@ HWY_INLINE T simd_vector_cos_distance_impl(Vector<T> left, Vector<T> right) {
   T norm_left = std::sqrt(hn::ReduceSum(d, norm_left_v));
   T norm_right = std::sqrt(hn::ReduceSum(d, norm_right_v));
   T dot = hn::ReduceSum(d, dot_v);
+  if (norm_left == T{} || norm_right == T{}) {
+    return std::numeric_limits<T>::quiet_NaN();
+  }
   T cosine_similarity = dot / (norm_left * norm_right);
 
-  return 1.0f - cosine_similarity;
+  return T(1) - cosine_similarity;
 }
 
 template <typename T>
@@ -140,7 +143,7 @@ HWY_INLINE T simd_vector_sum_impl(Vector<T> left) {
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
-  for (; (i + lanes) < left.Size(); i += lanes) {
+  for (; (i + lanes) <= left.Size(); i += lanes) {
     auto lv = hn::LoadU(d, left.Data() + i);
     auto sum_v = hn::ReduceSum(d, lv);
     sum += sum_v;
@@ -155,11 +158,11 @@ HWY_INLINE T simd_vector_sum_impl(Vector<T> left) {
 
 template <typename T>
 HWY_INLINE T simd_vector_reduce_max_impl(Vector<T> left) {
-  T max_val = std::numeric_limits<T>::min();
+  T max_val = std::numeric_limits<T>::lowest();
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
-  for (; (i + lanes) < left.Size(); i += lanes) {
+  for (; (i + lanes) <= left.Size(); i += lanes) {
     auto lv = hn::LoadU(d, left.Data() + i);
     auto max_v = hn::ReduceMax(d, lv);
     if (max_v > max_val) {
@@ -182,7 +185,7 @@ HWY_INLINE T simd_vector_reduce_min_impl(Vector<T> left) {
   const hn::ScalableTag<T> d;
   constexpr auto lanes = hn::Lanes(d);
   size_t i = 0;
-  for (; (i + lanes) < left.Size(); i += lanes) {
+  for (; (i + lanes) <= left.Size(); i += lanes) {
     auto lv = hn::LoadU(d, left.Data() + i);
     auto min_v = hn::ReduceMin(d, lv);
     if (min_v < min_val) {
@@ -206,9 +209,14 @@ HWY_INLINE Vector<T> simd_vector_iota_impl(Context& ctx, T start, uint32_t n) {
   auto result = ctx.NewEmptyVector<T>(n);
   T* arena_data = result.MutableData();
   size_t i = 0;
-  for (; i < n; i += lanes) {
+  size_t full_vectors = (n / lanes) * lanes;
+  for (; i < full_vectors; i += lanes) {
     auto v = hn::Iota(d, start + i);
     hn::StoreU(v, d, arena_data + i);
+  }
+  if (i < n) {
+    auto v = hn::Iota(d, start + i);
+    hn::StoreN(v, d, arena_data + i, n - i);
   }
   return result;
 }
@@ -248,8 +256,14 @@ HWY_INLINE Vector<T> simd_vector_gather_impl(Context& ctx, Vector<T> data, Vecto
   if (HWY_UNLIKELY(idx == count)) {
     return result;
   }
+  size_t data_size = data.Size();
   for (size_t i = idx; i < count; i++) {
-    dst[i] = base[indices[i]];
+    int32_t ix = indices[i];
+    if (ix >= 0 && static_cast<size_t>(ix) < data_size) {
+      dst[i] = base[ix];
+    } else {
+      dst[i] = T{};
+    }
   }
   return result;
 }
@@ -306,11 +320,14 @@ HWY_INLINE T random_impl(uint64_t seed) {
   }
 }
 
-HWY_INLINE const uint8_t* get_mask_bits(const uint8_t* bits, size_t idx, uint64_t& tmp) {
+HWY_INLINE const uint8_t* get_mask_bits(const uint8_t* bits, size_t idx, size_t byte_count, uint64_t& tmp) {
   size_t bits_offset = idx / 8;
   size_t bits_cursor = idx % 8;
-  uint8_t shift_bits = (bits[bits_offset] >> bits_cursor);
-  tmp = shift_bits;
+  uint16_t two_bytes = static_cast<uint16_t>(bits[bits_offset]);
+  if (bits_offset + 1 < byte_count) {
+    two_bytes |= static_cast<uint16_t>(bits[bits_offset + 1]) << 8;
+  }
+  tmp = static_cast<uint64_t>(two_bytes >> bits_cursor);
   return reinterpret_cast<uint8_t*>(&tmp);
 }
 
@@ -322,9 +339,12 @@ HWY_INLINE void store_mask_bits(hn::Mask<D> mask, uint8_t* bits, size_t idx) {
   size_t bits_cursor = idx % 8;
 
   if constexpr (N < 8) {
-    uint8_t tmp[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    uint8_t tmp[8] = {0};
     hn::StoreMaskBits(d, mask, tmp);
-    bits[bits_offset] = (bits[bits_offset] | (tmp[0] << bits_cursor));
+    uint16_t val = static_cast<uint16_t>(bits[bits_offset]) |
+                   (static_cast<uint16_t>(tmp[0]) << bits_cursor);
+    bits[bits_offset] = static_cast<uint8_t>(val);
+    bits[bits_offset + 1] |= static_cast<uint8_t>(val >> 8);
   } else {
     hn::StoreMaskBits(d, mask, bits + bits_offset);
   }
@@ -351,6 +371,7 @@ HWY_INLINE size_t simd_vector_filter_impl(const T* in, const uint8_t* bits, T* o
   using D = hn::ScalableTag<T>;
   constexpr D d;
   constexpr size_t N = hn::Lanes(d);
+  size_t bits_byte_count = (count + 7) / 8;
   if constexpr (N % 8 > 0) {
     size_t idx = 0;
     size_t out_offset = 0;
@@ -358,7 +379,7 @@ HWY_INLINE size_t simd_vector_filter_impl(const T* in, const uint8_t* bits, T* o
     if (count >= N) {
       for (; idx <= count - N; idx += N) {
         auto v = hn::LoadU(d, in + idx);
-        auto mask = hn::LoadMaskBits(d, get_mask_bits(bits, idx, tmp_bits));
+        auto mask = hn::LoadMaskBits(d, get_mask_bits(bits, idx, bits_byte_count, tmp_bits));
         size_t n = hn::CompressBlendedStore(v, mask, d, out + out_offset);
         out_offset += n;
       }
@@ -368,7 +389,7 @@ HWY_INLINE size_t simd_vector_filter_impl(const T* in, const uint8_t* bits, T* o
     const size_t remaining = count - idx;
     HWY_DASSERT(0 != remaining && remaining < N);
     const hn::Vec<D> v = hn::LoadN(d, in + idx, remaining);
-    auto mask = hn::And(hn::FirstN(d, remaining), hn::LoadMaskBits(d, get_mask_bits(bits, idx, tmp_bits)));
+    auto mask = hn::And(hn::FirstN(d, remaining), hn::LoadMaskBits(d, get_mask_bits(bits, idx, bits_byte_count, tmp_bits)));
     out_offset += hn::CompressBlendedStore(v, mask, d, out + out_offset);
     return out_offset;
   } else {
@@ -467,8 +488,11 @@ T simd_vector_l2_distance(Vector<T> left, Vector<T> right) {
 
 template <typename T>
 T simd_vector_avg(Vector<T> left) {
+  if (left.Size() == 0) {
+    return T{};
+  }
   T sum = simd_vector_sum(left);
-  return sum / left.Size();
+  return sum / static_cast<T>(left.Size());
 }
 
 template <typename T>
@@ -478,10 +502,12 @@ Vector<T> simd_vector_filter(Context& ctx, Vector<T> data, Vector<Bit> bits) {
   auto* raw = result.MutableData();
   size_t filter_cursor = 0;
   if constexpr (std::is_same_v<T, Bit>) {
+    size_t bytes_capacity = (data.Size() + 63) / 64 * 8;
+    memset(raw, 0, bytes_capacity);
     uint64_t* bits64 = reinterpret_cast<uint64_t*>(raw);
     for (size_t idx = 0; idx < data.Size(); idx++) {
       if (bits[idx]) {
-        Bit bit = data[filter_cursor++];
+        Bit bit = data[idx];
         size_t bits_idx = filter_cursor / 64;
         size_t bits_cursor = filter_cursor % 64;
         if (bit) {
@@ -526,20 +552,31 @@ Vector<T> simd_vector_gather(Context& ctx, Vector<T> data, Vector<int32_t> indic
                 std::is_same_v<int8_t, T> || std::is_same_v<uint8_t, T>) {
     Vector<T> result = ctx.NewEmptyVector<T>(indices.Size());
     T* raw = result.MutableData();
+    size_t data_size = data.Size();
     for (size_t i = 0; i < indices.Size(); i++) {
-      raw[i] = data[indices[i]];
+      int32_t ix = indices[i];
+      if (ix >= 0 && static_cast<size_t>(ix) < data_size) {
+        raw[i] = data[ix];
+      } else {
+        raw[i] = T{};
+      }
     }
     return result;
   } else if constexpr (std::is_same_v<T, Bit>) {
     Vector<T> result = ctx.NewEmptyVector<T>(indices.Size());
+    size_t bytes_capacity = (indices.Size() + 63) / 64 * 8;
+    memset(result.MutableData(), 0, bytes_capacity);
     uint64_t* raw = reinterpret_cast<uint64_t*>(result.MutableData());
+    size_t data_size = data.Size();
     for (size_t i = 0; i < indices.Size(); i++) {
+      int32_t ix = indices[i];
+      if (ix < 0 || static_cast<size_t>(ix) >= data_size) {
+        continue;
+      }
       size_t bits_idx = i / 64;
       size_t bits_cursor = i % 64;
-      if (data[indices[i]]) {
+      if (data[ix]) {
         raw[bits_idx] = bits64_set(raw[bits_idx], bits_cursor);
-      } else {
-        raw[bits_idx] = bits64_clear(raw[bits_idx], bits_cursor);
       }
     }
     return result;

@@ -326,7 +326,13 @@ static void register_fma() {
 
 template <typename T>
 static T scalar_abs_diff(T a, T b) {
-  return std::abs(a - b);
+  if constexpr (std::is_floating_point_v<T>) {
+    return std::abs(a - b);
+  } else if constexpr (std::is_signed_v<T>) {
+    return a > b ? a - b : b - a;
+  } else {
+    return a > b ? a - b : b - a;
+  }
 }
 template <typename T>
 static void register_abs_diff() {

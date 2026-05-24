@@ -101,10 +101,10 @@ struct SimdTableHelper {
 
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_f32", group_by<float>);
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_f64", group_by<double>);
-    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u8", group_by<uint32_t>);
-    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i8", group_by<int32_t>);
-    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u16", group_by<uint32_t>);
-    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i26", group_by<int32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u8", group_by<uint8_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i8", group_by<int8_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u16", group_by<uint16_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i16", group_by<int16_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u32", group_by<uint32_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_i32", group_by<int32_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND("group_by_u64", group_by<uint64_t>);
@@ -114,10 +114,10 @@ struct SimdTableHelper {
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_BIT), get_column<Bit>);
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_F32), get_column<float>);
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_F64), get_column<double>);
-    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U8), get_column<uint32_t>);
-    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I8), get_column<int32_t>);
-    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U16), get_column<uint32_t>);
-    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I16), get_column<int32_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U8), get_column<uint8_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I8), get_column<int8_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U16), get_column<uint16_t>);
+    RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I16), get_column<int16_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U32), get_column<uint32_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_I32), get_column<int32_t>);
     RUDF_STRUCT_HELPER_METHOD_BIND(GetFunctionName(kTableGetColumnFunc, DATA_U64), get_column<uint64_t>);

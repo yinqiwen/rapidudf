@@ -105,8 +105,8 @@ HWY_INLINE int simd_string_find_string_impl(const char* s, size_t len, const cha
       }
     }
   }
-  // `count` was a multiple of the vector length `N`: already done.
-  if (HWY_UNLIKELY(idx == (len - part_len))) {
+  // All valid positions have been checked.
+  if (HWY_UNLIKELY(idx > len - part_len)) {
     return -1;
   }
   const size_t remaining = len - idx - part_len + 1;
@@ -119,6 +119,9 @@ HWY_INLINE int simd_string_find_string_impl(const char* s, size_t len, const cha
   auto mask = hn::And(mask0, mask1);
   auto found = hn::FindFirstTrue(d, mask);
   while (found >= 0) {
+    if (static_cast<size_t>(found) >= remaining) {
+      break;
+    }
     if (part_len == 2) {
       return found + idx;
     }
@@ -254,6 +257,12 @@ std::vector<std::string_view> simd_string_split_by_char(std::string_view s, char
     }
     last_pos = pos + 1;
   }
+  if (last_pos < s.size()) {
+    auto part = s.substr(last_pos);
+    if (!part.empty()) {
+      ss.emplace_back(part);
+    }
+  }
   return ss;
 }
 
@@ -272,6 +281,12 @@ std::vector<std::string_view> simd_string_split_by_string(std::string_view s, st
       }
     }
     last_pos = pos + sep.size();
+  }
+  if (last_pos < s.size()) {
+    auto part = s.substr(last_pos);
+    if (!part.empty()) {
+      ss.emplace_back(part);
+    }
   }
   return ss;
 }

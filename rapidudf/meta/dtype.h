@@ -299,11 +299,6 @@ DType get_dtype() {
     }
   }
   if constexpr (is_specialization<T, Vector>::value) {
-    // using val_type = typename T::value_type;
-    // if constexpr (is_specialization<val_type, simd::Vector>::value || ){
-
-    // }
-    // RETURN_IF_NOT_FUNDAMENTAL_TYPE(val_type)
     auto v = get_dtype<typename T::value_type>();
     if (v.IsPtr() || v.IsCollection()) {
       DType complex(DATA_COMPLEX_OBJECT);

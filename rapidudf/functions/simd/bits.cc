@@ -64,6 +64,7 @@ HWY_INLINE void simd_vector_bits_not_impl(Vector<Bit> src, Vector<Bit> dst) {
   size_t idx = 0;
   size_t count = src.Size();
   size_t byte_count = count / 8;
+  size_t padding_bits = (8 - (count % 8)) % 8;
   if (count % 8 > 0) {
     byte_count++;
   }
@@ -76,11 +77,21 @@ HWY_INLINE void simd_vector_bits_not_impl(Vector<Bit> src, Vector<Bit> dst) {
     }
   }
   // `count` was a multiple of the vector length `N`: already done.
-  if (HWY_UNLIKELY(idx == byte_count)) return;
+  if (HWY_UNLIKELY(idx == byte_count)) {
+    // Clear padding bits in last byte
+    if (padding_bits > 0) {
+      out[byte_count - 1] &= static_cast<uint8_t>(~0 >> padding_bits);
+    }
+    return;
+  }
   const size_t remaining = byte_count - idx;
   HWY_DASSERT(0 != remaining && remaining < N);
   const hn::Vec<D> v1 = hn::LoadN(d, in + idx, remaining);
   hn::StoreN(do_simd_unary_op<D, OP_NOT>(d, v1), d, out + idx, remaining);
+  // Clear padding bits in last byte
+  if (padding_bits > 0) {
+    out[byte_count - 1] &= static_cast<uint8_t>(~0 >> padding_bits);
+  }
 }
 
 template <OpToken op>
@@ -91,6 +102,7 @@ HWY_INLINE void simd_vector_bits_binary_impl(Vector<Bit> left, Vector<Bit> right
   size_t idx = 0;
   size_t count = left.Size();
   size_t byte_count = count / 8;
+  size_t padding_bits = (8 - (count % 8)) % 8;
   if (count % 8 > 0) {
     byte_count++;
   }
@@ -105,12 +117,21 @@ HWY_INLINE void simd_vector_bits_binary_impl(Vector<Bit> left, Vector<Bit> right
     }
   }
   // `count` was a multiple of the vector length `N`: already done.
-  if (HWY_UNLIKELY(idx == byte_count)) return;
+  if (HWY_UNLIKELY(idx == byte_count)) {
+    if (padding_bits > 0) {
+      out[byte_count - 1] &= static_cast<uint8_t>(~0 >> padding_bits);
+    }
+    return;
+  }
   const size_t remaining = byte_count - idx;
   HWY_DASSERT(0 != remaining && remaining < N);
   const hn::Vec<D> v1 = hn::LoadN(d, left_in + idx, remaining);
   const hn::Vec<D> v2 = hn::LoadN(d, right_in + idx, remaining);
   hn::StoreN(do_simd_binary_op<D, op>(d, v1, v2), d, out + idx, remaining);
+  // Clear padding bits in last byte
+  if (padding_bits > 0) {
+    out[byte_count - 1] &= static_cast<uint8_t>(~0 >> padding_bits);
+  }
 }
 
 size_t simd_vector_count_true_impl(Vector<Bit> src) {
@@ -120,6 +141,7 @@ size_t simd_vector_count_true_impl(Vector<Bit> src) {
   size_t idx = 0;
   size_t count = src.Size();
   size_t byte_count = count / 8;
+  size_t padding_bits = (8 - (count % 8)) % 8;
   if (count % 8 > 0) {
     byte_count++;
   }
@@ -134,12 +156,27 @@ size_t simd_vector_count_true_impl(Vector<Bit> src) {
     }
   }
   // `count` was a multiple of the vector length `N`: already done.
-  if (HWY_UNLIKELY(idx == byte_count)) return n;
+  if (HWY_UNLIKELY(idx == byte_count)) {
+    // Subtract padding bits from the last byte if needed
+    if (padding_bits > 0) {
+      uint8_t last_byte = src_in[byte_count - 1];
+      uint8_t padding_mask = static_cast<uint8_t>(~0 << (8 - padding_bits));
+      n -= __builtin_popcount(last_byte & padding_mask);
+    }
+    return n;
+  }
   const size_t remaining = byte_count - idx;
   HWY_DASSERT(0 != remaining && remaining < N);
   const hn::Vec<D> v = hn::LoadN(d, src_in + idx, remaining);
   auto results = hn::PopulationCount(v);
   n += hn::ReduceSum(d, results);
+
+  // Subtract padding bits from the last byte
+  if (padding_bits > 0) {
+    uint8_t last_byte = src_in[byte_count - 1];
+    uint8_t padding_mask = static_cast<uint8_t>(~0 << (8 - padding_bits));
+    n -= __builtin_popcount(last_byte & padding_mask);
+  }
 
   return n;
 }
